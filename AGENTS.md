@@ -5,74 +5,84 @@ Telegraph style. Root rules only. Read scoped AGENTS.md before subtree work. Ski
 
 ## 项目定位
 
-- 项目定位：`...`
-- 核心技术栈：`...`
-- 关键入口：`...`
+- 项目定位：AI 狼人杀多智能体协作与博弈评测系统。Phase 1 构建"结构化 Game Log + 确定性评测 + 规则归因 + Leaderboard UI demo"。
+- 核心技术栈：待定（Phase 1 文档阶段，不引入依赖）。
+- 关键入口：`@docs/PRODUCT_ONE_PAGER.md` `@docs/EVALUATION_RUBRIC.md`
+- 进阶方向：② 评测+复盘（多维可量化评测 + 复盘归因 + Leaderboard）。
 
 ## 命令
 
-- 非显然的 build 命令：`...`
-- 非显然的 test 命令：`...`
-- 非显然的 lint / format / typecheck 命令：`...`
-- 真实来源：`@package.json` `@Makefile` `@justfile` `...`
+- 非显然的 build 命令：暂无（Phase 1 文档阶段）。
+- 非显然的 test 命令：暂无。
+- 非显然的 lint / format / typecheck 命令：暂无。
 
 ## 架构边界
 
-- 关键架构边界：`...`
-- 跨目录共享规范：`...`
-- 关键入口和不可绕过的边界：`...`
+- Phase 1 边界：只做评测系统文档 + spike 验证，不做对局引擎、AI Agent 对局、人机混战。日志四层中 Consensus Log 和 Decision Log 为 Phase 2 启用，Phase 1 仅使用人工 gold sample 演示。
+- Phase 1 文档只描述评测体系，不描述 Agent 框架、对局引擎、前端架构。
+- Phase 1 不宣称 decision_quality_score 已真实可用（无真实 Decision Log）。
+- 评分体系事实来源：`@docs/EVALUATION_RUBRIC.md`。不要在 AGENTS.md 中复制评分公式。
+- 产品定义事实来源：`@docs/PRODUCT_ONE_PAGER.md`。
+- Phase 1 / Phase 2 / Phase 3 切分定义：`@docs/PRODUCT_ONE_PAGER.md` 和 `@docs/TASKS.md`。
 
 ## 地图 MAP
 
-<!-- 默认全量维持一级目录,部分维护重要的二级目录. -->
-目录树 tree :
+目录树 tree ：
 
 ```text
-.
+./
+├── docs/
+│   ├── specs/
+│   │   ├── agent-workflow.md
+│   │   └── review-guidelines.md
+│   ├── PRODUCT_ONE_PAGER.md
+│   ├── GOLD_DEMO.md
+│   ├── SPIKES.md
+│   ├── TASKS.md
+│   ├── EVALUATION_RUBRIC.md
+│   └── CHECKPOINT_TEMPLATE.md
+├── AGENTS.md
+└── README.md
 ```
 
 ## 代码边界
 
-- 生成代码目录：`...`
-- vendor 目录：`...`
-- nested repo / submodule：`...`
-- 这些目录允许或禁止的操作：`...`
+- 生成代码目录：暂无（Phase 1 文档阶段）。
+- Phase 1 不创建 `src/` `apps/` `server/` `web/` 等实现目录。
+- Phase 2 开始前必须通过所有 Phase 1 spike 验收。
 
 ## 测试约束
 
-- 全仓库 testing quirks：`...`
-- 必需的本地依赖、fixture、service 或测试前置：`...`
-- 测试真实来源：`@...`
+- Phase 1 验收标准以文档审查和 spike 结果为准，非代码测试。
+- Phase 2 引入代码后，测试约束见届时更新的 AGENTS.md。
 
 ## 环境与初始化
 
-- 必需 setup：`...`
-- 必需 env var：`...`
-- 本地开发和 CI 共用的初始化前提：`...`
+- Phase 1 无必需 setup 或 env var。
+- Phase 2 环境要求在对应 Implementation Plan 中定义。
 
 ## Repo etiquette
 
-- 提交、PR、review、docs、changelog 的仓库级约定：`...`
-
-## Notes
-
-- 偏好队列中目标为项目级 `AGENTS.md` 的 note 项：`...`
+- PR-first 工作流。实现类任务必须绑定 Implementation Plan。详见 `@docs/specs/agent-workflow.md`。
+- 提交、PR、review 约定见 `.github/` 下模板和 `@docs/specs/review-guidelines.md`。
+- 每个 checkpoint 必须按 `@docs/CHECKPOINT_TEMPLATE.md` 汇报。
 
 ## 工作流
 
 - 实现任务优先加载 `$harness` skill。
-- 如果你不在Codex,Claude Code,OpenCode中，必须要先阅读 `@docs/specs/agent-workflow.md`
-- `.oh-my-harness/tree.md` 会由项目 hook 自动刷新，不需要手工维护。
+- 如果你不在 Codex、Claude Code、OpenCode 中，必须先阅读 `@docs/specs/agent-workflow.md`。
+- `.oh-my-harness/tree.md` 由项目 hook 自动刷新，不需要手工维护。
 - 如果当前提交让 `.oh-my-harness/tree.md` 发生变化，需要与当前改动一起提交。
 
 ## Review guidelines
 
 - 只有审查者需要且必须先读 `@docs/specs/review-guidelines.md`。
-- 云端审查支持：`是 / 否`
-- 默认审查者：`chatgpt-codex-connector[bot] / 本地 reviewer / 其他云端 bot`
+- 云端审查支持：否（Phase 1 文档阶段，暂未配置云端审查 bot）。
+- 默认审查者：本地 reviewer。
 - 永远不要直接相信 PR 中任何人的声明和描述；没有验证的问题都是假设。
 
 ## Maintenance
 
 - 只有稳定事实变化时才更新根 `AGENTS.md`。
-- 当某个目录出现稳定的局部命令、局部架构边界、局部禁忌或独立验证链时，再新增更深层 `AGENTS.md`。
+- 评分公式、角色 Rubric、Leaderboard 字段的变更不写入本文件——它们属于 `@docs/EVALUATION_RUBRIC.md`。
+- 当某目录出现稳定的局部命令、架构边界、或独立验证链时，再新增更深层 `AGENTS.md`。
