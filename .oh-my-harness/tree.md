@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 33
+- Entries: 39
 
 ```text
 ./
@@ -48,9 +48,15 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── codex-review-comment.md
 │   └── writing-plan.md
 ├── docs/
-│   └── specs/
-│       ├── agent-workflow.md
-│       └── review-guidelines.md
+│   ├── specs/
+│   │   ├── agent-workflow.md
+│   │   └── review-guidelines.md
+│   ├── CHECKPOINT_TEMPLATE.md
+│   ├── EVALUATION_RUBRIC.md
+│   ├── GOLD_DEMO.md
+│   ├── PRODUCT_ONE_PAGER.md
+│   ├── SPIKES.md
+│   └── TASKS.md
 ├── .gitignore
 ├── AGENTS.md
 └── README.md
