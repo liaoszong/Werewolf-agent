@@ -74,6 +74,19 @@ Telegraph style. Root rules only. Read scoped AGENTS.md before subtree work. Ski
 - `.oh-my-harness/tree.md` 由项目 hook 自动刷新，不需要手工维护。
 - 如果当前提交让 `.oh-my-harness/tree.md` 发生变化，需要与当前改动一起提交。
 
+### 判断当前进度
+
+本项目是 PR-first 工作流。判断"下一步做什么"时，**禁止仅根据 `docs/TASKS.md` 的 pending 状态做决策**。
+
+当前事实优先级：
+
+1. 已合入 PR 和 main 上实际存在的产物文件（`gh pr list --state merged --limit 10`）
+2. 未合入的 open PR（plan PR / implementation PR）
+3. `docs/TASKS.md` 的依赖关系和任务类型（状态字段可能滞后，不作为事实源）
+4. `AGENTS.md` / `README.md` / `docs/SPIKES.md` 等长期规则
+
+每次判断进度前，必须先运行 `gh pr list --limit 10` 和 `git log --oneline -10`，再对照 `docs/TASKS.md` 的依赖图决定下一步。
+
 ## Review guidelines
 
 - 只有审查者需要且必须先读 `@docs/specs/review-guidelines.md`。

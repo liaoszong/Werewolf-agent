@@ -1,5 +1,7 @@
 # TASKS — Werewolf-agent Phase 1
 
+> **Progress note:** 本文件描述 Phase 1 任务依赖关系和计划状态，但任务完成状态可能滞后于实际进度。判断当前进度时，必须以已合入 PR 和 main 上实际存在的产物文件为准。如果本文件状态与 PR / main 文件冲突，以 PR / main 文件为准。
+
 任务按类型组织。每个 spike 通过前不展开对应的 engineering task。
 
 ---
@@ -20,15 +22,15 @@
 
 ### S0：名局筛选 + 资料完整性 + 版权风险
 
-- 状态：`pending`
-- 产出：候选对局的事件摘要 + 完整性评估 + 版权评估（或手工构造对局的完整事件链）。
+- 状态：`completed`（人工构造虚拟对局，PR #2）
+- 产出：`docs/gold-game/s0-gold-game-seed.md`。
 - 依赖：无。
 - 通过标准：见 `@docs/SPIKES.md` Spike 0。
 
 ### S1：Game Log schema 验证
 
-- 状态：`pending`
-- 产出：一份完整的 Game Log JSON + schema 修正建议（如有）。
+- 状态：`completed`（PR #3 plan, PR #4 impl）
+- 产出：`docs/gold-game/g001-game-log.json` + `docs/gold-game/s1-schema-validation.md`。
 - 依赖：S0。
 - 通过标准：见 `@docs/SPIKES.md` Spike 1。
 
