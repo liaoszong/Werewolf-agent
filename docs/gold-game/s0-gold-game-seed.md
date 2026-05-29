@@ -122,3 +122,18 @@ At the start of the Day 2 vote, p2 and p5 are dead. The living players are p1, p
 - p6 votes for p1.
 
 For village vote cohesion, the village-team vote distribution is `{p1: 2}` over 2 village-team voters, so the Day 2 village cohesion value is `2 / 2 = 1.0`.
+
+## Completeness Assessment
+
+| Required item | Covered | Evidence event_id | Notes |
+|---|---|---|---|
+| role assignment | yes | g001_e001-g001_e006 | All 6 players have explicit roles and teams. |
+| night actions | yes | g001_e007-g001_e009, g001_e024-g001_e025 | Night 1 and Night 2 actions are explicit. |
+| seer check | yes | g001_e008 | The seer checks p1 and receives a werewolf result. |
+| witch action | yes | g001_e009, g001_e025 | Save and poison usage are both explicit. |
+| day speeches | yes | g001_e010-g001_e015, g001_e030-g001_e032 | Public speech summaries exist for each day. |
+| votes | yes | g001_e016-g001_e021, g001_e033-g001_e035 | Every living voter has a target. |
+| deaths | yes | g001_e022, g001_e026, g001_e027, g001_e036 | Eliminations and night deaths are explicit. |
+| role reveals | yes | g001_e023, g001_e028, g001_e029, g001_e037 | Key revealed roles are explicit. |
+| game over | yes | g001_e038 | Winner and end condition are explicit. |
+| copyright risk | yes | Copyright / Source Risk Assessment | No external copyrighted match material is used. |
