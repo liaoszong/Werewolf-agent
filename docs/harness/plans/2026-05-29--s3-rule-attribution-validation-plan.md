@@ -479,7 +479,6 @@ for forbidden in ['[AI 生成]', 'React', 'Vite']:
     assert forbidden not in report, forbidden
 for positive_claim in ['S3 completes the attribution engine', 'attribution engine is complete']:
     assert positive_claim not in report, positive_claim
-    assert forbidden not in report, forbidden
 
 print('S3 validation report content check passed')
 PY
