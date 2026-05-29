@@ -1,0 +1,86 @@
+{
+  "attribution_id": "s3_g001_rule_attribution",
+  "game_id": "g001",
+  "source_game_log": "docs/gold-game/g001-game-log.json",
+  "source_score_log": "docs/gold-game/s2-score-log.json",
+  "source_metrics_summary": "docs/gold-game/s2-metrics-summary.json",
+  "source_label": "[deterministic]",
+  "phase": "Phase 1",
+  "attribution_boundary": {
+    "method": "deterministic structured-event pattern matching",
+    "ai_annotations": "none",
+    "free_text_reasoning": "not_used",
+    "decision_quality_score": 0,
+    "notes": "S3 validates expected attribution outputs only. It does not implement the production attribution engine."
+  },
+  "turn_points": [
+    {
+      "turn_point_id": "s3_g001_tp001",
+      "rule_id": "attribution:F.1.critical_vote",
+      "rule": "critical_vote",
+      "round": 2,
+      "actor": "system",
+      "subject": "p1",
+      "description_template": "第 2 轮投票为关键转折点，p1 以 1 票之差被处决，该玩家身份为狼人。",
+      "impact_score": 1.0,
+      "impact_sign": "positive_for_villager",
+      "impact_score_policy": "F.1 gives a x2 multiplier only when the eliminated player is a core villager role. For eliminated werewolf p1, S3 uses the default critical-vote impact score of 1.0 and records this as a validation policy, not a rubric change.",
+      "evidence_event_ids": [
+        "g001_e033",
+        "g001_e034",
+        "g001_e035",
+        "g001_e036",
+        "g001_e037"
+      ]
+    }
+  ],
+  "top_attribution": {
+    "turn_point_id": "s3_g001_tp001",
+    "rule_id": "attribution:F.1.critical_vote",
+    "description_template": "第 2 轮 2-1 处决 p1 是本局村民获胜的直接关键转折点。",
+    "selection_policy": "highest impact_score; ties break by later sequence"
+  },
+  "rule_evaluation_summary": {
+    "attribution:F.1.critical_vote": {
+      "status": "triggered",
+      "triggered_turn_point_ids": [
+        "s3_g001_tp001"
+      ],
+      "notes": "Round 2 elimination is 2-1, so one changed vote would change the result. p1 is revealed as werewolf."
+    },
+    "attribution:F.2.information_gap": {
+      "status": "not_triggered",
+      "triggered_turn_point_ids": [],
+      "notes": "S2 records seer info_conveyed as 1.0. p3's p1 suspicion is publicly represented before p3 dies."
+    },
+    "attribution:F.3.witch_misfire": {
+      "status": "not_triggered",
+      "triggered_turn_point_ids": [],
+      "notes": "p4 saves villager p5 and poisons werewolf p2. No witch misfire against a core villager role is present."
+    },
+    "attribution:F.4.vote_deviation": {
+      "status": "not_triggered",
+      "triggered_turn_point_ids": [],
+      "notes": "Round 1 village vote accuracy is exactly 50%, not below 50%. Round 2 village vote accuracy is 100%."
+    },
+    "attribution:F.5.successful_disguise": {
+      "status": "not_triggered",
+      "triggered_turn_point_ids": [],
+      "notes": "No werewolf is both voted but not eliminated and then survives at least 2 later rounds."
+    }
+  },
+  "validation_notes": [
+    {
+      "type": "possible_false_negative",
+      "event_ids": [
+        "g001_e016",
+        "g001_e017",
+        "g001_e020",
+        "g001_e021",
+        "g001_e022",
+        "g001_e023"
+      ],
+      "notes": "Round 1 seer p3 elimination is human-salient, but F.1 does not trigger because the vote margin is 4-2 rather than 1. S3 records this as a validation observation and does not change the stable rule."
+    }
+  ]
+}
