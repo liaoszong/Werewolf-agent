@@ -137,3 +137,22 @@ For village vote cohesion, the village-team vote distribution is `{p1: 2}` over 
 | role reveals | yes | g001_e023, g001_e028, g001_e029, g001_e037 | Key revealed roles are explicit. |
 | game over | yes | g001_e038 | Winner and end condition are explicit. |
 | copyright risk | yes | Copyright / Source Risk Assessment | No external copyrighted match material is used. |
+
+## Copyright / Source Risk Assessment
+
+| Item | Assessment |
+|---|---|
+| Source | Manually authored virtual game |
+| External copyrighted video used | No |
+| External copyrighted audio used | No |
+| External copyrighted transcript used | No |
+| Direct copied dialogue | No |
+| Public figure or streamer content used | No |
+| Risk level | Low |
+| Decision | Safe for Phase 1 Gold Demo input |
+
+## S0 Decision
+
+S0 uses a manually authored virtual game as the Phase 1 Gold Game seed.
+
+This satisfies the S0 fallback path because the event chain is complete, deterministic, and free from external-source risk. It also avoids spending Phase 1 effort on public match research before the scoring pipeline has a fixed input.
