@@ -31,11 +31,15 @@ Phase 1 使用一局 6 人狼人杀对局的 Game Log。优先使用人工编写
 
 ## Phase 1 做什么
 
-- 选定一局 6 人狼人杀对局 → 整理结构化 Game Log。
-- 实现确定性评分器：outcome_score + rule_integrity_score + 过程指标 + 规则归因。
-- 用人工 gold decision_summary 和 consensus sample 演示完整评分链。
+Phase 1 deterministic MVP 已完成以下闭环：
+
+- 选定一局 6 人狼人杀人工 Gold Game → 整理结构化 Game Log。
+- 产出确定性的 outcome_score + rule_integrity_score + 过程指标 + 结果指标。
+- 产出确定性规则归因：turn_points + top_attribution。
 - 构建最小可视化页面：时间线、状态表、投票表、指标表、单局评分卡、Leaderboard UI demo。
-- 7 个 spike 验证所有关键不确定性。
+- 保持所有数据来源标注：`[结构化事件]`、`[deterministic]`、`[mock]`、`[人工 gold sample]`。
+
+Phase 1 closure 使用 S0/S1/S2/S3/S6。S4 Consensus Log schema 验证和 S5 AI 语义标注可行性验证延后到 Phase 2，与真实 Agent 输出、真实 Decision Log / Consensus Log 启用一起验证。
 
 ## Phase 1 不做什么
 
@@ -77,13 +81,13 @@ Phase 1 使用一局 6 人狼人杀对局的 Game Log。优先使用人工编写
 | 层 | 内容 | Phase 1 | Phase 2 |
 |----|------|---------|---------|
 | Game Log | 事实事件（不可变） | 人工整理名局 | AI Agent 对局产生 |
-| Consensus Log | 狼人夜间协商过程（Phase 2 启用） | 人工 gold sample 演示 | AI Agent 产生 |
-| Decision Log | 行动前结构化理由（Phase 2 启用） | 人工 gold sample 演示 | AI Agent 产生 |
+| Consensus Log | 狼人夜间协商过程（Phase 2 启用） | 不作为 Phase 1 closure 阻塞项 | AI Agent 产生 |
+| Decision Log | 行动前结构化理由（Phase 2 启用） | 不作为 Phase 1 closure 阻塞项；decision_quality_score 恒为 0 | AI Agent 产生 |
 | Score Log | 评分器输出（可重算） | 确定性规则计算 | 完整三维评分 |
 
 ## Phase 2 / Phase 3 概述
 
-- **Phase 2**：接入真实 AI Agent，启用 Decision Log / Consensus Log，加入 decision_quality_score 和 AI 语义标注。
+- **Phase 2**：打开运行时实现边界，启动 E1-E4 或替代工程路径；接入真实 AI Agent，启用真实 Decision Log / Consensus Log，并重新验证 S4/S5。
 - **Phase 3**：多模型、多角色轮换、统计显著的真实 Leaderboard。
 
 各一句话，不展开。
