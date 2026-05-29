@@ -99,8 +99,7 @@
       "werewolf_vote_coordination": 1.0,
       "werewolf_vote_coordination_by_day": {
         "round_1": 1.0
-      },
-      "turn_point_count": "not_computed_in_S2"
+      }
     }
   },
   "score_summary": {
@@ -132,7 +131,21 @@
       "p6": 0
     }
   },
+  "metrics_deferred_to_later_spikes": [
+    {
+      "metric": "turn_point_count",
+      "owner": "S3 rule attribution validation",
+      "reason": "turn_point_count is defined as an attribution count; S2 does not compute attribution outputs."
+    }
+  ],
   "known_rubric_gaps_recorded_not_fixed": [
+    {
+      "gap": "werewolf_day_vote_without_elimination",
+      "events": [
+        "g001_e033"
+      ],
+      "S2_policy": "count in vote_accuracy metrics; assign outcome_score 0 in score log; do not modify EVALUATION_RUBRIC.md in this PR"
+    },
     {
       "gap": "witch_day_vote_outcome_not_explicit",
       "events": [

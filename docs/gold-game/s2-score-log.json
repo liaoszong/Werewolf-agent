@@ -29,9 +29,10 @@
       ],
       "evidence_event_ids": [
         "g001_e007",
+        "g001_e009",
         "g001_e028"
       ],
-      "notes": "Wolf team killed a villager target; p5 is revealed as villager."
+      "notes": "Wolf team chose a villager target; p5 is later revealed as villager, while g001_e009 records that the Night 1 save prevented the kill from taking effect."
     },
     {
       "score_id": "s2_g001_e008",
@@ -261,13 +262,13 @@
       "decision_quality_score": 0,
       "rule_integrity_score": 0,
       "rules_triggered": [
-        "rubric:E.1.werewolf.vote_without_elimination"
+        "rubric-gap:werewolf_day_vote_without_elimination"
       ],
       "evidence_event_ids": [
         "g001_e033",
         "g001_e036"
       ],
-      "notes": "p1 voted for p4, but p4 was not eliminated. E.1 vote outcome rows are tied to successful elimination, so S2 assigns 0."
+      "notes": "p1 voted for p4, but p4 was not eliminated. E.1 has no explicit row for a werewolf vote that does not cause elimination, so S2 assigns 0 and records the rubric gap."
     },
     {
       "score_id": "s2_g001_e034",

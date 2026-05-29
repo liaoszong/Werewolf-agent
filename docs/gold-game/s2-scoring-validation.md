@@ -57,14 +57,16 @@ S2 validates that the S1 Game Log can be scored deterministically for Phase 1. I
 |---|---:|---|
 | village_vote_cohesion | 0.75 | Round 1 = 0.5, Round 2 = 1.0 |
 | werewolf_vote_coordination | 1.0 | Round 1: p1 and p2 both vote p3; Round 2 excluded because only p1 remains |
-| turn_point_count | not computed in S2 | S3 owns attribution validation |
 
 ## Rubric Mapping Notes
 
 - Werewolf night kills are scored as `wolf_team` team-scope records.
+- The Night 1 werewolf kill target was a villager, so S2 records the target-selection outcome; `g001_e009` is included as evidence that the witch save prevented that kill from taking effect.
+- A werewolf daytime vote that does not cause elimination is recorded as a rubric gap and assigned `outcome_score = 0`.
 - Witch daytime votes are counted in vote accuracy metrics, but S2 assigns `outcome_score = 0` because the current Witch rubric has no explicit daytime vote outcome row.
-- This PR records the Witch vote rubric gap but does not modify `docs/EVALUATION_RUBRIC.md`.
+- This PR records the werewolf non-elimination vote gap and Witch vote rubric gap but does not modify `docs/EVALUATION_RUBRIC.md`.
 - `decision_quality_score` is not inferred from summaries or visible refs in S2.
+- `turn_point_count` is deferred to S3 rule attribution validation and is not emitted as a non-numeric team metric in `s2-metrics-summary.json`.
 
 ## S2 Acceptance Check
 
