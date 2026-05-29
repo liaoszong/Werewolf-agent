@@ -13,8 +13,14 @@
 - 输入：一局 6 人狼人杀结构化 Game Log（Spike 0 产出。优先路径：人工编写虚拟对局）。
 - 输出：确定性的 outcome_score + rule_integrity_score + 过程指标 + 规则归因 + 单局评分卡 + Leaderboard UI demo（静态 HTML）。
 - 验收：两次运行同一 Game Log 所有指标一致；非技术用户 3 分钟能理解评测系统工作方式。
-- 状态：`pending`
-- 注意：Phase 1 的 decision_quality_score 恒为 0（无真实 Decision Log），不宣称已真实可用。Consensus Log 和 Decision Log 仅以人工 gold sample 形式演示。
+- 状态：`completed`（deterministic MVP closure：S0/S1/S2/S3/S6 已完成；S4/S5 延后到 Phase 2）
+- 完成产物：
+  - `docs/gold-game/g001-game-log.json`
+  - `docs/gold-game/s2-score-log.json`
+  - `docs/gold-game/s2-metrics-summary.json`
+  - `docs/gold-game/s3-rule-attribution.json`
+  - `docs/demo/phase1-gold-demo.html`
+- 注意：Phase 1 的 decision_quality_score 恒为 0（无真实 Decision Log），不宣称已真实可用。Consensus Log 和 Decision Log 的真实数据采集转入 Phase 2。
 
 ---
 
@@ -36,63 +42,63 @@
 
 ### S2：确定性评分器验证
 
-- 状态：`pending`
-- 产出：每角色的 outcome_score + rule_integrity_score + 过程/结果指标。
+- 状态：`completed`（PR #5 plan, PR #6 impl）
+- 产出：`docs/gold-game/s2-score-log.json` + `docs/gold-game/s2-metrics-summary.json` + `docs/gold-game/s2-scoring-validation.md`。
 - 依赖：S1。
 - 通过标准：见 `@docs/SPIKES.md` Spike 2。
 
 ### S3：规则归因验证
 
-- 状态：`pending`
-- 产出：turn_points 列表 + top_attribution。
+- 状态：`completed`（PR #7 impl）
+- 产出：`docs/gold-game/s3-rule-attribution.json` + `docs/gold-game/s3-attribution-validation.md`。
 - 依赖：S2。
 - 通过标准：见 `@docs/SPIKES.md` Spike 3。
 
 ### S4：狼人 Consensus Log schema 验证
 
-- 状态：`pending`
+- 状态：`deferred_to_phase_2`（真实 Consensus Log 为 Phase 2 启用；Phase 1 deterministic MVP 不再阻塞于人工 consensus sample）
 - 产出：人工 gold consensus sample + schema 可用性评估。
 - 依赖：S1（可与 S2、S3 并行）。
 - 通过标准：见 `@docs/SPIKES.md` Spike 4。
 
 ### S5：AI 语义标注可行性验证
 
-- 状态：`pending`
+- 状态：`deferred_to_phase_2`（AI 标注与真实 Agent 输出、Decision Log 启用一起验证；Phase 1 demo 不依赖 AI 标注）
 - 产出：标注准确率报告 + 一致性报告 + token 统计。
 - 依赖：无（使用独立构造的样例，不依赖前面 spike）。
 - 通过标准：见 `@docs/SPIKES.md` Spike 5。
 
 ### S6：Leaderboard UI demo 验证
 
-- 状态：`pending`
-- 产出：静态 HTML 页面（时间线 + 投票表 + 状态表 + 指标表 + 评分卡 + Leaderboard）。
+- 状态：`completed`（PR #8 plan, PR #9 impl）
+- 产出：`docs/demo/phase1-gold-demo.html`。
 - 依赖：S2（可使用真实评分 + mock 数据，不需要 S3 归因先完成）。
 - 通过标准：见 `@docs/SPIKES.md` Spike 6。
 
 ---
 
-## Engineering Tasks
+## Phase 2 Candidate Engineering Tasks
 
-**仅在对应 spike 通过后创建。** 此处只列出预期工程任务类型，不展开细节步骤。
+**Phase 1 不启动 E1-E4。** 这些任务是 Phase 2 候选工程任务，只有在 Phase 2 charter / Implementation Plan 明确允许业务代码后才能展开。此处只保留任务路由，不代表已开始实现。
 
 ### E1：Game Log 解析器
 
-- 状态：`blocked`（依赖 S0、S1 通过）
+- 状态：`phase_2_candidate`（S0/S1 已满足；等待 Phase 2 实现边界打开）
 - 说明：读取结构化 Game Log JSON，验证 schema，转换为内部数据结构。
 
 ### E2：确定性评分器
 
-- 状态：`blocked`（依赖 S2 通过）
+- 状态：`phase_2_candidate`（S2 已满足；等待 E1 与 Phase 2 实现边界）
 - 说明：实现 EVALUATION_RUBRIC.md 中所有确定性评分规则。输出 Score Log。
 
 ### E3：规则归因引擎
 
-- 状态：`blocked`（依赖 S3 通过）
+- 状态：`phase_2_candidate`（S3 已满足；等待 E1/E2 与 Phase 2 实现边界）
 - 说明：实现归因规则匹配引擎。输出 turn_points + top_attribution。
 
 ### E4：可视化页面
 
-- 状态：`blocked`（依赖 S6 通过）
+- 状态：`phase_2_candidate`（S6 已满足；Phase 1 已有静态 HTML demo，Phase 2 是否重做由后续 plan 决定）
 - 说明：构建可双击打开的单文件静态 HTML（建议路径：`docs/demo/phase1-gold-demo.html`）。不依赖后端、不依赖构建工具、不引入 React/Vite。包含时间线、状态表、投票表、指标表、评分卡、Leaderboard。
 
 ---
@@ -112,17 +118,18 @@
 
 ## Demo Acceptance
 
-**Demo 1：评分器演示**
+**Demo 1：Phase 1 deterministic Gold Demo**
 
-- 触发条件：S2 通过后。
-- 演示内容：运行 Game Log → 产出评分摘要。
-- 验收：两次运行结果一致。人工审查 3 个评分案例合理。
+- 触发条件：S0/S1/S2/S3/S6 完成后。
+- 演示内容：固定 Game Log → 确定性评分摘要 → 规则归因 → 静态 Leaderboard UI demo。
+- 验收：同一 Game Log 的 deterministic 指标可复现；非技术用户 3 分钟内能复述谁赢了、关键转折点是什么、评测系统如何打分。
+- 状态：`completed`（`docs/demo/phase1-gold-demo.html`）
 
-**Demo 2：完整 Gold Demo**
+**Demo 2：Phase 2 runtime pipeline demo**
 
-- 触发条件：S3、S4、S6 通过后，E1-E4 完成后。
-- 演示内容：按 `@docs/GOLD_DEMO.md` 3 分钟脚本完整演示。
-- 验收：非技术用户能复述关键信息。所有数据标注清晰。
+- 触发条件：Phase 2 charter 明确允许业务代码，并完成 E1-E4 或替代实现路径。
+- 演示内容：运行时读取 Game Log → 计算 Score Log → 计算 Attribution → 输出或刷新 UI。
+- 验收：后续 Phase 2 plan 定义。
 
 ---
 
