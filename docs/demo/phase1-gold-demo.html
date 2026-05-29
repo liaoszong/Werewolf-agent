@@ -48,172 +48,172 @@ select.sort-btn{min-width:200px}
 </head>
 <body>
 
-<h1>Werewolf-agent Phase 1 Gold Demo</h1>
-<p style="text-align:center;font-size:.85rem;color:#8b949e;margin-bottom:16px">结构化 Game Log &rarr; 确定性评测 &rarr; 规则归因 &rarr; Leaderboard UI demo</p>
+<h1>Werewolf-agent 第一阶段演示</h1>
+<p style="text-align:center;font-size:.85rem;color:#8b949e;margin-bottom:16px">结构化对局日志 &rarr; 确定性评测 &rarr; 规则归因 &rarr; 排行榜演示</p>
 
 <div class="phase-banner">
-<strong>Phase 1 只做静态 HTML UI demo。</strong><br>
-不包含真实 AI Agent 对局。decision_quality_score 在 Phase 1 固定为 0。Leaderboard 只是一行 Gold Game deterministic 数据 + 多行 mock 数据。
+<strong>第一阶段仅展示静态 HTML 演示页面。</strong><br>
+不含真实 AI 智能体对局。决策质量分在本阶段固定为 0。排行榜仅包含一行真实对局确定性数据 + 多行模拟数据。
 </div>
 
-<!-- ==================== GOLD GAME SUMMARY ==================== -->
+<!-- ==================== 对局概要 ==================== -->
 <div class="panel" id="game-summary">
-<h2>Gold Game Summary <span class="badge badge-event">[结构化事件]</span></h2>
+<h2>对局概要 <span class="badge badge-event">[结构化事件]</span></h2>
 <table>
-<tr><td style="width:200px">Game ID</td><td>g001</td></tr>
-<tr><td>Players</td><td>6</td></tr>
-<tr><td>Role setup</td><td>2 werewolves + 1 seer + 1 witch + 2 villagers</td></tr>
-<tr><td>Winner</td><td>villager</td></tr>
-<tr><td>End round</td><td>2</td></tr>
-<tr><td>Survivors</td><td>p4, p6</td></tr>
-<tr><td>End condition</td><td>all_werewolves_eliminated</td></tr>
-<tr><td>Data source</td><td><span class="badge badge-event">[结构化事件]</span></td></tr>
+<tr><td style="width:200px">对局编号</td><td>g001</td></tr>
+<tr><td>玩家人数</td><td>6</td></tr>
+<tr><td>角色配置</td><td>2 狼人 + 1 预言家 + 1 女巫 + 2 平民</td></tr>
+<tr><td>获胜方</td><td>村民阵营</td></tr>
+<tr><td>结束回合</td><td>2</td></tr>
+<tr><td>存活玩家</td><td>p4, p6</td></tr>
+<tr><td>结束条件</td><td>狼人全灭</td></tr>
+<tr><td>数据来源</td><td><span class="badge badge-event">[结构化事件]</span></td></tr>
 </table>
 </div>
 
-<!-- ==================== PLAYER TABLE ==================== -->
+<!-- ==================== 玩家状态表 ==================== -->
 <div class="panel" id="player-table">
-<h2>Player Status <span class="badge badge-event">[结构化事件]</span></h2>
+<h2>玩家状态 <span class="badge badge-event">[结构化事件]</span></h2>
 <table>
-<thead><tr><th>Player</th><th>Role</th><th>Team</th><th>Final status</th><th>Source</th></tr></thead>
+<thead><tr><th>玩家</th><th>角色</th><th>阵营</th><th>最终状态</th><th>来源</th></tr></thead>
 <tbody>
-<tr><td><b>p1</b></td><td><span class="role-label werewolf">werewolf</span></td><td>werewolf</td><td>eliminated, revealed</td><td><span class="badge badge-event">[结构化事件]</span></td></tr>
-<tr><td><b>p2</b></td><td><span class="role-label werewolf">werewolf</span></td><td>werewolf</td><td>died, revealed</td><td><span class="badge badge-event">[结构化事件]</span></td></tr>
-<tr><td><b>p3</b></td><td><span class="role-label seer">seer</span></td><td>villager</td><td>eliminated, revealed</td><td><span class="badge badge-event">[结构化事件]</span></td></tr>
-<tr><td><b>p4</b></td><td><span class="role-label witch">witch</span></td><td>villager</td><td>survivor</td><td><span class="badge badge-event">[结构化事件]</span></td></tr>
-<tr><td><b>p5</b></td><td><span class="role-label villager">villager</span></td><td>villager</td><td>died, revealed</td><td><span class="badge badge-event">[结构化事件]</span></td></tr>
-<tr><td><b>p6</b></td><td><span class="role-label villager">villager</span></td><td>villager</td><td>survivor</td><td><span class="badge badge-event">[结构化事件]</span></td></tr>
+<tr><td><b>p1</b></td><td><span class="role-label werewolf">狼人</span></td><td>狼人</td><td>被票出，身份公开</td><td><span class="badge badge-event">[结构化事件]</span></td></tr>
+<tr><td><b>p2</b></td><td><span class="role-label werewolf">狼人</span></td><td>狼人</td><td>死亡，身份公开</td><td><span class="badge badge-event">[结构化事件]</span></td></tr>
+<tr><td><b>p3</b></td><td><span class="role-label seer">预言家</span></td><td>村民</td><td>被票出，身份公开</td><td><span class="badge badge-event">[结构化事件]</span></td></tr>
+<tr><td><b>p4</b></td><td><span class="role-label witch">女巫</span></td><td>村民</td><td>存活</td><td><span class="badge badge-event">[结构化事件]</span></td></tr>
+<tr><td><b>p5</b></td><td><span class="role-label villager">平民</span></td><td>村民</td><td>死亡，身份公开</td><td><span class="badge badge-event">[结构化事件]</span></td></tr>
+<tr><td><b>p6</b></td><td><span class="role-label villager">平民</span></td><td>村民</td><td>存活</td><td><span class="badge badge-event">[结构化事件]</span></td></tr>
 </tbody></table>
 </div>
 
-<!-- ==================== TIMELINE ==================== -->
+<!-- ==================== 时间线 ==================== -->
 <div class="panel" id="timeline">
-<h2>Timeline <span class="badge badge-event">[结构化事件]</span></h2>
+<h2>时间线 <span class="badge badge-event">[结构化事件]</span></h2>
 
-<div class="timeline-group"><h4>Round 0 &mdash; Setup</h4>
+<div class="timeline-group"><h4>第 0 轮 &mdash; 角色分配</h4>
 <table class="timeline-table">
-<thead><tr><th>seq</th><th>type</th><th>actor</th><th>target</th><th>visibility</th><th>summary</th></tr></thead>
+<thead><tr><th>序号</th><th>类型</th><th>行动者</th><th>目标</th><th>可见性</th><th>摘要</th></tr></thead>
 <tbody>
-<tr><td>1</td><td>role_assignment</td><td>system</td><td>p1</td><td>specific_player_ids</td><td>p1 receives the werewolf role.</td></tr>
-<tr><td>2</td><td>role_assignment</td><td>system</td><td>p2</td><td>specific_player_ids</td><td>p2 receives the werewolf role.</td></tr>
-<tr><td>3</td><td>role_assignment</td><td>system</td><td>p3</td><td>specific_player_ids</td><td>p3 receives the seer role.</td></tr>
-<tr><td>4</td><td>role_assignment</td><td>system</td><td>p4</td><td>specific_player_ids</td><td>p4 receives the witch role.</td></tr>
-<tr><td>5</td><td>role_assignment</td><td>system</td><td>p5</td><td>specific_player_ids</td><td>p5 receives the villager role.</td></tr>
-<tr><td>6</td><td>role_assignment</td><td>system</td><td>p6</td><td>specific_player_ids</td><td>p6 receives the villager role.</td></tr>
+<tr><td>1</td><td>角色分配</td><td>系统</td><td>p1</td><td>仅本人</td><td>p1 获得狼人身份。</td></tr>
+<tr><td>2</td><td>角色分配</td><td>系统</td><td>p2</td><td>仅本人</td><td>p2 获得狼人身份。</td></tr>
+<tr><td>3</td><td>角色分配</td><td>系统</td><td>p3</td><td>仅本人</td><td>p3 获得预言家身份。</td></tr>
+<tr><td>4</td><td>角色分配</td><td>系统</td><td>p4</td><td>仅本人</td><td>p4 获得女巫身份。</td></tr>
+<tr><td>5</td><td>角色分配</td><td>系统</td><td>p5</td><td>仅本人</td><td>p5 获得平民身份。</td></tr>
+<tr><td>6</td><td>角色分配</td><td>系统</td><td>p6</td><td>仅本人</td><td>p6 获得平民身份。</td></tr>
 </tbody></table></div>
 
-<div class="timeline-group"><h4>Round 1 &mdash; Night</h4>
+<div class="timeline-group"><h4>第 1 轮 &mdash; 夜晚</h4>
 <table class="timeline-table">
-<thead><tr><th>seq</th><th>type</th><th>actor</th><th>target</th><th>visibility</th><th>summary</th></tr></thead>
+<thead><tr><th>序号</th><th>类型</th><th>行动者</th><th>目标</th><th>可见性</th><th>摘要</th></tr></thead>
 <tbody>
-<tr><td>7</td><td>werewolf_kill</td><td>wolf_team</td><td>p5</td><td>werewolf_team</td><td>The werewolf team chooses p5 as the kill target.</td></tr>
-<tr><td>8</td><td>seer_check</td><td>p3</td><td>p1</td><td>seer</td><td>p3 checks p1 and receives a werewolf result.</td></tr>
-<tr><td>9</td><td>witch_save</td><td>p4</td><td>p5</td><td>witch</td><td>p4 uses the save potion on p5.</td></tr>
+<tr><td>7</td><td>狼人选刀</td><td>狼队</td><td>p5</td><td>狼队</td><td>狼队选择 p5 为击杀目标。</td></tr>
+<tr><td>8</td><td>预言家查验</td><td>p3</td><td>p1</td><td>预言家</td><td>p3 查验 p1，结果为狼人。</td></tr>
+<tr><td>9</td><td>女巫救人</td><td>p4</td><td>p5</td><td>女巫</td><td>p4 对 p5 使用解药。</td></tr>
 </tbody></table></div>
 
-<div class="timeline-group"><h4>Round 1 &mdash; Day</h4>
+<div class="timeline-group"><h4>第 1 轮 &mdash; 白天</h4>
 <table class="timeline-table">
-<thead><tr><th>seq</th><th>type</th><th>actor</th><th>target</th><th>visibility</th><th>summary</th></tr></thead>
+<thead><tr><th>序号</th><th>类型</th><th>行动者</th><th>目标</th><th>可见性</th><th>摘要</th></tr></thead>
 <tbody>
-<tr><td>10</td><td>player_speech</td><td>p3</td><td>p1</td><td>public</td><td>p3 claims useful night information and pushes suspicion toward p1.</td></tr>
-<tr><td>11</td><td>player_speech</td><td>p1</td><td>p3</td><td>public</td><td>p1 challenges p3 and frames p3 as a wolf trying to force an early mis-elimination.</td></tr>
-<tr><td>12</td><td>player_speech</td><td>p2</td><td>p3</td><td>public</td><td>p2 supports p1 and argues that p3's pressure is too aggressive.</td></tr>
-<tr><td>13</td><td>player_speech</td><td>p4</td><td>p1</td><td>public</td><td>p4 notes that p1 and p2 are aligned too quickly but does not reveal witch identity.</td></tr>
-<tr><td>14</td><td>player_speech</td><td>p5</td><td>p3</td><td>public</td><td>p5 says p3's claim lacks enough public evidence and leans toward voting p3.</td></tr>
-<tr><td>15</td><td>player_speech</td><td>p6</td><td>p1</td><td>public</td><td>p6 is uncertain but sees a possible p1 and p2 pairing.</td></tr>
-<tr><td>16</td><td>player_vote</td><td>p1</td><td>p3</td><td>public</td><td>p1 votes for p3.</td></tr>
-<tr><td>17</td><td>player_vote</td><td>p2</td><td>p3</td><td>public</td><td>p2 votes for p3.</td></tr>
-<tr><td>18</td><td>player_vote</td><td>p3</td><td>p1</td><td>public</td><td>p3 votes for p1.</td></tr>
-<tr><td>19</td><td>player_vote</td><td>p4</td><td>p1</td><td>public</td><td>p4 votes for p1.</td></tr>
-<tr><td>20</td><td>player_vote</td><td>p5</td><td>p3</td><td>public</td><td>p5 votes for p3.</td></tr>
-<tr><td>21</td><td>player_vote</td><td>p6</td><td>p3</td><td>public</td><td>p6 votes for p3.</td></tr>
-<tr style="background:#3a1f1f55"><td>22</td><td>player_eliminated</td><td>system</td><td>p3</td><td>public</td><td>p3 is eliminated by a 4-2 vote.</td></tr>
-<tr><td>23</td><td>role_revealed</td><td>system</td><td>p3</td><td>public</td><td>p3 is revealed as the seer.</td></tr>
+<tr><td>10</td><td>发言</td><td>p3</td><td>p1</td><td>公开</td><td>p3 声称有夜间信息，将嫌疑指向 p1。</td></tr>
+<tr><td>11</td><td>发言</td><td>p1</td><td>p3</td><td>公开</td><td>p1 反击 p3，称其是狼人在强行带节奏。</td></tr>
+<tr><td>12</td><td>发言</td><td>p2</td><td>p3</td><td>公开</td><td>p2 支持 p1，认为 p3 的攻击过于激进。</td></tr>
+<tr><td>13</td><td>发言</td><td>p4</td><td>p1</td><td>公开</td><td>p4 注意到 p1 和 p2 快速抱团有异常，但未暴露女巫身份。</td></tr>
+<tr><td>14</td><td>发言</td><td>p5</td><td>p3</td><td>公开</td><td>p5 认为 p3 缺乏公开证据，倾向于投票给 p3。</td></tr>
+<tr><td>15</td><td>发言</td><td>p6</td><td>p1</td><td>公开</td><td>p6 犹豫，但注意到 p1 和 p2 可能是一对。</td></tr>
+<tr><td>16</td><td>投票</td><td>p1</td><td>p3</td><td>公开</td><td>p1 投票给 p3。</td></tr>
+<tr><td>17</td><td>投票</td><td>p2</td><td>p3</td><td>公开</td><td>p2 投票给 p3。</td></tr>
+<tr><td>18</td><td>投票</td><td>p3</td><td>p1</td><td>公开</td><td>p3 投票给 p1。</td></tr>
+<tr><td>19</td><td>投票</td><td>p4</td><td>p1</td><td>公开</td><td>p4 投票给 p1。</td></tr>
+<tr><td>20</td><td>投票</td><td>p5</td><td>p3</td><td>公开</td><td>p5 投票给 p3。</td></tr>
+<tr><td>21</td><td>投票</td><td>p6</td><td>p3</td><td>公开</td><td>p6 投票给 p3。</td></tr>
+<tr style="background:#3a1f1f55"><td>22</td><td>玩家出局</td><td>系统</td><td>p3</td><td>公开</td><td>p3 以 4-2 票被处决。</td></tr>
+<tr><td>23</td><td>身份公开</td><td>系统</td><td>p3</td><td>公开</td><td>p3 身份公开为预言家。</td></tr>
 </tbody></table></div>
 
-<div class="timeline-group"><h4>Round 2 &mdash; Night</h4>
+<div class="timeline-group"><h4>第 2 轮 &mdash; 夜晚</h4>
 <table class="timeline-table">
-<thead><tr><th>seq</th><th>type</th><th>actor</th><th>target</th><th>visibility</th><th>summary</th></tr></thead>
+<thead><tr><th>序号</th><th>类型</th><th>行动者</th><th>目标</th><th>可见性</th><th>摘要</th></tr></thead>
 <tbody>
-<tr><td>24</td><td>werewolf_kill</td><td>wolf_team</td><td>p5</td><td>werewolf_team</td><td>The werewolf team again chooses p5 as the kill target.</td></tr>
-<tr><td>25</td><td>witch_poison</td><td>p4</td><td>p2</td><td>witch</td><td>p4 uses the poison potion on p2 based on public evidence.</td></tr>
+<tr><td>24</td><td>狼人选刀</td><td>狼队</td><td>p5</td><td>狼队</td><td>狼队再次选择 p5 为击杀目标。</td></tr>
+<tr><td>25</td><td>女巫毒人</td><td>p4</td><td>p2</td><td>女巫</td><td>p4 根据公开证据对 p2 使用毒药。</td></tr>
 </tbody></table></div>
 
-<div class="timeline-group"><h4>Round 2 &mdash; Day</h4>
+<div class="timeline-group"><h4>第 2 轮 &mdash; 白天</h4>
 <table class="timeline-table">
-<thead><tr><th>seq</th><th>type</th><th>actor</th><th>target</th><th>visibility</th><th>summary</th></tr></thead>
+<thead><tr><th>序号</th><th>类型</th><th>行动者</th><th>目标</th><th>可见性</th><th>摘要</th></tr></thead>
 <tbody>
-<tr style="background:#3a1f1f33"><td>26</td><td>player_died</td><td>system</td><td>p5</td><td>public</td><td>p5 dies from the werewolf night kill.</td></tr>
-<tr style="background:#1f3a1f33"><td>27</td><td>player_died</td><td>system</td><td>p2</td><td>public</td><td>p2 dies from the witch poison.</td></tr>
-<tr><td>28</td><td>role_revealed</td><td>system</td><td>p5</td><td>public</td><td>p5 is revealed as a villager.</td></tr>
-<tr><td>29</td><td>role_revealed</td><td>system</td><td>p2</td><td>public</td><td>p2 is revealed as a werewolf.</td></tr>
-<tr><td>30</td><td>player_speech</td><td>p4</td><td>p1</td><td>public</td><td>p4 argues that p1 and p2 formed a coordinated push against the real seer.</td></tr>
-<tr><td>31</td><td>player_speech</td><td>p1</td><td>p4</td><td>public</td><td>p1 argues that p4 is using p2's death to force an easy final vote.</td></tr>
-<tr><td>32</td><td>player_speech</td><td>p6</td><td>p1</td><td>public</td><td>p6 accepts that p2's revealed role makes p1's Day 1 behavior highly suspicious.</td></tr>
-<tr><td>33</td><td>player_vote</td><td>p1</td><td>p4</td><td>public</td><td>p1 votes for p4.</td></tr>
-<tr><td>34</td><td>player_vote</td><td>p4</td><td>p1</td><td>public</td><td>p4 votes for p1.</td></tr>
-<tr><td>35</td><td>player_vote</td><td>p6</td><td>p1</td><td>public</td><td>p6 votes for p1.</td></tr>
-<tr style="background:#1f3a1f33"><td>36</td><td>player_eliminated</td><td>system</td><td>p1</td><td>public</td><td>p1 is eliminated by a 2-1 vote.</td></tr>
-<tr><td>37</td><td>role_revealed</td><td>system</td><td>p1</td><td>public</td><td>p1 is revealed as a werewolf.</td></tr>
-<tr style="background:#1f3a1f55"><td>38</td><td>game_over</td><td>system</td><td>villager_team</td><td>public</td><td>The village team wins because all werewolves have been eliminated.</td></tr>
+<tr style="background:#3a1f1f33"><td>26</td><td>玩家死亡</td><td>系统</td><td>p5</td><td>公开</td><td>p5 死于狼人夜间击杀。</td></tr>
+<tr style="background:#1f3a1f33"><td>27</td><td>玩家死亡</td><td>系统</td><td>p2</td><td>公开</td><td>p2 死于女巫毒药。</td></tr>
+<tr><td>28</td><td>身份公开</td><td>系统</td><td>p5</td><td>公开</td><td>p5 身份公开为平民。</td></tr>
+<tr><td>29</td><td>身份公开</td><td>系统</td><td>p2</td><td>公开</td><td>p2 身份公开为狼人。</td></tr>
+<tr><td>30</td><td>发言</td><td>p4</td><td>p1</td><td>公开</td><td>p4 指出 p1 与 p2 联手攻击真预言家。</td></tr>
+<tr><td>31</td><td>发言</td><td>p1</td><td>p4</td><td>公开</td><td>p1 辩称 p4 在利用 p2 之死强行锁定最后一票。</td></tr>
+<tr><td>32</td><td>发言</td><td>p6</td><td>p1</td><td>公开</td><td>p6 认可：p2 已被证实为狼人，p1 第一天抱团行为极度可疑。</td></tr>
+<tr><td>33</td><td>投票</td><td>p1</td><td>p4</td><td>公开</td><td>p1 投票给 p4。</td></tr>
+<tr><td>34</td><td>投票</td><td>p4</td><td>p1</td><td>公开</td><td>p4 投票给 p1。</td></tr>
+<tr><td>35</td><td>投票</td><td>p6</td><td>p1</td><td>公开</td><td>p6 投票给 p1。</td></tr>
+<tr style="background:#1f3a1f33"><td>36</td><td>玩家出局</td><td>系统</td><td>p1</td><td>公开</td><td>p1 以 2-1 票被处决。</td></tr>
+<tr><td>37</td><td>身份公开</td><td>系统</td><td>p1</td><td>公开</td><td>p1 身份公开为狼人。</td></tr>
+<tr style="background:#1f3a1f55"><td>38</td><td>游戏结束</td><td>系统</td><td>村民阵营</td><td>公开</td><td>村民阵营获胜，狼人全灭。</td></tr>
 </tbody></table></div>
 </div>
 
-<!-- ==================== VOTE TABLE ==================== -->
+<!-- ==================== 投票表 ==================== -->
 <div class="panel" id="vote-table">
-<h2>Vote Summary <span class="badge badge-event">[结构化事件]</span></h2>
-<div class="timeline-group"><h4>Round 1</h4>
-<table><thead><tr><th>Voter</th><th>Target</th><th>Voter role (final)</th></tr></thead>
+<h2>投票汇总 <span class="badge badge-event">[结构化事件]</span></h2>
+<div class="timeline-group"><h4>第 1 轮</h4>
+<table><thead><tr><th>投票人</th><th>投票目标</th><th>投票人身份（终局）</th></tr></thead>
 <tbody>
-<tr><td>p1</td><td>p3 <span class="role-label seer">seer</span></td><td><span class="role-label werewolf">werewolf</span></td></tr>
-<tr><td>p2</td><td>p3 <span class="role-label seer">seer</span></td><td><span class="role-label werewolf">werewolf</span></td></tr>
-<tr><td>p3</td><td>p1 <span class="role-label werewolf">werewolf</span></td><td><span class="role-label seer">seer</span></td></tr>
-<tr><td>p4</td><td>p1 <span class="role-label werewolf">werewolf</span></td><td><span class="role-label witch">witch</span></td></tr>
-<tr><td>p5</td><td>p3 <span class="role-label seer">seer</span></td><td><span class="role-label villager">villager</span></td></tr>
-<tr><td>p6</td><td>p3 <span class="role-label seer">seer</span></td><td><span class="role-label villager">villager</span></td></tr>
+<tr><td>p1</td><td>p3 <span class="role-label seer">预言家</span></td><td><span class="role-label werewolf">狼人</span></td></tr>
+<tr><td>p2</td><td>p3 <span class="role-label seer">预言家</span></td><td><span class="role-label werewolf">狼人</span></td></tr>
+<tr><td>p3</td><td>p1 <span class="role-label werewolf">狼人</span></td><td><span class="role-label seer">预言家</span></td></tr>
+<tr><td>p4</td><td>p1 <span class="role-label werewolf">狼人</span></td><td><span class="role-label witch">女巫</span></td></tr>
+<tr><td>p5</td><td>p3 <span class="role-label seer">预言家</span></td><td><span class="role-label villager">平民</span></td></tr>
+<tr><td>p6</td><td>p3 <span class="role-label seer">预言家</span></td><td><span class="role-label villager">平民</span></td></tr>
 </tbody></table>
-<p style="margin-top:4px;font-size:.85rem"><b>Round 1 result:</b> p1, p2, p5, p6 voted p3; p3 and p4 voted p1; p3 eliminated 4-2.</p>
+<p style="margin-top:4px;font-size:.85rem"><b>第 1 轮结果：</b>p1, p2, p5, p6 投票给 p3；p3 和 p4 投票给 p1；p3 以 4-2 被处决。</p>
 </div>
-<div class="timeline-group"><h4>Round 2</h4>
-<table><thead><tr><th>Voter</th><th>Target</th><th>Voter role (final)</th></tr></thead>
+<div class="timeline-group"><h4>第 2 轮</h4>
+<table><thead><tr><th>投票人</th><th>投票目标</th><th>投票人身份（终局）</th></tr></thead>
 <tbody>
-<tr><td>p1</td><td>p4 <span class="role-label witch">witch</span></td><td><span class="role-label werewolf">werewolf</span></td></tr>
-<tr><td>p4</td><td>p1 <span class="role-label werewolf">werewolf</span></td><td><span class="role-label witch">witch</span></td></tr>
-<tr><td>p6</td><td>p1 <span class="role-label werewolf">werewolf</span></td><td><span class="role-label villager">villager</span></td></tr>
+<tr><td>p1</td><td>p4 <span class="role-label witch">女巫</span></td><td><span class="role-label werewolf">狼人</span></td></tr>
+<tr><td>p4</td><td>p1 <span class="role-label werewolf">狼人</span></td><td><span class="role-label witch">女巫</span></td></tr>
+<tr><td>p6</td><td>p1 <span class="role-label werewolf">狼人</span></td><td><span class="role-label villager">平民</span></td></tr>
 </tbody></table>
-<p style="margin-top:4px;font-size:.85rem"><b>Round 2 result:</b> p1 voted p4; p4 and p6 voted p1; p1 eliminated 2-1.</p>
+<p style="margin-top:4px;font-size:.85rem"><b>第 2 轮结果：</b>p1 投票给 p4；p4 和 p6 投票给 p1；p1 以 2-1 被处决。</p>
 </div>
 </div>
 
-<!-- ==================== RESULT METRICS ==================== -->
+<!-- ==================== 结果指标 ==================== -->
 <div class="panel" id="result-metrics">
-<h2>Result Metrics <span class="badge badge-deterministic">[deterministic]</span></h2>
+<h2>结果指标 <span class="badge badge-deterministic">[确定性]</span></h2>
 <div class="metrics-grid">
-<div class="metric-kv"><span class="key">winner</span><br><span class="val">villager</span></div>
-<div class="metric-kv"><span class="key">game_length</span><br><span class="val">2</span></div>
-<div class="metric-kv"><span class="key">werewolf_survival_rate</span><br><span class="val">0.0</span></div>
-<div class="metric-kv"><span class="key">villager_survival_rate</span><br><span class="val">0.5</span></div>
-<div class="metric-kv"><span class="key">margin</span><br><span class="val">2</span></div>
-<div class="metric-kv"><span class="key">villager_win_efficiency</span><br><span class="val">1.0</span></div>
+<div class="metric-kv"><span class="key">获胜方</span><br><span class="val">村民阵营</span></div>
+<div class="metric-kv"><span class="key">对局回合数</span><br><span class="val">2</span></div>
+<div class="metric-kv"><span class="key">狼人存活率</span><br><span class="val">0.0</span></div>
+<div class="metric-kv"><span class="key">村民存活率</span><br><span class="val">0.5</span></div>
+<div class="metric-kv"><span class="key">胜方优势</span><br><span class="val">2</span></div>
+<div class="metric-kv"><span class="key">村民获胜效率</span><br><span class="val">1.0</span></div>
 </div>
 </div>
 
-<!-- ==================== PROCESS METRICS ==================== -->
+<!-- ==================== 过程指标 ==================== -->
 <div class="panel" id="process-metrics">
-<h2>Process Metrics <span class="badge badge-deterministic">[deterministic]</span></h2>
+<h2>过程指标 <span class="badge badge-deterministic">[确定性]</span></h2>
 
-<h3>vote_accuracy_by_player</h3>
-<table><thead><tr><th>Player</th><th>Role</th><th>Accurate votes</th><th>Total votes</th><th>Accuracy</th></tr></thead>
+<h3>投票准确率（按玩家）</h3>
+<table><thead><tr><th>玩家</th><th>角色</th><th>正确投票</th><th>总投票</th><th>准确率</th></tr></thead>
 <tbody>
-<tr><td>p1</td><td><span class="role-label werewolf">werewolf</span></td><td>2</td><td>2</td><td>1.0</td></tr>
-<tr><td>p2</td><td><span class="role-label werewolf">werewolf</span></td><td>1</td><td>1</td><td>1.0</td></tr>
-<tr><td>p3</td><td><span class="role-label seer">seer</span></td><td>1</td><td>1</td><td>1.0</td></tr>
-<tr><td>p4</td><td><span class="role-label witch">witch</span></td><td>2</td><td>2</td><td>1.0</td></tr>
-<tr><td>p5</td><td><span class="role-label villager">villager</span></td><td>0</td><td>1</td><td>0.0</td></tr>
-<tr><td>p6</td><td><span class="role-label villager">villager</span></td><td>1</td><td>2</td><td>0.5</td></tr>
+<tr><td>p1</td><td><span class="role-label werewolf">狼人</span></td><td>2</td><td>2</td><td>1.0</td></tr>
+<tr><td>p2</td><td><span class="role-label werewolf">狼人</span></td><td>1</td><td>1</td><td>1.0</td></tr>
+<tr><td>p3</td><td><span class="role-label seer">预言家</span></td><td>1</td><td>1</td><td>1.0</td></tr>
+<tr><td>p4</td><td><span class="role-label witch">女巫</span></td><td>2</td><td>2</td><td>1.0</td></tr>
+<tr><td>p5</td><td><span class="role-label villager">平民</span></td><td>0</td><td>1</td><td>0.0</td></tr>
+<tr><td>p6</td><td><span class="role-label villager">平民</span></td><td>1</td><td>2</td><td>0.5</td></tr>
 </tbody></table>
 
-<h3>survival_rounds</h3>
+<h3>存活轮数</h3>
 <div class="metrics-grid">
 <div class="metric-kv"><span class="key">p1</span><br><span class="val">2</span></div>
 <div class="metric-kv"><span class="key">p2</span><br><span class="val">2</span></div>
@@ -223,53 +223,53 @@ select.sort-btn{min-width:200px}
 <div class="metric-kv"><span class="key">p6</span><br><span class="val">2</span></div>
 </div>
 
-<h3>seer_metrics</h3>
-<table><thead><tr><th>Metric</th><th>Value</th></tr></thead>
+<h3>预言家指标</h3>
+<table><thead><tr><th>指标</th><th>数值</th></tr></thead>
 <tbody>
-<tr><td>check_accuracy</td><td>1.0</td></tr>
-<tr><td>info_conveyed</td><td>1.0</td></tr>
+<tr><td>查验准确率</td><td>1.0</td></tr>
+<tr><td>信息传递率</td><td>1.0</td></tr>
 </tbody></table>
 
-<h3>witch_metrics</h3>
-<table><thead><tr><th>Metric</th><th>Value</th></tr></thead>
+<h3>女巫指标</h3>
+<table><thead><tr><th>指标</th><th>数值</th></tr></thead>
 <tbody>
-<tr><td>save_accuracy</td><td>1.0</td></tr>
-<tr><td>poison_accuracy</td><td>1.0</td></tr>
+<tr><td>救人准确率</td><td>1.0</td></tr>
+<tr><td>毒人准确率</td><td>1.0</td></tr>
 </tbody></table>
 
-<h3>team_metrics</h3>
-<table><thead><tr><th>Metric</th><th>Value</th></tr></thead>
+<h3>阵营指标</h3>
+<table><thead><tr><th>指标</th><th>数值</th></tr></thead>
 <tbody>
-<tr><td>village_vote_cohesion</td><td>0.75</td></tr>
-<tr><td>werewolf_vote_coordination</td><td>1.0</td></tr>
+<tr><td>村民投票凝聚度</td><td>0.75</td></tr>
+<tr><td>狼人投票协同度</td><td>1.0</td></tr>
 </tbody></table>
 </div>
 
-<!-- ==================== SCORE CARD ==================== -->
+<!-- ==================== 评分卡 ==================== -->
 <div class="panel" id="score-card">
-<h2>Score Card <span class="badge badge-deterministic">[deterministic]</span></h2>
-<table><thead><tr><th>Subject</th><th>Role / Scope</th><th>Outcome score</th><th>Decision quality score</th><th>Rule integrity score</th><th>Data label</th></tr></thead>
+<h2>评分卡 <span class="badge badge-deterministic">[确定性]</span></h2>
+<table><thead><tr><th>对象</th><th>角色 / 范围</th><th>结果贡献分</th><th>决策质量分</th><th>规则合规分</th><th>数据标注</th></tr></thead>
 <tbody>
-<tr><td><b>p1</b></td><td>werewolf (player)</td><td>2</td><td>0</td><td>0</td><td><span class="badge badge-deterministic">[deterministic]</span></td></tr>
-<tr><td><b>p2</b></td><td>werewolf (player)</td><td>2</td><td>0</td><td>0</td><td><span class="badge badge-deterministic">[deterministic]</span></td></tr>
-<tr><td><b>p3</b></td><td>seer (player)</td><td>4</td><td>0</td><td>0</td><td><span class="badge badge-deterministic">[deterministic]</span></td></tr>
-<tr><td><b>p4</b></td><td>witch (player)</td><td>4</td><td>0</td><td>0</td><td><span class="badge badge-deterministic">[deterministic]</span></td></tr>
-<tr><td><b>p5</b></td><td>villager (player)</td><td>-2</td><td>0</td><td>0</td><td><span class="badge badge-deterministic">[deterministic]</span></td></tr>
-<tr><td><b>p6</b></td><td>villager (player)</td><td>0</td><td>0</td><td>0</td><td><span class="badge badge-deterministic">[deterministic]</span></td></tr>
-<tr><td><b>wolf_team</b></td><td>team</td><td>2</td><td>0</td><td>0</td><td><span class="badge badge-deterministic">[deterministic]</span></td></tr>
+<tr><td><b>p1</b></td><td>狼人（个人）</td><td>2</td><td>0</td><td>0</td><td><span class="badge badge-deterministic">[确定性]</span></td></tr>
+<tr><td><b>p2</b></td><td>狼人（个人）</td><td>2</td><td>0</td><td>0</td><td><span class="badge badge-deterministic">[确定性]</span></td></tr>
+<tr><td><b>p3</b></td><td>预言家（个人）</td><td>4</td><td>0</td><td>0</td><td><span class="badge badge-deterministic">[确定性]</span></td></tr>
+<tr><td><b>p4</b></td><td>女巫（个人）</td><td>4</td><td>0</td><td>0</td><td><span class="badge badge-deterministic">[确定性]</span></td></tr>
+<tr><td><b>p5</b></td><td>平民（个人）</td><td>-2</td><td>0</td><td>0</td><td><span class="badge badge-deterministic">[确定性]</span></td></tr>
+<tr><td><b>p6</b></td><td>平民（个人）</td><td>0</td><td>0</td><td>0</td><td><span class="badge badge-deterministic">[确定性]</span></td></tr>
+<tr><td><b>狼队</b></td><td>团队</td><td>2</td><td>0</td><td>0</td><td><span class="badge badge-deterministic">[确定性]</span></td></tr>
 </tbody></table>
-<div class="note">decision_quality_score 在 Phase 1 固定为 0（无真实 Decision Log）。rule_integrity_score 均为 0（Game Log 无 info_leak_flag 或 contradiction_flag）。</div>
+<div class="note">决策质量分在第一阶段固定为 0（无真实决策日志）。规则合规分均为 0（对局日志无信息泄漏或矛盾标记）。</div>
 </div>
 
-<!-- ==================== ATTRIBUTION ==================== -->
+<!-- ==================== 归因 ==================== -->
 <div class="panel" id="attribution">
-<h2>Rule Attribution <span class="badge badge-deterministic">[deterministic]</span></h2>
+<h2>规则归因 <span class="badge badge-deterministic">[确定性]</span></h2>
 
-<h3>Top Attribution</h3>
+<h3>首要归因</h3>
 <p style="font-size:.9rem;background:#0d1117;padding:10px;border-radius:4px;border:1px solid #30363d"><span class="badge badge-info">s3_g001_tp001</span> 第 2 轮 2-1 处决 p1 是本局村民获胜的直接关键转折点。</p>
 
-<h3>Triggered Turn Points</h3>
-<table><thead><tr><th>ID</th><th>Rule</th><th>Round</th><th>Subject</th><th>Impact</th><th>Sign</th></tr></thead>
+<h3>已触发转折点</h3>
+<table><thead><tr><th>编号</th><th>规则</th><th>轮次</th><th>对象</th><th>影响分</th><th>影响方向</th></tr></thead>
 <tbody>
 <tr>
 <td>s3_g001_tp001</td>
@@ -277,69 +277,69 @@ select.sort-btn{min-width:200px}
 <td>2</td>
 <td>p1</td>
 <td>1.0</td>
-<td>positive_for_villager</td>
+<td>对村民有利</td>
 </tr>
 </tbody></table>
-<p style="font-size:.78rem;color:#8b949e">Evidence: g001_e033, g001_e034, g001_e035, g001_e036, g001_e037</p>
+<p style="font-size:.78rem;color:#8b949e">证据事件: g001_e033, g001_e034, g001_e035, g001_e036, g001_e037</p>
 
-<h3>Rule Evaluation Summary</h3>
-<table><thead><tr><th>Rule</th><th>Status</th><th>Reason</th></tr></thead>
+<h3>规则评估汇总</h3>
+<table><thead><tr><th>规则</th><th>状态</th><th>原因</th></tr></thead>
 <tbody>
-<tr><td>attribution:F.1.critical_vote</td><td style="color:#3fb950">triggered</td><td>Round 2 elimination is 2-1; one changed vote changes the result.</td></tr>
-<tr><td>attribution:F.2.information_gap</td><td style="color:#8b949e">not triggered</td><td>Seer info_conveyed = 1.0.</td></tr>
-<tr><td>attribution:F.3.witch_misfire</td><td style="color:#8b949e">not triggered</td><td>Witch saved villager, poisoned werewolf.</td></tr>
-<tr><td>attribution:F.4.vote_deviation</td><td style="color:#8b949e">not triggered</td><td>Round 1 accuracy = 50% (not &lt;50%).</td></tr>
-<tr><td>attribution:F.5.successful_disguise</td><td style="color:#8b949e">not triggered</td><td>No wolf survived &ge;2 rounds after being voted.</td></tr>
+<tr><td>attribution:F.1 关键投票</td><td style="color:#3fb950">已触发</td><td>第 2 轮票差为 1，一票改变结果。</td></tr>
+<tr><td>attribution:F.2 信息断层</td><td style="color:#8b949e">未触发</td><td>预言家信息传递率 = 1.0。</td></tr>
+<tr><td>attribution:F.3 女巫误伤</td><td style="color:#8b949e">未触发</td><td>女巫救平民、毒狼人，无误伤核心角色。</td></tr>
+<tr><td>attribution:F.4 投票偏离</td><td style="color:#8b949e">未触发</td><td>第 1 轮准确率 = 50%（不满足 &lt;50%）。</td></tr>
+<tr><td>attribution:F.5 伪装存活</td><td style="color:#8b949e">未触发</td><td>无狼人被投票后存活 &ge;2 轮。</td></tr>
 </tbody></table>
 
-<div class="note"><b>Validation Observation:</b> Round 1 seer p3 elimination is human-salient, but the current deterministic F.1 rule does not trigger because the vote margin is 4-2 rather than 1. This is recorded as a validation observation, not silently changed in the rubric.</div>
+<div class="note"><b>验证观察：</b>第 1 轮预言家 p3 被票出是肉眼可见的转折，但当前确定性 F.1 规则不触发，因为票差为 4-2 而非 1。此记录为验证观察，不静默修改评分规则。</div>
 </div>
 
-<!-- ==================== LEADERBOARD ==================== -->
+<!-- ==================== 排行榜 ==================== -->
 <div class="panel" id="leaderboard">
-<h2>Leaderboard UI Demo</h2>
+<h2>排行榜演示</h2>
 
 <div class="phase-banner" style="margin-bottom:12px">
-<strong>Phase 1 不跨角色混合排名；真实角色榜需要足够样本后才有统计意义。</strong>
+<strong>第一阶段不跨角色混合排名；真实角色榜需要足够样本后才有统计意义。</strong>
 </div>
 
 <div class="controls">
-<label for="sortSelect">Sort by:</label>
+<label for="sortSelect">排序方式：</label>
 <select id="sortSelect" class="sort-btn" onchange="renderLeaderboard(this.value)">
-<option value="avg_decision_quality_score">avg_decision_quality_score (desc)</option>
-<option value="win_rate">win_rate (desc)</option>
-<option value="avg_outcome_score">avg_outcome_score (desc)</option>
-<option value="avg_total_score">avg_total_score (desc)</option>
-<option value="avg_rule_integrity_score">avg_rule_integrity_score (desc)</option>
-<option value="info_leak_rate">info_leak_rate (asc)</option>
+<option value="avg_decision_quality_score">决策质量分（降序）</option>
+<option value="win_rate">胜率（降序）</option>
+<option value="avg_outcome_score">结果贡献分（降序）</option>
+<option value="avg_total_score">综合分（降序）</option>
+<option value="avg_rule_integrity_score">规则合规分（降序）</option>
+<option value="info_leak_rate">信息泄漏率（升序）</option>
 </select>
 </div>
 
-<h3>Overview Leaderboard</h3>
+<h3>总览排行榜</h3>
 <table id="leaderboardTable"><thead><tr>
-<th>Agent</th><th>Model</th><th>Games</th><th>Win Rate</th><th>Outcome</th><th>DQ</th><th>RI</th><th>Total</th><th>Info Leak</th><th>Conf</th><th>Source</th>
+<th>智能体</th><th>模型</th><th>局数</th><th>胜率</th><th>贡献分</th><th>决策质量</th><th>规则合规</th><th>综合分</th><th>信息泄漏</th><th>置信度</th><th>来源</th>
 </tr></thead><tbody></tbody></table>
 <p class="sample-warn" id="sampleWarning"></p>
 
-<h3>Werewolf Role Section</h3>
-<table><thead><tr><th>Agent</th><th>leadership_success</th><th>follow_quality</th><th>persuasion_success</th><th>deadlock_rate</th><th>Win Rate</th><th>Total Score</th><th>Games</th><th>Source</th></tr></thead>
+<h3>狼人角色分区</h3>
+<table><thead><tr><th>智能体</th><th>领导采纳率</th><th>跟随质量</th><th>说服成功率</th><th>僵局率</th><th>胜率</th><th>综合分</th><th>局数</th><th>来源</th></tr></thead>
 <tbody id="wolfRoleBody"></tbody></table>
 
-<h3>Seer Role Section</h3>
-<table><thead><tr><th>Agent</th><th>Win Rate</th><th>Total Score</th><th>Games</th><th>Source</th></tr></thead>
+<h3>预言家角色分区</h3>
+<table><thead><tr><th>智能体</th><th>胜率</th><th>综合分</th><th>局数</th><th>来源</th></tr></thead>
 <tbody id="seerRoleBody"></tbody></table>
 
-<h3>Witch Role Section</h3>
-<table><thead><tr><th>Agent</th><th>Win Rate</th><th>Total Score</th><th>Games</th><th>Source</th></tr></thead>
+<h3>女巫角色分区</h3>
+<table><thead><tr><th>智能体</th><th>胜率</th><th>综合分</th><th>局数</th><th>来源</th></tr></thead>
 <tbody id="witchRoleBody"></tbody></table>
 
-<h3>Villager Role Section</h3>
-<table><thead><tr><th>Agent</th><th>Win Rate</th><th>Total Score</th><th>Games</th><th>Source</th></tr></thead>
+<h3>平民角色分区</h3>
+<table><thead><tr><th>智能体</th><th>胜率</th><th>综合分</th><th>局数</th><th>来源</th></tr></thead>
 <tbody id="villagerRoleBody"></tbody></table>
 </div>
 
 <footer>
-Werewolf-agent Phase 1 Gold Demo &mdash; data labels: [结构化事件] [deterministic] [mock]
+Werewolf-agent 第一阶段演示 &mdash; 数据标注：[结构化事件] [确定性] [模拟数据]
 </footer>
 
 <script>
