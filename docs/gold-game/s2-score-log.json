@@ -1,0 +1,318 @@
+{
+  "score_log_id": "s2_g001_expected_score_log",
+  "game_id": "g001",
+  "source_game_log": "docs/gold-game/g001-game-log.json",
+  "source_label": "[deterministic]",
+  "phase": "Phase 1",
+  "scoring_boundary": {
+    "decision_quality_score": 0,
+    "decision_quality_reason": "Phase 1 has no real Decision Log. All decision_quality_score values are fixed at 0.",
+    "ai_annotations": "none",
+    "rule_integrity_default": 0,
+    "rule_integrity_reason": "S1 contains no info_leak_flag or contradiction_flag events."
+  },
+  "records": [
+    {
+      "score_id": "s2_g001_e007",
+      "event_id": "g001_e007",
+      "actor": "wolf_team",
+      "scope": "team",
+      "round": 1,
+      "phase": "night",
+      "action_type": "werewolf_kill",
+      "target": "p5",
+      "outcome_score": 1,
+      "decision_quality_score": 0,
+      "rule_integrity_score": 0,
+      "rules_triggered": [
+        "rubric:E.1.werewolf.kill_villager"
+      ],
+      "evidence_event_ids": [
+        "g001_e007",
+        "g001_e009",
+        "g001_e028"
+      ],
+      "notes": "Wolf team chose a villager target; p5 is later revealed as villager, while g001_e009 records that the Night 1 save prevented the kill from taking effect."
+    },
+    {
+      "score_id": "s2_g001_e008",
+      "event_id": "g001_e008",
+      "actor": "p3",
+      "scope": "player",
+      "round": 1,
+      "phase": "night",
+      "action_type": "seer_check",
+      "target": "p1",
+      "outcome_score": 2,
+      "decision_quality_score": 0,
+      "rule_integrity_score": 0,
+      "rules_triggered": [
+        "rubric:E.2.seer.check_werewolf"
+      ],
+      "evidence_event_ids": [
+        "g001_e008",
+        "g001_e037"
+      ],
+      "notes": "Seer checked p1, who is later revealed as werewolf."
+    },
+    {
+      "score_id": "s2_g001_e009",
+      "event_id": "g001_e009",
+      "actor": "p4",
+      "scope": "player",
+      "round": 1,
+      "phase": "night",
+      "action_type": "witch_save",
+      "target": "p5",
+      "outcome_score": 1,
+      "decision_quality_score": 0,
+      "rule_integrity_score": 0,
+      "rules_triggered": [
+        "rubric:E.3.witch.save_villager"
+      ],
+      "evidence_event_ids": [
+        "g001_e009",
+        "g001_e028"
+      ],
+      "notes": "Witch saved p5, who is later revealed as villager."
+    },
+    {
+      "score_id": "s2_g001_e016",
+      "event_id": "g001_e016",
+      "actor": "p1",
+      "scope": "player",
+      "round": 1,
+      "phase": "day",
+      "action_type": "player_vote",
+      "target": "p3",
+      "outcome_score": 2,
+      "decision_quality_score": 0,
+      "rule_integrity_score": 0,
+      "rules_triggered": [
+        "rubric:E.1.werewolf.vote_eliminate_key_villager"
+      ],
+      "evidence_event_ids": [
+        "g001_e016",
+        "g001_e022",
+        "g001_e023"
+      ],
+      "notes": "Werewolf p1 voted to eliminate p3, who is revealed as seer."
+    },
+    {
+      "score_id": "s2_g001_e017",
+      "event_id": "g001_e017",
+      "actor": "p2",
+      "scope": "player",
+      "round": 1,
+      "phase": "day",
+      "action_type": "player_vote",
+      "target": "p3",
+      "outcome_score": 2,
+      "decision_quality_score": 0,
+      "rule_integrity_score": 0,
+      "rules_triggered": [
+        "rubric:E.1.werewolf.vote_eliminate_key_villager"
+      ],
+      "evidence_event_ids": [
+        "g001_e017",
+        "g001_e022",
+        "g001_e023"
+      ],
+      "notes": "Werewolf p2 voted to eliminate p3, who is revealed as seer."
+    },
+    {
+      "score_id": "s2_g001_e018",
+      "event_id": "g001_e018",
+      "actor": "p3",
+      "scope": "player",
+      "round": 1,
+      "phase": "day",
+      "action_type": "player_vote",
+      "target": "p1",
+      "outcome_score": 2,
+      "decision_quality_score": 0,
+      "rule_integrity_score": 0,
+      "rules_triggered": [
+        "rubric:E.2.seer.vote_eliminate_werewolf"
+      ],
+      "evidence_event_ids": [
+        "g001_e018",
+        "g001_e037"
+      ],
+      "notes": "Seer p3 voted for p1, who is later revealed as werewolf."
+    },
+    {
+      "score_id": "s2_g001_e019",
+      "event_id": "g001_e019",
+      "actor": "p4",
+      "scope": "player",
+      "round": 1,
+      "phase": "day",
+      "action_type": "player_vote",
+      "target": "p1",
+      "outcome_score": 0,
+      "decision_quality_score": 0,
+      "rule_integrity_score": 0,
+      "rules_triggered": [
+        "rubric-gap:witch_day_vote_outcome_not_explicit"
+      ],
+      "evidence_event_ids": [
+        "g001_e019",
+        "g001_e037"
+      ],
+      "notes": "Witch daytime vote is counted in vote_accuracy metrics, but E.3 has no explicit vote outcome row. S2 assigns score 0 and records the rubric gap."
+    },
+    {
+      "score_id": "s2_g001_e020",
+      "event_id": "g001_e020",
+      "actor": "p5",
+      "scope": "player",
+      "round": 1,
+      "phase": "day",
+      "action_type": "player_vote",
+      "target": "p3",
+      "outcome_score": -2,
+      "decision_quality_score": 0,
+      "rule_integrity_score": 0,
+      "rules_triggered": [
+        "rubric:E.4.villager.vote_eliminate_key_villager"
+      ],
+      "evidence_event_ids": [
+        "g001_e020",
+        "g001_e022",
+        "g001_e023"
+      ],
+      "notes": "Villager p5 voted to eliminate p3, who is revealed as seer."
+    },
+    {
+      "score_id": "s2_g001_e021",
+      "event_id": "g001_e021",
+      "actor": "p6",
+      "scope": "player",
+      "round": 1,
+      "phase": "day",
+      "action_type": "player_vote",
+      "target": "p3",
+      "outcome_score": -2,
+      "decision_quality_score": 0,
+      "rule_integrity_score": 0,
+      "rules_triggered": [
+        "rubric:E.4.villager.vote_eliminate_key_villager"
+      ],
+      "evidence_event_ids": [
+        "g001_e021",
+        "g001_e022",
+        "g001_e023"
+      ],
+      "notes": "Villager p6 voted to eliminate p3, who is revealed as seer."
+    },
+    {
+      "score_id": "s2_g001_e024",
+      "event_id": "g001_e024",
+      "actor": "wolf_team",
+      "scope": "team",
+      "round": 2,
+      "phase": "night",
+      "action_type": "werewolf_kill",
+      "target": "p5",
+      "outcome_score": 1,
+      "decision_quality_score": 0,
+      "rule_integrity_score": 0,
+      "rules_triggered": [
+        "rubric:E.1.werewolf.kill_villager"
+      ],
+      "evidence_event_ids": [
+        "g001_e024",
+        "g001_e026",
+        "g001_e028"
+      ],
+      "notes": "Wolf team killed p5, who is revealed as villager."
+    },
+    {
+      "score_id": "s2_g001_e025",
+      "event_id": "g001_e025",
+      "actor": "p4",
+      "scope": "player",
+      "round": 2,
+      "phase": "night",
+      "action_type": "witch_poison",
+      "target": "p2",
+      "outcome_score": 3,
+      "decision_quality_score": 0,
+      "rule_integrity_score": 0,
+      "rules_triggered": [
+        "rubric:E.3.witch.poison_werewolf"
+      ],
+      "evidence_event_ids": [
+        "g001_e025",
+        "g001_e029"
+      ],
+      "notes": "Witch poisoned p2, who is revealed as werewolf."
+    },
+    {
+      "score_id": "s2_g001_e033",
+      "event_id": "g001_e033",
+      "actor": "p1",
+      "scope": "player",
+      "round": 2,
+      "phase": "day",
+      "action_type": "player_vote",
+      "target": "p4",
+      "outcome_score": 0,
+      "decision_quality_score": 0,
+      "rule_integrity_score": 0,
+      "rules_triggered": [
+        "rubric-gap:werewolf_day_vote_without_elimination"
+      ],
+      "evidence_event_ids": [
+        "g001_e033",
+        "g001_e036"
+      ],
+      "notes": "p1 voted for p4, but p4 was not eliminated. E.1 has no explicit row for a werewolf vote that does not cause elimination, so S2 assigns 0 and records the rubric gap."
+    },
+    {
+      "score_id": "s2_g001_e034",
+      "event_id": "g001_e034",
+      "actor": "p4",
+      "scope": "player",
+      "round": 2,
+      "phase": "day",
+      "action_type": "player_vote",
+      "target": "p1",
+      "outcome_score": 0,
+      "decision_quality_score": 0,
+      "rule_integrity_score": 0,
+      "rules_triggered": [
+        "rubric-gap:witch_day_vote_outcome_not_explicit"
+      ],
+      "evidence_event_ids": [
+        "g001_e034",
+        "g001_e036",
+        "g001_e037"
+      ],
+      "notes": "Witch daytime vote is counted in vote_accuracy metrics, but E.3 has no explicit vote outcome row. S2 assigns score 0 and records the rubric gap."
+    },
+    {
+      "score_id": "s2_g001_e035",
+      "event_id": "g001_e035",
+      "actor": "p6",
+      "scope": "player",
+      "round": 2,
+      "phase": "day",
+      "action_type": "player_vote",
+      "target": "p1",
+      "outcome_score": 2,
+      "decision_quality_score": 0,
+      "rule_integrity_score": 0,
+      "rules_triggered": [
+        "rubric:E.4.villager.vote_eliminate_werewolf"
+      ],
+      "evidence_event_ids": [
+        "g001_e035",
+        "g001_e036",
+        "g001_e037"
+      ],
+      "notes": "Villager p6 voted to eliminate p1, who is revealed as werewolf."
+    }
+  ]
+}
