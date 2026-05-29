@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Werewolf-agent Phase 1 Gold Demo</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#0f1117;color:#e1e4e8;line-height:1.6;padding:clamp(12px,3vw,32px)}
+h1{font-size:clamp(1.3rem,3vw,1.8rem);text-align:center;margin-bottom:4px}
+h2{font-size:clamp(1rem,2.5vw,1.3rem);border-bottom:2px solid #30363d;padding-bottom:6px;margin:24px 0 12px}
+h3{font-size:.95rem;margin:16px 0 8px;color:#8b949e}
+table{width:100%;border-collapse:collapse;font-size:.85rem;margin:8px 0}
+th,td{padding:6px 10px;text-align:left;border:1px solid #30363d}
+th{background:#161b22;font-weight:600;position:sticky;top:0}
+tr:nth-child(even){background:#161b2299}
+.panel{background:#161b22;border:1px solid #30363d;border-radius:6px;padding:16px;margin-bottom:16px}
+.badge{display:inline-block;font-size:.72rem;padding:1px 6px;border-radius:3px;font-weight:600;margin-right:4px;white-space:nowrap}
+.badge-event{background:#1f3a4b;color:#58a6ff}
+.badge-deterministic{background:#1f3a1f;color:#3fb950}
+.badge-mock{background:#3a2f1f;color:#d29922}
+.badge-warn{background:#3a1f1f;color:#f85149}
+.badge-info{background:#2f1f3a;color:#bc8cff}
+.phase-banner{background:#1f1f2e;border-left:3px solid #f0883e;padding:12px 16px;margin-bottom:20px;font-size:.82rem;color:#c9d1d9;border-radius:0 6px 6px 0}
+.phase-banner strong{color:#f0883e}
+.timeline-group{margin-bottom:10px}
+.timeline-group h4{font-size:.82rem;color:#8b949e;margin-bottom:4px}
+.timeline-table{font-size:.78rem}
+.timeline-table td{font-size:.76rem}
+.metrics-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px}
+.metric-kv{background:#0d1117;padding:8px 10px;border-radius:4px;border:1px solid #21262d}
+.metric-kv .key{font-size:.72rem;color:#8b949e}
+.metric-kv .val{font-size:.95rem;font-weight:600;color:#e6edf3}
+.controls{margin:8px 0 16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.controls label{font-size:.85rem;color:#8b949e}
+.controls select{padding:4px 8px;background:#0d1117;color:#e6edf3;border:1px solid #30363d;border-radius:4px;font-size:.85rem}
+.warning-row{background:#3a1f1f44!important;color:#f0883e}
+.sample-warn{font-size:.75rem;color:#f0883e}
+.role-label{font-size:.72rem;background:#21262d;padding:1px 5px;border-radius:3px;margin:0 2px}
+.werewolf{color:#f85149}
+.seer{color:#bc8cff}
+.witch{color:#3fb950}
+.villager{color:#8b949e}
+.note{font-size:.78rem;color:#8b949e;border-left:2px solid #58a6ff;padding:4px 10px;margin:8px 0}
+footer{text-align:center;font-size:.75rem;color:#484f58;margin-top:32px;padding-top:16px;border-top:1px solid #21262d}
+select.sort-btn{min-width:200px}
+</style>
+</head>
+<body>
+
+<h1>Werewolf-agent Phase 1 Gold Demo</h1>
+<p style="text-align:center;font-size:.85rem;color:#8b949e;margin-bottom:16px">结构化 Game Log &rarr; 确定性评测 &rarr; 规则归因 &rarr; Leaderboard UI demo</p>
+
+<div class="phase-banner">
+<strong>Phase 1 只做静态 HTML UI demo。</strong><br>
+不包含真实 AI Agent 对局。decision_quality_score 在 Phase 1 固定为 0。Leaderboard 只是一行 Gold Game deterministic 数据 + 多行 mock 数据。
+</div>
+
+<!-- ==================== GOLD GAME SUMMARY ==================== -->
+<div class="panel" id="game-summary">
+<h2>Gold Game Summary <span class="badge badge-event">[结构化事件]</span></h2>
+<table>
+<tr><td style="width:200px">Game ID</td><td>g001</td></tr>
+<tr><td>Players</td><td>6</td></tr>
+<tr><td>Role setup</td><td>2 werewolves + 1 seer + 1 witch + 2 villagers</td></tr>
+<tr><td>Winner</td><td>villager</td></tr>
+<tr><td>End round</td><td>2</td></tr>
+<tr><td>Survivors</td><td>p4, p6</td></tr>
+<tr><td>End condition</td><td>all_werewolves_eliminated</td></tr>
+<tr><td>Data source</td><td><span class="badge badge-event">[结构化事件]</span></td></tr>
+</table>
+</div>
+
+<!-- ==================== PLAYER TABLE ==================== -->
+<div class="panel" id="player-table">
+<h2>Player Status <span class="badge badge-event">[结构化事件]</span></h2>
+<table>
+<thead><tr><th>Player</th><th>Role</th><th>Team</th><th>Final status</th><th>Source</th></tr></thead>
+<tbody>
+<tr><td><b>p1</b></td><td><span class="role-label werewolf">werewolf</span></td><td>werewolf</td><td>eliminated, revealed</td><td><span class="badge badge-event">[结构化事件]</span></td></tr>
+<tr><td><b>p2</b></td><td><span class="role-label werewolf">werewolf</span></td><td>werewolf</td><td>died, revealed</td><td><span class="badge badge-event">[结构化事件]</span></td></tr>
+<tr><td><b>p3</b></td><td><span class="role-label seer">seer</span></td><td>villager</td><td>eliminated, revealed</td><td><span class="badge badge-event">[结构化事件]</span></td></tr>
+<tr><td><b>p4</b></td><td><span class="role-label witch">witch</span></td><td>villager</td><td>survivor</td><td><span class="badge badge-event">[结构化事件]</span></td></tr>
+<tr><td><b>p5</b></td><td><span class="role-label villager">villager</span></td><td>villager</td><td>died, revealed</td><td><span class="badge badge-event">[结构化事件]</span></td></tr>
+<tr><td><b>p6</b></td><td><span class="role-label villager">villager</span></td><td>villager</td><td>survivor</td><td><span class="badge badge-event">[结构化事件]</span></td></tr>
+</tbody></table>
+</div>
+
+<!-- ==================== TIMELINE ==================== -->
+<div class="panel" id="timeline">
+<h2>Timeline <span class="badge badge-event">[结构化事件]</span></h2>
+
+<div class="timeline-group"><h4>Round 0 &mdash; Setup</h4>
+<table class="timeline-table">
+<thead><tr><th>seq</th><th>type</th><th>actor</th><th>target</th><th>visibility</th><th>summary</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>role_assignment</td><td>system</td><td>p1</td><td>specific_player_ids</td><td>p1 receives the werewolf role.</td></tr>
+<tr><td>2</td><td>role_assignment</td><td>system</td><td>p2</td><td>specific_player_ids</td><td>p2 receives the werewolf role.</td></tr>
+<tr><td>3</td><td>role_assignment</td><td>system</td><td>p3</td><td>specific_player_ids</td><td>p3 receives the seer role.</td></tr>
+<tr><td>4</td><td>role_assignment</td><td>system</td><td>p4</td><td>specific_player_ids</td><td>p4 receives the witch role.</td></tr>
+<tr><td>5</td><td>role_assignment</td><td>system</td><td>p5</td><td>specific_player_ids</td><td>p5 receives the villager role.</td></tr>
+<tr><td>6</td><td>role_assignment</td><td>system</td><td>p6</td><td>specific_player_ids</td><td>p6 receives the villager role.</td></tr>
+</tbody></table></div>
+
+<div class="timeline-group"><h4>Round 1 &mdash; Night</h4>
+<table class="timeline-table">
+<thead><tr><th>seq</th><th>type</th><th>actor</th><th>target</th><th>visibility</th><th>summary</th></tr></thead>
+<tbody>
+<tr><td>7</td><td>werewolf_kill</td><td>wolf_team</td><td>p5</td><td>werewolf_team</td><td>The werewolf team chooses p5 as the kill target.</td></tr>
+<tr><td>8</td><td>seer_check</td><td>p3</td><td>p1</td><td>seer</td><td>p3 checks p1 and receives a werewolf result.</td></tr>
+<tr><td>9</td><td>witch_save</td><td>p4</td><td>p5</td><td>witch</td><td>p4 uses the save potion on p5.</td></tr>
+</tbody></table></div>
+
+<div class="timeline-group"><h4>Round 1 &mdash; Day</h4>
+<table class="timeline-table">
+<thead><tr><th>seq</th><th>type</th><th>actor</th><th>target</th><th>visibility</th><th>summary</th></tr></thead>
+<tbody>
+<tr><td>10</td><td>player_speech</td><td>p3</td><td>p1</td><td>public</td><td>p3 claims useful night information and pushes suspicion toward p1.</td></tr>
+<tr><td>11</td><td>player_speech</td><td>p1</td><td>p3</td><td>public</td><td>p1 challenges p3 and frames p3 as a wolf trying to force an early mis-elimination.</td></tr>
+<tr><td>12</td><td>player_speech</td><td>p2</td><td>p3</td><td>public</td><td>p2 supports p1 and argues that p3's pressure is too aggressive.</td></tr>
+<tr><td>13</td><td>player_speech</td><td>p4</td><td>p1</td><td>public</td><td>p4 notes that p1 and p2 are aligned too quickly but does not reveal witch identity.</td></tr>
+<tr><td>14</td><td>player_speech</td><td>p5</td><td>p3</td><td>public</td><td>p5 says p3's claim lacks enough public evidence and leans toward voting p3.</td></tr>
+<tr><td>15</td><td>player_speech</td><td>p6</td><td>p1</td><td>public</td><td>p6 is uncertain but sees a possible p1 and p2 pairing.</td></tr>
+<tr><td>16</td><td>player_vote</td><td>p1</td><td>p3</td><td>public</td><td>p1 votes for p3.</td></tr>
+<tr><td>17</td><td>player_vote</td><td>p2</td><td>p3</td><td>public</td><td>p2 votes for p3.</td></tr>
+<tr><td>18</td><td>player_vote</td><td>p3</td><td>p1</td><td>public</td><td>p3 votes for p1.</td></tr>
+<tr><td>19</td><td>player_vote</td><td>p4</td><td>p1</td><td>public</td><td>p4 votes for p1.</td></tr>
+<tr><td>20</td><td>player_vote</td><td>p5</td><td>p3</td><td>public</td><td>p5 votes for p3.</td></tr>
+<tr><td>21</td><td>player_vote</td><td>p6</td><td>p3</td><td>public</td><td>p6 votes for p3.</td></tr>
+<tr style="background:#3a1f1f55"><td>22</td><td>player_eliminated</td><td>system</td><td>p3</td><td>public</td><td>p3 is eliminated by a 4-2 vote.</td></tr>
+<tr><td>23</td><td>role_revealed</td><td>system</td><td>p3</td><td>public</td><td>p3 is revealed as the seer.</td></tr>
+</tbody></table></div>
+
+<div class="timeline-group"><h4>Round 2 &mdash; Night</h4>
+<table class="timeline-table">
+<thead><tr><th>seq</th><th>type</th><th>actor</th><th>target</th><th>visibility</th><th>summary</th></tr></thead>
+<tbody>
+<tr><td>24</td><td>werewolf_kill</td><td>wolf_team</td><td>p5</td><td>werewolf_team</td><td>The werewolf team again chooses p5 as the kill target.</td></tr>
+<tr><td>25</td><td>witch_poison</td><td>p4</td><td>p2</td><td>witch</td><td>p4 uses the poison potion on p2 based on public evidence.</td></tr>
+</tbody></table></div>
+
+<div class="timeline-group"><h4>Round 2 &mdash; Day</h4>
+<table class="timeline-table">
+<thead><tr><th>seq</th><th>type</th><th>actor</th><th>target</th><th>visibility</th><th>summary</th></tr></thead>
+<tbody>
+<tr style="background:#3a1f1f33"><td>26</td><td>player_died</td><td>system</td><td>p5</td><td>public</td><td>p5 dies from the werewolf night kill.</td></tr>
+<tr style="background:#1f3a1f33"><td>27</td><td>player_died</td><td>system</td><td>p2</td><td>public</td><td>p2 dies from the witch poison.</td></tr>
+<tr><td>28</td><td>role_revealed</td><td>system</td><td>p5</td><td>public</td><td>p5 is revealed as a villager.</td></tr>
+<tr><td>29</td><td>role_revealed</td><td>system</td><td>p2</td><td>public</td><td>p2 is revealed as a werewolf.</td></tr>
+<tr><td>30</td><td>player_speech</td><td>p4</td><td>p1</td><td>public</td><td>p4 argues that p1 and p2 formed a coordinated push against the real seer.</td></tr>
+<tr><td>31</td><td>player_speech</td><td>p1</td><td>p4</td><td>public</td><td>p1 argues that p4 is using p2's death to force an easy final vote.</td></tr>
+<tr><td>32</td><td>player_speech</td><td>p6</td><td>p1</td><td>public</td><td>p6 accepts that p2's revealed role makes p1's Day 1 behavior highly suspicious.</td></tr>
+<tr><td>33</td><td>player_vote</td><td>p1</td><td>p4</td><td>public</td><td>p1 votes for p4.</td></tr>
+<tr><td>34</td><td>player_vote</td><td>p4</td><td>p1</td><td>public</td><td>p4 votes for p1.</td></tr>
+<tr><td>35</td><td>player_vote</td><td>p6</td><td>p1</td><td>public</td><td>p6 votes for p1.</td></tr>
+<tr style="background:#1f3a1f33"><td>36</td><td>player_eliminated</td><td>system</td><td>p1</td><td>public</td><td>p1 is eliminated by a 2-1 vote.</td></tr>
+<tr><td>37</td><td>role_revealed</td><td>system</td><td>p1</td><td>public</td><td>p1 is revealed as a werewolf.</td></tr>
+<tr style="background:#1f3a1f55"><td>38</td><td>game_over</td><td>system</td><td>villager_team</td><td>public</td><td>The village team wins because all werewolves have been eliminated.</td></tr>
+</tbody></table></div>
+</div>
+
+<!-- ==================== VOTE TABLE ==================== -->
+<div class="panel" id="vote-table">
+<h2>Vote Summary <span class="badge badge-event">[结构化事件]</span></h2>
+<div class="timeline-group"><h4>Round 1</h4>
+<table><thead><tr><th>Voter</th><th>Target</th><th>Voter role (final)</th></tr></thead>
+<tbody>
+<tr><td>p1</td><td>p3 <span class="role-label seer">seer</span></td><td><span class="role-label werewolf">werewolf</span></td></tr>
+<tr><td>p2</td><td>p3 <span class="role-label seer">seer</span></td><td><span class="role-label werewolf">werewolf</span></td></tr>
+<tr><td>p3</td><td>p1 <span class="role-label werewolf">werewolf</span></td><td><span class="role-label seer">seer</span></td></tr>
+<tr><td>p4</td><td>p1 <span class="role-label werewolf">werewolf</span></td><td><span class="role-label witch">witch</span></td></tr>
+<tr><td>p5</td><td>p3 <span class="role-label seer">seer</span></td><td><span class="role-label villager">villager</span></td></tr>
+<tr><td>p6</td><td>p3 <span class="role-label seer">seer</span></td><td><span class="role-label villager">villager</span></td></tr>
+</tbody></table>
+<p style="margin-top:4px;font-size:.85rem"><b>Round 1 result:</b> p1, p2, p5, p6 voted p3; p3 and p4 voted p1; p3 eliminated 4-2.</p>
+</div>
+<div class="timeline-group"><h4>Round 2</h4>
+<table><thead><tr><th>Voter</th><th>Target</th><th>Voter role (final)</th></tr></thead>
+<tbody>
+<tr><td>p1</td><td>p4 <span class="role-label witch">witch</span></td><td><span class="role-label werewolf">werewolf</span></td></tr>
+<tr><td>p4</td><td>p1 <span class="role-label werewolf">werewolf</span></td><td><span class="role-label witch">witch</span></td></tr>
+<tr><td>p6</td><td>p1 <span class="role-label werewolf">werewolf</span></td><td><span class="role-label villager">villager</span></td></tr>
+</tbody></table>
+<p style="margin-top:4px;font-size:.85rem"><b>Round 2 result:</b> p1 voted p4; p4 and p6 voted p1; p1 eliminated 2-1.</p>
+</div>
+</div>
+
+<!-- ==================== RESULT METRICS ==================== -->
+<div class="panel" id="result-metrics">
+<h2>Result Metrics <span class="badge badge-deterministic">[deterministic]</span></h2>
+<div class="metrics-grid">
+<div class="metric-kv"><span class="key">winner</span><br><span class="val">villager</span></div>
+<div class="metric-kv"><span class="key">game_length</span><br><span class="val">2</span></div>
+<div class="metric-kv"><span class="key">werewolf_survival_rate</span><br><span class="val">0.0</span></div>
+<div class="metric-kv"><span class="key">villager_survival_rate</span><br><span class="val">0.5</span></div>
+<div class="metric-kv"><span class="key">margin</span><br><span class="val">2</span></div>
+<div class="metric-kv"><span class="key">villager_win_efficiency</span><br><span class="val">1.0</span></div>
+</div>
+</div>
+
+<!-- ==================== PROCESS METRICS ==================== -->
+<div class="panel" id="process-metrics">
+<h2>Process Metrics <span class="badge badge-deterministic">[deterministic]</span></h2>
+
+<h3>vote_accuracy_by_player</h3>
+<table><thead><tr><th>Player</th><th>Role</th><th>Accurate votes</th><th>Total votes</th><th>Accuracy</th></tr></thead>
+<tbody>
+<tr><td>p1</td><td><span class="role-label werewolf">werewolf</span></td><td>2</td><td>2</td><td>1.0</td></tr>
+<tr><td>p2</td><td><span class="role-label werewolf">werewolf</span></td><td>1</td><td>1</td><td>1.0</td></tr>
+<tr><td>p3</td><td><span class="role-label seer">seer</span></td><td>1</td><td>1</td><td>1.0</td></tr>
+<tr><td>p4</td><td><span class="role-label witch">witch</span></td><td>2</td><td>2</td><td>1.0</td></tr>
+<tr><td>p5</td><td><span class="role-label villager">villager</span></td><td>0</td><td>1</td><td>0.0</td></tr>
+<tr><td>p6</td><td><span class="role-label villager">villager</span></td><td>1</td><td>2</td><td>0.5</td></tr>
+</tbody></table>
+
+<h3>survival_rounds</h3>
+<div class="metrics-grid">
+<div class="metric-kv"><span class="key">p1</span><br><span class="val">2</span></div>
+<div class="metric-kv"><span class="key">p2</span><br><span class="val">2</span></div>
+<div class="metric-kv"><span class="key">p3</span><br><span class="val">1</span></div>
+<div class="metric-kv"><span class="key">p4</span><br><span class="val">2</span></div>
+<div class="metric-kv"><span class="key">p5</span><br><span class="val">2</span></div>
+<div class="metric-kv"><span class="key">p6</span><br><span class="val">2</span></div>
+</div>
+
+<h3>seer_metrics</h3>
+<table><thead><tr><th>Metric</th><th>Value</th></tr></thead>
+<tbody>
+<tr><td>check_accuracy</td><td>1.0</td></tr>
+<tr><td>info_conveyed</td><td>1.0</td></tr>
+</tbody></table>
+
+<h3>witch_metrics</h3>
+<table><thead><tr><th>Metric</th><th>Value</th></tr></thead>
+<tbody>
+<tr><td>save_accuracy</td><td>1.0</td></tr>
+<tr><td>poison_accuracy</td><td>1.0</td></tr>
+</tbody></table>
+
+<h3>team_metrics</h3>
+<table><thead><tr><th>Metric</th><th>Value</th></tr></thead>
+<tbody>
+<tr><td>village_vote_cohesion</td><td>0.75</td></tr>
+<tr><td>werewolf_vote_coordination</td><td>1.0</td></tr>
+</tbody></table>
+</div>
+
+<!-- ==================== SCORE CARD ==================== -->
+<div class="panel" id="score-card">
+<h2>Score Card <span class="badge badge-deterministic">[deterministic]</span></h2>
+<table><thead><tr><th>Subject</th><th>Role / Scope</th><th>Outcome score</th><th>Decision quality score</th><th>Rule integrity score</th><th>Data label</th></tr></thead>
+<tbody>
+<tr><td><b>p1</b></td><td>werewolf (player)</td><td>2</td><td>0</td><td>0</td><td><span class="badge badge-deterministic">[deterministic]</span></td></tr>
+<tr><td><b>p2</b></td><td>werewolf (player)</td><td>2</td><td>0</td><td>0</td><td><span class="badge badge-deterministic">[deterministic]</span></td></tr>
+<tr><td><b>p3</b></td><td>seer (player)</td><td>4</td><td>0</td><td>0</td><td><span class="badge badge-deterministic">[deterministic]</span></td></tr>
+<tr><td><b>p4</b></td><td>witch (player)</td><td>4</td><td>0</td><td>0</td><td><span class="badge badge-deterministic">[deterministic]</span></td></tr>
+<tr><td><b>p5</b></td><td>villager (player)</td><td>-2</td><td>0</td><td>0</td><td><span class="badge badge-deterministic">[deterministic]</span></td></tr>
+<tr><td><b>p6</b></td><td>villager (player)</td><td>0</td><td>0</td><td>0</td><td><span class="badge badge-deterministic">[deterministic]</span></td></tr>
+<tr><td><b>wolf_team</b></td><td>team</td><td>2</td><td>0</td><td>0</td><td><span class="badge badge-deterministic">[deterministic]</span></td></tr>
+</tbody></table>
+<div class="note">decision_quality_score 在 Phase 1 固定为 0（无真实 Decision Log）。rule_integrity_score 均为 0（Game Log 无 info_leak_flag 或 contradiction_flag）。</div>
+</div>
+
+<!-- ==================== ATTRIBUTION ==================== -->
+<div class="panel" id="attribution">
+<h2>Rule Attribution <span class="badge badge-deterministic">[deterministic]</span></h2>
+
+<h3>Top Attribution</h3>
+<p style="font-size:.9rem;background:#0d1117;padding:10px;border-radius:4px;border:1px solid #30363d"><span class="badge badge-info">s3_g001_tp001</span> 第 2 轮 2-1 处决 p1 是本局村民获胜的直接关键转折点。</p>
+
+<h3>Triggered Turn Points</h3>
+<table><thead><tr><th>ID</th><th>Rule</th><th>Round</th><th>Subject</th><th>Impact</th><th>Sign</th></tr></thead>
+<tbody>
+<tr>
+<td>s3_g001_tp001</td>
+<td>attribution:F.1.critical_vote</td>
+<td>2</td>
+<td>p1</td>
+<td>1.0</td>
+<td>positive_for_villager</td>
+</tr>
+</tbody></table>
+<p style="font-size:.78rem;color:#8b949e">Evidence: g001_e033, g001_e034, g001_e035, g001_e036, g001_e037</p>
+
+<h3>Rule Evaluation Summary</h3>
+<table><thead><tr><th>Rule</th><th>Status</th><th>Reason</th></tr></thead>
+<tbody>
+<tr><td>attribution:F.1.critical_vote</td><td style="color:#3fb950">triggered</td><td>Round 2 elimination is 2-1; one changed vote changes the result.</td></tr>
+<tr><td>attribution:F.2.information_gap</td><td style="color:#8b949e">not triggered</td><td>Seer info_conveyed = 1.0.</td></tr>
+<tr><td>attribution:F.3.witch_misfire</td><td style="color:#8b949e">not triggered</td><td>Witch saved villager, poisoned werewolf.</td></tr>
+<tr><td>attribution:F.4.vote_deviation</td><td style="color:#8b949e">not triggered</td><td>Round 1 accuracy = 50% (not &lt;50%).</td></tr>
+<tr><td>attribution:F.5.successful_disguise</td><td style="color:#8b949e">not triggered</td><td>No wolf survived &ge;2 rounds after being voted.</td></tr>
+</tbody></table>
+
+<div class="note"><b>Validation Observation:</b> Round 1 seer p3 elimination is human-salient, but the current deterministic F.1 rule does not trigger because the vote margin is 4-2 rather than 1. This is recorded as a validation observation, not silently changed in the rubric.</div>
+</div>
+
+<!-- ==================== LEADERBOARD ==================== -->
+<div class="panel" id="leaderboard">
+<h2>Leaderboard UI Demo</h2>
+
+<div class="phase-banner" style="margin-bottom:12px">
+<strong>Phase 1 不跨角色混合排名；真实角色榜需要足够样本后才有统计意义。</strong>
+</div>
+
+<div class="controls">
+<label for="sortSelect">Sort by:</label>
+<select id="sortSelect" class="sort-btn" onchange="renderLeaderboard(this.value)">
+<option value="avg_decision_quality_score">avg_decision_quality_score (desc)</option>
+<option value="win_rate">win_rate (desc)</option>
+<option value="avg_outcome_score">avg_outcome_score (desc)</option>
+<option value="avg_total_score">avg_total_score (desc)</option>
+<option value="avg_rule_integrity_score">avg_rule_integrity_score (desc)</option>
+<option value="info_leak_rate">info_leak_rate (asc)</option>
+</select>
+</div>
+
+<h3>Overview Leaderboard</h3>
+<table id="leaderboardTable"><thead><tr>
+<th>Agent</th><th>Model</th><th>Games</th><th>Win Rate</th><th>Outcome</th><th>DQ</th><th>RI</th><th>Total</th><th>Info Leak</th><th>Conf</th><th>Source</th>
+</tr></thead><tbody></tbody></table>
+<p class="sample-warn" id="sampleWarning"></p>
+
+<h3>Werewolf Role Section</h3>
+<table><thead><tr><th>Agent</th><th>leadership_success</th><th>follow_quality</th><th>persuasion_success</th><th>deadlock_rate</th><th>Source</th></tr></thead>
+<tbody id="wolfRoleBody"></tbody></table>
+
+<h3>Seer Role Section</h3>
+<table><thead><tr><th>Agent</th><th>Win Rate</th><th>Total Score</th><th>Games</th><th>Source</th></tr></thead>
+<tbody id="seerRoleBody"></tbody></table>
+
+<h3>Witch Role Section</h3>
+<table><thead><tr><th>Agent</th><th>Win Rate</th><th>Total Score</th><th>Games</th><th>Source</th></tr></thead>
+<tbody id="witchRoleBody"></tbody></table>
+
+<h3>Villager Role Section</h3>
+<table><thead><tr><th>Agent</th><th>Win Rate</th><th>Total Score</th><th>Games</th><th>Source</th></tr></thead>
+<tbody id="villagerRoleBody"></tbody></table>
+</div>
+
+<footer>
+Werewolf-agent Phase 1 Gold Demo &mdash; data labels: [结构化事件] [deterministic] [mock]
+</footer>
+
+<script>
+var leaderboardRows = [
+  {agent_id:"gold-g001-baseline",model:"manually-authored-gold-game",agent_version:"phase1-gold",games_played:1,role_distribution:{werewolf:0,seer:0,witch:0,villager:0,hunter:0},win_rate:1.0,avg_outcome_score:10.0,avg_decision_quality_score:0.0,avg_rule_integrity_score:0.0,avg_total_score:10.0,info_leak_rate:0.0,contradiction_rate:0.0,confidence_level:"low",sample_size_warning:"数据不足，排名无统计意义",source_label:"[deterministic]",role_scores:{werewolf:{win_rate:0,avg_total_score:0,games:0,leadership_success:0,follow_quality:0,persuasion_success:0,deadlock_rate:0},seer:{win_rate:0,avg_total_score:0,games:0},witch:{win_rate:0,avg_total_score:0,games:0},villager:{win_rate:0,avg_total_score:0,games:0}}},
+  {agent_id:"mock-werewolf-alpha",model:"mock-model-v1",agent_version:"v2.1",games_played:3,role_distribution:{werewolf:1,seer:1,witch:0,villager:1,hunter:0},win_rate:0.33,avg_outcome_score:3.5,avg_decision_quality_score:1.2,avg_rule_integrity_score:0.0,avg_total_score:4.7,info_leak_rate:0.05,contradiction_rate:0.02,confidence_level:"low",sample_size_warning:"数据不足，排名无统计意义",source_label:"[mock]",role_scores:{werewolf:{win_rate:0.5,avg_total_score:3.0,games:1,leadership_success:0.8,follow_quality:0.6,persuasion_success:0.5,deadlock_rate:0.1},seer:{win_rate:0.0,avg_total_score:5.0,games:1},witch:{win_rate:0,avg_total_score:0,games:0},villager:{win_rate:0.0,avg_total_score:1.0,games:1}}},
+  {agent_id:"mock-seer-beta",model:"mock-model-v2",agent_version:"v1.0",games_played:5,role_distribution:{werewolf:2,seer:1,witch:1,villager:1,hunter:0},win_rate:0.6,avg_outcome_score:6.2,avg_decision_quality_score:1.8,avg_rule_integrity_score:-0.2,avg_total_score:7.8,info_leak_rate:0.03,contradiction_rate:0.01,confidence_level:"low",sample_size_warning:"低置信度",source_label:"[mock]",role_scores:{werewolf:{win_rate:0.5,avg_total_score:4.0,games:2,leadership_success:0.7,follow_quality:0.5,persuasion_success:0.4,deadlock_rate:0.2},seer:{win_rate:1.0,avg_total_score:8.0,games:1},witch:{win_rate:0.0,avg_total_score:6.0,games:1},villager:{win_rate:1.0,avg_total_score:3.0,games:1}}},
+  {agent_id:"mock-witch-gamma",model:"mock-model-v1",agent_version:"v2.0",games_played:7,role_distribution:{werewolf:2,seer:2,witch:1,villager:2,hunter:0},win_rate:0.43,avg_outcome_score:4.8,avg_decision_quality_score:0.9,avg_rule_integrity_score:-0.5,avg_total_score:5.2,info_leak_rate:0.08,contradiction_rate:0.04,confidence_level:"medium",sample_size_warning:"低置信度",source_label:"[mock]",role_scores:{werewolf:{win_rate:0.0,avg_total_score:2.0,games:2,leadership_success:0.5,follow_quality:0.4,persuasion_success:0.3,deadlock_rate:0.3},seer:{win_rate:0.5,avg_total_score:5.5,games:2},witch:{win_rate:0.0,avg_total_score:7.0,games:1},villager:{win_rate:1.0,avg_total_score:4.0,games:2}}},
+  {agent_id:"mock-villager-delta",model:"mock-model-v3",agent_version:"v1.2",games_played:20,role_distribution:{werewolf:5,seer:5,witch:5,villager:5,hunter:0},win_rate:0.55,avg_outcome_score:5.5,avg_decision_quality_score:2.1,avg_rule_integrity_score:0.0,avg_total_score:7.6,info_leak_rate:0.0,contradiction_rate:0.01,confidence_level:"high",sample_size_warning:"统计可信",source_label:"[mock]",role_scores:{werewolf:{win_rate:0.6,avg_total_score:6.0,games:5,leadership_success:0.85,follow_quality:0.7,persuasion_success:0.6,deadlock_rate:0.05},seer:{win_rate:0.6,avg_total_score:7.5,games:5},witch:{win_rate:0.4,avg_total_score:6.5,games:5},villager:{win_rate:0.6,avg_total_score:5.0,games:5}}},
+  {agent_id:"mock-balanced-epsilon",model:"mock-model-v2",agent_version:"v2.0",games_played:12,role_distribution:{werewolf:3,seer:3,witch:3,villager:3,hunter:0},win_rate:0.5,avg_outcome_score:5.0,avg_decision_quality_score:1.5,avg_rule_integrity_score:-0.1,avg_total_score:6.4,info_leak_rate:0.02,contradiction_rate:0.02,confidence_level:"medium",sample_size_warning:"低置信度",source_label:"[mock]",role_scores:{werewolf:{win_rate:0.33,avg_total_score:4.5,games:3,leadership_success:0.6,follow_quality:0.55,persuasion_success:0.45,deadlock_rate:0.15},seer:{win_rate:0.67,avg_total_score:7.0,games:3},witch:{win_rate:0.67,avg_total_score:6.0,games:3},villager:{win_rate:0.33,avg_total_score:3.5,games:3}}},
+  {agent_id:"mock-risky-zeta",model:"mock-model-v1",agent_version:"v3.0",games_played:2,role_distribution:{werewolf:1,seer:0,witch:0,villager:1,hunter:0},win_rate:0.0,avg_outcome_score:1.0,avg_decision_quality_score:0.5,avg_rule_integrity_score:-2.0,avg_total_score:-0.5,info_leak_rate:0.15,contradiction_rate:0.08,confidence_level:"low",sample_size_warning:"数据不足，排名无统计意义",source_label:"[mock]",role_scores:{werewolf:{win_rate:0,avg_total_score:1.0,games:1,leadership_success:0.3,follow_quality:0.2,persuasion_success:0.1,deadlock_rate:0.5},seer:{win_rate:0,avg_total_score:0,games:0},witch:{win_rate:0,avg_total_score:0,games:0},villager:{win_rate:0.0,avg_total_score:-2.0,games:1}}}
+];
+
+function getWarningClass(warning) {
+  if (!warning) return "";
+  if (warning.indexOf("数据不足") >= 0) return "warning-row";
+  if (warning.indexOf("低置信度") >= 0) return "";
+  return "";
+}
+
+function renderLeaderboard(sortKey) {
+  var rows = leaderboardRows.slice();
+  var isAsc = (sortKey === "info_leak_rate");
+
+  rows.sort(function(a, b) {
+    var va = a[sortKey], vb = b[sortKey];
+    if (va < vb) return isAsc ? -1 : 1;
+    if (va > vb) return isAsc ? 1 : -1;
+    return 0;
+  });
+
+  var tbody = document.getElementById("leaderboardTable").getElementsByTagName("tbody")[0];
+  tbody.innerHTML = "";
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    var cls = getWarningClass(r.sample_size_warning);
+    var srcBadge = r.source_label === "[deterministic]"
+      ? '<span class="badge badge-deterministic">[deterministic]</span>'
+      : '<span class="badge badge-mock">[mock]</span>';
+    tbody.innerHTML += "<tr class=\"" + cls + "\">" +
+      "<td>" + r.agent_id + "</td>" +
+      "<td>" + r.model + "</td>" +
+      "<td>" + r.games_played + "</td>" +
+      "<td>" + r.win_rate.toFixed(2) + "</td>" +
+      "<td>" + r.avg_outcome_score.toFixed(1) + "</td>" +
+      "<td>" + r.avg_decision_quality_score.toFixed(1) + "</td>" +
+      "<td>" + r.avg_rule_integrity_score.toFixed(1) + "</td>" +
+      "<td>" + r.avg_total_score.toFixed(1) + "</td>" +
+      "<td>" + r.info_leak_rate.toFixed(2) + "</td>" +
+      "<td>" + r.confidence_level + "</td>" +
+      "<td>" + srcBadge + "</td>" +
+      "</tr>";
+  }
+
+  var warn = "";
+  for (var j = 0; j < rows.length; j++) {
+    if (rows[j].sample_size_warning) {
+      if (warn.indexOf(rows[j].sample_size_warning) < 0) {
+        if (warn) warn += " | ";
+        warn += rows[j].agent_id + ": " + rows[j].sample_size_warning;
+      }
+    }
+  }
+  document.getElementById("sampleWarning").textContent = warn ? "Sample size warnings: " + warn : "";
+}
+
+function renderRoleTables() {
+  var rows = leaderboardRows;
+
+  function renderRoleBody(id, roleKey, extraCols) {
+    var tbody = document.getElementById(id);
+    tbody.innerHTML = "";
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      var rs = r.role_scores[roleKey];
+      var srcBadge = r.source_label === "[deterministic]"
+        ? '<span class="badge badge-deterministic">[deterministic]</span>'
+        : '<span class="badge badge-mock">[mock]</span>';
+      var cls = getWarningClass(r.sample_size_warning);
+      var rowHtml = "<tr class=\"" + cls + "\"><td>" + r.agent_id + "</td>";
+      if (extraCols) {
+        for (var c = 0; c < extraCols.length; c++) {
+          rowHtml += "<td>" + (rs[extraCols[c]] != null ? (typeof rs[extraCols[c]] === "number" ? rs[extraCols[c]].toFixed(2) : rs[extraCols[c]]) : "N/A") + "</td>";
+        }
+      }
+      rowHtml += "<td>" + rs.win_rate.toFixed(2) + "</td><td>" + rs.avg_total_score.toFixed(1) + "</td><td>" + rs.games + "</td><td>" + srcBadge + "</td></tr>";
+      tbody.innerHTML += rowHtml;
+    }
+  }
+
+  renderRoleBody("wolfRoleBody", "werewolf", ["leadership_success", "follow_quality", "persuasion_success", "deadlock_rate"]);
+  renderRoleBody("seerRoleBody", "seer", []);
+  renderRoleBody("witchRoleBody", "witch", []);
+  renderRoleBody("villagerRoleBody", "villager", []);
+}
+
+renderLeaderboard("avg_decision_quality_score");
+renderRoleTables();
+</script>
+
+</body>
+</html>
