@@ -156,3 +156,28 @@ For village vote cohesion, the village-team vote distribution is `{p1: 2}` over 
 S0 uses a manually authored virtual game as the Phase 1 Gold Game seed.
 
 This satisfies the S0 fallback path because the event chain is complete, deterministic, and free from external-source risk. It also avoids spending Phase 1 effort on public match research before the scoring pipeline has a fixed input.
+
+## S0 Acceptance Check
+
+- [x] Event chain is continuous with no missing night/day transitions.
+- [x] Every night action is explicit.
+- [x] Every day has public speech summaries.
+- [x] Every vote has voter and target.
+- [x] Every death has timing and cause.
+- [x] Every role reveal needed by the demo is explicit.
+- [x] Winner and end condition are explicit.
+- [x] Copyright risk is low because the game is manually authored.
+- [x] This file does not claim real AI Agent gameplay.
+- [x] This file does not claim `decision_quality_score` is available.
+
+## Checkpoint Report Guidance
+
+When reporting this checkpoint, use `docs/CHECKPOINT_TEMPLATE.md` and state:
+
+- User-visible change: the repository now has one complete Phase 1 Gold Game seed that can be reviewed before Game Log JSON conversion.
+- Fixed input: `docs/gold-game/s0-gold-game-seed.md`.
+- Fixed output: one complete manually authored event chain with role setup, night actions, day speeches, votes, deaths, reveals, and game result.
+- AI annotation record: no AI annotation; this checkpoint is manually authored and deterministic/gold-input preparation only.
+- Data label clarity: game facts are marked `[结构化事件]`; no `[mock]` leaderboard data is introduced; no `[AI 生成]` data is introduced.
+- This checkpoint does not represent a parser, scorer, attribution engine, UI, real Agent gameplay, or usable `decision_quality_score`.
+- Next risk: S1 may reveal that the current Game Log schema needs small field clarifications for night resolution, role reveal timing, or witch potion state.
