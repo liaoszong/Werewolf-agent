@@ -24,7 +24,9 @@ AI 狼人杀多智能体协作与博弈评测系统。
 
 ## 当前状态
 
-**Phase 1 文档启动阶段。** 评测体系设计已完成审查（2026-05），正在建立产品文档和 spike 计划。暂无业务代码。
+**Phase 1 deterministic MVP 已完成。** 当前 main 已包含一局人工构造的 6 人 Gold Game、结构化 Game Log、确定性评分产物、规则归因产物和单文件静态 Leaderboard UI demo。仓库仍无业务代码；E1-E4 运行时实现任务转入 Phase 2 候选范围。
+
+Phase 1 不代表真实 AI Agent 对局、真实 Decision Log / Consensus Log 采集、真实多模型 Leaderboard 或真实 `decision_quality_score` 可用。
 
 ## 文档索引
 
