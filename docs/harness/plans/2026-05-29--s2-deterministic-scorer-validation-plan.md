@@ -39,7 +39,7 @@ This plan creates expected outputs for the Gold Game:
 - Create: `docs/gold-game/s2-score-log.json`
 - Create: `docs/gold-game/s2-metrics-summary.json`
 - Create: `docs/gold-game/s2-scoring-validation.md`
-- Modify: none
+- Modify: `docs/harness/plans/2026-05-29--s2-deterministic-scorer-validation-plan.md` only if implementation review reveals the embedded S2 examples must be corrected to keep the bound plan reproducible.
 - Test file: no separate committed test file for this Phase 1 data/document spike. Each task includes an explicit Python standard-library validation command.
 
 ## Hard Boundaries
@@ -137,7 +137,7 @@ import json
 from pathlib import Path
 
 records = [
-    ['s2_g001_e007', 'g001_e007', 'wolf_team', 'team', 1, 'night', 'werewolf_kill', 'p5', 1, ['rubric:E.1.werewolf.kill_villager'], ['g001_e007', 'g001_e028'], 'Wolf team killed a villager target; p5 is revealed as villager.'],
+    ['s2_g001_e007', 'g001_e007', 'wolf_team', 'team', 1, 'night', 'werewolf_kill', 'p5', 1, ['rubric:E.1.werewolf.kill_villager'], ['g001_e007', 'g001_e009', 'g001_e028'], 'Wolf team chose a villager target; p5 is later revealed as villager, while g001_e009 records that the Night 1 save prevented the kill from taking effect.'],
     ['s2_g001_e008', 'g001_e008', 'p3', 'player', 1, 'night', 'seer_check', 'p1', 2, ['rubric:E.2.seer.check_werewolf'], ['g001_e008', 'g001_e037'], 'Seer checked p1, who is later revealed as werewolf.'],
     ['s2_g001_e009', 'g001_e009', 'p4', 'player', 1, 'night', 'witch_save', 'p5', 1, ['rubric:E.3.witch.save_villager'], ['g001_e009', 'g001_e028'], 'Witch saved p5, who is later revealed as villager.'],
     ['s2_g001_e016', 'g001_e016', 'p1', 'player', 1, 'day', 'player_vote', 'p3', 2, ['rubric:E.1.werewolf.vote_eliminate_key_villager'], ['g001_e016', 'g001_e022', 'g001_e023'], 'Werewolf p1 voted to eliminate p3, who is revealed as seer.'],
@@ -148,7 +148,7 @@ records = [
     ['s2_g001_e021', 'g001_e021', 'p6', 'player', 1, 'day', 'player_vote', 'p3', -2, ['rubric:E.4.villager.vote_eliminate_key_villager'], ['g001_e021', 'g001_e022', 'g001_e023'], 'Villager p6 voted to eliminate p3, who is revealed as seer.'],
     ['s2_g001_e024', 'g001_e024', 'wolf_team', 'team', 2, 'night', 'werewolf_kill', 'p5', 1, ['rubric:E.1.werewolf.kill_villager'], ['g001_e024', 'g001_e026', 'g001_e028'], 'Wolf team killed p5, who is revealed as villager.'],
     ['s2_g001_e025', 'g001_e025', 'p4', 'player', 2, 'night', 'witch_poison', 'p2', 3, ['rubric:E.3.witch.poison_werewolf'], ['g001_e025', 'g001_e029'], 'Witch poisoned p2, who is revealed as werewolf.'],
-    ['s2_g001_e033', 'g001_e033', 'p1', 'player', 2, 'day', 'player_vote', 'p4', 0, ['rubric:E.1.werewolf.vote_without_elimination'], ['g001_e033', 'g001_e036'], 'p1 voted for p4, but p4 was not eliminated. E.1 vote outcome rows are tied to successful elimination, so S2 assigns 0.'],
+    ['s2_g001_e033', 'g001_e033', 'p1', 'player', 2, 'day', 'player_vote', 'p4', 0, ['rubric-gap:werewolf_day_vote_without_elimination'], ['g001_e033', 'g001_e036'], 'p1 voted for p4, but p4 was not eliminated. E.1 has no explicit row for a werewolf vote that does not cause elimination, so S2 assigns 0 and records the rubric gap.'],
     ['s2_g001_e034', 'g001_e034', 'p4', 'player', 2, 'day', 'player_vote', 'p1', 0, ['rubric-gap:witch_day_vote_outcome_not_explicit'], ['g001_e034', 'g001_e036', 'g001_e037'], 'Witch daytime vote is counted in vote_accuracy metrics, but E.3 has no explicit vote outcome row. S2 assigns score 0 and records the rubric gap.'],
     ['s2_g001_e035', 'g001_e035', 'p6', 'player', 2, 'day', 'player_vote', 'p1', 2, ['rubric:E.4.villager.vote_eliminate_werewolf'], ['g001_e035', 'g001_e036', 'g001_e037'], 'Villager p6 voted to eliminate p1, who is revealed as werewolf.'],
 ]
@@ -225,6 +225,10 @@ assert {record['score_id'] for record in records} == {
     's2_g001_e018', 's2_g001_e019', 's2_g001_e020', 's2_g001_e021', 's2_g001_e024',
     's2_g001_e025', 's2_g001_e033', 's2_g001_e034', 's2_g001_e035'
 }
+by_id = {record['score_id']: record for record in records}
+assert 'g001_e009' in by_id['s2_g001_e007']['evidence_event_ids']
+assert 'killed a villager target' not in by_id['s2_g001_e007']['notes']
+assert by_id['s2_g001_e033']['rules_triggered'] == ['rubric-gap:werewolf_day_vote_without_elimination']
 assert sum(record['outcome_score'] for record in records if record['scope'] == 'player') == 10
 assert sum(record['outcome_score'] for record in records if record['scope'] == 'team') == 2
 print('S2 score log validation passed')
@@ -300,7 +304,6 @@ metrics = {
             'village_vote_cohesion_by_day': {'round_1': 0.5, 'round_2': 1.0},
             'werewolf_vote_coordination': 1.0,
             'werewolf_vote_coordination_by_day': {'round_1': 1.0},
-            'turn_point_count': 'not_computed_in_S2',
         },
     },
     'score_summary': {
@@ -309,7 +312,19 @@ metrics = {
         'player_rule_integrity_scores': {'p1': 0, 'p2': 0, 'p3': 0, 'p4': 0, 'p5': 0, 'p6': 0},
         'player_decision_quality_scores': {'p1': 0, 'p2': 0, 'p3': 0, 'p4': 0, 'p5': 0, 'p6': 0},
     },
+    'metrics_deferred_to_later_spikes': [
+        {
+            'metric': 'turn_point_count',
+            'owner': 'S3 rule attribution validation',
+            'reason': 'turn_point_count is defined as an attribution count; S2 does not compute attribution outputs.',
+        }
+    ],
     'known_rubric_gaps_recorded_not_fixed': [
+        {
+            'gap': 'werewolf_day_vote_without_elimination',
+            'events': ['g001_e033'],
+            'S2_policy': 'count in vote_accuracy metrics; assign outcome_score 0 in score log; do not modify EVALUATION_RUBRIC.md in this PR',
+        },
         {
             'gap': 'witch_day_vote_outcome_not_explicit',
             'events': ['g001_e019', 'g001_e034'],
@@ -373,6 +388,12 @@ assert len(votes) == 9
 assert metrics['process_metrics']['vote_accuracy_by_player']['p6']['vote_accuracy'] == 0.5
 assert metrics['process_metrics']['team_metrics']['village_vote_cohesion'] == 0.75
 assert metrics['process_metrics']['team_metrics']['werewolf_vote_coordination'] == 1.0
+assert 'turn_point_count' not in metrics['process_metrics']['team_metrics']
+assert metrics['metrics_deferred_to_later_spikes'][0]['metric'] == 'turn_point_count'
+assert {item['gap'] for item in metrics['known_rubric_gaps_recorded_not_fixed']} == {
+    'werewolf_day_vote_without_elimination',
+    'witch_day_vote_outcome_not_explicit',
+}
 assert events['g001_e038']['target'] == 'villager_team'
 
 print('S2 metrics summary validation passed')
@@ -458,14 +479,16 @@ S2 validates that the S1 Game Log can be scored deterministically for Phase 1. I
 |---|---:|---|
 | village_vote_cohesion | 0.75 | Round 1 = 0.5, Round 2 = 1.0 |
 | werewolf_vote_coordination | 1.0 | Round 1: p1 and p2 both vote p3; Round 2 excluded because only p1 remains |
-| turn_point_count | not computed in S2 | S3 owns attribution validation |
 
 ## Rubric Mapping Notes
 
 - Werewolf night kills are scored as `wolf_team` team-scope records.
+- The Night 1 werewolf kill target was a villager, so S2 records the target-selection outcome; `g001_e009` is included as evidence that the witch save prevented that kill from taking effect.
+- A werewolf daytime vote that does not cause elimination is recorded as a rubric gap and assigned `outcome_score = 0`.
 - Witch daytime votes are counted in vote accuracy metrics, but S2 assigns `outcome_score = 0` because the current Witch rubric has no explicit daytime vote outcome row.
-- This PR records the Witch vote rubric gap but does not modify `docs/EVALUATION_RUBRIC.md`.
+- This PR records the werewolf non-elimination vote gap and Witch vote rubric gap but does not modify `docs/EVALUATION_RUBRIC.md`.
 - `decision_quality_score` is not inferred from summaries or visible refs in S2.
+- `turn_point_count` is deferred to S3 rule attribution validation and is not emitted as a non-numeric team metric in `s2-metrics-summary.json`.
 
 ## S2 Acceptance Check
 
@@ -507,6 +530,8 @@ required = [
     'No AI semantic annotation is used.',
     'does not implement the production scorer',
     'Witch vote rubric gap',
+    'werewolf non-elimination vote gap',
+    'turn_point_count` is deferred to S3 rule attribution validation',
     'S2 Acceptance Check',
 ]
 for item in required:
@@ -584,6 +609,7 @@ Expected result:
 docs/gold-game/s2-metrics-summary.json
 docs/gold-game/s2-score-log.json
 docs/gold-game/s2-scoring-validation.md
+docs/harness/plans/2026-05-29--s2-deterministic-scorer-validation-plan.md
 ```
 
 The `git diff --check` command must produce no output.
@@ -608,6 +634,7 @@ Bound Implementation Plan:
 - Creates `docs/gold-game/s2-score-log.json`.
 - Creates `docs/gold-game/s2-metrics-summary.json`.
 - Creates `docs/gold-game/s2-scoring-validation.md`.
+- Corrects this bound plan's embedded S2 examples after implementation review so the plan remains reproducible.
 - Applies deterministic Phase 1 scoring to `docs/gold-game/g001-game-log.json`.
 - Records event-level score evidence and rule mappings.
 - Records result metrics, process metrics, per-player score summaries, and a repeatability check.
@@ -649,6 +676,7 @@ assert all(record['rule_integrity_score'] == 0 for record in score_log['records'
 assert metrics['result_metrics']['winner'] == 'villager'
 assert metrics['process_metrics']['team_metrics']['village_vote_cohesion'] == 0.75
 assert metrics['process_metrics']['team_metrics']['werewolf_vote_coordination'] == 1.0
+assert 'turn_point_count' not in metrics['process_metrics']['team_metrics']
 print('S2 implementation validation passed')
 PY
 git diff --check main...HEAD
@@ -661,11 +689,12 @@ Expected changed files:
 docs/gold-game/s2-metrics-summary.json
 docs/gold-game/s2-score-log.json
 docs/gold-game/s2-scoring-validation.md
+docs/harness/plans/2026-05-29--s2-deterministic-scorer-validation-plan.md
 ```
 
 ## Risk
 
-The main risk is rubric interpretation drift: Witch daytime votes currently have no explicit role-specific outcome row. This PR records that gap, counts Witch votes in vote accuracy metrics, assigns those vote score records `outcome_score = 0`, and does not modify `docs/EVALUATION_RUBRIC.md`.
+The main risk is rubric interpretation drift: Witch daytime votes currently have no explicit role-specific outcome row, and a werewolf daytime vote that does not cause elimination also lacks an explicit stable rubric row. This PR records those gaps, counts the votes in vote accuracy metrics, assigns those vote score records `outcome_score = 0`, and does not modify `docs/EVALUATION_RUBRIC.md`.
 ```
 
 ## Self-Review Checklist
