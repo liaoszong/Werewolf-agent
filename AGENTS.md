@@ -5,7 +5,7 @@ Telegraph style. Root rules only. Read scoped AGENTS.md before subtree work. Ski
 
 ## 项目定位
 
-- 项目定位：AI 狼人杀多智能体协作与博弈评测系统。Phase 1 构建"结构化 Game Log + 确定性评测 + 规则归因 + Leaderboard UI demo"。
+- 项目定位：AI 狼人杀多智能体协作与博弈评测系统。Phase 1 deterministic MVP 已闭合为"结构化 Game Log + 确定性评测 + 规则归因 + Leaderboard UI demo"；Phase 2 才打开运行时实现边界。
 - 核心技术栈：待定（Phase 1 文档阶段，不引入依赖）。
 - 关键入口：`@docs/PRODUCT_ONE_PAGER.md` `@docs/EVALUATION_RUBRIC.md`
 - 进阶方向：② 评测+复盘（多维可量化评测 + 复盘归因 + Leaderboard）。
@@ -24,6 +24,7 @@ Telegraph style. Root rules only. Read scoped AGENTS.md before subtree work. Ski
 - 评分体系事实来源：`@docs/EVALUATION_RUBRIC.md`。不要在 AGENTS.md 中复制评分公式。
 - 产品定义事实来源：`@docs/PRODUCT_ONE_PAGER.md`。
 - Phase 1 / Phase 2 / Phase 3 切分定义：`@docs/PRODUCT_ONE_PAGER.md` 和 `@docs/TASKS.md`。
+- S4/S5 和 E1-E4 已转入 Phase 2 路由：Phase 1 closure 不再阻塞于人工 Consensus Log sample 或 AI 语义标注；E1-E4 只有在 Phase 2 Implementation Plan 明确允许业务代码后才能启动。
 
 ## 地图 MAP
 
@@ -49,7 +50,8 @@ Telegraph style. Root rules only. Read scoped AGENTS.md before subtree work. Ski
 
 - 生成代码目录：暂无（Phase 1 文档阶段）。
 - Phase 1 不创建 `src/` `apps/` `server/` `web/` 等实现目录。
-- Phase 2 开始前必须通过所有 Phase 1 spike 验收。
+- Phase 1 closure 以 S0/S1/S2/S3/S6 为 deterministic MVP 验收链；S4/S5 延后到 Phase 2。
+- Phase 2 引入代码前必须有明确的 Phase 2 Implementation Plan，并更新对应测试约束。
 
 ## 测试约束
 
