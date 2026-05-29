@@ -85,7 +85,10 @@ Telegraph style. Root rules only. Read scoped AGENTS.md before subtree work. Ski
 3. `docs/TASKS.md` 的依赖关系和任务类型（状态字段可能滞后，不作为事实源）
 4. `AGENTS.md` / `README.md` / `docs/SPIKES.md` 等长期规则
 
-每次判断进度前，必须先运行 `gh pr list --limit 10` 和 `git log --oneline -10`，再对照 `docs/TASKS.md` 的依赖图决定下一步。
+每次判断进度前，必须先获取最近 PR 和提交历史，再对照 `docs/TASKS.md` 的依赖图决定下一步：
+
+- **本地 agent（Claude Code / Codex / OpenCode / Cursor）**：必须运行 `gh pr list --limit 10` 和 `git log --oneline -10`。
+- **云端 agent / GitHub connector agent**：不能直接运行 shell 命令时，必须使用等价的 GitHub API 或 connector 工具——列出最近 PR（含 merged/open/closed 状态）、读取 PR 标题与 changed files、读取 main 最新提交历史。**不得以"非本地环境"为由跳过进度校验。**
 
 ## Review guidelines
 
