@@ -51,3 +51,46 @@ Day 2 note for scoring conversion: after Night 2 resolution, the living players 
 | Elimination reveal | Eliminated player's role is publicly revealed |
 | Win condition | Village wins when all werewolves are eliminated |
 | Speech content | Stored as summarized public events, not copied dialogue |
+
+## Event Chain
+
+| event_id | seq | round | phase | type | actor | target | visibility | summary | label |
+|---|---:|---:|---|---|---|---|---|---|---|
+| g001_e001 | 1 | 0 | setup | role_assignment | system | p1 | specific_player_ids | p1 receives the werewolf role. | [结构化事件] |
+| g001_e002 | 2 | 0 | setup | role_assignment | system | p2 | specific_player_ids | p2 receives the werewolf role. | [结构化事件] |
+| g001_e003 | 3 | 0 | setup | role_assignment | system | p3 | specific_player_ids | p3 receives the seer role. | [结构化事件] |
+| g001_e004 | 4 | 0 | setup | role_assignment | system | p4 | specific_player_ids | p4 receives the witch role. | [结构化事件] |
+| g001_e005 | 5 | 0 | setup | role_assignment | system | p5 | specific_player_ids | p5 receives the villager role. | [结构化事件] |
+| g001_e006 | 6 | 0 | setup | role_assignment | system | p6 | specific_player_ids | p6 receives the villager role. | [结构化事件] |
+| g001_e007 | 7 | 1 | night | werewolf_kill | wolf_team | p5 | werewolf_team | The werewolf team chooses p5 as the kill target. | [结构化事件] |
+| g001_e008 | 8 | 1 | night | seer_check | p3 | p1 | seer | p3 checks p1 and receives a werewolf result. | [结构化事件] |
+| g001_e009 | 9 | 1 | night | witch_save | p4 | p5 | witch | p4 uses the save potion on p5. | [结构化事件] |
+| g001_e010 | 10 | 1 | day | player_speech | p3 | p1 | public | p3 claims useful night information and pushes suspicion toward p1. | [结构化事件] |
+| g001_e011 | 11 | 1 | day | player_speech | p1 | p3 | public | p1 challenges p3 and frames p3 as a wolf trying to force an early mis-elimination. | [结构化事件] |
+| g001_e012 | 12 | 1 | day | player_speech | p2 | p3 | public | p2 supports p1 and argues that p3's pressure is too aggressive. | [结构化事件] |
+| g001_e013 | 13 | 1 | day | player_speech | p4 | p1 | public | p4 notes that p1 and p2 are aligned too quickly but does not reveal witch identity. | [结构化事件] |
+| g001_e014 | 14 | 1 | day | player_speech | p5 | p3 | public | p5 says p3's claim lacks enough public evidence and leans toward voting p3. | [结构化事件] |
+| g001_e015 | 15 | 1 | day | player_speech | p6 | p1 | public | p6 is uncertain but sees a possible p1 and p2 pairing. | [结构化事件] |
+| g001_e016 | 16 | 1 | day | player_vote | p1 | p3 | public | p1 votes for p3. | [结构化事件] |
+| g001_e017 | 17 | 1 | day | player_vote | p2 | p3 | public | p2 votes for p3. | [结构化事件] |
+| g001_e018 | 18 | 1 | day | player_vote | p3 | p1 | public | p3 votes for p1. | [结构化事件] |
+| g001_e019 | 19 | 1 | day | player_vote | p4 | p1 | public | p4 votes for p1. | [结构化事件] |
+| g001_e020 | 20 | 1 | day | player_vote | p5 | p3 | public | p5 votes for p3. | [结构化事件] |
+| g001_e021 | 21 | 1 | day | player_vote | p6 | p3 | public | p6 votes for p3. | [结构化事件] |
+| g001_e022 | 22 | 1 | day | player_eliminated | system | p3 | public | p3 is eliminated by a 4-2 vote. | [结构化事件] |
+| g001_e023 | 23 | 1 | day | role_revealed | system | p3 | public | p3 is revealed as the seer. | [结构化事件] |
+| g001_e024 | 24 | 2 | night | werewolf_kill | wolf_team | p5 | werewolf_team | The werewolf team again chooses p5 as the kill target. | [结构化事件] |
+| g001_e025 | 25 | 2 | night | witch_poison | p4 | p2 | witch | p4 uses the poison potion on p2 after p3's public seer reveal, p2's public Day 1 support for p1, and p2's public vote against p3 make p2's alignment suspicious. | [结构化事件] |
+| g001_e026 | 26 | 2 | day | player_died | system | p5 | public | p5 dies from the werewolf night kill. | [结构化事件] |
+| g001_e027 | 27 | 2 | day | player_died | system | p2 | public | p2 dies from the witch poison. | [结构化事件] |
+| g001_e028 | 28 | 2 | day | role_revealed | system | p5 | public | p5 is revealed as a villager. | [结构化事件] |
+| g001_e029 | 29 | 2 | day | role_revealed | system | p2 | public | p2 is revealed as a werewolf. | [结构化事件] |
+| g001_e030 | 30 | 2 | day | player_speech | p4 | p1 | public | p4 argues that p1 and p2 formed a coordinated push against the real seer. | [结构化事件] |
+| g001_e031 | 31 | 2 | day | player_speech | p1 | p4 | public | p1 argues that p4 is using p2's death to force an easy final vote. | [结构化事件] |
+| g001_e032 | 32 | 2 | day | player_speech | p6 | p1 | public | p6 accepts that p2's revealed role makes p1's Day 1 behavior highly suspicious. | [结构化事件] |
+| g001_e033 | 33 | 2 | day | player_vote | p1 | p4 | public | p1 votes for p4. | [结构化事件] |
+| g001_e034 | 34 | 2 | day | player_vote | p4 | p1 | public | p4 votes for p1. | [结构化事件] |
+| g001_e035 | 35 | 2 | day | player_vote | p6 | p1 | public | p6 votes for p1. | [结构化事件] |
+| g001_e036 | 36 | 2 | day | player_eliminated | system | p1 | public | p1 is eliminated by a 2-1 vote. | [结构化事件] |
+| g001_e037 | 37 | 2 | day | role_revealed | system | p1 | public | p1 is revealed as a werewolf. | [结构化事件] |
+| g001_e038 | 38 | 2 | game_end | game_over | system | villager_team | public | The village team wins because all werewolves have been eliminated. | [结构化事件] |
