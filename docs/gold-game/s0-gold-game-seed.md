@@ -94,3 +94,31 @@ Day 2 note for scoring conversion: after Night 2 resolution, the living players 
 | g001_e036 | 36 | 2 | day | player_eliminated | system | p1 | public | p1 is eliminated by a 2-1 vote. | [结构化事件] |
 | g001_e037 | 37 | 2 | day | role_revealed | system | p1 | public | p1 is revealed as a werewolf. | [结构化事件] |
 | g001_e038 | 38 | 2 | game_end | game_over | system | villager_team | public | The village team wins because all werewolves have been eliminated. | [结构化事件] |
+
+## S1 Conversion Notes
+
+These notes are not separate game events. They exist to keep the later Game Log JSON conversion unambiguous.
+
+### Visible evidence for g001_e025
+
+p4's Night 2 poison decision against p2 must use only information visible to p4 before the poison decision:
+
+| Evidence event_id | Visibility | Why p4 can use it |
+|---|---|---|
+| g001_e011 | public | p1 publicly attacked p3 on Day 1. |
+| g001_e012 | public | p2 publicly supported p1's attack on p3. |
+| g001_e017 | public | p2 publicly voted for p3. |
+| g001_e023 | public | p3 was publicly revealed as the seer after elimination. |
+
+Suggested future `visible_info_refs` for g001_e025: `g001_e011`, `g001_e012`, `g001_e017`, `g001_e023`.
+
+### Day 2 vote-cohesion note
+
+At the start of the Day 2 vote, p2 and p5 are dead. The living players are p1, p4, and p6.
+
+- Werewolf-team living voter: p1.
+- Village-team living voters: p4 and p6.
+- p4 votes for p1.
+- p6 votes for p1.
+
+For village vote cohesion, the village-team vote distribution is `{p1: 2}` over 2 village-team voters, so the Day 2 village cohesion value is `2 / 2 = 1.0`.
