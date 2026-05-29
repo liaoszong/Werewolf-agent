@@ -475,8 +475,10 @@ required_phrases = [
 for phrase in required_phrases:
     assert phrase in report, phrase
 
-for forbidden in ['[AI 生成]', 'production rule attribution engine exists', 'React', 'Vite']:
+for forbidden in ['[AI 生成]', 'React', 'Vite']:
     assert forbidden not in report, forbidden
+for positive_claim in ['S3 completes the attribution engine', 'attribution engine is complete']:
+    assert positive_claim not in report, positive_claim
 
 print('S3 validation report content check passed')
 PY
@@ -687,7 +689,7 @@ Adds S3 deterministic rule attribution validation artifacts for the Phase 1 Gold
 
 Bound Implementation Plan:
 
-- `docs/harness/plans/2026-05-29--s3-rule-attribution-validation.md`
+- `docs/harness/plans/2026-05-29--s3-rule-attribution-validation-plan.md`
 
 ## Scope
 
@@ -773,7 +775,7 @@ Adds an Implementation Plan for the next Werewolf Phase 1 step: S3 rule attribut
 
 Bound Implementation Plan:
 
-- `docs/harness/plans/2026-05-29--s3-rule-attribution-validation.md`
+- `docs/harness/plans/2026-05-29--s3-rule-attribution-validation-plan.md`
 
 ## Progress basis
 
@@ -820,7 +822,7 @@ git diff --name-only main...HEAD
 Expected result:
 
 ```text
-docs/harness/plans/2026-05-29--s3-rule-attribution-validation.md
+docs/harness/plans/2026-05-29--s3-rule-attribution-validation-plan.md
 ```
 
 ## Follow-up Implementation PR description prepared in the plan
