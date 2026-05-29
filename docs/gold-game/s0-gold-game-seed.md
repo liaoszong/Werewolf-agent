@@ -178,6 +178,6 @@ When reporting this checkpoint, use `docs/CHECKPOINT_TEMPLATE.md` and state:
 - Fixed input: `docs/gold-game/s0-gold-game-seed.md`.
 - Fixed output: one complete manually authored event chain with role setup, night actions, day speeches, votes, deaths, reveals, and game result.
 - AI annotation record: no AI annotation; this checkpoint is manually authored and deterministic/gold-input preparation only.
-- Data label clarity: game facts are marked `[结构化事件]`; no `[mock]` leaderboard data is introduced; no `[AI 生成]` data is introduced.
+- Data label clarity: game facts are marked `[结构化事件]`; no `[mock]` leaderboard data is introduced; no AI-generated data is introduced.
 - This checkpoint does not represent a parser, scorer, attribution engine, UI, real Agent gameplay, or usable `decision_quality_score`.
 - Next risk: S1 may reveal that the current Game Log schema needs small field clarifications for night resolution, role reveal timing, or witch potion state.
