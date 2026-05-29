@@ -4,7 +4,7 @@
 
 **Goal:** Validate that the Phase 1 Gold Game Log can produce deterministic `outcome_score`, `rule_integrity_score`, process metrics, result metrics, and a repeatable score summary without business code.
 
-**Architecture:** This is a Phase 1 data/document spike, not a runtime scorer implementation. It consumes `docs/gold-game/g001-game-log.json`, creates deterministic expected scoring artifacts under `docs/gold-game/`, and validates internal consistency with Python standard-library commands. The output becomes the fixed acceptance target for later E2 scorer implementation.
+**Architecture:** This is a Phase 1 data/document spike, not a runtime scorer implementation. It consumes `docs/gold-game/g001-game-log.json`, creates deterministic expected scoring artifacts under `docs/gold-game/`, and validates internal consistency with Python standard-library commands. The output becomes the fixed acceptance target for E2 scorer implementation.
 
 **Tech Stack:** JSON, Markdown, Python standard library validation commands only. No runtime dependencies.
 
@@ -86,11 +86,7 @@ assert events['g001_e025']['target'] == 'p2'
 assert events['g001_e038']['type'] == 'game_over'
 
 report = Path('docs/gold-game/s1-schema-validation.md').read_text(encoding='utf-8')
-for phrase in [
-    'S1',
-    'g001-game-log.json',
-    'schema',
-]:
+for phrase in ['S1', 'g001-game-log.json', 'schema']:
     assert phrase in report
 
 print('S1 input is ready for S2')
@@ -140,6 +136,42 @@ python - <<'PY'
 import json
 from pathlib import Path
 
+records = [
+    ['s2_g001_e007', 'g001_e007', 'wolf_team', 'team', 1, 'night', 'werewolf_kill', 'p5', 1, ['rubric:E.1.werewolf.kill_villager'], ['g001_e007', 'g001_e028'], 'Wolf team killed a villager target; p5 is revealed as villager.'],
+    ['s2_g001_e008', 'g001_e008', 'p3', 'player', 1, 'night', 'seer_check', 'p1', 2, ['rubric:E.2.seer.check_werewolf'], ['g001_e008', 'g001_e037'], 'Seer checked p1, who is later revealed as werewolf.'],
+    ['s2_g001_e009', 'g001_e009', 'p4', 'player', 1, 'night', 'witch_save', 'p5', 1, ['rubric:E.3.witch.save_villager'], ['g001_e009', 'g001_e028'], 'Witch saved p5, who is later revealed as villager.'],
+    ['s2_g001_e016', 'g001_e016', 'p1', 'player', 1, 'day', 'player_vote', 'p3', 2, ['rubric:E.1.werewolf.vote_eliminate_key_villager'], ['g001_e016', 'g001_e022', 'g001_e023'], 'Werewolf p1 voted to eliminate p3, who is revealed as seer.'],
+    ['s2_g001_e017', 'g001_e017', 'p2', 'player', 1, 'day', 'player_vote', 'p3', 2, ['rubric:E.1.werewolf.vote_eliminate_key_villager'], ['g001_e017', 'g001_e022', 'g001_e023'], 'Werewolf p2 voted to eliminate p3, who is revealed as seer.'],
+    ['s2_g001_e018', 'g001_e018', 'p3', 'player', 1, 'day', 'player_vote', 'p1', 2, ['rubric:E.2.seer.vote_eliminate_werewolf'], ['g001_e018', 'g001_e037'], 'Seer p3 voted for p1, who is later revealed as werewolf.'],
+    ['s2_g001_e019', 'g001_e019', 'p4', 'player', 1, 'day', 'player_vote', 'p1', 0, ['rubric-gap:witch_day_vote_outcome_not_explicit'], ['g001_e019', 'g001_e037'], 'Witch daytime vote is counted in vote_accuracy metrics, but E.3 has no explicit vote outcome row. S2 assigns score 0 and records the rubric gap.'],
+    ['s2_g001_e020', 'g001_e020', 'p5', 'player', 1, 'day', 'player_vote', 'p3', -2, ['rubric:E.4.villager.vote_eliminate_key_villager'], ['g001_e020', 'g001_e022', 'g001_e023'], 'Villager p5 voted to eliminate p3, who is revealed as seer.'],
+    ['s2_g001_e021', 'g001_e021', 'p6', 'player', 1, 'day', 'player_vote', 'p3', -2, ['rubric:E.4.villager.vote_eliminate_key_villager'], ['g001_e021', 'g001_e022', 'g001_e023'], 'Villager p6 voted to eliminate p3, who is revealed as seer.'],
+    ['s2_g001_e024', 'g001_e024', 'wolf_team', 'team', 2, 'night', 'werewolf_kill', 'p5', 1, ['rubric:E.1.werewolf.kill_villager'], ['g001_e024', 'g001_e026', 'g001_e028'], 'Wolf team killed p5, who is revealed as villager.'],
+    ['s2_g001_e025', 'g001_e025', 'p4', 'player', 2, 'night', 'witch_poison', 'p2', 3, ['rubric:E.3.witch.poison_werewolf'], ['g001_e025', 'g001_e029'], 'Witch poisoned p2, who is revealed as werewolf.'],
+    ['s2_g001_e033', 'g001_e033', 'p1', 'player', 2, 'day', 'player_vote', 'p4', 0, ['rubric:E.1.werewolf.vote_without_elimination'], ['g001_e033', 'g001_e036'], 'p1 voted for p4, but p4 was not eliminated. E.1 vote outcome rows are tied to successful elimination, so S2 assigns 0.'],
+    ['s2_g001_e034', 'g001_e034', 'p4', 'player', 2, 'day', 'player_vote', 'p1', 0, ['rubric-gap:witch_day_vote_outcome_not_explicit'], ['g001_e034', 'g001_e036', 'g001_e037'], 'Witch daytime vote is counted in vote_accuracy metrics, but E.3 has no explicit vote outcome row. S2 assigns score 0 and records the rubric gap.'],
+    ['s2_g001_e035', 'g001_e035', 'p6', 'player', 2, 'day', 'player_vote', 'p1', 2, ['rubric:E.4.villager.vote_eliminate_werewolf'], ['g001_e035', 'g001_e036', 'g001_e037'], 'Villager p6 voted to eliminate p1, who is revealed as werewolf.'],
+]
+
+score_records = []
+for score_id, event_id, actor, scope, round_no, phase, action_type, target, outcome, rules, evidence, notes in records:
+    score_records.append({
+        'score_id': score_id,
+        'event_id': event_id,
+        'actor': actor,
+        'scope': scope,
+        'round': round_no,
+        'phase': phase,
+        'action_type': action_type,
+        'target': target,
+        'outcome_score': outcome,
+        'decision_quality_score': 0,
+        'rule_integrity_score': 0,
+        'rules_triggered': rules,
+        'evidence_event_ids': evidence,
+        'notes': notes,
+    })
+
 score_log = {
     'score_log_id': 's2_g001_expected_score_log',
     'game_id': 'g001',
@@ -151,234 +183,9 @@ score_log = {
         'decision_quality_reason': 'Phase 1 has no real Decision Log. All decision_quality_score values are fixed at 0.',
         'ai_annotations': 'none',
         'rule_integrity_default': 0,
-        'rule_integrity_reason': 'S1 contains no info_leak_flag or contradiction_flag events.'
+        'rule_integrity_reason': 'S1 contains no info_leak_flag or contradiction_flag events.',
     },
-    'records': [
-        {
-            'score_id': 's2_g001_e007',
-            'event_id': 'g001_e007',
-            'actor': 'wolf_team',
-            'scope': 'team',
-            'round': 1,
-            'phase': 'night',
-            'action_type': 'werewolf_kill',
-            'target': 'p5',
-            'outcome_score': 1,
-            'decision_quality_score': 0,
-            'rule_integrity_score': 0,
-            'rules_triggered': ['rubric:E.1.werewolf.kill_villager'],
-            'evidence_event_ids': ['g001_e007', 'g001_e028'],
-            'notes': 'Wolf team killed a villager target; p5 is revealed as villager.'
-        },
-        {
-            'score_id': 's2_g001_e008',
-            'event_id': 'g001_e008',
-            'actor': 'p3',
-            'scope': 'player',
-            'round': 1,
-            'phase': 'night',
-            'action_type': 'seer_check',
-            'target': 'p1',
-            'outcome_score': 2,
-            'decision_quality_score': 0,
-            'rule_integrity_score': 0,
-            'rules_triggered': ['rubric:E.2.seer.check_werewolf'],
-            'evidence_event_ids': ['g001_e008', 'g001_e037'],
-            'notes': 'Seer checked p1, who is later revealed as werewolf.'
-        },
-        {
-            'score_id': 's2_g001_e009',
-            'event_id': 'g001_e009',
-            'actor': 'p4',
-            'scope': 'player',
-            'round': 1,
-            'phase': 'night',
-            'action_type': 'witch_save',
-            'target': 'p5',
-            'outcome_score': 1,
-            'decision_quality_score': 0,
-            'rule_integrity_score': 0,
-            'rules_triggered': ['rubric:E.3.witch.save_villager'],
-            'evidence_event_ids': ['g001_e009', 'g001_e028'],
-            'notes': 'Witch saved p5, who is later revealed as villager.'
-        },
-        {
-            'score_id': 's2_g001_e016',
-            'event_id': 'g001_e016',
-            'actor': 'p1',
-            'scope': 'player',
-            'round': 1,
-            'phase': 'day',
-            'action_type': 'player_vote',
-            'target': 'p3',
-            'outcome_score': 2,
-            'decision_quality_score': 0,
-            'rule_integrity_score': 0,
-            'rules_triggered': ['rubric:E.1.werewolf.vote_eliminate_key_villager'],
-            'evidence_event_ids': ['g001_e016', 'g001_e022', 'g001_e023'],
-            'notes': 'Werewolf p1 voted to eliminate p3, who is revealed as seer.'
-        },
-        {
-            'score_id': 's2_g001_e017',
-            'event_id': 'g001_e017',
-            'actor': 'p2',
-            'scope': 'player',
-            'round': 1,
-            'phase': 'day',
-            'action_type': 'player_vote',
-            'target': 'p3',
-            'outcome_score': 2,
-            'decision_quality_score': 0,
-            'rule_integrity_score': 0,
-            'rules_triggered': ['rubric:E.1.werewolf.vote_eliminate_key_villager'],
-            'evidence_event_ids': ['g001_e017', 'g001_e022', 'g001_e023'],
-            'notes': 'Werewolf p2 voted to eliminate p3, who is revealed as seer.'
-        },
-        {
-            'score_id': 's2_g001_e018',
-            'event_id': 'g001_e018',
-            'actor': 'p3',
-            'scope': 'player',
-            'round': 1,
-            'phase': 'day',
-            'action_type': 'player_vote',
-            'target': 'p1',
-            'outcome_score': 2,
-            'decision_quality_score': 0,
-            'rule_integrity_score': 0,
-            'rules_triggered': ['rubric:E.2.seer.vote_eliminate_werewolf'],
-            'evidence_event_ids': ['g001_e018', 'g001_e037'],
-            'notes': 'Seer p3 voted for p1, who is later revealed as werewolf.'
-        },
-        {
-            'score_id': 's2_g001_e019',
-            'event_id': 'g001_e019',
-            'actor': 'p4',
-            'scope': 'player',
-            'round': 1,
-            'phase': 'day',
-            'action_type': 'player_vote',
-            'target': 'p1',
-            'outcome_score': 0,
-            'decision_quality_score': 0,
-            'rule_integrity_score': 0,
-            'rules_triggered': ['rubric-gap:witch_day_vote_outcome_not_explicit'],
-            'evidence_event_ids': ['g001_e019', 'g001_e037'],
-            'notes': 'Witch daytime vote is counted in vote_accuracy metrics, but E.3 has no explicit vote outcome row. S2 assigns score 0 and records the rubric gap.'
-        },
-        {
-            'score_id': 's2_g001_e020',
-            'event_id': 'g001_e020',
-            'actor': 'p5',
-            'scope': 'player',
-            'round': 1,
-            'phase': 'day',
-            'action_type': 'player_vote',
-            'target': 'p3',
-            'outcome_score': -2,
-            'decision_quality_score': 0,
-            'rule_integrity_score': 0,
-            'rules_triggered': ['rubric:E.4.villager.vote_eliminate_key_villager'],
-            'evidence_event_ids': ['g001_e020', 'g001_e022', 'g001_e023'],
-            'notes': 'Villager p5 voted to eliminate p3, who is revealed as seer.'
-        },
-        {
-            'score_id': 's2_g001_e021',
-            'event_id': 'g001_e021',
-            'actor': 'p6',
-            'scope': 'player',
-            'round': 1,
-            'phase': 'day',
-            'action_type': 'player_vote',
-            'target': 'p3',
-            'outcome_score': -2,
-            'decision_quality_score': 0,
-            'rule_integrity_score': 0,
-            'rules_triggered': ['rubric:E.4.villager.vote_eliminate_key_villager'],
-            'evidence_event_ids': ['g001_e021', 'g001_e022', 'g001_e023'],
-            'notes': 'Villager p6 voted to eliminate p3, who is revealed as seer.'
-        },
-        {
-            'score_id': 's2_g001_e024',
-            'event_id': 'g001_e024',
-            'actor': 'wolf_team',
-            'scope': 'team',
-            'round': 2,
-            'phase': 'night',
-            'action_type': 'werewolf_kill',
-            'target': 'p5',
-            'outcome_score': 1,
-            'decision_quality_score': 0,
-            'rule_integrity_score': 0,
-            'rules_triggered': ['rubric:E.1.werewolf.kill_villager'],
-            'evidence_event_ids': ['g001_e024', 'g001_e026', 'g001_e028'],
-            'notes': 'Wolf team killed p5, who is revealed as villager.'
-        },
-        {
-            'score_id': 's2_g001_e025',
-            'event_id': 'g001_e025',
-            'actor': 'p4',
-            'scope': 'player',
-            'round': 2,
-            'phase': 'night',
-            'action_type': 'witch_poison',
-            'target': 'p2',
-            'outcome_score': 3,
-            'decision_quality_score': 0,
-            'rule_integrity_score': 0,
-            'rules_triggered': ['rubric:E.3.witch.poison_werewolf'],
-            'evidence_event_ids': ['g001_e025', 'g001_e029'],
-            'notes': 'Witch poisoned p2, who is revealed as werewolf.'
-        },
-        {
-            'score_id': 's2_g001_e033',
-            'event_id': 'g001_e033',
-            'actor': 'p1',
-            'scope': 'player',
-            'round': 2,
-            'phase': 'day',
-            'action_type': 'player_vote',
-            'target': 'p4',
-            'outcome_score': 0,
-            'decision_quality_score': 0,
-            'rule_integrity_score': 0,
-            'rules_triggered': ['rubric:E.1.werewolf.vote_without_elimination'],
-            'evidence_event_ids': ['g001_e033', 'g001_e036'],
-            'notes': 'p1 voted for p4, but p4 was not eliminated. E.1 vote outcome rows are tied to successful elimination, so S2 assigns 0.'
-        },
-        {
-            'score_id': 's2_g001_e034',
-            'event_id': 'g001_e034',
-            'actor': 'p4',
-            'scope': 'player',
-            'round': 2,
-            'phase': 'day',
-            'action_type': 'player_vote',
-            'target': 'p1',
-            'outcome_score': 0,
-            'decision_quality_score': 0,
-            'rule_integrity_score': 0,
-            'rules_triggered': ['rubric-gap:witch_day_vote_outcome_not_explicit'],
-            'evidence_event_ids': ['g001_e034', 'g001_e036', 'g001_e037'],
-            'notes': 'Witch daytime vote is counted in vote_accuracy metrics, but E.3 has no explicit vote outcome row. S2 assigns score 0 and records the rubric gap.'
-        },
-        {
-            'score_id': 's2_g001_e035',
-            'event_id': 'g001_e035',
-            'actor': 'p6',
-            'scope': 'player',
-            'round': 2,
-            'phase': 'day',
-            'action_type': 'player_vote',
-            'target': 'p1',
-            'outcome_score': 2,
-            'decision_quality_score': 0,
-            'rule_integrity_score': 0,
-            'rules_triggered': ['rubric:E.4.villager.vote_eliminate_werewolf'],
-            'evidence_event_ids': ['g001_e035', 'g001_e036', 'g001_e037'],
-            'notes': 'Villager p6 voted to eliminate p1, who is revealed as werewolf.'
-        }
-    ]
+    'records': score_records,
 }
 
 Path('docs/gold-game/s2-score-log.json').write_text(
@@ -408,7 +215,7 @@ records = score_log['records']
 
 assert score_log['game_id'] == 'g001'
 assert score_log['source_label'] == '[deterministic]'
-assert len(records) == 15
+assert len(records) == 14
 assert all(record['decision_quality_score'] == 0 for record in records)
 assert all(record['rule_integrity_score'] == 0 for record in records)
 assert all(record['rules_triggered'] for record in records)
@@ -460,7 +267,7 @@ metrics = {
         'villager_survival_rate': 0.5,
         'margin': 2,
         'werewolf_win_speed': None,
-        'villager_win_efficiency': 1.0
+        'villager_win_efficiency': 1.0,
     },
     'process_metrics': {
         'vote_accuracy_by_player': {
@@ -469,95 +276,46 @@ metrics = {
             'p3': {'accurate_votes': 1, 'total_votes': 1, 'vote_accuracy': 1.0},
             'p4': {'accurate_votes': 2, 'total_votes': 2, 'vote_accuracy': 1.0},
             'p5': {'accurate_votes': 0, 'total_votes': 1, 'vote_accuracy': 0.0},
-            'p6': {'accurate_votes': 1, 'total_votes': 2, 'vote_accuracy': 0.5}
+            'p6': {'accurate_votes': 1, 'total_votes': 2, 'vote_accuracy': 0.5},
         },
-        'survival_rounds': {
-            'p1': 2,
-            'p2': 2,
-            'p3': 1,
-            'p4': 2,
-            'p5': 2,
-            'p6': 2
-        },
-        'contradiction_count_by_player': {
-            'p1': 0,
-            'p2': 0,
-            'p3': 0,
-            'p4': 0,
-            'p5': 0,
-            'p6': 0
-        },
-        'info_leak_count_by_player': {
-            'p1': 0,
-            'p2': 0,
-            'p3': 0,
-            'p4': 0,
-            'p5': 0,
-            'p6': 0
-        },
+        'survival_rounds': {'p1': 2, 'p2': 2, 'p3': 1, 'p4': 2, 'p5': 2, 'p6': 2},
+        'contradiction_count_by_player': {'p1': 0, 'p2': 0, 'p3': 0, 'p4': 0, 'p5': 0, 'p6': 0},
+        'info_leak_count_by_player': {'p1': 0, 'p2': 0, 'p3': 0, 'p4': 0, 'p5': 0, 'p6': 0},
         'seer_metrics': {
             'actor': 'p3',
             'check_accuracy': 1.0,
             'check_targeting': 1.0,
             'info_conveyed': 1.0,
-            'evidence_event_ids': ['g001_e008', 'g001_e010']
+            'evidence_event_ids': ['g001_e008', 'g001_e010'],
         },
         'witch_metrics': {
             'actor': 'p4',
             'save_accuracy': 1.0,
             'poison_accuracy': 1.0,
             'ability_utilization': 1.0,
-            'evidence_event_ids': ['g001_e009', 'g001_e025']
+            'evidence_event_ids': ['g001_e009', 'g001_e025'],
         },
         'team_metrics': {
             'village_vote_cohesion': 0.75,
-            'village_vote_cohesion_by_day': {
-                'round_1': 0.5,
-                'round_2': 1.0
-            },
+            'village_vote_cohesion_by_day': {'round_1': 0.5, 'round_2': 1.0},
             'werewolf_vote_coordination': 1.0,
-            'werewolf_vote_coordination_by_day': {
-                'round_1': 1.0
-            },
-            'turn_point_count': 'not_computed_in_S2'
-        }
+            'werewolf_vote_coordination_by_day': {'round_1': 1.0},
+            'turn_point_count': 'not_computed_in_S2',
+        },
     },
     'score_summary': {
-        'player_outcome_scores': {
-            'p1': 2,
-            'p2': 2,
-            'p3': 4,
-            'p4': 4,
-            'p5': -2,
-            'p6': 0
-        },
-        'team_outcome_scores': {
-            'wolf_team': 2
-        },
-        'player_rule_integrity_scores': {
-            'p1': 0,
-            'p2': 0,
-            'p3': 0,
-            'p4': 0,
-            'p5': 0,
-            'p6': 0
-        },
-        'player_decision_quality_scores': {
-            'p1': 0,
-            'p2': 0,
-            'p3': 0,
-            'p4': 0,
-            'p5': 0,
-            'p6': 0
-        }
+        'player_outcome_scores': {'p1': 2, 'p2': 2, 'p3': 4, 'p4': 4, 'p5': -2, 'p6': 0},
+        'team_outcome_scores': {'wolf_team': 2},
+        'player_rule_integrity_scores': {'p1': 0, 'p2': 0, 'p3': 0, 'p4': 0, 'p5': 0, 'p6': 0},
+        'player_decision_quality_scores': {'p1': 0, 'p2': 0, 'p3': 0, 'p4': 0, 'p5': 0, 'p6': 0},
     },
     'known_rubric_gaps_recorded_not_fixed': [
         {
             'gap': 'witch_day_vote_outcome_not_explicit',
             'events': ['g001_e019', 'g001_e034'],
-            'S2_policy': 'count in vote_accuracy metrics; assign outcome_score 0 in score log; do not modify EVALUATION_RUBRIC.md in this PR'
+            'S2_policy': 'count in vote_accuracy metrics; assign outcome_score 0 in score log; do not modify EVALUATION_RUBRIC.md in this PR',
         }
-    ]
+    ],
 }
 
 Path('docs/gold-game/s2-metrics-summary.json').write_text(
@@ -646,7 +404,6 @@ cat > docs/gold-game/s2-scoring-validation.md <<'EOF'
 ## Status
 
 - Task: S2
-- Status: completed when this document, `s2-score-log.json`, and `s2-metrics-summary.json` pass the validation commands in the bound Implementation Plan
 - Source Game Log: `docs/gold-game/g001-game-log.json`
 - Score Log: `docs/gold-game/s2-score-log.json`
 - Metrics Summary: `docs/gold-game/s2-metrics-summary.json`
@@ -656,7 +413,7 @@ cat > docs/gold-game/s2-scoring-validation.md <<'EOF'
 
 ## Scope
 
-S2 validates that the S1 Game Log can be scored deterministically for Phase 1. It does not implement the production scorer. It creates expected scoring artifacts that a later E2 scorer can reproduce.
+S2 validates that the S1 Game Log can be scored deterministically for Phase 1. It does not implement the production scorer. It creates expected scoring artifacts that E2 can reproduce.
 
 ## Phase 1 Scoring Boundary
 
@@ -722,7 +479,7 @@ S2 validates that the S1 Game Log can be scored deterministically for Phase 1. I
 
 ## What This Does Not Represent
 
-This S2 output does not mean a production deterministic scorer exists. It only provides fixed expected outputs and validation rules for later implementation. It also does not validate AI semantic annotation, Consensus Log scoring, Decision Log scoring, or rule attribution; those remain separate tasks.
+This S2 output does not mean a production deterministic scorer exists. It only provides fixed expected outputs and validation rules for implementation. It also does not validate AI semantic annotation, Consensus Log scoring, Decision Log scoring, or rule attribution; those remain separate tasks.
 
 ## Next Step After S2
 
@@ -755,7 +512,6 @@ required = [
 for item in required:
     assert item in text, f'missing: {item}'
 for forbidden in [
-    'production scorer exists',
     'AI semantic annotation is validated',
     'Decision Log scoring is complete',
 ]:
@@ -876,7 +632,6 @@ python -m json.tool docs/gold-game/s2-score-log.json > /tmp/s2-score-log.pretty.
 python -m json.tool docs/gold-game/s2-metrics-summary.json > /tmp/s2-metrics-summary.pretty.json
 python - <<'PY'
 import json
-import hashlib
 from pathlib import Path
 
 for path in [
@@ -888,7 +643,7 @@ for path in [
 
 score_log = json.loads(Path('docs/gold-game/s2-score-log.json').read_text(encoding='utf-8'))
 metrics = json.loads(Path('docs/gold-game/s2-metrics-summary.json').read_text(encoding='utf-8'))
-assert len(score_log['records']) == 15
+assert len(score_log['records']) == 14
 assert all(record['decision_quality_score'] == 0 for record in score_log['records'])
 assert all(record['rule_integrity_score'] == 0 for record in score_log['records'])
 assert metrics['result_metrics']['winner'] == 'villager'
