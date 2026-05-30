@@ -114,14 +114,14 @@ git commit -m "feat: 添加特定功能"
 
 ## 必填内容
 
-每个 Implementation Plan 的每个任务必须明确：
+每个 Implementation Plan 必须明确：
 
-*   Create / Modify 的文件
-*   Test 文件
-*   执行命令
-*   预期输出
-*   禁止范围
-*   PR 描述草案
+*   每个任务的 Create / Modify 文件
+*   每个任务的 Test 文件
+*   每个任务的执行命令
+*   每个任务的预期输出
+*   全局禁止范围
+*   一个整体 Implementation PR 描述草案
 
 不要写 TBD / TODO / 稍后实现。
 

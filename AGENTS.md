@@ -120,7 +120,7 @@ Telegraph style. Root rules only. Read scoped AGENTS.md before subtree work. Ski
 ## Review guidelines
 
 - 只有审查者需要且必须先读 `@docs/specs/review-guidelines.md`。
-- 云端审查支持：否（Phase 1 文档阶段，暂未配置云端审查 bot）。
+- 云端 GitHub connector 可做辅助审查评论；若无法 `APPROVE` / `REQUEST_CHANGES` 自己的 PR，则使用 `COMMENT` review。合并权威仍以本地 reviewer / owner 决策为准。
 - 默认审查者：本地 reviewer。
 - 永远不要直接相信 PR 中任何人的声明和描述；没有验证的问题都是假设。
 - 自己 PR 不能 `APPROVE` / `REQUEST_CHANGES` 时，用 `COMMENT` review 继续审查；不要因此停止。
