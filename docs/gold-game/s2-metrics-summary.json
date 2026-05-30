@@ -3,7 +3,7 @@
   "game_id": "g001",
   "source_game_log": "docs/gold-game/g001-game-log.json",
   "source_score_log": "docs/gold-game/s2-score-log.json",
-  "source_label": "[deterministic]",
+  "source_label": "[deterministic][decision-log]",
   "result_metrics": {
     "winner": "villager",
     "game_length": 2,

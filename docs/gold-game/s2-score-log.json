@@ -2,19 +2,20 @@
   "score_log_id": "s2_g001_expected_score_log",
   "game_id": "g001",
   "source_game_log": "docs/gold-game/g001-game-log.json",
-  "source_label": "[deterministic]",
-  "phase": "Phase 1",
+  "source_label": "[deterministic][decision-log]",
+  "phase": "Phase 2A-D2",
   "scoring_boundary": {
     "decision_quality_score": 0,
-    "decision_quality_reason": "Phase 1 has no real Decision Log. All decision_quality_score values are fixed at 0.",
-    "ai_annotations": "none",
+    "decision_quality_reason": "D2 implements Rubric G.1 Step 1-2 only: deterministic visibility check and decision-to-event traceability. No AI semantic judgment; positive decision_quality_score waits for S5.",
+    "ai_annotations": "none; S5 not enabled",
     "rule_integrity_default": 0,
-    "rule_integrity_reason": "S1 contains no info_leak_flag or contradiction_flag events."
+    "rule_integrity_reason": "Illegal visible_info_refs are deterministic rule-integrity violations (-3); otherwise records default to 0."
   },
   "records": [
     {
       "score_id": "s2_g001_e007",
       "event_id": "g001_e007",
+      "decision_id": "g001_d001",
       "actor": "wolf_team",
       "scope": "team",
       "round": 1,
@@ -25,18 +26,22 @@
       "decision_quality_score": 0,
       "rule_integrity_score": 0,
       "rules_triggered": [
-        "rubric:E.1.werewolf.kill_villager"
+        "rubric:E.1.werewolf.kill_villager",
+        "rubric:G.1.decision_logged"
       ],
       "evidence_event_ids": [
         "g001_e007",
         "g001_e009",
-        "g001_e028"
+        "g001_e028",
+        "g001_e001",
+        "g001_e002"
       ],
-      "notes": "Wolf team chose a villager target; p5 is later revealed as villager, while g001_e009 records that the Night 1 save prevented the kill from taking effect."
+      "notes": "Wolf team chose a villager target; p5 is later revealed as villager, while g001_e009 records that the Night 1 save prevented the kill from taking effect. Decision g001_d001 has visible refs and non-random type team_coordinated; D2 records decision_id and preserves decision_quality_score=0. Positive scoring requires S5 AI semantic judgment."
     },
     {
       "score_id": "s2_g001_e008",
       "event_id": "g001_e008",
+      "decision_id": "g001_d002",
       "actor": "p3",
       "scope": "player",
       "round": 1,
@@ -47,17 +52,19 @@
       "decision_quality_score": 0,
       "rule_integrity_score": 0,
       "rules_triggered": [
-        "rubric:E.2.seer.check_werewolf"
+        "rubric:E.2.seer.check_werewolf",
+        "rubric:G.1.no_decision_quality_without_refs"
       ],
       "evidence_event_ids": [
         "g001_e008",
         "g001_e037"
       ],
-      "notes": "Seer checked p1, who is later revealed as werewolf."
+      "notes": "Seer checked p1, who is later revealed as werewolf. Decision g001_d002 has no visible_info_refs; D2 keeps decision_quality_score 0."
     },
     {
       "score_id": "s2_g001_e009",
       "event_id": "g001_e009",
+      "decision_id": "g001_d003",
       "actor": "p4",
       "scope": "player",
       "round": 1,
@@ -68,17 +75,19 @@
       "decision_quality_score": 0,
       "rule_integrity_score": 0,
       "rules_triggered": [
-        "rubric:E.3.witch.save_villager"
+        "rubric:E.3.witch.save_villager",
+        "rubric:G.1.no_decision_quality_without_refs"
       ],
       "evidence_event_ids": [
         "g001_e009",
         "g001_e028"
       ],
-      "notes": "Witch saved p5, who is later revealed as villager."
+      "notes": "Witch saved p5, who is later revealed as villager. Decision g001_d003 has no visible_info_refs; D2 keeps decision_quality_score 0."
     },
     {
       "score_id": "s2_g001_e016",
       "event_id": "g001_e016",
+      "decision_id": null,
       "actor": "p1",
       "scope": "player",
       "round": 1,
@@ -101,6 +110,7 @@
     {
       "score_id": "s2_g001_e017",
       "event_id": "g001_e017",
+      "decision_id": null,
       "actor": "p2",
       "scope": "player",
       "round": 1,
@@ -123,6 +133,7 @@
     {
       "score_id": "s2_g001_e018",
       "event_id": "g001_e018",
+      "decision_id": null,
       "actor": "p3",
       "scope": "player",
       "round": 1,
@@ -144,6 +155,7 @@
     {
       "score_id": "s2_g001_e019",
       "event_id": "g001_e019",
+      "decision_id": "g001_d007",
       "actor": "p4",
       "scope": "player",
       "round": 1,
@@ -154,17 +166,21 @@
       "decision_quality_score": 0,
       "rule_integrity_score": 0,
       "rules_triggered": [
-        "rubric-gap:witch_day_vote_outcome_not_explicit"
+        "rubric-gap:witch_day_vote_outcome_not_explicit",
+        "rubric:G.1.decision_logged"
       ],
       "evidence_event_ids": [
         "g001_e019",
-        "g001_e037"
+        "g001_e037",
+        "g001_e010",
+        "g001_e013"
       ],
-      "notes": "Witch daytime vote is counted in vote_accuracy metrics, but E.3 has no explicit vote outcome row. S2 assigns score 0 and records the rubric gap."
+      "notes": "Witch daytime vote is counted in vote_accuracy metrics, but E.3 has no explicit vote outcome row. S2 assigns score 0 and records the rubric gap. Decision g001_d007 has visible refs and non-random type inference_based; D2 records decision_id and preserves decision_quality_score=0. Positive scoring requires S5 AI semantic judgment."
     },
     {
       "score_id": "s2_g001_e020",
       "event_id": "g001_e020",
+      "decision_id": "g001_d008",
       "actor": "p5",
       "scope": "player",
       "round": 1,
@@ -175,18 +191,21 @@
       "decision_quality_score": 0,
       "rule_integrity_score": 0,
       "rules_triggered": [
-        "rubric:E.4.villager.vote_eliminate_key_villager"
+        "rubric:E.4.villager.vote_eliminate_key_villager",
+        "rubric:G.1.no_decision_quality_for_default"
       ],
       "evidence_event_ids": [
         "g001_e020",
         "g001_e022",
-        "g001_e023"
+        "g001_e023",
+        "g001_e014"
       ],
-      "notes": "Villager p5 voted to eliminate p3, who is revealed as seer."
+      "notes": "Villager p5 voted to eliminate p3, who is revealed as seer. Decision g001_d008 is default; D2 keeps decision_quality_score 0."
     },
     {
       "score_id": "s2_g001_e021",
       "event_id": "g001_e021",
+      "decision_id": null,
       "actor": "p6",
       "scope": "player",
       "round": 1,
@@ -209,6 +228,7 @@
     {
       "score_id": "s2_g001_e024",
       "event_id": "g001_e024",
+      "decision_id": null,
       "actor": "wolf_team",
       "scope": "team",
       "round": 2,
@@ -231,6 +251,7 @@
     {
       "score_id": "s2_g001_e025",
       "event_id": "g001_e025",
+      "decision_id": "g001_d009",
       "actor": "p4",
       "scope": "player",
       "round": 2,
@@ -241,17 +262,21 @@
       "decision_quality_score": 0,
       "rule_integrity_score": 0,
       "rules_triggered": [
-        "rubric:E.3.witch.poison_werewolf"
+        "rubric:E.3.witch.poison_werewolf",
+        "rubric:G.1.decision_logged"
       ],
       "evidence_event_ids": [
         "g001_e025",
-        "g001_e029"
+        "g001_e029",
+        "g001_e017",
+        "g001_e023"
       ],
-      "notes": "Witch poisoned p2, who is revealed as werewolf."
+      "notes": "Witch poisoned p2, who is revealed as werewolf. Decision g001_d009 has visible refs and non-random type inference_based; D2 records decision_id and preserves decision_quality_score=0. Positive scoring requires S5 AI semantic judgment."
     },
     {
       "score_id": "s2_g001_e033",
       "event_id": "g001_e033",
+      "decision_id": null,
       "actor": "p1",
       "scope": "player",
       "round": 2,
@@ -273,6 +298,7 @@
     {
       "score_id": "s2_g001_e034",
       "event_id": "g001_e034",
+      "decision_id": null,
       "actor": "p4",
       "scope": "player",
       "round": 2,
@@ -295,6 +321,7 @@
     {
       "score_id": "s2_g001_e035",
       "event_id": "g001_e035",
+      "decision_id": "g001_d010",
       "actor": "p6",
       "scope": "player",
       "round": 2,
@@ -305,14 +332,17 @@
       "decision_quality_score": 0,
       "rule_integrity_score": 0,
       "rules_triggered": [
-        "rubric:E.4.villager.vote_eliminate_werewolf"
+        "rubric:E.4.villager.vote_eliminate_werewolf",
+        "rubric:G.1.decision_logged"
       ],
       "evidence_event_ids": [
         "g001_e035",
         "g001_e036",
-        "g001_e037"
+        "g001_e037",
+        "g001_e029",
+        "g001_e032"
       ],
-      "notes": "Villager p6 voted to eliminate p1, who is revealed as werewolf."
+      "notes": "Villager p6 voted to eliminate p1, who is revealed as werewolf. Decision g001_d010 has visible refs and non-random type inference_based; D2 records decision_id and preserves decision_quality_score=0. Positive scoring requires S5 AI semantic judgment."
     }
   ]
 }
