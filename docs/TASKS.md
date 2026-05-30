@@ -101,8 +101,9 @@
 
 ### E4：可视化页面
 
-- 状态：`phase_2_candidate`（S6 已满足；Phase 1 已有静态 HTML demo，Phase 2 是否重做由后续 plan 决定）
-- 说明：构建可双击打开的单文件静态 HTML（建议路径：`docs/demo/phase1-gold-demo.html`）。不依赖后端、不依赖构建工具、不引入 React/Vite。包含时间线、状态表、投票表、指标表、评分卡、Leaderboard。
+- 状态：`completed`（Phase 2 runtime demo HTML exporter）
+- 产出：`src/werewolf_eval/render_demo.py` + `tests/test_render_demo.py` + `docs/demo/phase2-runtime-demo.html`。
+- 说明：构建可双击打开的单文件静态 HTML，不依赖后端、不依赖构建工具、不引入 React/Vite。该页面从 E1/E2/E3 runtime pipeline 生成，包含时间线、状态表、投票表、指标表、评分卡、Leaderboard，并保留 Phase 2 边界声明。
 
 ---
 
@@ -130,6 +131,7 @@
 
 **Demo 2：Phase 2 runtime pipeline demo**
 
+- 状态：`completed`（`docs/demo/phase2-runtime-demo.html`；仅表示 E1/E2/E3 runtime pipeline 可生成可视化 demo，不表示真实 AI Agent / Decision Log / Consensus Log 已启用）
 - 触发条件：Phase 2 charter 明确允许业务代码，并完成 E1-E4 或替代实现路径。
 - 演示内容：运行时读取 Game Log → 计算 Score Log → 计算 Attribution → 输出或刷新 UI。
 - 验收：后续 Phase 2 plan 定义。

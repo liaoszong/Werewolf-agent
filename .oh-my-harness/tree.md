@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 68
+- Entries: 71
 
 ```text
 ./
@@ -49,7 +49,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   └── writing-plan.md
 ├── docs/
 │   ├── demo/
-│   │   └── phase1-gold-demo.html
+│   │   ├── phase1-gold-demo.html
+│   │   └── phase2-runtime-demo.html
 │   ├── gold-game/
 │   │   ├── g001-game-log.json
 │   │   ├── s0-gold-game-seed.md
@@ -86,12 +87,14 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       ├── attribute_game.py
 │       ├── attribution.py
 │       ├── game_log.py
+│       ├── render_demo.py
 │       ├── score_game.py
 │       ├── scoring.py
 │       └── validate_game_log.py
 ├── tests/
 │   ├── test_attribution.py
 │   ├── test_game_log.py
+│   ├── test_render_demo.py
 │   └── test_scoring.py
 ├── .gitignore
 ├── AGENTS.md
