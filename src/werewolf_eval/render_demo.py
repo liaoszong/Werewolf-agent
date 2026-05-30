@@ -176,3 +176,103 @@ def build_demo_context(game: GameLog, score_log: Any, metrics: Any, attribution:
         },
         "leaderboard": leaderboard,
     }
+
+
+# ---------------------------------------------------------------------------
+# Task 4: HTML renderer and CLI writer
+# ---------------------------------------------------------------------------
+
+
+def _row(cells: list[object]) -> str:
+    return "<tr>" + "".join(f"<td>{_html(cell)}</td>" for cell in cells) + "</tr>"
+
+
+def _head(cells: list[str]) -> str:
+    return "<tr>" + "".join(f"<th>{_html(cell)}</th>" for cell in cells) + "</tr>"
+
+
+def render_html(context: dict[str, Any]) -> str:
+    game = context["game"]
+    timeline_rows = "\n".join(
+        _row([event["sequence"], event["round"], event["phase"], event["type_label"], event["actor"], event["target"], event["summary"]])
+        for event in context["timeline"]
+    )
+    player_rows = "\n".join(
+        _row([player["player_id"], player["role_label"], player["team_label"], player["final_state"]])
+        for player in context["players"]
+    )
+    vote_rows = "\n".join(
+        _row([vote["round"], vote["event_id"], vote["actor"], vote["target"], vote["summary"]])
+        for vote in context["votes"]
+    )
+    leaderboard_rows = "\n".join(
+        _row([
+            row["agent_id"], row["model"], row["games_played"], row["win_rate"],
+            row["avg_outcome_score"], row["avg_decision_quality_score"],
+            row["avg_rule_integrity_score"], row["top_attribution"], row["source_label"],
+        ])
+        for row in context["leaderboard"]
+    )
+    attribution_rows = "\n".join(
+        _row([item["turn_point_id"], item["rule_id"], item["round"], item["subject"], item["impact_score"], item["description_template"]])
+        for item in context["attribution"]["turn_point_rows"]
+    )
+
+    return f"""<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Werewolf-agent Phase 2 Runtime Demo</title>
+  <style>
+    body {{ font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 32px; color: #172033; background: #f7f8fb; }}
+    main {{ max-width: 1180px; margin: 0 auto; }}
+    section {{ background: white; border: 1px solid #dde3ee; border-radius: 14px; padding: 18px; margin: 18px 0; }}
+    table {{ width: 100%; border-collapse: collapse; font-size: 14px; }}
+    th, td {{ border-bottom: 1px solid #e5e9f2; padding: 8px; text-align: left; vertical-align: top; }}
+    th {{ background: #f1f4f9; }}
+    .badge {{ display: inline-block; padding: 3px 8px; border-radius: 999px; background: #eef2ff; margin-right: 6px; font-size: 12px; }}
+    .scroll {{ overflow-x: auto; }}
+    .warning {{ background: #fff7ed; border-color: #fed7aa; }}
+  </style>
+</head>
+<body>
+<main>
+  <h1>Werewolf-agent Phase 2 Runtime Demo</h1>
+  <p><span class="badge">运行时生成</span><span class="badge">[deterministic]</span><span class="badge">[人工 gold sample]</span> This page is generated from the E1/E2/E3 runtime pipeline.</p>
+  <section class="warning"><h2>边界声明</h2><p>This is not real AI Agent gameplay, not real Decision Log / Consensus Log collection, and not a real multi-model Leaderboard. 当前 decision_quality_score 固定为 0。</p></section>
+  <section><h2>对局摘要</h2><p>Game: {_html(game["game_id"])} / Winner: {_html(game["winner_label"])} / Players: {_html(game["players"])} / Events: {_html(game["events"])} / Source: {_html(game["source_label"])}</p></section>
+  <section><h2>玩家状态</h2><div class="scroll"><table>{_head(["玩家", "角色", "阵营", "终局状态"])}{player_rows}</table></div></section>
+  <section><h2>时间线</h2><div class="scroll"><table>{_head(["序号", "轮次", "阶段", "类型", "行动者", "目标", "摘要"])}{timeline_rows}</table></div></section>
+  <section><h2>投票表</h2><div class="scroll"><table>{_head(["轮次", "事件", "投票者", "目标", "摘要"])}{vote_rows}</table></div></section>
+  <section><h2>确定性指标</h2><p>Score records: {_html(context["score"]["records"])} {_html(context["score"]["source_label"])}。decision_quality_score: 固定为 0。</p></section>
+  <section><h2>规则归因</h2><p>{_html(context["attribution"]["description"])} {_html(context["attribution"]["source_label"])}</p><div class="scroll"><table>{_head(["转折点", "规则", "轮次", "主体", "影响分", "描述"])}{attribution_rows}</table></div></section>
+  <section><h2>Leaderboard</h2><div class="scroll"><table>{_head(["Agent", "Model", "Games", "Win rate", "Outcome", "Decision", "Integrity", "Top attribution", "Source"])}{leaderboard_rows}</table></div></section>
+</main>
+</body>
+</html>
+"""
+
+
+def write_demo_html(game_log_path: str | Path, output_path: str | Path) -> None:
+    game = load_game_log(game_log_path)
+    score_log = score_game(game)
+    metrics = summarize_metrics(game, score_log)
+    attribution = attribute_game(game, score_log, metrics)
+    context = build_demo_context(game, score_log, metrics, attribution)
+    Path(output_path).write_text(render_html(context), encoding="utf-8")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Generate Werewolf-agent Phase 2 runtime demo HTML.")
+    parser.add_argument("path", help="Path to Game Log JSON")
+    parser.add_argument("--html-out", required=True, help="Output HTML file path")
+    args = parser.parse_args()
+
+    write_demo_html(args.path, args.html_out)
+    print(f"rendered_demo_html={args.html_out}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
