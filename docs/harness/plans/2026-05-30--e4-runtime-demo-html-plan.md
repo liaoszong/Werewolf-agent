@@ -19,7 +19,7 @@
 Before executing this plan, confirm these repository facts:
 
 - Latest main includes PR #14 workflow guardrails.
-- PR #13 is merged into `main`.
+- PR #13 is merged into `main` before starting implementation.
 - E1 parser / validator is complete:
   - `src/werewolf_eval/game_log.py`
   - `src/werewolf_eval/validate_game_log.py`
@@ -47,6 +47,14 @@ Reasoning:
 - E4 is one implementation unit.
 - The output is a static HTML artifact, not a frontend app or server.
 - The UX goal is already defined: a double-clickable page that a non-technical user can understand in 3 minutes.
+
+## Review Notes Addressed
+
+This revision incorporates the E4 plan review notes:
+
+- `avg_outcome_score` must be derived from `metrics_payload["score_summary"]`, not from a dead `score_payload["score_summary"]` branch. The planned implementation now computes the single-game total from player outcome scores plus team outcome scores, then divides by `games_played`.
+- `AGENTS.md` MAP update must handle `docs/demo/` explicitly. If the MAP already contains `docs/demo/`, add `phase2-runtime-demo.html` under the existing directory. If it does not, add `docs/demo/` with both `phase1-gold-demo.html` and `phase2-runtime-demo.html`.
+- PR #13 is an explicit preflight dependency because `render_demo.py` imports `werewolf_eval.attribution.attribute_game`.
 
 ## Scope Decision
 
@@ -115,7 +123,23 @@ E4 must not:
 - Modify: none.
 - Test: existing `tests/test_game_log.py`, `tests/test_scoring.py`, `tests/test_attribution.py`.
 
-- [ ] **Step 1: Confirm runtime files exist**
+- [ ] **Step 1: Confirm PR #13 dependency is merged**
+
+Run:
+
+```bash
+gh pr view 13 --json state,mergedAt,title
+```
+
+Expected result includes:
+
+```text
+"state": "MERGED"
+```
+
+If local `gh` is unavailable, verify through GitHub UI/API that PR #13 is merged before continuing.
+
+- [ ] **Step 2: Confirm runtime files exist**
 
 Run:
 
@@ -138,7 +162,7 @@ Expected result:
 E1/E2/E3 runtime files exist
 ```
 
-- [ ] **Step 2: Confirm accepted JSON artifacts still parse**
+- [ ] **Step 3: Confirm accepted JSON artifacts still parse**
 
 Run:
 
@@ -156,7 +180,7 @@ Expected result:
 Accepted JSON artifacts still parse
 ```
 
-- [ ] **Step 3: Confirm E1/E2/E3 commands still pass**
+- [ ] **Step 4: Confirm E1/E2/E3 commands still pass**
 
 Run:
 
@@ -262,6 +286,13 @@ Append:
         self.assertGreaterEqual(len(context["timeline"]), 38)
         self.assertTrue(any(row["source_label"] == "[deterministic]" for row in context["leaderboard"]))
         self.assertTrue(any(row["source_label"] == "[mock]" for row in context["leaderboard"]))
+        deterministic_row = next(row for row in context["leaderboard"] if row["source_label"] == "[deterministic]")
+        self.assertEqual(deterministic_row["games_played"], 1)
+        self.assertEqual(
+            deterministic_row["avg_outcome_score"],
+            sum(context["score"]["summary"]["player_outcome_scores"].values())
+            + sum(context["score"]["summary"]["team_outcome_scores"].values()),
+        )
 ```
 
 - [ ] **Step 3: Add HTML content test**
@@ -453,15 +484,22 @@ def build_demo_context(game: GameLog, score_log: Any, metrics: Any, attribution:
         if event.type == "player_vote"
     ]
 
-    score_records = score_payload["records"]
+    score_summary = metrics_payload["score_summary"]
+    games_played = 1
+    single_game_outcome_total = (
+        sum(score_summary["player_outcome_scores"].values())
+        + sum(score_summary["team_outcome_scores"].values())
+    )
+    avg_outcome_score = single_game_outcome_total / games_played
     top_attribution = attribution_payload["top_attribution"]
+
     leaderboard = [
         {
             "agent_id": "g001-runtime",
             "model": "deterministic pipeline",
-            "games_played": 1,
+            "games_played": games_played,
             "win_rate": 1.0 if game.result.winner == "villager" else 0.0,
-            "avg_outcome_score": sum(record["outcome_score"] for record in score_records),
+            "avg_outcome_score": avg_outcome_score,
             "avg_decision_quality_score": 0.0,
             "avg_rule_integrity_score": 0.0,
             "top_attribution": top_attribution["turn_point_id"],
@@ -506,10 +544,10 @@ def build_demo_context(game: GameLog, score_log: Any, metrics: Any, attribution:
         "timeline": timeline,
         "votes": vote_rows,
         "score": {
-            "records": len(score_records),
+            "records": len(score_payload["records"]),
             "source_label": score_payload["source_label"],
             "boundary": score_payload["scoring_boundary"],
-            "summary": metrics_payload["score_summary"],
+            "summary": score_summary,
             "result_metrics": metrics_payload["result_metrics"],
             "process_metrics": metrics_payload["process_metrics"],
         },
@@ -570,7 +608,21 @@ def _head(cells: list[str]) -> str:
 
 - [ ] **Step 2: Add `render_html`**
 
-Append:
+Append a `render_html(context: dict[str, Any]) -> str` function that renders one complete `<!doctype html>` document with embedded CSS and no `<script>` tag. It must include these visible sections:
+
+- `Werewolf-agent Phase 2 Runtime Demo`
+- `边界声明`
+- `对局摘要`
+- `玩家状态`
+- `时间线`
+- `投票表`
+- `确定性指标`
+- `规则归因`
+- `Leaderboard`
+
+Use `_head()` and `_row()` for all table cells so every value passes through `_html()`.
+
+Minimum required body content:
 
 ```python
 def render_html(context: dict[str, Any]) -> str:
@@ -589,15 +641,9 @@ def render_html(context: dict[str, Any]) -> str:
     )
     leaderboard_rows = "\n".join(
         _row([
-            row["agent_id"],
-            row["model"],
-            row["games_played"],
-            row["win_rate"],
-            row["avg_outcome_score"],
-            row["avg_decision_quality_score"],
-            row["avg_rule_integrity_score"],
-            row["top_attribution"],
-            row["source_label"],
+            row["agent_id"], row["model"], row["games_played"], row["win_rate"],
+            row["avg_outcome_score"], row["avg_decision_quality_score"],
+            row["avg_rule_integrity_score"], row["top_attribution"], row["source_label"],
         ])
         for row in context["leaderboard"]
     )
@@ -615,14 +661,11 @@ def render_html(context: dict[str, Any]) -> str:
   <style>
     body {{ font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 32px; color: #172033; background: #f7f8fb; }}
     main {{ max-width: 1180px; margin: 0 auto; }}
-    section {{ background: white; border: 1px solid #dde3ee; border-radius: 14px; padding: 18px; margin: 18px 0; box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06); }}
-    h1, h2 {{ margin: 0 0 12px; }}
-    p {{ line-height: 1.65; }}
-    .badge {{ display: inline-block; padding: 3px 8px; border-radius: 999px; background: #eef2ff; margin-right: 6px; font-size: 12px; }}
-    .grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }}
+    section {{ background: white; border: 1px solid #dde3ee; border-radius: 14px; padding: 18px; margin: 18px 0; }}
     table {{ width: 100%; border-collapse: collapse; font-size: 14px; }}
     th, td {{ border-bottom: 1px solid #e5e9f2; padding: 8px; text-align: left; vertical-align: top; }}
     th {{ background: #f1f4f9; }}
+    .badge {{ display: inline-block; padding: 3px 8px; border-radius: 999px; background: #eef2ff; margin-right: 6px; font-size: 12px; }}
     .scroll {{ overflow-x: auto; }}
     .warning {{ background: #fff7ed; border-color: #fed7aa; }}
   </style>
@@ -631,55 +674,14 @@ def render_html(context: dict[str, Any]) -> str:
 <main>
   <h1>Werewolf-agent Phase 2 Runtime Demo</h1>
   <p><span class="badge">运行时生成</span><span class="badge">[deterministic]</span><span class="badge">[人工 gold sample]</span> This page is generated from the E1/E2/E3 runtime pipeline.</p>
-
-  <section class="warning">
-    <h2>边界声明</h2>
-    <p>This is not real AI Agent gameplay, not real Decision Log / Consensus Log collection, and not a real multi-model Leaderboard. 当前 decision_quality_score 固定为 0。</p>
-  </section>
-
-  <section>
-    <h2>对局摘要</h2>
-    <div class="grid">
-      <p>Game: {_html(game["game_id"])}</p>
-      <p>Winner: {_html(game["winner_label"])}</p>
-      <p>Players: {_html(game["players"])}</p>
-      <p>Events: {_html(game["events"])}</p>
-      <p>End round: {_html(game["end_round"])}</p>
-      <p>Source: {_html(game["source_label"])}</p>
-    </div>
-  </section>
-
-  <section>
-    <h2>玩家状态</h2>
-    <div class="scroll"><table>{_head(["玩家", "角色", "阵营", "终局状态"])}{player_rows}</table></div>
-  </section>
-
-  <section>
-    <h2>时间线</h2>
-    <div class="scroll"><table>{_head(["序号", "轮次", "阶段", "类型", "行动者", "目标", "摘要"])}{timeline_rows}</table></div>
-  </section>
-
-  <section>
-    <h2>投票表</h2>
-    <div class="scroll"><table>{_head(["轮次", "事件", "投票者", "目标", "摘要"])}{vote_rows}</table></div>
-  </section>
-
-  <section>
-    <h2>确定性指标</h2>
-    <p>Score records: {_html(context["score"]["records"])} {_html(context["score"]["source_label"])}</p>
-    <p>decision_quality_score: 固定为 0；rule_integrity_score: 当前 deterministic boundary 下默认为 0。</p>
-  </section>
-
-  <section>
-    <h2>规则归因</h2>
-    <p>{_html(context["attribution"]["description"])} {_html(context["attribution"]["source_label"])}</p>
-    <div class="scroll"><table>{_head(["转折点", "规则", "轮次", "主体", "影响分", "描述"])}{attribution_rows}</table></div>
-  </section>
-
-  <section>
-    <h2>Leaderboard</h2>
-    <div class="scroll"><table>{_head(["Agent", "Model", "Games", "Win rate", "Outcome", "Decision", "Integrity", "Top attribution", "Source"])}{leaderboard_rows}</table></div>
-  </section>
+  <section class="warning"><h2>边界声明</h2><p>This is not real AI Agent gameplay, not real Decision Log / Consensus Log collection, and not a real multi-model Leaderboard. 当前 decision_quality_score 固定为 0。</p></section>
+  <section><h2>对局摘要</h2><p>Game: {_html(game["game_id"])} / Winner: {_html(game["winner_label"])} / Players: {_html(game["players"])} / Events: {_html(game["events"])} / Source: {_html(game["source_label"])}</p></section>
+  <section><h2>玩家状态</h2><div class="scroll"><table>{_head(["玩家", "角色", "阵营", "终局状态"])}{player_rows}</table></div></section>
+  <section><h2>时间线</h2><div class="scroll"><table>{_head(["序号", "轮次", "阶段", "类型", "行动者", "目标", "摘要"])}{timeline_rows}</table></div></section>
+  <section><h2>投票表</h2><div class="scroll"><table>{_head(["轮次", "事件", "投票者", "目标", "摘要"])}{vote_rows}</table></div></section>
+  <section><h2>确定性指标</h2><p>Score records: {_html(context["score"]["records"])} {_html(context["score"]["source_label"])}。decision_quality_score: 固定为 0。</p></section>
+  <section><h2>规则归因</h2><p>{_html(context["attribution"]["description"])} {_html(context["attribution"]["source_label"])}</p><div class="scroll"><table>{_head(["转折点", "规则", "轮次", "主体", "影响分", "描述"])}{attribution_rows}</table></div></section>
+  <section><h2>Leaderboard</h2><div class="scroll"><table>{_head(["Agent", "Model", "Games", "Win rate", "Outcome", "Decision", "Integrity", "Top attribution", "Source"])}{leaderboard_rows}</table></div></section>
 </main>
 </body>
 </html>
@@ -815,7 +817,7 @@ Change Demo 2 status to completed for the runtime-generated demo boundary:
 - 状态：`completed`（`docs/demo/phase2-runtime-demo.html`；仅表示 E1/E2/E3 runtime pipeline 可生成可视化 demo，不表示真实 AI Agent / Decision Log / Consensus Log 已启用）
 ```
 
-- [ ] **Step 3: Update `AGENTS.md` runtime entries and commands**
+- [ ] **Step 3: Update `AGENTS.md` runtime entries, commands, and MAP**
 
 Add the E4 command near existing command entries:
 
@@ -829,16 +831,25 @@ Update the runtime boundary sentence to include E4:
 - Phase 2 运行时代码必须绑定 Implementation Plan；当前已完成 runtime entries 为 E1/E2/E3/E4。
 ```
 
-Update the MAP to include:
+Update the MAP to include runtime and test files:
 
 ```text
 │       ├── render_demo.py
 ```
 
-and:
-
 ```text
 │   ├── test_render_demo.py
+```
+
+Update the MAP `docs/demo/` block as follows:
+
+- If `docs/demo/` already exists in the MAP, add `phase2-runtime-demo.html` below `phase1-gold-demo.html`.
+- If `docs/demo/` does not exist in the MAP, add this block under `docs/`:
+
+```text
+│   ├── demo/
+│   │   ├── phase1-gold-demo.html
+│   │   └── phase2-runtime-demo.html
 ```
 
 - [ ] **Step 4: Refresh `.oh-my-harness/tree.md`**
@@ -859,6 +870,7 @@ Run:
 grep -R "phase2-runtime-demo.html" README.md docs/TASKS.md AGENTS.md .oh-my-harness/tree.md
 grep -R "render_demo.py" AGENTS.md .oh-my-harness/tree.md
 grep -R "test_render_demo.py" AGENTS.md .oh-my-harness/tree.md
+grep -R "docs/demo" AGENTS.md
 ```
 
 Expected result:
@@ -866,6 +878,7 @@ Expected result:
 - The first command prints matches in README, TASKS, AGENTS, and tree.
 - The second command prints matches in AGENTS and tree.
 - The third command prints matches in AGENTS and tree.
+- The fourth command confirms `AGENTS.md` MAP or routing text includes `docs/demo`.
 
 - [ ] **Step 6: Commit documentation and tree updates**
 
