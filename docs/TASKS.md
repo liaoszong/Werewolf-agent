@@ -1,6 +1,8 @@
-# TASKS — Werewolf-agent Phase 1
+# TASKS — Werewolf-agent Task Status
 
 > **Progress note:** 本文件描述 Phase 1 任务依赖关系和计划状态，但任务完成状态可能滞后于实际进度。判断当前进度时，必须以已合入 PR 和 main 上实际存在的产物文件为准。如果本文件状态与 PR / main 文件冲突，以 PR / main 文件为准。
+
+> **Roadmap note:** Phase 2 / Phase 3 route boundaries are defined in `docs/ROADMAP.md`. This file tracks task status and candidate engineering work; it does not replace the roadmap.
 
 任务按类型组织。每个 spike 通过前不展开对应的 engineering task。
 
@@ -79,7 +81,7 @@
 
 ## Phase 2 Candidate Engineering Tasks
 
-**E1-E4 与 D1 已作为 Phase 2 runtime entries 完成。** S4/S5 仍延后到 Phase 2。以下记录各工程任务的完成状态与产物路径。
+**E1-E4 与 D1 已作为 Phase 2 runtime entries 完成。** 当前 Phase 2A 优先级是 D2 Decision Log scoring integration。S4/S5 在 D2 后推进；G1/L1 属于 Phase 3 / Phase 3+ 路线。以下记录各工程任务的完成状态与产物路径，阶段边界以 `docs/ROADMAP.md` 为准。
 
 ### E1：Game Log 解析器
 
@@ -110,6 +112,42 @@
 - 状态：`completed`（Phase 2 Decision Log runtime input；Decision Log parser / validator 已实现）
 - 产出：`docs/gold-game/g001-decision-log.json` + `src/werewolf_eval/decision_log.py` + `src/werewolf_eval/validate_decision_log.py` + `tests/test_decision_log.py`。
 - 说明：读取人工 gold Decision Log JSON，验证其 `game_id` 与 Game Log 一致，验证 actor / target / visible_info_refs / decision_type / confidence 等字段。D1 不调用 AI，不启用 S5，不修改 scoring，`decision_quality_score` 仍未接入评分链。
+
+### D2：Decision Log scoring integration
+
+- 状态：`candidate_next`（Phase 2A evaluator runtime closure；下一步推荐任务）
+- 依赖：D1 + E2。
+- 目标：将 Decision Log 接入 scoring，让 `decision_quality_score` 不再全局固定为 0。
+- 边界：不调用 AI，不启用 S5，不做 Consensus Log，不宣称 `decision_quality_score` 完整可用。
+- 路线依据：`docs/prs/2026-05-30--phase2-next-step-research.md` + `docs/ROADMAP.md`。
+
+### S4：Consensus Log runtime/input
+
+- 状态：`candidate_after_D2`（Phase 2B collaboration input）
+- 依赖：E1 / S1；产品优先级上放在 D2 后。
+- 目标：验证狼人夜间协商层 Consensus Log 的 parser / validator / fixture / CLI。
+- 边界：不做 AI gameplay，不做 S5 语义标注。
+
+### S5：AI semantic labeling research
+
+- 状态：`candidate_after_D2_research_first`（Phase 2B semantic input）
+- 依赖：D1；integration 依赖 D2。
+- 目标：研究 provider、prompt、准确率、一致性、token 成本和失败降级。
+- 边界：先做 Research PR / spike，不直接进入 Implementation Plan。
+
+### G1：Real AI Agent gameplay engine
+
+- 状态：`phase_3_candidate`
+- 依赖：稳定的 Game Log / Decision Log / scoring contracts；S4 合同稳定后更安全。
+- 目标：实现真实 AI Agent 自动对局，产出结构化 Game Log / Decision Log / Consensus Log。
+- 边界：不属于 Phase 2A evaluator runtime closure。
+
+### L1：Real multi-game Leaderboard
+
+- 状态：`phase_3_plus_candidate`
+- 依赖：G1 产生足够多局、多角色、多模型数据。
+- 目标：形成真实多模型、多版本、按角色区分的 Leaderboard。
+- 边界：不在没有多局数据时宣称真实排行榜完成。
 
 ---
 
