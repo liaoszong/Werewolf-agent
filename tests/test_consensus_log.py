@@ -142,6 +142,22 @@ class ConsensusLogTests(unittest.TestCase):
         with self.assertRaisesRegex(ConsensusLogValidationError, "max 1 per action_round"):
             parse_consensus_log(raw, self.game)
 
+    def test_rejects_missing_consensus_for_werewolf_kill(self) -> None:
+        raw = load_json("docs/gold-game/g001-consensus-log.json")
+        raw["consensuses"] = [raw["consensuses"][0]]
+
+        with self.assertRaisesRegex(ConsensusLogValidationError, "no matching consensus entry"):
+            parse_consensus_log(raw, self.game)
+
+    def test_rejects_duplicate_consensus_for_same_kill(self) -> None:
+        raw = load_json("docs/gold-game/g001-consensus-log.json")
+        clone = dict(raw["consensuses"][0])
+        clone["consensus_id"] = "g001_c003"
+        raw["consensuses"].append(clone)
+
+        with self.assertRaisesRegex(ConsensusLogValidationError, "multiple consensus entries"):
+            parse_consensus_log(raw, self.game)
+
 
 if __name__ == "__main__":
     unittest.main()

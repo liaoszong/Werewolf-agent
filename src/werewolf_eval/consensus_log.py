@@ -135,6 +135,8 @@ def validate_consensus_log(consensus_log: ConsensusLog, game: GameLog) -> None:
     for consensus in consensus_log.consensuses:
         _validate_consensus(consensus, game)
 
+    _validate_consensus_covers_all_kills(consensus_log, game)
+
 
 def _parse_consensus(raw: Any) -> Consensus:
     if not isinstance(raw, dict):
@@ -333,6 +335,39 @@ def _validate_consensus(consensus: Consensus, game: GameLog) -> None:
         _validate_response(consensus, response, set(proposal_ids), game)
 
     _validate_final_decision(consensus, game)
+
+
+def _validate_consensus_covers_all_kills(consensus_log: ConsensusLog, game: GameLog) -> None:
+    kill_events = [
+        event for event in game.events if event.type == "werewolf_kill"
+    ]
+    if not kill_events:
+        return
+
+    kill_keys = {(event.round, event.phase, event.target) for event in kill_events}
+    covered: dict[tuple[int, str, str], list[str]] = {}
+    for consensus in consensus_log.consensuses:
+        decision = consensus.final_decision
+        key = (consensus.round, consensus.phase, decision.target)
+        covered.setdefault(key, []).append(consensus.consensus_id)
+
+    for key in kill_keys:
+        matches = covered.get(key, [])
+        if len(matches) == 0:
+            round, phase, target = key
+            raise ConsensusLogValidationError(
+                f"werewolf_kill event (round {round}, phase {phase}, target {target}) has no matching consensus entry"
+            )
+        if len(matches) > 1:
+            raise ConsensusLogValidationError(
+                f"werewolf_kill event has multiple consensus entries: {matches}"
+            )
+
+    for key, consensus_ids in covered.items():
+        if key not in kill_keys:
+            raise ConsensusLogValidationError(
+                f"consensus entries {consensus_ids} target a non-existent werewolf_kill event"
+            )
 
 
 def _validate_proposal(consensus: Consensus, proposal: ConsensusProposal, game: GameLog) -> None:
