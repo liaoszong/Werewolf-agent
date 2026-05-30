@@ -47,9 +47,15 @@ Telegraph style. Root rules only. Read scoped AGENTS.md before subtree work. Ski
 │   ├── TASKS.md
 │   ├── EVALUATION_RUBRIC.md
 │   ├── CHECKPOINT_TEMPLATE.md
-│   └── demo/
-│       ├── phase1-gold-demo.html
-│       └── phase2-runtime-demo.html
+│   ├── demo/
+│   │   ├── phase1-gold-demo.html
+│   │   └── phase2-runtime-demo.html
+│   └── gold-game/
+│       ├── g001-game-log.json
+│       ├── g001-decision-log.json
+│       ├── s2-score-log.json
+│       ├── s2-metrics-summary.json
+│       └── s3-rule-attribution.json
 ├── src/
 │   └── werewolf_eval/
 │       ├── __init__.py
