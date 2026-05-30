@@ -12,8 +12,9 @@ Telegraph style. Root rules only. Read scoped AGENTS.md before subtree work. Ski
 
 ## 命令
 
-- 非显然的 build 命令：暂无（Phase 1 文档阶段）。
-- 非显然的 test 命令：暂无。
+- 非显然的 build 命令：暂无。
+- 非显然的 test 命令：`PYTHONPATH=src python -m unittest discover -s tests -p "test_*.py"`。
+- Game Log 校验命令：`PYTHONPATH=src python -m werewolf_eval.validate_game_log docs/gold-game/g001-game-log.json`。
 - 非显然的 lint / format / typecheck 命令：暂无。
 
 ## 架构边界
@@ -48,15 +49,16 @@ Telegraph style. Root rules only. Read scoped AGENTS.md before subtree work. Ski
 
 ## 代码边界
 
-- 生成代码目录：暂无（Phase 1 文档阶段）。
+- 生成代码目录：`src/werewolf_eval/`。
 - Phase 1 不创建 `src/` `apps/` `server/` `web/` 等实现目录。
 - Phase 1 closure 以 S0/S1/S2/S3/S6 为 deterministic MVP 验收链；S4/S5 延后到 Phase 2。
-- Phase 2 引入代码前必须有明确的 Phase 2 Implementation Plan，并更新对应测试约束。
+- Phase 2 运行时代码必须绑定 Implementation Plan；当前允许的最小代码入口是 E1 Game Log parser / validator。
 
 ## 测试约束
 
 - Phase 1 验收标准以文档审查和 spike 结果为准，非代码测试。
-- Phase 2 引入代码后，测试约束见届时更新的 AGENTS.md。
+- Phase 2 当前测试约束：所有运行时代码变更必须通过 `PYTHONPATH=src python -m unittest discover -s tests -p "test_*.py"`。
+- 涉及 Game Log 输入契约时，必须同时通过 `PYTHONPATH=src python -m werewolf_eval.validate_game_log docs/gold-game/g001-game-log.json`。
 
 ## 环境与初始化
 
