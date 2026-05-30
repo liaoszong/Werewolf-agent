@@ -24,7 +24,7 @@ AI 狼人杀多智能体协作与博弈评测系统。
 
 ## 当前状态
 
-**Phase 1 deterministic MVP 已完成。** 当前 main 已包含 E1 Game Log parser / validator 和 E2 deterministic scorer 运行时代码；E3/E4 仍为 Phase 2 候选工程任务。
+**Phase 1 deterministic MVP 已完成。** 当前 main 已包含 E1 Game Log parser / validator、E2 deterministic scorer 和 E3 rule attribution engine 运行时代码；E4 仍为 Phase 2 候选工程任务。
 
 Phase 1 不代表真实 AI Agent 对局、真实 Decision Log / Consensus Log 采集、真实多模型 Leaderboard 或真实 `decision_quality_score` 可用。
 

@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 64
+- Entries: 68
 
 ```text
 ./
@@ -68,7 +68,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │       ├── 2026-05-29--s2-deterministic-scorer-validation-plan.md
 │   │       ├── 2026-05-29--s3-rule-attribution-validation-plan.md
 │   │       ├── 2026-05-29--s6-leaderboard-ui-demo-validation-plan.md
-│   │       └── 2026-05-30--e2-deterministic-scorer-plan.md
+│   │       ├── 2026-05-30--e2-deterministic-scorer-plan.md
+│   │       └── 2026-05-30--e3-rule-attribution-engine-plan.md
 │   ├── specs/
 │   │   ├── agent-workflow.md
 │   │   └── review-guidelines.md
@@ -84,10 +85,13 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       ├── game_log.py
 │       ├── validate_game_log.py
 │       ├── scoring.py
-│       └── score_game.py
+│       ├── score_game.py
+│       ├── attribution.py
+│       └── attribute_game.py
 ├── tests/
 │   ├── test_game_log.py
-│   └── test_scoring.py
+│   ├── test_scoring.py
+│   └── test_attribution.py
 ├── .gitignore
 ├── AGENTS.md
 └── README.md
