@@ -73,17 +73,16 @@
       "target": "p5",
       "outcome_score": 1,
       "decision_quality_score": 0,
-      "rule_integrity_score": -3,
+      "rule_integrity_score": 0,
       "rules_triggered": [
         "rubric:E.3.witch.save_villager",
-        "rubric:G.1.illegal_visible_info_ref"
+        "rubric:G.1.no_decision_quality_without_refs"
       ],
       "evidence_event_ids": [
         "g001_e009",
-        "g001_e028",
-        "g001_e007"
+        "g001_e028"
       ],
-      "notes": "Witch saved p5, who is later revealed as villager. Decision g001_d003 references non-visible events ['g001_e007']; D2 assigns no decision quality and applies rule_integrity_score -3."
+      "notes": "Witch saved p5, who is later revealed as villager. Decision g001_d003 has no visible_info_refs; D2 keeps decision_quality_score 0."
     },
     {
       "score_id": "s2_g001_e016",

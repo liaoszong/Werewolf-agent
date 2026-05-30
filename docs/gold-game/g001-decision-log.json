@@ -39,7 +39,7 @@
       "phase": "night",
       "action": "witch_save",
       "target": "p5",
-      "visible_info_refs": ["g001_e007"],
+      "visible_info_refs": [],
       "reason_summary": "女巫看到夜间死亡目标为 p5，选择使用解药保住一名村民。",
       "decision_type": "inference_based",
       "confidence": 0.85,
