@@ -20,22 +20,22 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       ├── receiving-code-review/
 │       │   └── SKILL.md
 │       ├── systematic-debugging/
-│       │   ├── CREATION-LOG.md
-│       │   ├── LICENSE.upstream
-│       │   ├── SKILL.md
 │       │   ├── condition-based-waiting-example.ts
 │       │   ├── condition-based-waiting.md
+│       │   ├── CREATION-LOG.md
 │       │   ├── defense-in-depth.md
 │       │   ├── find-polluter.sh
+│       │   ├── LICENSE.upstream
 │       │   ├── root-cause-tracing.md
+│       │   ├── SKILL.md
 │       │   ├── test-academic.md
 │       │   ├── test-pressure-1.md
 │       │   ├── test-pressure-2.md
 │       │   └── test-pressure-3.md
 │       └── tdd/
 │           ├── LICENSE.upstream
-│           ├── SKILL.md
 │           ├── mocking.md
+│           ├── SKILL.md
 │           └── tests.md
 ├── .codex/
 │   ├── hooks/
@@ -69,7 +69,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │       ├── 2026-05-29--s3-rule-attribution-validation-plan.md
 │   │       ├── 2026-05-29--s6-leaderboard-ui-demo-validation-plan.md
 │   │       ├── 2026-05-30--e2-deterministic-scorer-plan.md
-│   │       └── 2026-05-30--e3-rule-attribution-engine-plan.md
+│   │       ├── 2026-05-30--e3-rule-attribution-engine-plan.md
+│   │       └── 2026-05-30--e4-runtime-demo-html-plan.md
 │   ├── specs/
 │   │   ├── agent-workflow.md
 │   │   └── review-guidelines.md
@@ -82,16 +83,16 @@ Use this file for navigation only. Verify implementation details by reading sour
 ├── src/
 │   └── werewolf_eval/
 │       ├── __init__.py
-│       ├── game_log.py
-│       ├── validate_game_log.py
-│       ├── scoring.py
-│       ├── score_game.py
+│       ├── attribute_game.py
 │       ├── attribution.py
-│       └── attribute_game.py
+│       ├── game_log.py
+│       ├── score_game.py
+│       ├── scoring.py
+│       └── validate_game_log.py
 ├── tests/
+│   ├── test_attribution.py
 │   ├── test_game_log.py
-│   ├── test_scoring.py
-│   └── test_attribution.py
+│   └── test_scoring.py
 ├── .gitignore
 ├── AGENTS.md
 └── README.md

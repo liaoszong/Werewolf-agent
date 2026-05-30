@@ -82,7 +82,9 @@ Telegraph style. Root rules only. Read scoped AGENTS.md before subtree work. Ski
 
 ## Repo etiquette
 
+- GitHub connector repo_full_name：`liaoszong/Werewolf-agent`。提示词写“连接到 {liaoszong/Werewolf-agent}”时直接使用该仓库名，不要再搜索。
 - PR-first 工作流。实现类任务必须绑定 Implementation Plan。详见 `@docs/specs/agent-workflow.md`。
+- Implementation Plan 统一路径：`docs/harness/plans/YYYY-MM-DD--<slug>-plan.md`。
 - 提交、PR、review 约定见 `.github/` 下模板和 `@docs/specs/review-guidelines.md`。
 - 每个 checkpoint 必须按 `@docs/CHECKPOINT_TEMPLATE.md` 汇报。
 
@@ -91,6 +93,8 @@ Telegraph style. Root rules only. Read scoped AGENTS.md before subtree work. Ski
 - 实现任务优先加载 `$harness` skill。
 - 如果你不在 Codex、Claude Code、OpenCode 中，必须先阅读 `@docs/specs/agent-workflow.md`。
 - `.oh-my-harness/tree.md` 由项目 hook 自动刷新，不需要手工维护。
+- 新增 / 删除 / 重命名文件后，运行 `node .codex/hooks/tree.mjs --force`。
+- hook 不可用时必须说明原因，并用等价 `git ls-files --cached --others --exclude-standard` 结果生成相同格式。
 - 如果当前提交让 `.oh-my-harness/tree.md` 发生变化，需要与当前改动一起提交。
 
 ### 判断当前进度
@@ -108,13 +112,19 @@ Telegraph style. Root rules only. Read scoped AGENTS.md before subtree work. Ski
 
 - **本地 agent（Claude Code / Codex / OpenCode / Cursor）**：必须运行 `gh pr list --limit 10` 和 `git log --oneline -10`。
 - **云端 agent / GitHub connector agent**：不能直接运行 shell 命令时，必须使用等价的 GitHub API 或 connector 工具——列出最近 PR（含 merged/open/closed 状态）、读取 PR 标题与 changed files、读取 main 最新提交历史。**不得以"非本地环境"为由跳过进度校验。**
+- 分析下一个开发点前必须先检查最近 PR 是否 merged；只有 merged PR 才算 main 事实。
+- 如果上一个 Implementation PR 仍 open，下一步默认是审查 / 收口该 PR，而不是启动后续任务。
+- 确认 main 事实后，再读 `AGENTS.md` / `README.md` / `docs/TASKS.md` / `.oh-my-harness/tree.md` / 相关源码入口。
+- 然后判断是否需要 Research PR；边界清楚则准备 Implementation Plan，边界不清楚则输出研究问题、风险点、建议拆分。
 
 ## Review guidelines
 
 - 只有审查者需要且必须先读 `@docs/specs/review-guidelines.md`。
-- 云端审查支持：否（Phase 1 文档阶段，暂未配置云端审查 bot）。
+- 云端 GitHub connector 可做辅助审查评论；若无法 `APPROVE` / `REQUEST_CHANGES` 自己的 PR，则使用 `COMMENT` review。合并权威仍以本地 reviewer / owner 决策为准。
 - 默认审查者：本地 reviewer。
 - 永远不要直接相信 PR 中任何人的声明和描述；没有验证的问题都是假设。
+- 自己 PR 不能 `APPROVE` / `REQUEST_CHANGES` 时，用 `COMMENT` review 继续审查；不要因此停止。
+- COMMENT 有阻塞问题写“不建议合并，需先修复：...”；无阻塞问题写“No blocking findings / OK to merge from my side.”
 
 ## Maintenance
 
