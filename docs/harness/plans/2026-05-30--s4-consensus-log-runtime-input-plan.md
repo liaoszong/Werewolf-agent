@@ -160,7 +160,7 @@ No other files should be modified.
           "response_id": 1,
           "to_proposal_id": 2,
           "responder": "p1",
-          "response_type": "reject",
+          "response_type": "oppose_with_reason",
           "reason_summary": "p5 is a more consistent target than p6; p6 voted with the crowd and creates no special risk.",
           "visible_info_refs": ["g001_e022", "g001_e023"]
         }
