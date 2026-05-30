@@ -4,7 +4,7 @@
 
 **Goal:** Build a reproducible research harness for S5 semantic labels before any scoring integration.
 
-**Architecture:** The PR adds research documentation, a strict saved-output label contract, a small manual eval set, an example output file, an offline evaluator, and unit tests. The evaluator reads JSON from disk and computes agreement metrics. It does not call external services and does not change scoring.
+**Architecture:** The PR adds research documentation, a strict saved-output label contract, a small manual eval set, a complete example output file, an offline evaluator, and unit tests. The evaluator reads JSON from disk and computes agreement metrics for the three contract axes. It does not call external services and does not change scoring.
 
 **Tech Stack:** Python standard library only (`argparse`, `json`, `pathlib`, `unittest`), Markdown, JSON fixtures, existing `unittest` commands, existing tree refresh hook.
 
@@ -13,6 +13,12 @@
 ## Context
 
 Current main has D2 and S4 complete. D2 connects Decision Log to deterministic scoring, but positive `decision_quality_score` is still intentionally held at 0 until semantic judgment is researched and reviewed. S4 adds Consensus Log input validation, which closes the collaboration input side. The next best step is S5 research, not gameplay and not scoring integration.
+
+This revision also resolves three non-blocking review observations from PR #28:
+
+- The random/default eval item now uses `g001_d008`, whose `decision_type` is `default`, instead of `g001_d006`, whose fields indicate a coordinated wolf speech.
+- The eval set now includes `expected_reasoning_consistency`, matching the three-axis contract.
+- The example output fixture is specified in full, so implementers do not need to infer the five label objects.
 
 ## Research PR Decision
 
@@ -71,7 +77,7 @@ No other files should be changed.
 
 - [ ] **步骤 1：创建 research report**
 
-Create `docs/prs/2026-05-30--s5-semantic-label-research.md` with these sections:
+Create `docs/prs/2026-05-30--s5-semantic-label-research.md` with this content:
 
 ```markdown
 # S5 Semantic Label Research
@@ -94,6 +100,7 @@ This PR prepares offline S5 research artifacts. It does not integrate semantic l
 - Decision coverage: 100%.
 - `quality_label` agreement: at least 80%.
 - `evidence_alignment` agreement: at least 80%.
+- `reasoning_consistency` agreement: at least 80%.
 - Duplicate decisions, missing decisions, unknown labels, or out-of-range confidence values block integration.
 
 ## Required Validation Command
@@ -105,7 +112,7 @@ PYTHONPATH=. python scripts/research/evaluate_semantic_labels.py docs/gold-game/
 Expected output:
 
 ```text
-s5_semantic_label_accuracy quality_label=1.000 evidence_alignment=1.000 valid=true decisions=5
+s5_semantic_label_accuracy quality_label=1.000 evidence_alignment=1.000 reasoning_consistency=1.000 valid=true decisions=5
 ```
 ```
 
@@ -153,6 +160,8 @@ Allowed `reasoning_consistency` values:
 - `thin`
 - `inconsistent`
 
+`confidence` must be a number from `0.0` to `1.0`. `short_rationale` must be non-empty and at most 180 characters.
+
 - [ ] **步骤 3：创建 prompt notes**
 
 Create `docs/semantic-labeling/s5-label-prompts.md` with two candidates:
@@ -160,7 +169,7 @@ Create `docs/semantic-labeling/s5-label-prompts.md` with two candidates:
 - `candidate_a_minimal_json`: shortest strict JSON instruction.
 - `candidate_b_evidence_first_json`: evidence-first instruction that asks for label assignment from visible evidence and reason summary.
 
-Both candidates must require output matching `s5-label-contract.md`.
+Both candidates must require output matching `s5-label-contract.md`. Both candidates must state that labels are research output only and must not assign numeric score values.
 
 - [ ] **步骤 4：创建 docs existence test**
 
@@ -225,18 +234,97 @@ Create `docs/gold-game/s5-semantic-label-eval-set.json`:
   "game_id": "g001",
   "source_decision_log": "docs/gold-game/g001-decision-log.json",
   "items": [
-    {"decision_id": "g001_d001", "expected_quality_label": "supported_neutral", "expected_evidence_alignment": "aligned"},
-    {"decision_id": "g001_d002", "expected_quality_label": "supported_neutral", "expected_evidence_alignment": "aligned"},
-    {"decision_id": "g001_d003", "expected_quality_label": "unsupported", "expected_evidence_alignment": "missing"},
-    {"decision_id": "g001_d006", "expected_quality_label": "random_or_default", "expected_evidence_alignment": "missing"},
-    {"decision_id": "g001_d010", "expected_quality_label": "supported_good", "expected_evidence_alignment": "aligned"}
-  ]
+    {
+      "decision_id": "g001_d001",
+      "expected_quality_label": "supported_neutral",
+      "expected_evidence_alignment": "aligned",
+      "expected_reasoning_consistency": "consistent"
+    },
+    {
+      "decision_id": "g001_d002",
+      "expected_quality_label": "unsupported",
+      "expected_evidence_alignment": "missing",
+      "expected_reasoning_consistency": "thin"
+    },
+    {
+      "decision_id": "g001_d003",
+      "expected_quality_label": "unsupported",
+      "expected_evidence_alignment": "missing",
+      "expected_reasoning_consistency": "consistent"
+    },
+    {
+      "decision_id": "g001_d008",
+      "expected_quality_label": "random_or_default",
+      "expected_evidence_alignment": "weak",
+      "expected_reasoning_consistency": "thin"
+    },
+    {
+      "decision_id": "g001_d010",
+      "expected_quality_label": "supported_good",
+      "expected_evidence_alignment": "aligned",
+      "expected_reasoning_consistency": "consistent"
+    }
+  ],
+  "notes": {
+    "g001_d008": "This is the random/default eval example because its Decision Log decision_type is default. g001_d006 is not used for this label because it is team_coordinated and cites visible speech evidence."
+  }
 }
 ```
 
-- [ ] **步骤 2：创建 example output fixture**
+- [ ] **步骤 2：创建 complete example output fixture**
 
-Create `docs/gold-game/s5-semantic-label-output.example.json` with exactly five `labels`, one for each eval-set `decision_id`. The `quality_label` and `evidence_alignment` values must match the eval set, so the example output validates at 1.000 agreement.
+Create `docs/gold-game/s5-semantic-label-output.example.json` with this complete content:
+
+```json
+{
+  "label_log_id": "s5_g001_example_output",
+  "game_id": "g001",
+  "source_label": "[semantic research output]",
+  "prompt_candidate": "candidate_a_minimal_json",
+  "labels": [
+    {
+      "decision_id": "g001_d001",
+      "quality_label": "supported_neutral",
+      "evidence_alignment": "aligned",
+      "reasoning_consistency": "consistent",
+      "confidence": 0.72,
+      "short_rationale": "The wolf-team kill has visible setup evidence but the quality remains neutral until S5 scoring is designed."
+    },
+    {
+      "decision_id": "g001_d002",
+      "quality_label": "unsupported",
+      "evidence_alignment": "missing",
+      "reasoning_consistency": "thin",
+      "confidence": 0.66,
+      "short_rationale": "The seer check has no visible refs, so the stated inference is not evidence-supported in this contract."
+    },
+    {
+      "decision_id": "g001_d003",
+      "quality_label": "unsupported",
+      "evidence_alignment": "missing",
+      "reasoning_consistency": "consistent",
+      "confidence": 0.7,
+      "short_rationale": "The save rationale is coherent, but the Decision Log entry intentionally has no visible refs."
+    },
+    {
+      "decision_id": "g001_d008",
+      "quality_label": "random_or_default",
+      "evidence_alignment": "weak",
+      "reasoning_consistency": "thin",
+      "confidence": 0.63,
+      "short_rationale": "The decision_type is default, and the visible evidence gives only weak support for the vote."
+    },
+    {
+      "decision_id": "g001_d010",
+      "quality_label": "supported_good",
+      "evidence_alignment": "aligned",
+      "reasoning_consistency": "consistent",
+      "confidence": 0.82,
+      "short_rationale": "The final vote cites visible late-game evidence and targets a plausible wolf."
+    }
+  ]
+}
+```
 
 - [ ] **步骤 3：追加 fixture tests**
 
@@ -251,6 +339,8 @@ class SemanticLabelFixtureTests(unittest.TestCase):
         decision_ids = [item["decision_id"] for item in payload["items"]]
         self.assertEqual(len(decision_ids), len(set(decision_ids)))
         self.assertEqual(len(decision_ids), 5)
+        self.assertIn("g001_d008", decision_ids)
+        self.assertNotIn("g001_d006", decision_ids)
 
     def test_example_output_covers_eval_set(self) -> None:
         eval_set = json.loads((ROOT / "docs/gold-game/s5-semantic-label-eval-set.json").read_text(encoding="utf-8"))
@@ -306,6 +396,7 @@ class SemanticLabelEvaluatorTests(unittest.TestCase):
         self.assertEqual(result["decision_count"], 5)
         self.assertEqual(result["quality_label_accuracy"], 1.0)
         self.assertEqual(result["evidence_alignment_accuracy"], 1.0)
+        self.assertEqual(result["reasoning_consistency_accuracy"], 1.0)
 ```
 
 Run before implementation:
@@ -334,13 +425,13 @@ Required behavior:
 - Load both JSON files.
 - Require matching `game_id`.
 - Require every eval-set decision to appear exactly once in output labels.
-- Reject unknown label values.
+- Reject unknown label values for all three axes.
 - Reject confidence outside `[0.0, 1.0]`.
-- Return `valid`, `decision_count`, `quality_label_accuracy`, and `evidence_alignment_accuracy`.
+- Return `valid`, `decision_count`, `quality_label_accuracy`, `evidence_alignment_accuracy`, and `reasoning_consistency_accuracy`.
 - CLI prints one line:
 
 ```text
-s5_semantic_label_accuracy quality_label=1.000 evidence_alignment=1.000 valid=true decisions=5
+s5_semantic_label_accuracy quality_label=1.000 evidence_alignment=1.000 reasoning_consistency=1.000 valid=true decisions=5
 ```
 
 - [ ] **步骤 3：运行 evaluator test and CLI**
@@ -355,7 +446,7 @@ Expected result:
 ```text
 Ran 1 test
 OK
-s5_semantic_label_accuracy quality_label=1.000 evidence_alignment=1.000 valid=true decisions=5
+s5_semantic_label_accuracy quality_label=1.000 evidence_alignment=1.000 reasoning_consistency=1.000 valid=true decisions=5
 ```
 
 - [ ] **步骤 4：提交 task 3**
@@ -427,6 +518,8 @@ git commit -m "chore: refresh tree for S5 semantic label research"
 - Every task has exact files, commands, and expected results.
 - The evaluator is offline and deterministic.
 - Invalid saved-output behavior is rejected before scoring integration.
+- The eval set covers all three semantic-label axes.
+- `g001_d008`, not `g001_d006`, is the random/default eval example.
 
 ## PR Description Draft
 
@@ -449,8 +542,8 @@ Bound plan: `docs/harness/plans/2026-05-30--s5-semantic-label-research-plan.md`
 
 - Add S5 research report.
 - Add semantic label contract and prompt notes.
-- Add manual eval set and example saved output.
-- Add offline evaluator and tests.
+- Add manual eval set and complete example saved output.
+- Add offline evaluator and tests for all three contract axes.
 - Refresh `.oh-my-harness/tree.md`.
 
 ## Validation
