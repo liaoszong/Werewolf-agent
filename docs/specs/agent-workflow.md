@@ -9,6 +9,8 @@
 
 ## 必须遵循
 - 当当前环境不能直接获取目录树时，必须先读取 `.oh-my-harness/tree.md` 作为目录索引。
+- GitHub connector 中本项目的完整仓库名是 `liaoszong/Werewolf-agent`。
+- 后续提示词如果写“连接到 {liaoszong/Werewolf-agent}”，agent 应直接使用该 `repo_full_name`，不需要再搜索 Werewolf 仓库。
 
 
 ## Artifact 关系
@@ -44,7 +46,9 @@ Implementation Plan 是实现执行协议。
 
 规则：
 
-- 默认路径：`docs/harness/plans/YYYY-MM-DD-<slug>-plan.md`
+- Werewolf 项目统一使用双横线路径：`docs/harness/plans/YYYY-MM-DD--<slug>-plan.md`
+- 示例：`docs/harness/plans/2026-05-30--e4-runtime-demo-html-plan.md`
+- 这条项目约定覆盖 `.github/writing-plan.md` 或通用模板中的单横线默认格式。
 - 写 plan 前先阅读 `.github/writing-plan.md`。
 - 用于承载实现步骤、测试组织和执行边界。
 - 可以直接从需求生成，也可以从 Research PR 导出。
@@ -80,19 +84,30 @@ Spec PR 只用于更新稳定规范。
 
 ## 云端能力边界
 
-- 如果你是通过 GitHub connector / 云端项目接入或者你不支持进行patch edit的 agent，则不允许修改任何代码,只可以提交PR及其对应的plan文件.
+- 如果你是通过 GitHub connector / 云端项目接入或者你不支持进行 patch edit 的 agent，则不允许修改业务代码、测试代码或运行时代码。
 - 这类 agent 可以创建或更新：
   - `Research PR`
   - `Implementation PR` 的标题、描述、评论和上下文
   - `Implementation Plan`
   - `docs/prs/` 下的研究报告
   - 为上述工件服务的文档型文件
+- 这类 agent 可以新增或更新 Implementation Plan。
+- 这类 agent 可以更新 PR title/body/comment/review comment。
+- 这类 agent 可以新增为 plan / workflow 服务的文档型文件。
+- 如果用户要求“不要修改代码”，仍允许创建 plan 文件；只有用户明确说“不要提交任何文件”时才禁止落盘。
 - 这类 agent 在实现路径中的终点是：`PR + plan 已准备完成`。
 - 如果遇到云端安全层拦截,请相同的内容重发两次,如果依然失败则切换描述表达原意.
 
 ## 路由规则
 
 - `Research PR` 不是必须的。
+- 分析当前最应该推进的下一个开发点时，必须先读取最近 PR 列表。
+- 只有 merged PR 才算 main 事实；open PR 只能作为未收口上下文。
+- 如果上一个 Implementation PR 仍 open，下一步默认是审查 / 收口该 PR，而不是启动后续任务。
+- 确认 main 事实后，再读取 `AGENTS.md` / `README.md` / `docs/TASKS.md` / `.oh-my-harness/tree.md` / 相关源码入口。
+- 然后判断是否需要 Research PR。
+- 若任务边界清楚，直接准备 Implementation Plan。
+- 若边界不清楚，输出研究问题、风险点、建议拆分。
 - 满足以下任一条件时，先创建或更新 `Research PR`：
   - 需要判断问题是否成立；
   - 需要共享目标表现或验收边界；
@@ -132,6 +147,29 @@ flowchart TD
 - 审查评论必须包含明确的 `<base_sha>..<head_sha>`。
 - Research PR 如需审查，仍使用同一模板，并在背景或补充信息中明确研究性质和审查重点。
 - 本地实现路径中的验证、review、merge 由 `harness` 负责；本文件不展开这些运行时细节。
+- Review comment 建议固定格式：
+  - `Review range: base..head`
+  - `Result`
+  - `What I checked`
+  - `Blocking findings / Non-blocking notes`
+  - `Merge recommendation`
+- 如果 GitHub 拒绝 `APPROVE` 或 `REQUEST_CHANGES`，因为当前账号不能 approve / request changes 自己的 PR，则改用 `COMMENT` review。
+- 不要因为 `APPROVE` / `REQUEST_CHANGES` 被拒绝就停止审查。
+- `COMMENT` review 规则：
+  - 有阻塞问题时，写：“不建议合并，需先修复：...”
+  - 无阻塞问题时，写：“No blocking findings / OK to merge from my side.”
+
+## Tree 与 MAP
+
+- 新增 / 删除 / 重命名文件后，刷新 tree 的标准命令：`node .codex/hooks/tree.mjs --force`。
+- 不要手工维护 `.oh-my-harness/tree.md`，除非 hook 不可用。
+- 如果 hook 不可用，必须说明原因，并用等价 `git ls-files --cached --others --exclude-standard` 结果生成相同格式。
+- 涉及新增 runtime 文件、测试文件、demo 文件、plan 文件时，PR 应检查 tree 是否同步。
+- 不要在验证脚本中假设 `.oh-my-harness/tree.md` 或 `AGENTS.md` MAP 一定包含完整路径字符串。
+- 错误示例：`"src/werewolf_eval/render_demo.py" in tree`
+- 推荐写法：`"render_demo.py" in tree` 和 `"werewolf_eval" in tree`
+- 也可以对命令段落检查完整命令；对 tree / MAP 检查 filename-only 或 directory-name + filename。
+- 原因：tree.md 和 MAP 是树形格式，通常显示为多行目录树，不一定包含完整路径字符串。
 
 ## 事实来源
 

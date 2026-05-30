@@ -10,9 +10,10 @@
 
 **背景：** 这应该在专门的工作树中运行（并收集了充分的上下文信息）。
 
-**保存计划到：** `docs/harness/plans/YYYY-MM-DD-<slug>-plan.md`
+**保存计划到：** `docs/harness/plans/YYYY-MM-DD--<slug>-plan.md`
 
 *   用户对计划位置的偏好会覆盖此默认设置
+*   Werewolf 项目统一使用双横线格式 `YYYY-MM-DD--<slug>-plan.md`，覆盖通用单横线默认格式
 
 ## 范围检查
 
@@ -111,6 +112,38 @@ git commit -m "feat: 添加特定功能"
 *   描述要做什么但不展示如何做的步骤（代码步骤需要代码块）
 *   引用了在任何任务中未定义的类型、函数或方法
 
+## 必填内容
+
+每个 Implementation Plan 的每个任务必须明确：
+
+*   Create / Modify 的文件
+*   Test 文件
+*   执行命令
+*   预期输出
+*   禁止范围
+*   PR 描述草案
+
+不要写 TBD / TODO / 稍后实现。
+
+## Tree / MAP 验证
+
+不要在验证脚本中假设 `.oh-my-harness/tree.md` 或 `AGENTS.md` MAP 一定包含完整路径字符串。
+
+错误示例：
+
+```python
+"src/werewolf_eval/render_demo.py" in tree
+```
+
+推荐写法：
+
+```python
+"render_demo.py" in tree
+"werewolf_eval" in tree
+```
+
+或对命令段落检查完整命令，对 tree / MAP 检查 filename-only / directory-name + filename。原因是 tree.md 和 MAP 是树形格式，通常显示为多行目录树，不一定包含完整路径字符串。
+
 ## 记住
 
 *   始终使用精确的文件路径
@@ -135,6 +168,6 @@ git commit -m "feat: 添加特定功能"
 
 保存计划后，提供执行选择：
 
-**"计划已完成并保存到 `docs/harness/plans/YYYY-MM-DD-<slug>-plan.md`。有一种执行选项：**
+**"计划已完成并保存到 `docs/harness/plans/YYYY-MM-DD--<slug>-plan.md`。有一种执行选项：**
 
 **1\. 内联执行** \- 在此会话中继续执行任务，使用检查点进行批量执行
