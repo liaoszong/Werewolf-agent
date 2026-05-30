@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 85
+- Entries: 90
 
 ```text
 ./
@@ -77,7 +77,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │       ├── 2026-05-30--e3-rule-attribution-engine-plan.md
 │   │       ├── 2026-05-30--e4-runtime-demo-html-plan.md
 │   │       ├── 2026-05-30--roadmap-alignment-plan.md
-│   │       └── 2026-05-30--s4-consensus-log-runtime-input-plan.md
+│   │       ├── 2026-05-30--s4-consensus-log-runtime-input-plan.md
+│   │       └── 2026-05-30--s4x-context-budget-hardening-plan.md
 │   ├── prs/
 │   │   └── 2026-05-30--phase2-next-step-research.md
 │   ├── specs/
@@ -90,6 +91,12 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── ROADMAP.md
 │   ├── SPIKES.md
 │   └── TASKS.md
+├── scripts/
+│   ├── context/
+│   │   ├── build_plan_index.py
+│   │   └── build_task_context.py
+│   └── dev/
+│       └── validate_brief.py
 ├── src/
 │   └── werewolf_eval/
 │       ├── __init__.py
@@ -107,6 +114,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 ├── tests/
 │   ├── test_attribution.py
 │   ├── test_consensus_log.py
+│   ├── test_context_budget.py
 │   ├── test_decision_log.py
 │   ├── test_game_log.py
 │   ├── test_render_demo.py

@@ -115,6 +115,20 @@ Telegraph style. Root rules only. Read scoped AGENTS.md before subtree work. Ski
 - hook 不可用时必须说明原因，并用等价 `git ls-files --cached --others --exclude-standard` 结果生成相同格式。
 - 如果当前提交让 `.oh-my-harness/tree.md` 发生变化，需要与当前改动一起提交。
 
+### Context Budget Gate
+
+- Do not read long plan files in full.
+- For plan tasks, start from `docs/generated-context/current-task.ctx.md`.
+- If `docs/generated-context/current-task.ctx.md` is missing or stale, generate it with `scripts/context/build_plan_index.py` and `scripts/context/build_task_context.py`.
+- Use `docs/generated-context/<plan>.index.json` to locate exact source plan line ranges.
+- Only read original plan line ranges when the generated context is insufficient.
+- Run validation through `scripts/dev/validate_brief.py` unless a task-specific plan explicitly requires a narrower command first.
+- Read `.logs/validate/latest/summary.json` before reading any validation log.
+- Read `.logs/validate/latest/*.short.log` only when `summary.json` lists it in `next_read`.
+- Do not read full validation logs unless `summary.json` and the short log are insufficient to identify the failure.
+- Do not use Repomix as the default context entry.
+- Do not introduce Semble, CodeGraph, or codebase-memory MCP unless a later plan explicitly allows it.
+
 ### 判断当前进度
 
 本项目是 PR-first 工作流。判断"下一步做什么"时，**禁止仅根据 `docs/TASKS.md` 的 pending 状态做决策**。
