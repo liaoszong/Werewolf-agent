@@ -1,0 +1,40 @@
+{
+  "eval_set_id": "s5_g001_manual_eval_set",
+  "game_id": "g001",
+  "source_decision_log": "docs/gold-game/g001-decision-log.json",
+  "items": [
+    {
+      "decision_id": "g001_d001",
+      "expected_quality_label": "supported_neutral",
+      "expected_evidence_alignment": "aligned",
+      "expected_reasoning_consistency": "consistent"
+    },
+    {
+      "decision_id": "g001_d002",
+      "expected_quality_label": "unsupported",
+      "expected_evidence_alignment": "missing",
+      "expected_reasoning_consistency": "thin"
+    },
+    {
+      "decision_id": "g001_d003",
+      "expected_quality_label": "unsupported",
+      "expected_evidence_alignment": "missing",
+      "expected_reasoning_consistency": "consistent"
+    },
+    {
+      "decision_id": "g001_d008",
+      "expected_quality_label": "random_or_default",
+      "expected_evidence_alignment": "weak",
+      "expected_reasoning_consistency": "thin"
+    },
+    {
+      "decision_id": "g001_d010",
+      "expected_quality_label": "supported_good",
+      "expected_evidence_alignment": "aligned",
+      "expected_reasoning_consistency": "consistent"
+    }
+  ],
+  "notes": {
+    "g001_d008": "This is the random/default eval example because its Decision Log decision_type is default. g001_d006 is not used for this label because it is team_coordinated and cites visible speech evidence."
+  }
+}
