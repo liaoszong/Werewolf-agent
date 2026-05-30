@@ -178,13 +178,22 @@ def _score_werewolf_kill(game: GameLog, event: Event) -> ScoreRecord:
         notes = f"Wolf team killed {event.target}, who is revealed as villager."
 
     evidence = [event.event_id]
-    death_event = _death_event_for_target(game, event.target)
+    # Only consider death/save events from the same round as the kill.
+    death_event = next(
+        (e.event_id for e in game.events
+         if e.type == "player_died" and e.target == event.target and e.round == event.round),
+        None,
+    )
     if death_event:
         evidence.append(death_event)
     else:
-        # When the kill target was saved by witch (no player_died),
+        # When the kill target was saved by witch (no same-round player_died),
         # include the witch_save event as alternative evidence.
-        save_event = _save_event_for_target(game, event.target)
+        save_event = next(
+            (e.event_id for e in game.events
+             if e.type == "witch_save" and e.target == event.target and e.round == event.round),
+            None,
+        )
         if save_event:
             evidence.append(save_event)
     reveal_event = _reveal_event_for_target(game, event.target)
