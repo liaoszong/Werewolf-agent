@@ -49,5 +49,47 @@ class SemanticLabelEvaluatorTests(unittest.TestCase):
         self.assertEqual(result["reasoning_consistency_accuracy"], 1.0)
 
 
+    def test_evaluator_rejects_duplicate_decision_id(self) -> None:
+        from scripts.research.evaluate_semantic_labels import evaluate_files
+
+        output = json.loads((ROOT / "docs/gold-game/s5-semantic-label-output.example.json").read_text(encoding="utf-8"))
+        output["labels"].append(output["labels"][0])
+        dup_path = ROOT / "docs/gold-game/_dup_output.json"
+        dup_path.write_text(json.dumps(output, ensure_ascii=False), encoding="utf-8")
+        try:
+            with self.assertRaisesRegex(ValueError, "duplicate decision_id"):
+                evaluate_files(ROOT / "docs/gold-game/s5-semantic-label-eval-set.json", dup_path)
+        finally:
+            dup_path.unlink(missing_ok=True)
+
+    def test_evaluator_rejects_missing_confidence(self) -> None:
+        from scripts.research.evaluate_semantic_labels import evaluate_files
+
+        output = json.loads((ROOT / "docs/gold-game/s5-semantic-label-output.example.json").read_text(encoding="utf-8"))
+        del output["labels"][0]["confidence"]
+        bad_path = ROOT / "docs/gold-game/_bad_output.json"
+        bad_path.write_text(json.dumps(output, ensure_ascii=False), encoding="utf-8")
+        try:
+            with self.assertRaisesRegex(ValueError, "label missing fields"):
+                evaluate_files(ROOT / "docs/gold-game/s5-semantic-label-eval-set.json", bad_path)
+        finally:
+            bad_path.unlink(missing_ok=True)
+
+    def test_evaluator_accepts_80_percent_threshold(self) -> None:
+        from scripts.research.evaluate_semantic_labels import evaluate_files
+
+        output = json.loads((ROOT / "docs/gold-game/s5-semantic-label-output.example.json").read_text(encoding="utf-8"))
+        output["labels"][0]["quality_label"] = "contradicted"
+        bad_path = ROOT / "docs/gold-game/_bad_output.json"
+        bad_path.write_text(json.dumps(output, ensure_ascii=False), encoding="utf-8")
+        try:
+            result = evaluate_files(ROOT / "docs/gold-game/s5-semantic-label-eval-set.json", bad_path)
+            self.assertEqual(result["decision_count"], 5)
+            self.assertEqual(result["quality_label_accuracy"], 0.8)
+            self.assertTrue(result["valid"])
+        finally:
+            bad_path.unlink(missing_ok=True)
+
+
 if __name__ == "__main__":
     unittest.main()

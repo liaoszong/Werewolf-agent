@@ -8,6 +8,44 @@ from typing import Any
 VALID_QUALITY_LABELS = {"supported_good", "supported_neutral", "unsupported", "contradicted", "random_or_default"}
 VALID_EVIDENCE_ALIGNMENTS = {"aligned", "weak", "missing", "contradicted"}
 VALID_REASONING_CONSISTENCIES = {"consistent", "thin", "inconsistent"}
+ACCEPTANCE_THRESHOLD = 0.8
+MAX_RATIONALE_CHARS = 180
+
+LABEL_REQUIRED_FIELDS = {
+    "decision_id",
+    "quality_label",
+    "evidence_alignment",
+    "reasoning_consistency",
+    "confidence",
+    "short_rationale",
+}
+
+
+def _validate_label(label: dict[str, Any]) -> None:
+    missing = LABEL_REQUIRED_FIELDS - set(label)
+    if missing:
+        raise ValueError(f"label missing fields: {sorted(missing)}")
+
+    did = label["decision_id"]
+
+    if label["quality_label"] not in VALID_QUALITY_LABELS:
+        raise ValueError(f"unknown quality_label for {did}: {label['quality_label']!r}")
+    if label["evidence_alignment"] not in VALID_EVIDENCE_ALIGNMENTS:
+        raise ValueError(f"unknown evidence_alignment for {did}: {label['evidence_alignment']!r}")
+    if label["reasoning_consistency"] not in VALID_REASONING_CONSISTENCIES:
+        raise ValueError(f"unknown reasoning_consistency for {did}: {label['reasoning_consistency']!r}")
+
+    confidence = label["confidence"]
+    if not isinstance(confidence, (int, float)) or isinstance(confidence, bool):
+        raise ValueError(f"confidence must be a number for {did}: {confidence!r}")
+    if not 0.0 <= float(confidence) <= 1.0:
+        raise ValueError(f"confidence out of range for {did}: {confidence}")
+
+    rationale = label["short_rationale"]
+    if not isinstance(rationale, str) or not rationale.strip():
+        raise ValueError(f"short_rationale must be non-empty for {did}")
+    if len(rationale) > MAX_RATIONALE_CHARS:
+        raise ValueError(f"short_rationale exceeds {MAX_RATIONALE_CHARS} chars for {did}: {len(rationale)}")
 
 
 def evaluate_files(eval_set_path: Path, output_path: Path) -> dict[str, Any]:
@@ -18,6 +56,16 @@ def evaluate_files(eval_set_path: Path, output_path: Path) -> dict[str, Any]:
         raise ValueError(
             f"game_id mismatch: eval set {eval_set['game_id']!r} != output {output['game_id']!r}"
         )
+
+    label_ids = [label.get("decision_id") for label in output["labels"]]
+    seen: set[str] = set()
+    for did in label_ids:
+        if did in seen:
+            raise ValueError(f"duplicate decision_id in output labels: {did!r}")
+        seen.add(did)
+
+    for label in output["labels"]:
+        _validate_label(label)
 
     eval_items = {item["decision_id"]: item for item in eval_set["items"]}
     output_labels = {label["decision_id"]: label for label in output["labels"]}
@@ -32,17 +80,6 @@ def evaluate_files(eval_set_path: Path, output_path: Path) -> dict[str, Any]:
             parts.append(f"extra in output: {sorted(extra)}")
         raise ValueError("; ".join(parts))
 
-    for label in output["labels"]:
-        if label["quality_label"] not in VALID_QUALITY_LABELS:
-            raise ValueError(f"unknown quality_label: {label['quality_label']!r}")
-        if label["evidence_alignment"] not in VALID_EVIDENCE_ALIGNMENTS:
-            raise ValueError(f"unknown evidence_alignment: {label['evidence_alignment']!r}")
-        if label["reasoning_consistency"] not in VALID_REASONING_CONSISTENCIES:
-            raise ValueError(f"unknown reasoning_consistency: {label['reasoning_consistency']!r}")
-        confidence = label.get("confidence")
-        if confidence is not None and not 0.0 <= confidence <= 1.0:
-            raise ValueError(f"confidence out of range for {label['decision_id']}: {confidence}")
-
     quality_correct = sum(
         1 for did, item in eval_items.items()
         if output_labels[did]["quality_label"] == item["expected_quality_label"]
@@ -56,14 +93,17 @@ def evaluate_files(eval_set_path: Path, output_path: Path) -> dict[str, Any]:
         if output_labels[did]["reasoning_consistency"] == item["expected_reasoning_consistency"]
     )
     total = len(eval_items)
-    valid = quality_correct == total and evidence_correct == total and reasoning_correct == total
+    quality_acc = quality_correct / total
+    evidence_acc = evidence_correct / total
+    reasoning_acc = reasoning_correct / total
+    valid = quality_acc >= ACCEPTANCE_THRESHOLD and evidence_acc >= ACCEPTANCE_THRESHOLD and reasoning_acc >= ACCEPTANCE_THRESHOLD
 
     return {
         "valid": valid,
         "decision_count": total,
-        "quality_label_accuracy": quality_correct / total,
-        "evidence_alignment_accuracy": evidence_correct / total,
-        "reasoning_consistency_accuracy": reasoning_correct / total,
+        "quality_label_accuracy": quality_acc,
+        "evidence_alignment_accuracy": evidence_acc,
+        "reasoning_consistency_accuracy": reasoning_acc,
     }
 
 
