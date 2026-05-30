@@ -33,12 +33,12 @@ class DeterministicScorerTests(unittest.TestCase):
         self.d2_metrics = summarize_metrics(self.game, self.d2_score_log)
 
     def test_score_log_matches_s2_expected_records(self) -> None:
-        actual = score_log_to_dict(self.score_log)
+        actual = score_log_to_dict(self.d2_score_log)
         expected = load_json("docs/gold-game/s2-score-log.json")
         self.assertEqual(actual, expected)
 
     def test_metrics_summary_matches_s2_expected(self) -> None:
-        actual = metrics_summary_to_dict(self.metrics)
+        actual = metrics_summary_to_dict(self.d2_metrics)
         expected = load_json("docs/gold-game/s2-metrics-summary.json")
         self.assertEqual(actual, expected)
 

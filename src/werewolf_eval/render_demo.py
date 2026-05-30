@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from werewolf_eval.attribution import attribute_game, attribution_to_dict
+from werewolf_eval.decision_log import load_decision_log
 from werewolf_eval.game_log import GameLog, load_game_log
 from werewolf_eval.scoring import (
     metrics_summary_to_dict,
@@ -100,6 +101,8 @@ def build_demo_context(game: GameLog, score_log: Any, metrics: Any, attribution:
     ]
 
     score_summary = metrics_payload["score_summary"]
+    decision_quality_total = sum(record["decision_quality_score"] for record in score_payload["records"])
+    decision_log_enabled = score_payload["phase"] == "Phase 2A-D2"
     games_played = 1
     single_game_outcome_total = (
         sum(score_summary["player_outcome_scores"].values())
@@ -115,7 +118,7 @@ def build_demo_context(game: GameLog, score_log: Any, metrics: Any, attribution:
             "games_played": games_played,
             "win_rate": 1.0 if game.result.winner == "villager" else 0.0,
             "avg_outcome_score": avg_outcome_score,
-            "avg_decision_quality_score": 0.0,
+            "avg_decision_quality_score": 0.0,  # D2 demo convention: decision_quality_score waits for S5 AI semantic judgment
             "avg_rule_integrity_score": 0.0,
             "top_attribution": top_attribution["turn_point_id"],
             "source_label": "[deterministic]",
@@ -165,6 +168,8 @@ def build_demo_context(game: GameLog, score_log: Any, metrics: Any, attribution:
             "summary": score_summary,
             "result_metrics": metrics_payload["result_metrics"],
             "process_metrics": metrics_payload["process_metrics"],
+            "decision_log_enabled": decision_log_enabled,
+            "decision_quality_total": decision_quality_total,
         },
         "attribution": {
             "turn_points": len(attribution_payload["turn_points"]),
@@ -218,6 +223,13 @@ def render_html(context: dict[str, Any]) -> str:
         for item in context["attribution"]["turn_point_rows"]
     )
 
+    if context["score"]["decision_log_enabled"]:
+        boundary_copy = "This is not real AI Agent gameplay, not real Consensus Log collection, not AI semantic labeling, and not a real multi-model Leaderboard. Decision Log is connected to scoring via D2 deterministic Step 1-2 (visibility check + decision_id traceability), but decision_quality_score remains 0 (positive scoring waits for S5 AI semantic judgment)."
+        decision_copy = "decision_quality_score: D2 visibility check + decision_id traceability complete; positive scoring still 0 (waiting for S5)."
+    else:
+        boundary_copy = "This is not real AI Agent gameplay, not real Decision Log / Consensus Log collection, and not a real multi-model Leaderboard. No Decision Log supplied; decision_quality_score fixed at 0."
+        decision_copy = "decision_quality_score: no Decision Log supplied; fixed at 0."
+
     return f"""<!doctype html>
 <html lang="zh-CN">
 <head>
@@ -240,12 +252,12 @@ def render_html(context: dict[str, Any]) -> str:
 <main>
   <h1>Werewolf-agent Phase 2 Runtime Demo</h1>
   <p><span class="badge">运行时生成</span><span class="badge">[deterministic]</span><span class="badge">[人工 gold sample]</span> This page is generated from the E1/E2/E3 runtime pipeline.</p>
-  <section class="warning"><h2>边界声明</h2><p>This is not real AI Agent gameplay, not real Decision Log / Consensus Log collection, and not a real multi-model Leaderboard. 当前 decision_quality_score 固定为 0。</p></section>
+  <section class="warning"><h2>边界声明</h2><p>{_html(boundary_copy)}</p></section>
   <section><h2>对局摘要</h2><p>Game: {_html(game["game_id"])} / Winner: {_html(game["winner_label"])} / Players: {_html(game["players"])} / Events: {_html(game["events"])} / Source: {_html(game["source_label"])}</p></section>
   <section><h2>玩家状态</h2><div class="scroll"><table>{_head(["玩家", "角色", "阵营", "终局状态"])}{player_rows}</table></div></section>
   <section><h2>时间线</h2><div class="scroll"><table>{_head(["序号", "轮次", "阶段", "类型", "行动者", "目标", "摘要"])}{timeline_rows}</table></div></section>
   <section><h2>投票表</h2><div class="scroll"><table>{_head(["轮次", "事件", "投票者", "目标", "摘要"])}{vote_rows}</table></div></section>
-  <section><h2>确定性指标</h2><p>Score records: {_html(context["score"]["records"])} {_html(context["score"]["source_label"])}。decision_quality_score: 固定为 0。</p></section>
+  <section><h2>确定性指标</h2><p>Score records: {_html(context["score"]["records"])} {_html(context["score"]["source_label"])}。{_html(decision_copy)}</p></section>
   <section><h2>规则归因</h2><p>{_html(context["attribution"]["description"])} {_html(context["attribution"]["source_label"])}</p><div class="scroll"><table>{_head(["转折点", "规则", "轮次", "主体", "影响分", "描述"])}{attribution_rows}</table></div></section>
   <section><h2>Leaderboard</h2><div class="scroll"><table>{_head(["Agent", "Model", "Games", "Win rate", "Outcome", "Decision", "Integrity", "Top attribution", "Source"])}{leaderboard_rows}</table></div></section>
 </main>
@@ -254,9 +266,10 @@ def render_html(context: dict[str, Any]) -> str:
 """
 
 
-def write_demo_html(game_log_path: str | Path, output_path: str | Path) -> None:
+def write_demo_html(game_log_path: str | Path, output_path: str | Path, decision_log_path: str | Path | None = None) -> None:
     game = load_game_log(game_log_path)
-    score_log = score_game(game)
+    decision_log = load_decision_log(decision_log_path, game) if decision_log_path else None
+    score_log = score_game(game, decision_log=decision_log)
     metrics = summarize_metrics(game, score_log)
     attribution = attribute_game(game, score_log, metrics)
     context = build_demo_context(game, score_log, metrics, attribution)
@@ -266,10 +279,11 @@ def write_demo_html(game_log_path: str | Path, output_path: str | Path) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Generate Werewolf-agent Phase 2 runtime demo HTML.")
     parser.add_argument("path", help="Path to Game Log JSON")
+    parser.add_argument("--decision-log", help="Optional path to Decision Log JSON for D2 deterministic decision-quality scoring")
     parser.add_argument("--html-out", required=True, help="Output HTML file path")
     args = parser.parse_args()
 
-    write_demo_html(args.path, args.html_out)
+    write_demo_html(args.path, args.html_out, args.decision_log)
     print(f"rendered_demo_html={args.html_out}")
     return 0
 

@@ -59,10 +59,25 @@ class RuntimeDemoRenderTests(unittest.TestCase):
         self.assertIn("[deterministic]", html)
         self.assertIn("[mock]", html)
         self.assertIn("decision_quality_score", html)
-        self.assertIn("固定为 0", html)
+        self.assertIn("fixed at 0", html)
         self.assertIn("not real AI Agent gameplay", html)
         self.assertNotIn("<script", html.lower())
         self.assertNotIn("https://", html)
+
+    def test_write_demo_html_with_decision_log_shows_d2_boundary(self) -> None:
+        output = ROOT / "docs/demo/test-phase2-d2-runtime-demo.html"
+        try:
+            write_demo_html(
+                ROOT / "docs/gold-game/g001-game-log.json",
+                output,
+                ROOT / "docs/gold-game/g001-decision-log.json",
+            )
+            html = output.read_text(encoding="utf-8")
+            self.assertIn("D2 deterministic Step 1-2", html)
+            self.assertIn("D2 visibility check", html)
+            self.assertIn("waiting for S5", html)
+        finally:
+            output.unlink(missing_ok=True)
 
     def test_write_demo_html_creates_single_file_output(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
