@@ -954,7 +954,7 @@ PYTHONPATH=src python -m unittest discover -s tests -p "test_*.py"
 Expected result:
 
 ```text
-Ran 45 tests
+Ran 51 tests
 
 OK
 ```
@@ -1069,7 +1069,7 @@ Expected result:
 ```text
 validated game_id=g001 players=6 events=38 winner=villager end_round=2
 validated consensus_log_id=s4_g001_consensus_log game_id=g001 consensuses=2 source_label=[人工 gold sample]
-Ran 45 tests
+Ran 51 tests
 
 OK
 ```
@@ -1119,7 +1119,7 @@ validated game_id=g001 players=6 events=38 winner=villager end_round=2
 validated decision_log_id=d1_g001_decision_log game_id=g001 decisions=10
 decision_log=enabled decision_quality_total=0
 rendered_demo_html=docs/demo/phase2-runtime-demo.html
-Ran 45 tests
+Ran 51 tests
 
 OK
 ```
@@ -1230,7 +1230,7 @@ PYTHONPATH=src python -m werewolf_eval.render_demo docs/gold-game/g001-game-log.
 # => rendered_demo_html=docs/demo/phase2-runtime-demo.html
 
 PYTHONPATH=src python -m unittest discover -s tests -p "test_*.py"
-# => Ran 45 tests OK
+# => Ran 51 tests OK
 
 git diff --check main...HEAD
 # => clean
