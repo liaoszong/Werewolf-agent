@@ -105,5 +105,32 @@ class TaskContextBuilderTests(unittest.TestCase):
         self.assertIn("python scripts/context/build_plan_index.py", text)
 
 
+class ValidationBriefTests(unittest.TestCase):
+    def test_summarize_completed_process_records_logs_and_next_read(self) -> None:
+        from scripts.dev.validate_brief import summarize_completed_process
+
+        with tempfile.TemporaryDirectory() as tmp:
+            log_dir = Path(tmp)
+            result = summarize_completed_process(
+                name="unit_tests",
+                command="python -m unittest discover",
+                returncode=1,
+                stdout="line one\nline two\nline three\n",
+                stderr="failure detail\n",
+                log_dir=log_dir,
+            )
+
+            short_log = log_dir / "unit_tests.short.log"
+            full_log = log_dir / "unit_tests.log"
+            self.assertFalse(result["ok"])
+            self.assertEqual(result["name"], "unit_tests")
+            self.assertEqual(result["exit_code"], 1)
+            self.assertEqual(result["short_log"], str(short_log))
+            self.assertEqual(result["full_log"], str(full_log))
+            self.assertEqual(result["next_read"], str(short_log))
+            self.assertIn("line three", short_log.read_text(encoding="utf-8"))
+            self.assertIn("failure detail", full_log.read_text(encoding="utf-8"))
+
+
 if __name__ == "__main__":
     unittest.main()
