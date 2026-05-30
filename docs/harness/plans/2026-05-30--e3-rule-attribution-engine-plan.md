@@ -434,24 +434,7 @@ Expected result:
 ImportError: cannot import name 'attribute_game'
 ```
 
-This failure proves the test is exercising the missing E3 public function.
-
-- [ ] **Step 3: Commit failing tests only if the repository workflow allows red commits**
-
-If this repository accepts TDD red commits, run:
-
-```bash
-git add tests/test_attribution.py
-git commit -m "test: add attribution golden tests"
-```
-
-Expected result:
-
-```text
-[task/e3-rule-attribution-engine ...] test: add attribution golden tests
-```
-
-If the local workflow requires every commit to keep tests green, do not commit after Step 2. Continue to Task 4, then commit tests and implementation together in Task 4 Step 6.
+This failure proves the test is exercising the missing E3 public function. Do not commit yet — proceed directly to Task 4 to implement the engine, then commit tests and implementation together.
 
 ---
 
@@ -539,9 +522,10 @@ def _critical_vote_turn_points(game: GameLog) -> list[TurnPoint]:
             role_text = "村民"
 
         impact_score = 2.0 if eliminated_role in {"seer", "witch"} else 1.0
-        policy = "F.1 gives a x2 multiplier only when the eliminated player is a core villager role. For eliminated werewolf p1, S3 uses the default critical-vote impact score of 1.0 and records this as a validation policy, not a rubric change."
         if eliminated_role in {"seer", "witch"}:
             policy = "F.1 gives a x2 multiplier when the eliminated player is a core villager role."
+        else:
+            policy = f"F.1 gives a x2 multiplier only when the eliminated player is a core villager role. For eliminated {eliminated_team} {eliminated_target}, S3 uses the default critical-vote impact score of 1.0 and records this as a validation policy, not a rubric change."
 
         evidence = [event.event_id for event in votes] + [eliminated.event_id, reveal.event_id]
         turn_points.append(
@@ -605,7 +589,7 @@ def _rule_evaluation_summary(game: GameLog, turn_points: list[TurnPoint], metric
 Append this code:
 
 ```python
-def _top_attribution(turn_points: list[TurnPoint]) -> TopAttribution:
+def _top_attribution(game: GameLog, turn_points: list[TurnPoint]) -> TopAttribution:
     if not turn_points:
         return TopAttribution(
             turn_point_id="none",
@@ -615,10 +599,18 @@ def _top_attribution(turn_points: list[TurnPoint]) -> TopAttribution:
         )
 
     selected = sorted(turn_points, key=lambda item: (item.impact_score, item.round, item.turn_point_id))[-1]
-    if selected.turn_point_id == "s3_g001_tp001":
-        description = "第 2 轮 2-1 处决 p1 是本局村民获胜的直接关键转折点。"
-    else:
-        description = selected.description_template
+
+    # Derive the summary from structured data rather than hardcoding by turn_point_id.
+    votes_in_round = [e for e in game.events if e.type == "player_vote" and e.round == selected.round]
+    eliminated_events = [e for e in game.events if e.type == "player_eliminated" and e.round == selected.round]
+    vote_for = sum(1 for v in votes_in_round if v.target == selected.subject)
+    runner_up = max(
+        (sum(1 for v in votes_in_round if v.target == t)
+         for t in {v.target for v in votes_in_round} if t != selected.subject),
+        default=0,
+    )
+    winner_side = "村民" if selected.impact_sign == "positive_for_villager" else "狼人"
+    description = f"第 {selected.round} 轮 {vote_for}-{runner_up} 处决 {selected.subject} 是本局{winner_side}获胜的直接关键转折点。"
 
     return TopAttribution(
         turn_point_id=selected.turn_point_id,
@@ -655,13 +647,13 @@ def attribute_game(game: GameLog, score_log: ScoreLog, metrics: MetricsSummary) 
         phase="Phase 1",
         attribution_boundary=_attribution_boundary(),
         turn_points=turn_points,
-        top_attribution=_top_attribution(turn_points),
+        top_attribution=_top_attribution(game, turn_points),
         rule_evaluation_summary=_rule_evaluation_summary(game, turn_points, metrics),
         validation_notes=_validation_notes(),
     )
 ```
 
-- [ ] **Step 6: Run attribution tests**
+- [ ] **Step 6: Run attribution tests and commit**
 
 Run:
 
@@ -676,23 +668,10 @@ Ran 6 tests
 OK
 ```
 
-If Task 3 tests were not committed because red commits are disallowed, commit tests and implementation together now:
+Commit tests and implementation together:
 
 ```bash
 git add src/werewolf_eval/attribution.py tests/test_attribution.py
-git commit -m "feat: compute deterministic rule attribution"
-```
-
-Expected result:
-
-```text
-[task/e3-rule-attribution-engine ...] feat: compute deterministic rule attribution
-```
-
-If Task 3 tests were already committed, commit only implementation now:
-
-```bash
-git add src/werewolf_eval/attribution.py
 git commit -m "feat: compute deterministic rule attribution"
 ```
 
@@ -897,25 +876,27 @@ tasks = Path("docs/TASKS.md").read_text(encoding="utf-8")
 readme = Path("README.md").read_text(encoding="utf-8")
 tree = Path(".oh-my-harness/tree.md").read_text(encoding="utf-8")
 
-required = [
-    (agents, "src/werewolf_eval/attribution.py"),
-    (agents, "src/werewolf_eval/attribute_game.py"),
-    (agents, "tests/test_attribution.py"),
-    (agents, "PYTHONPATH=src python -m werewolf_eval.attribute_game docs/gold-game/g001-game-log.json"),
-    (agents, "当前已完成 runtime entries 为 E1/E2/E3，E4 仍需独立 Implementation Plan"),
-    (tasks, "E3：规则归因引擎"),
-    (tasks, "状态：`completed`（Phase 2 E3 rule attribution engine；turn_points / top_attribution runtime 已实现）"),
-    (tasks, "src/werewolf_eval/attribution.py"),
-    (readme, "E3 rule attribution engine 运行时代码"),
-    (readme, "Phase 1 不代表真实 AI Agent 对局"),
-    (readme, "真实 `decision_quality_score` 可用"),
-    (tree, "src/werewolf_eval/attribution.py"),
-    (tree, "src/werewolf_eval/attribute_game.py"),
-    (tree, "tests/test_attribution.py"),
+# AGENTS.md MAP and tree.md use branch-format trees, not full paths.
+# Check by filename for those; full paths for commands and TASKS.
+checks = [
+    ("AGENTS.md attribution.py", "attribution.py" in agents),
+    ("AGENTS.md attribute_game.py", "attribute_game.py" in agents),
+    ("AGENTS.md test_attribution.py", "test_attribution.py" in agents),
+    ("AGENTS.md CLI command", "attribute_game docs/gold-game/g001-game-log.json" in agents),
+    ("AGENTS.md boundary wording", "当前已完成 runtime entries 为 E1/E2/E3" in agents),
+    ("TASKS.md E3 title", "E3：规则归因引擎" in tasks),
+    ("TASKS.md E3 completed", "状态：`completed`（Phase 2 E3 rule attribution engine" in tasks),
+    ("TASKS.md attribution.py", "src/werewolf_eval/attribution.py" in tasks),
+    ("README.md E3 mention", "E3 rule attribution engine 运行时代码" in readme),
+    ("README.md caveat AI", "Phase 1 不代表真实 AI Agent 对局" in readme),
+    ("README.md caveat decision", "真实 `decision_quality_score` 可用" in readme),
+    ("tree.md attribution.py", "attribution.py" in tree),
+    ("tree.md attribute_game.py", "attribute_game.py" in tree),
+    ("tree.md test_attribution.py", "test_attribution.py" in tree),
 ]
 
-missing = [needle for text, needle in required if needle not in text]
-assert not missing, missing
+failed = [label for label, result in checks if not result]
+assert not failed, f"Failed: {failed}"
 print("E3 docs and tree validated")
 PY
 ```
