@@ -670,8 +670,8 @@ Apply these exact changes to `docs/gold-game/g001-decision-log.json`:
 // g001_d002: p3 first-night seer check has no prior public reasoning ref in the current Game Log.
 "visible_info_refs": []
 
-// g001_d003: p4 save decision may reference the werewolf kill target event because witch visibility is not modeled as a separate death-notice event in the current Game Log. Keep as is.
-"visible_info_refs": ["g001_e007"]
+// g001_d003: p4 save decision has no seer-level visibility into the werewolf kill target. The Game Log already records the save event (g001_e009) with witch visibility as a separate event; revealing g001_e007 to the witch actor would introduce an illegal ref penalty. Fixed to empty array.
+"visible_info_refs": []
 
 // g001_d004: p3 may reference own seer check result.
 "visible_info_refs": ["g001_e008"]
