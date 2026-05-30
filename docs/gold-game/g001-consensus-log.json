@@ -1,0 +1,99 @@
+{
+  "consensus_log_id": "s4_g001_consensus_log",
+  "game_id": "g001",
+  "source_label": "[人工 gold sample]",
+  "consensuses": [
+    {
+      "consensus_id": "g001_c001",
+      "game_id": "g001",
+      "round": 1,
+      "phase": "night",
+      "team": "werewolf",
+      "participants": ["p1", "p2"],
+      "coordinator": "p1",
+      "max_rounds": 3,
+      "actual_rounds": 2,
+      "status": "accepted_consensus",
+      "proposals": [
+        {
+          "proposal_id": 1,
+          "proposer": "p1",
+          "proposed_target": "p5",
+          "visible_info_refs": ["g001_e001", "g001_e002"],
+          "reason_summary": "p5 is an unprotected-looking villager candidate and avoids directly challenging the claimed information holder.",
+          "confidence": 0.66,
+          "action_round": 1
+        },
+        {
+          "proposal_id": 2,
+          "proposer": "p2",
+          "proposed_target": "p3",
+          "visible_info_refs": ["g001_e001", "g001_e002"],
+          "reason_summary": "p3 may become dangerous if allowed to speak, but killing p3 immediately could expose the wolf pair too early.",
+          "confidence": 0.58,
+          "action_round": 1
+        }
+      ],
+      "responses": [
+        {
+          "response_id": 1,
+          "to_proposal_id": 1,
+          "responder": "p2",
+          "response_type": "support_with_reason",
+          "reason_summary": "p5 is a safer first-night target than p3 because it keeps the daytime framing path open.",
+          "visible_info_refs": ["g001_e001", "g001_e002"],
+          "action_round": 2
+        }
+      ],
+      "final_decision": {
+        "target": "p5",
+        "decision_type": "accepted_consensus",
+        "primary_proposer": "p1",
+        "supporters": ["p1", "p2"],
+        "dissenters": [],
+        "resolution_round": 2
+      }
+    },
+    {
+      "consensus_id": "g001_c002",
+      "game_id": "g001",
+      "round": 2,
+      "phase": "night",
+      "team": "werewolf",
+      "participants": ["p1", "p2"],
+      "coordinator": "p1",
+      "max_rounds": 3,
+      "actual_rounds": 1,
+      "status": "coordinator_tie_break",
+      "proposals": [
+        {
+          "proposal_id": 1,
+          "proposer": "p1",
+          "proposed_target": "p5",
+          "visible_info_refs": ["g001_e022", "g001_e023"],
+          "reason_summary": "After p3 is eliminated and revealed as seer, killing p5 keeps pressure away from p1 before final daytime vote.",
+          "confidence": 0.7,
+          "action_round": 1
+        },
+        {
+          "proposal_id": 2,
+          "proposer": "p2",
+          "proposed_target": "p6",
+          "visible_info_refs": ["g001_e015"],
+          "reason_summary": "p6 is a quiet villager who voted for p3 in round 1; eliminating p6 avoids the seer-hunting narrative while keeping pressure diffuse.",
+          "confidence": 0.55,
+          "action_round": 1
+        }
+      ],
+      "responses": [],
+      "final_decision": {
+        "target": "p5",
+        "decision_type": "coordinator_tie_break",
+        "primary_proposer": "p1",
+        "supporters": ["p1"],
+        "dissenters": ["p2"],
+        "resolution_round": 1
+      }
+    }
+  ]
+}

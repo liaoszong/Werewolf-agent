@@ -124,10 +124,11 @@
 
 ### S4：Consensus Log runtime/input
 
-- 状态：`candidate_after_D2`（Phase 2B collaboration input）
+- 状态：`completed`（Phase 2B collaboration input；Consensus Log parser / validator / fixture / CLI 已实现）
+- 产出：`docs/gold-game/g001-consensus-log.json` + `src/werewolf_eval/consensus_log.py` + `src/werewolf_eval/validate_consensus_log.py` + `tests/test_consensus_log.py`。
 - 依赖：E1 / S1；产品优先级上放在 D2 后。
 - 目标：验证狼人夜间协商层 Consensus Log 的 parser / validator / fixture / CLI。
-- 边界：不做 AI gameplay，不做 S5 语义标注。
+- 边界：不做 AI gameplay，不做 S5 语义标注，不接 scoring，不宣称 team coordination scoring 完整可用。
 
 ### S5：AI semantic labeling research
 
@@ -164,6 +165,7 @@
 | E4 | 页面截图（`docs/demo/phase2-runtime-demo.html`） | 非技术用户 3 分钟能查看该页面，复述谁赢了、关键转折点是什么、评测系统如何打分，并能看到明确的 `[deterministic]` / `[mock]` 标签和 Phase 2 边界声明 |
 | D1 | Decision Log CLI 校验摘要 | 同一 Game Log + Decision Log 能稳定输出 `decision_log_id`、`game_id`、`decisions`、`source_label`，并拒绝非法 actor / refs / decision_type |
 | D2 | Decision Log scoring 摘要 + runtime demo D2 边界声明 | 传入同一 Game Log + Decision Log 后，Score Log 中部分记录带 `decision_id`，gold game 的 canonical Score Log 所有 `rule_integrity_score` 均为 0（无违规 refs）；非法 refs 扣 -3 由 synthetic unit test 覆盖；页面明确标注 D2 只含 deterministic Step 1-2，`decision_quality_score` 仍为 0（正向评分等待 S5） |
+| S4 | Consensus Log CLI 校验摘要 | 同一 Game Log + Consensus Log 能稳定输出 `consensus_log_id`、`game_id`、`consensuses`、`source_label`，并拒绝非法 participant / refs / status / final target |
 
 ---
 
@@ -196,6 +198,13 @@
 - 触发条件：D2 完成。
 - 演示内容：运行时读取 Game Log + Decision Log → 计算 Score Log / Metrics Summary → 输出带 D2 边界声明的 HTML demo。
 - 验收：同一输入稳定输出 `decision_id` 追溯到 Score Record，synthetic unit test 覆盖非法 refs → `rule_integrity_score = -3` 惩罚路径（canonical gold game 无违规 refs，所有 `rule_integrity_score` 均为 0）；页面明确说明 Decision Log 已接入但 `decision_quality_score` 仍为 0（正向评分等待 S5）。
+
+**Demo 5：Phase 2 Consensus Log input validation**
+
+- 状态：`completed`（`docs/gold-game/g001-consensus-log.json`；仅表示 Consensus Log runtime input 可被验证，不表示真实 AI 狼人协商、team coordination scoring 或 Consensus Log scoring 已启用）
+- 触发条件：S4 完成。
+- 演示内容：运行时读取 Game Log + Consensus Log → 校验狼人夜间协商结构化输入。
+- 验收：同一输入稳定输出 `validated consensus_log_id=s4_g001_consensus_log`、`game_id=g001`、`consensuses=2`、`source_label=[人工 gold sample]`；invalid participant / refs / status / final target 由 unit tests 覆盖并拒绝。
 
 ---
 
