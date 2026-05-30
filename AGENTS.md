@@ -15,6 +15,7 @@ Telegraph style. Root rules only. Read scoped AGENTS.md before subtree work. Ski
 - 非显然的 build 命令：暂无。
 - 非显然的 test 命令：`PYTHONPATH=src python -m unittest discover -s tests -p "test_*.py"`。
 - Game Log 校验命令：`PYTHONPATH=src python -m werewolf_eval.validate_game_log docs/gold-game/g001-game-log.json`。
+- Deterministic scorer 命令：`PYTHONPATH=src python -m werewolf_eval.score_game docs/gold-game/g001-game-log.json`。
 - 非显然的 lint / format / typecheck 命令：暂无。
 
 ## 架构边界
@@ -47,9 +48,12 @@ Telegraph style. Root rules only. Read scoped AGENTS.md before subtree work. Ski
 │   └── werewolf_eval/
 │       ├── __init__.py
 │       ├── game_log.py
-│       └── validate_game_log.py
+│       ├── validate_game_log.py
+│       ├── scoring.py
+│       └── score_game.py
 ├── tests/
-│   └── test_game_log.py
+│   ├── test_game_log.py
+│   └── test_scoring.py
 ├── AGENTS.md
 └── README.md
 ```

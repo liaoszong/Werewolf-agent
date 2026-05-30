@@ -89,12 +89,13 @@
 
 ### E2：确定性评分器
 
-- 状态：`phase_2_candidate`（S2 已满足；E1 完成后可准备独立 Implementation Plan）
+- 状态：`completed`（Phase 2 E2 deterministic scorer；Score Log / Metrics Summary runtime 已实现）
+- 产出：`src/werewolf_eval/scoring.py` + `src/werewolf_eval/score_game.py` + `tests/test_scoring.py`。
 - 说明：实现 EVALUATION_RUBRIC.md 中所有确定性评分规则。输出 Score Log。
 
 ### E3：规则归因引擎
 
-- 状态：`phase_2_candidate`（S3 已满足；等待 E1/E2 与 Phase 2 实现边界）
+- 状态：`phase_2_candidate`（S3 已满足；E1/E2 完成后可准备独立 Implementation Plan）
 - 说明：实现归因规则匹配引擎。输出 turn_points + top_attribution。
 
 ### E4：可视化页面
