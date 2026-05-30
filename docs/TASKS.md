@@ -83,12 +83,13 @@
 
 ### E1：Game Log 解析器
 
-- 状态：`phase_2_candidate`（S0/S1 已满足；等待 Phase 2 实现边界打开）
+- 状态：`completed`（Phase 2 E1 runtime entry；Game Log parser / validator 已实现）
+- 产出：`src/werewolf_eval/game_log.py` + `src/werewolf_eval/validate_game_log.py` + `tests/test_game_log.py`。
 - 说明：读取结构化 Game Log JSON，验证 schema，转换为内部数据结构。
 
 ### E2：确定性评分器
 
-- 状态：`phase_2_candidate`（S2 已满足；等待 E1 与 Phase 2 实现边界）
+- 状态：`phase_2_candidate`（S2 已满足；E1 完成后可准备独立 Implementation Plan）
 - 说明：实现 EVALUATION_RUBRIC.md 中所有确定性评分规则。输出 Score Log。
 
 ### E3：规则归因引擎

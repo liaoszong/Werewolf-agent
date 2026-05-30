@@ -9,3 +9,6 @@
 !.oh-my-harness/
 !.oh-my-harness/tree.md
 # oh-my-harness:end
+
+__pycache__/
+*.pyc
