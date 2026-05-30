@@ -95,7 +95,8 @@
 
 ### E3：规则归因引擎
 
-- 状态：`phase_2_candidate`（S3 已满足；E1/E2 完成后可准备独立 Implementation Plan）
+- 状态：`completed`（Phase 2 E3 rule attribution engine；turn_points / top_attribution runtime 已实现）
+- 产出：`src/werewolf_eval/attribution.py` + `src/werewolf_eval/attribute_game.py` + `tests/test_attribution.py`。
 - 说明：实现归因规则匹配引擎。输出 turn_points + top_attribution。
 
 ### E4：可视化页面
