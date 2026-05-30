@@ -80,5 +80,30 @@ class PlanIndexBuilderTests(unittest.TestCase):
         self.assertTrue(any("task id `1`" in item for item in task["acceptance"]))
 
 
+class TaskContextBuilderTests(unittest.TestCase):
+    def test_build_task_context_writes_minimal_markdown_for_selected_task(self) -> None:
+        from scripts.context.build_plan_index import build_plan_index
+        from scripts.context.build_task_context import build_task_context
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            plan = root / "docs/harness/plans/2026-05-30--example-plan.md"
+            plan.parent.mkdir(parents=True)
+            plan.write_text(MINI_PLAN, encoding="utf-8")
+            index = build_plan_index(plan, repo_root=root)
+            out = root / "docs/generated-context/current-task.ctx.md"
+
+            text = build_task_context(index=index, task_selector="1", out_path=out)
+            written = out.read_text(encoding="utf-8")
+
+        self.assertEqual(text, written)
+        self.assertIn("# Current Task Context", text)
+        self.assertIn("Plan: `2026-05-30--example-plan`", text)
+        self.assertIn("Task: `1` — Build context index", text)
+        self.assertIn("Original plan lines:", text)
+        self.assertIn("scripts/context/build_plan_index.py", text)
+        self.assertIn("python scripts/context/build_plan_index.py", text)
+
+
 if __name__ == "__main__":
     unittest.main()
