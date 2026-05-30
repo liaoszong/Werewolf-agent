@@ -418,8 +418,18 @@ Also add a canonical output test:
 def test_s5_score_outputs_match_expected_files(self) -> None:
     score_payload = score_log_to_dict(self.s5_score_log)
     metrics_payload = metrics_summary_to_dict(self.s5_metrics)
+    self.assertEqual(score_payload["score_log_id"], "s5_g001_expected_score_log")
+    self.assertEqual(score_payload["phase"], "Phase 2B-S5")
+    self.assertEqual(metrics_payload["metrics_id"], "s5_g001_expected_metrics")
+    self.assertEqual(metrics_payload["source_score_log"], "docs/gold-game/s5-score-log.json")
     self.assertEqual(score_payload, load_json("docs/gold-game/s5-score-log.json"))
     self.assertEqual(metrics_payload, load_json("docs/gold-game/s5-metrics-summary.json"))
+```
+
+Also keep an explicit D2 regression assertion in existing D2-only tests:
+
+```text
+self.assertNotIn("rubric:G.1.semantic_label_missing", records["g001_e019"].rules_triggered)
 ```
 
 - [ ] **步骤 2：运行测试确认失败**
@@ -458,10 +468,15 @@ def _semantic_rule(label: SemanticLabel) -> str:
     return f"rubric:G.1.semantic.{label.quality_label}"
 ```
 
-Extend `DecisionAssessment` to keep existing fields and continue returning one object per record. Modify `_assess_decision()` signature to:
+Extend `DecisionAssessment` to keep existing fields and continue returning one object per record. Modify `_assess_decision()` signature to distinguish "S5 disabled" from "S5 enabled but this decision has no label":
 
 ```python
-def _assess_decision(game: GameLog, decision: Decision | None, semantic_label: SemanticLabel | None = None) -> DecisionAssessment:
+def _assess_decision(
+    game: GameLog,
+    decision: Decision | None,
+    semantic_label: SemanticLabel | None = None,
+    semantic_labels_enabled: bool = False,
+) -> DecisionAssessment:
 ```
 
 Required behavior:
@@ -470,6 +485,7 @@ Required behavior:
 - illegal refs: unchanged except notes may say S5 skipped because deterministic integrity failed;
 - semantic label missing while label log is enabled: score 0 and add `rubric:G.1.semantic_label_missing`;
 - semantic label present: set `decision_quality_score` from `SEMANTIC_QUALITY_SCORE_BY_LABEL`, append `_semantic_rule(label)`, include existing visible-info evidence ids, and add a note containing `label.evidence_alignment`, `label.reasoning_consistency`, and `label.short_rationale`.
+- D2-only mode must not add any `rubric:G.1.semantic_*` or `rubric:G.1.semantic_label_missing` rules.
 
 Modify `score_game()` signature:
 
@@ -481,6 +497,7 @@ Inside `score_game()`, build:
 
 ```python
 labels_by_decision = semantic_label_log.label_by_decision_id if semantic_label_log else {}
+semantic_labels_enabled = semantic_label_log is not None
 ```
 
 Pass the matching label to `_assess_decision()`:
@@ -488,7 +505,7 @@ Pass the matching label to `_assess_decision()`:
 ```python
 decision = decisions_by_event.get(event.event_id)
 semantic_label = labels_by_decision.get(decision.decision_id) if decision else None
-assessment = _assess_decision(game, decision, semantic_label)
+assessment = _assess_decision(game, decision, semantic_label, semantic_labels_enabled)
 ```
 
 Update `ScoreLog.source_label`, `phase`, and `scoring_boundary`:
@@ -497,12 +514,49 @@ Update `ScoreLog.source_label`, `phase`, and `scoring_boundary`:
 - Decision Log only: existing D2 behavior;
 - Decision Log + Semantic Label Log: `source_label = "[deterministic][decision-log][semantic-labels]"`, `phase = "Phase 2B-S5"`.
 
+Also update S5-specific artifact metadata while preserving existing Phase 1 / D2 metadata when `semantic_label_log` is not supplied:
+
+- S5 `ScoreLog.score_log_id = "s5_g001_expected_score_log"`;
+- S5 `MetricsSummary.metrics_id = "s5_g001_expected_metrics"`;
+- S5 `MetricsSummary.source_score_log = "docs/gold-game/s5-score-log.json"`.
+
 - [ ] **步骤 4：generate canonical S5 outputs**
 
 Run:
 
 ```bash
-PYTHONPATH=src python -m werewolf_eval.score_game docs/gold-game/g001-game-log.json --decision-log docs/gold-game/g001-decision-log.json --semantic-labels docs/gold-game/s5-semantic-label-output.example.json --score-log-out docs/gold-game/s5-score-log.json --metrics-out docs/gold-game/s5-metrics-summary.json
+PYTHONPATH=src python - <<'PY'
+import json
+from pathlib import Path
+
+from werewolf_eval.decision_log import load_decision_log
+from werewolf_eval.game_log import load_game_log
+from werewolf_eval.scoring import metrics_summary_to_dict, score_game, score_log_to_dict, summarize_metrics
+from werewolf_eval.semantic_labels import load_semantic_label_log
+
+game = load_game_log("docs/gold-game/g001-game-log.json")
+decision_log = load_decision_log("docs/gold-game/g001-decision-log.json", game)
+semantic_label_log = load_semantic_label_log("docs/gold-game/s5-semantic-label-output.example.json", decision_log)
+score_log = score_game(game, decision_log=decision_log, semantic_label_log=semantic_label_log)
+metrics = summarize_metrics(game, score_log)
+
+Path("docs/gold-game/s5-score-log.json").write_text(
+    json.dumps(score_log_to_dict(score_log), ensure_ascii=False, indent=2) + "\n",
+    encoding="utf-8",
+)
+Path("docs/gold-game/s5-metrics-summary.json").write_text(
+    json.dumps(metrics_summary_to_dict(metrics), ensure_ascii=False, indent=2) + "\n",
+    encoding="utf-8",
+)
+print(f"scored game_id={game.game_id}")
+print(f"score_records={len(score_log.records)}")
+print(f"winner={metrics.result_metrics.winner}")
+print(f"game_length={metrics.result_metrics.game_length}")
+print(f"wolf_team_outcome_score={metrics.score_summary.team_outcome_scores.get('wolf_team', 0)}")
+print("decision_log=enabled")
+print("semantic_labels=enabled")
+print(f"decision_quality_total={sum(record.decision_quality_score for record in score_log.records)}")
+PY
 ```
 
 Expected result:
@@ -846,7 +900,7 @@ In `docs/TASKS.md`, update the S5 section to:
 ### S5：AI semantic labeling research and saved-label scoring integration
 
 - 状态：`completed`（Phase 2B semantic input；saved semantic labels can feed deterministic `decision_quality_score`）
-- 产出：`docs/semantic-labeling/s5-label-contract.md` + `docs/gold-game/s5-semantic-label-output.example.json` + `src/werewolf_eval/semantic_labels.py` + `src/werewolf_eval/validate_semantic_labels.py` + `scripts/research/evaluate_semantic_labels.py` + `tests/test_semantic_labels.py` + `tests/test_semantic_label_research.py`。
+- 产出：`docs/semantic-labeling/s5-label-contract.md` + `docs/gold-game/s5-semantic-label-output.example.json` + `src/werewolf_eval/semantic_labels.py` + `src/werewolf_eval/validate_semantic_labels.py` + `scripts/research/evaluate_semantic_labels.py` + `tests/test_semantic_labels.py` + `tests/test_semantic_label_research.py` + `docs/gold-game/s5-score-log.json` + `docs/gold-game/s5-metrics-summary.json` + `docs/demo/phase2-s5-runtime-demo.html`。
 - 依赖：D1 + D2。
 - 目标：用已保存的 Semantic Label Log 为 Decision Log 对应 Score Records 赋 deterministic `decision_quality_score`。
 - 边界：不做 provider integration，不做 live AI labeling，不做 gameplay，不做 multi-game Leaderboard。
