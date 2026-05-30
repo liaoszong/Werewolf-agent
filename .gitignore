@@ -12,3 +12,8 @@
 
 __pycache__/
 *.pyc
+
+# Generated context-budget artifacts
+docs/generated-context/*.index.json
+docs/generated-context/current-task.ctx.md
+.logs/validate/

@@ -132,5 +132,33 @@ class ValidationBriefTests(unittest.TestCase):
             self.assertIn("failure detail", full_log.read_text(encoding="utf-8"))
 
 
+class ContextBudgetGateDocsTests(unittest.TestCase):
+    def test_agents_documents_context_budget_gate(self) -> None:
+        text = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+        required = [
+            "Context Budget Gate",
+            "Do not read long plan files in full",
+            "docs/generated-context/current-task.ctx.md",
+            "scripts/context/build_plan_index.py",
+            "scripts/context/build_task_context.py",
+            "scripts/dev/validate_brief.py",
+            ".logs/validate/latest/summary.json",
+            "Do not use Repomix as the default context entry",
+            "Do not introduce Semble, CodeGraph, or codebase-memory MCP unless a later plan explicitly allows it",
+        ]
+        for item in required:
+            self.assertIn(item, text)
+
+    def test_gitignore_excludes_generated_context_and_logs(self) -> None:
+        text = (ROOT / ".gitignore").read_text(encoding="utf-8")
+        required = [
+            "docs/generated-context/*.index.json",
+            "docs/generated-context/current-task.ctx.md",
+            ".logs/validate/",
+        ]
+        for item in required:
+            self.assertIn(item, text)
+
+
 if __name__ == "__main__":
     unittest.main()
