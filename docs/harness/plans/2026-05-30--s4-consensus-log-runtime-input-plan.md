@@ -132,7 +132,7 @@ No other files should be modified.
       "round": 2,
       "phase": "night",
       "team": "werewolf",
-      "participants": ["p1"],
+      "participants": ["p1", "p2"],
       "coordinator": "p1",
       "max_rounds": 3,
       "actual_rounds": 1,
@@ -145,9 +145,26 @@ No other files should be modified.
           "visible_info_refs": ["g001_e022", "g001_e023"],
           "reason_summary": "After p3 is eliminated and revealed as seer, killing p5 keeps pressure away from p1 before final daytime vote.",
           "confidence": 0.7
+        },
+        {
+          "proposal_id": 2,
+          "proposer": "p2",
+          "proposed_target": "p6",
+          "visible_info_refs": ["g001_e015"],
+          "reason_summary": "p6 is a quiet villager who voted for p3 in round 1; eliminating p6 avoids the seer-hunting narrative while keeping pressure diffuse.",
+          "confidence": 0.55
         }
       ],
-      "responses": [],
+      "responses": [
+        {
+          "response_id": 1,
+          "to_proposal_id": 2,
+          "responder": "p1",
+          "response_type": "reject",
+          "reason_summary": "p5 is a more consistent target than p6; p6 voted with the crowd and creates no special risk.",
+          "visible_info_refs": ["g001_e022", "g001_e023"]
+        }
+      ],
       "final_decision": {
         "target": "p5",
         "decision_type": "consensus",
@@ -165,7 +182,7 @@ Rationale:
 
 - `g001_c001.final_decision.target = "p5"` matches Game Log event `g001_e007`, the round 1 werewolf kill.
 - `g001_c002.final_decision.target = "p5"` matches Game Log event `g001_e024`, the round 2 werewolf kill.
-- Round 2 has only participant `p1` because `p2` dies from witch poison at night 2 but the Game Log still records the werewolf-team kill at `g001_e024`; S4 accepts a single surviving werewolf participant for that consensus.
+- Round 2 has both `p1` and `p2` as participants because `g001_e024` (werewolf kill, seq 24) occurs before `g001_e025` (witch poison on `p2`, seq 25); `p2` is still alive and able to participate in the round 2 kill consensus.
 - Visible refs only use role-assignment refs for known werewolves and public refs already visible before the relevant final decision.
 
 - [ ] **步骤 2：记录预期 fixture shape**
@@ -687,6 +704,24 @@ def _validate_consensus(consensus: Consensus, game: GameLog) -> None:
     if len(set(proposal_ids)) != len(proposal_ids):
         raise ConsensusLogValidationError(f"{consensus.consensus_id}: proposal_id values must be unique")
 
+    # Rubric B.2: each wolf may make at most 1 proposal and at most 1 response per round.
+    proposer_counts: dict[str, int] = {}
+    for proposal in consensus.proposals:
+        proposer_counts[proposal.proposer] = proposer_counts.get(proposal.proposer, 0) + 1
+    for proposer, count in proposer_counts.items():
+        if count > 1:
+            raise ConsensusLogValidationError(
+                f"{consensus.consensus_id}: participant {proposer} has {count} proposals; max 1 per round"
+            )
+    responder_counts: dict[str, int] = {}
+    for response in consensus.responses:
+        responder_counts[response.responder] = responder_counts.get(response.responder, 0) + 1
+    for responder, count in responder_counts.items():
+        if count > 1:
+            raise ConsensusLogValidationError(
+                f"{consensus.consensus_id}: participant {responder} has {count} responses; max 1 per round"
+            )
+
     for proposal in consensus.proposals:
         _validate_proposal(consensus, proposal, game)
 
@@ -710,7 +745,7 @@ def _validate_proposal(consensus: Consensus, proposal: ConsensusProposal, game: 
         raise ConsensusLogValidationError(f"{consensus.consensus_id}: proposed_target must not be a werewolf participant")
 
     _validate_reason_summary(consensus.consensus_id, proposal.reason_summary)
-    _validate_visible_info_refs(consensus.consensus_id, proposal.visible_info_refs, game)
+    _validate_visible_info_refs(consensus.consensus_id, proposal.visible_info_refs, game, consensus.round)
 
     if proposal.confidence is not None and not 0.0 <= proposal.confidence <= 1.0:
         raise ConsensusLogValidationError(f"{consensus.consensus_id}: confidence must be between 0 and 1")
@@ -735,7 +770,7 @@ def _validate_response(
         raise ConsensusLogValidationError(f"{consensus.consensus_id}: invalid response_type {response.response_type!r}")
 
     _validate_reason_summary(consensus.consensus_id, response.reason_summary)
-    _validate_visible_info_refs(consensus.consensus_id, response.visible_info_refs, game)
+    _validate_visible_info_refs(consensus.consensus_id, response.visible_info_refs, game, consensus.round)
 
 
 def _validate_final_decision(consensus: Consensus, game: GameLog) -> None:
@@ -794,10 +829,35 @@ def _validate_reason_summary(consensus_id: str, reason_summary: str) -> None:
         raise ConsensusLogValidationError(f"{consensus_id}: reason_summary exceeds 150 chars")
 
 
-def _validate_visible_info_refs(consensus_id: str, visible_info_refs: list[str], game: GameLog) -> None:
+def _validate_visible_info_refs(consensus_id: str, visible_info_refs: list[str], game: GameLog, round: int) -> None:
     unknown_refs = set(visible_info_refs) - game.event_ids
     if unknown_refs:
         raise ConsensusLogValidationError(f"{consensus_id}: unknown visible_info_refs: {sorted(unknown_refs)}")
+
+    for ref in visible_info_refs:
+        event = game.event_by_id(ref)
+        if event.visibility in {"public", "all", "werewolf_team"}:
+            continue
+        if event.visibility == "specific_player_ids":
+            player = next((p for p in game.players if p.player_id == event.target), None)
+            if player is not None and player.team == "werewolf":
+                continue
+        raise ConsensusLogValidationError(
+            f"{consensus_id}: visible_info_ref {ref} has visibility {event.visibility!r}, "
+            f"not visible to werewolf team"
+        )
+
+    kill_event = next(
+        (e for e in game.events if e.type == "werewolf_kill" and e.round == round),
+        None,
+    )
+    if kill_event is not None:
+        for ref in visible_info_refs:
+            if game.event_by_id(ref).sequence >= kill_event.sequence:
+                raise ConsensusLogValidationError(
+                    f"{consensus_id}: visible_info_ref {ref} (seq {game.event_by_id(ref).sequence}) "
+                    f"is not before werewolf_kill {kill_event.event_id} (seq {kill_event.sequence})"
+                )
 ```
 
 - [ ] **步骤 2：运行 focused Consensus Log tests**
