@@ -195,7 +195,7 @@ No commit is required for Task 1 because it only verifies the starting state.
 
 Create this exact file content:
 
-```markdown
+````markdown
 # ROADMAP — Werewolf-agent
 
 ## Purpose
@@ -214,7 +214,7 @@ The final product route is:
 real or replayed Werewolf games
 -> structured Game Log / Decision Log / Consensus Log
 -> reproducible Score Log / Metrics Summary
--> deterministic and AI-assisted attribution
+-> deterministic attribution + AI-assisted semantic labels
 -> role-separated scorecards and real multi-game Leaderboard
 ```
 
@@ -326,8 +326,12 @@ D1 Decision Log input
 E1 Game Log parser
   -> S4 Consensus Log runtime/input
 
-D1 + D2
-  -> S5 AI semantic labeling research/integration
+D1 Decision Log input
+  -> S5 AI semantic labeling research / spike
+
+D1 Decision Log input
+  + D2 Decision Log scoring integration
+  -> S5 AI semantic labeling scoring integration
 
 E1 + D1 + D2 + S4 contracts
   -> G1 real AI Agent gameplay
@@ -370,7 +374,7 @@ D2 specifically must not claim full `decision_quality_score` quality. It only st
 - `docs/EVALUATION_RUBRIC.md`: scoring dimensions, formulas, log schemas, and AI judge boundary.
 - `docs/prs/`: research records and route decisions that may later be promoted into stable docs.
 - `docs/harness/plans/`: executable implementation protocols.
-```
+````
 
 - [ ] **Step 2: Check roadmap content**
 
@@ -791,7 +795,7 @@ docs: align project roadmap
 
 Use this PR body:
 
-```markdown
+````markdown
 ## Summary
 
 Adds a canonical ROADMAP and aligns project entry docs so future work stays tied to the final Werewolf-agent direction instead of narrowing into local task fragments.
@@ -846,7 +850,7 @@ validated game_id=g001
 validated decision_log_id=d1_g001_decision_log
 OK
 ```
-```
+````
 
 - [ ] **Step 7: Stop for review**
 
