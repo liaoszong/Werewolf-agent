@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import subprocess
 import sys
 import unittest
 
@@ -96,6 +97,27 @@ class DecisionLogTests(unittest.TestCase):
                 }
             ],
         }
+
+    def test_validate_decision_log_cli_outputs_summary(self) -> None:
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "werewolf_eval.validate_decision_log",
+                str(self.path),
+                str(ROOT / "docs/gold-game/g001-game-log.json"),
+            ],
+            cwd=ROOT,
+            env={"PYTHONPATH": str(ROOT / "src")},
+            text=True,
+            capture_output=True,
+            check=True,
+        )
+
+        self.assertIn("validated decision_log_id=d1_g001_decision_log", result.stdout)
+        self.assertIn("game_id=g001", result.stdout)
+        self.assertIn("decisions=10", result.stdout)
+        self.assertIn("source_label=[人工 gold sample]", result.stdout)
 
 
 if __name__ == "__main__":
