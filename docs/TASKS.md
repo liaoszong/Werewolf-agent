@@ -115,10 +115,11 @@
 
 ### D2：Decision Log scoring integration
 
-- 状态：`candidate_next`（Phase 2A evaluator runtime closure；下一步推荐任务）
+- 状态：`completed`（Phase 2A evaluator runtime closure；Decision Log 已接入 deterministic scoring）
+- 产出：`src/werewolf_eval/scoring.py` + `src/werewolf_eval/score_game.py` + `src/werewolf_eval/render_demo.py` + `docs/gold-game/s2-score-log.json` + `docs/gold-game/s2-metrics-summary.json` + `docs/demo/phase2-runtime-demo.html`。
 - 依赖：D1 + E2。
-- 目标：将 Decision Log 接入 scoring，让 `decision_quality_score` 不再全局固定为 0。
-- 边界：不调用 AI，不启用 S5，不做 Consensus Log，不宣称 `decision_quality_score` 完整可用。
+- 目标：将 Decision Log 接入 scoring，完成 deterministic visibility 检查和 decision_id 追溯。`decision_quality_score` 正向评分仍等待 S5 AI 语义判断。
+- 边界：只实现 Rubric G.1 Step 1-2 deterministic visibility 检查和 decision_id 追溯；不调用 AI，不启用 S5，不做 Consensus Log，不宣称 `decision_quality_score` 完整可用（正向评分等待 S5 AI 语义判断）。
 - 路线依据：`docs/prs/2026-05-30--phase2-next-step-research.md` + `docs/ROADMAP.md`。
 
 ### S4：Consensus Log runtime/input
@@ -162,6 +163,7 @@
 | E3 | 归因面板 | 每个 turn_point 可展开查看触发的规则 |
 | E4 | 页面截图（`docs/demo/phase2-runtime-demo.html`） | 非技术用户 3 分钟能查看该页面，复述谁赢了、关键转折点是什么、评测系统如何打分，并能看到明确的 `[deterministic]` / `[mock]` 标签和 Phase 2 边界声明 |
 | D1 | Decision Log CLI 校验摘要 | 同一 Game Log + Decision Log 能稳定输出 `decision_log_id`、`game_id`、`decisions`、`source_label`，并拒绝非法 actor / refs / decision_type |
+| D2 | Decision Log scoring 摘要 + runtime demo D2 边界声明 | 传入同一 Game Log + Decision Log 后，Score Log 中部分记录带 `decision_id` 和非零 `rule_integrity_score`（非法 refs 扣 -3）；页面明确标注 D2 只含 deterministic Step 1-2，`decision_quality_score` 仍为 0（正向评分等待 S5） |
 
 ---
 
@@ -187,6 +189,13 @@
 - 触发条件：D1 完成。
 - 演示内容：运行时读取 Game Log + Decision Log → 校验结构化决策输入。
 - 验收：同一输入稳定输出 `validated decision_log_id=d1_g001_decision_log`、`game_id=g001`、`decisions=10`、`source_label=[人工 gold sample]`。
+
+**Demo 4：Phase 2 Decision Log scoring integration**
+
+- 状态：`completed`（`docs/demo/phase2-runtime-demo.html` 使用 Decision Log 生成 D2 deterministic decision score）
+- 触发条件：D2 完成。
+- 演示内容：运行时读取 Game Log + Decision Log → 计算 Score Log / Metrics Summary → 输出带 D2 边界声明的 HTML demo。
+- 验收：同一输入稳定输出 `decision_id` 追溯到 Score Record，非法 refs 触发 `rule_integrity_score = -3`；页面明确说明 Decision Log 已接入但 `decision_quality_score` 仍为 0（正向评分等待 S5）。
 
 ---
 
