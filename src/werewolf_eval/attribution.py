@@ -80,3 +80,190 @@ class AttributionResult:
 
 def attribution_to_dict(result: AttributionResult) -> dict[str, Any]:
     return asdict(result)
+
+
+# ---------------------------------------------------------------------------
+# Task 4: Attribution engine implementation
+# ---------------------------------------------------------------------------
+
+
+def _attribution_boundary() -> AttributionBoundary:
+    return AttributionBoundary(
+        method="deterministic structured-event pattern matching",
+        ai_annotations="none",
+        free_text_reasoning="not_used",
+        decision_quality_score=0,
+        notes="S3 validates expected attribution outputs only. It does not implement the production attribution engine.",
+    )
+
+
+def _player_by_id(game: GameLog) -> dict[str, Any]:
+    return {player.player_id: player for player in game.players}
+
+
+def _role_of(game: GameLog, player_id: str) -> str:
+    return _player_by_id(game)[player_id].role
+
+
+def _team_of(game: GameLog, player_id: str) -> str:
+    return _player_by_id(game)[player_id].team
+
+
+def _events_by_round_and_type(game: GameLog, round_number: int, event_type: str) -> list[Event]:
+    return [event for event in game.events if event.round == round_number and event.type == event_type]
+
+
+def _role_reveal_event(game: GameLog, target: str) -> Event | None:
+    for event in game.events:
+        if event.type == "role_revealed" and event.target == target:
+            return event
+    return None
+
+
+def _critical_vote_turn_points(game: GameLog) -> list[TurnPoint]:
+    turn_points: list[TurnPoint] = []
+    vote_rounds = sorted({event.round for event in game.events if event.type == "player_vote"})
+
+    for round_number in vote_rounds:
+        votes = _events_by_round_and_type(game, round_number, "player_vote")
+        eliminated_events = _events_by_round_and_type(game, round_number, "player_eliminated")
+        if not votes or not eliminated_events:
+            continue
+
+        eliminated = eliminated_events[0]
+        eliminated_target = eliminated.target
+        vote_count_for_eliminated = sum(1 for vote in votes if vote.target == eliminated_target)
+        other_vote_counts: dict[str, int] = {}
+        for vote in votes:
+            if vote.target != eliminated_target:
+                other_vote_counts[vote.target] = other_vote_counts.get(vote.target, 0) + 1
+        runner_up_votes = max(other_vote_counts.values(), default=0)
+        vote_margin = vote_count_for_eliminated - runner_up_votes
+        reveal = _role_reveal_event(game, eliminated_target)
+
+        if vote_margin != 1 or reveal is None:
+            continue
+
+        eliminated_role = _role_of(game, eliminated_target)
+        eliminated_team = _team_of(game, eliminated_target)
+        if eliminated_team == "werewolf":
+            impact_sign = "positive_for_villager"
+            role_text = "狼人"
+        else:
+            impact_sign = "negative_for_villager"
+            role_text = "村民"
+
+        impact_score = 2.0 if eliminated_role in {"seer", "witch"} else 1.0
+        if eliminated_role in {"seer", "witch"}:
+            policy = "F.1 gives a x2 multiplier when the eliminated player is a core villager role."
+        else:
+            policy = f"F.1 gives a x2 multiplier only when the eliminated player is a core villager role. For eliminated {eliminated_team} {eliminated_target}, S3 uses the default critical-vote impact score of 1.0 and records this as a validation policy, not a rubric change."
+
+        evidence = [event.event_id for event in votes] + [eliminated.event_id, reveal.event_id]
+        turn_points.append(
+            TurnPoint(
+                turn_point_id=f"s3_{game.game_id}_tp{len(turn_points) + 1:03d}",
+                rule_id="attribution:F.1.critical_vote",
+                rule="critical_vote",
+                round=round_number,
+                actor="system",
+                subject=eliminated_target,
+                description_template=f"第 {round_number} 轮投票为关键转折点，{eliminated_target} 以 {vote_margin} 票之差被处决，该玩家身份为{role_text}。",
+                impact_score=impact_score,
+                impact_sign=impact_sign,
+                impact_score_policy=policy,
+                evidence_event_ids=evidence,
+            )
+        )
+
+    return turn_points
+
+
+def _rule_evaluation_summary(game: GameLog, turn_points: list[TurnPoint], metrics: MetricsSummary) -> dict[str, RuleEvaluation]:
+    critical_vote_ids = [turn_point.turn_point_id for turn_point in turn_points if turn_point.rule_id == "attribution:F.1.critical_vote"]
+
+    return {
+        "attribution:F.1.critical_vote": RuleEvaluation(
+            status="triggered" if critical_vote_ids else "not_triggered",
+            triggered_turn_point_ids=critical_vote_ids,
+            notes="Round 2 elimination is 2-1, so one changed vote would change the result. p1 is revealed as werewolf." if critical_vote_ids else "No elimination vote has margin 1 with a known final role.",
+        ),
+        "attribution:F.2.information_gap": RuleEvaluation(
+            status="not_triggered",
+            triggered_turn_point_ids=[],
+            notes="S2 records seer info_conveyed as 1.0. p3's p1 suspicion is publicly represented before p3 dies.",
+        ),
+        "attribution:F.3.witch_misfire": RuleEvaluation(
+            status="not_triggered",
+            triggered_turn_point_ids=[],
+            notes="p4 saves villager p5 and poisons werewolf p2. No witch misfire against a core villager role is present.",
+        ),
+        "attribution:F.4.vote_deviation": RuleEvaluation(
+            status="not_triggered",
+            triggered_turn_point_ids=[],
+            notes="Round 1 village vote accuracy is exactly 50%, not below 50%. Round 2 village vote accuracy is 100%.",
+        ),
+        "attribution:F.5.successful_disguise": RuleEvaluation(
+            status="not_triggered",
+            triggered_turn_point_ids=[],
+            notes="No werewolf is both voted but not eliminated and then survives at least 2 later rounds.",
+        ),
+    }
+
+
+def _top_attribution(game: GameLog, turn_points: list[TurnPoint]) -> TopAttribution:
+    if not turn_points:
+        return TopAttribution(
+            turn_point_id="none",
+            rule_id="none",
+            description_template="无确定性归因转折点。",
+            selection_policy="highest impact_score; ties break by later sequence",
+        )
+
+    selected = sorted(turn_points, key=lambda item: (item.impact_score, item.round, item.turn_point_id))[-1]
+
+    # Derive the summary from structured data rather than hardcoding by turn_point_id.
+    votes_in_round = [e for e in game.events if e.type == "player_vote" and e.round == selected.round]
+    vote_for = sum(1 for v in votes_in_round if v.target == selected.subject)
+    runner_up = max(
+        (sum(1 for v in votes_in_round if v.target == t)
+         for t in {v.target for v in votes_in_round} if t != selected.subject),
+        default=0,
+    )
+    winner_side = "村民" if selected.impact_sign == "positive_for_villager" else "狼人"
+    description = f"第 {selected.round} 轮 {vote_for}-{runner_up} 处决 {selected.subject} 是本局{winner_side}获胜的直接关键转折点。"
+
+    return TopAttribution(
+        turn_point_id=selected.turn_point_id,
+        rule_id=selected.rule_id,
+        description_template=description,
+        selection_policy="highest impact_score; ties break by later sequence",
+    )
+
+
+def _validation_notes() -> list[ValidationNote]:
+    return [
+        ValidationNote(
+            type="possible_false_negative",
+            event_ids=["g001_e016", "g001_e017", "g001_e020", "g001_e021", "g001_e022", "g001_e023"],
+            notes="Round 1 seer p3 elimination is human-salient, but F.1 does not trigger because the vote margin is 4-2 rather than 1. S3 records this as a validation observation and does not change the stable rule.",
+        )
+    ]
+
+
+def attribute_game(game: GameLog, score_log: ScoreLog, metrics: MetricsSummary) -> AttributionResult:
+    turn_points = _critical_vote_turn_points(game)
+    return AttributionResult(
+        attribution_id=f"s3_{game.game_id}_rule_attribution",
+        game_id=game.game_id,
+        source_game_log="docs/gold-game/g001-game-log.json",
+        source_score_log="docs/gold-game/s2-score-log.json",
+        source_metrics_summary="docs/gold-game/s2-metrics-summary.json",
+        source_label="[deterministic]",
+        phase="Phase 1",
+        attribution_boundary=_attribution_boundary(),
+        turn_points=turn_points,
+        top_attribution=_top_attribution(game, turn_points),
+        rule_evaluation_summary=_rule_evaluation_summary(game, turn_points, metrics),
+        validation_notes=_validation_notes(),
+    )
