@@ -1,0 +1,48 @@
+{
+  "label_log_id": "s5_g001_example_output",
+  "game_id": "g001",
+  "source_label": "[semantic research output]",
+  "prompt_candidate": "candidate_a_minimal_json",
+  "labels": [
+    {
+      "decision_id": "g001_d001",
+      "quality_label": "supported_neutral",
+      "evidence_alignment": "aligned",
+      "reasoning_consistency": "consistent",
+      "confidence": 0.72,
+      "short_rationale": "The wolf-team kill has visible setup evidence but the quality remains neutral until S5 scoring is designed."
+    },
+    {
+      "decision_id": "g001_d002",
+      "quality_label": "unsupported",
+      "evidence_alignment": "missing",
+      "reasoning_consistency": "thin",
+      "confidence": 0.66,
+      "short_rationale": "The seer check has no visible refs, so the stated inference is not evidence-supported in this contract."
+    },
+    {
+      "decision_id": "g001_d003",
+      "quality_label": "unsupported",
+      "evidence_alignment": "missing",
+      "reasoning_consistency": "consistent",
+      "confidence": 0.7,
+      "short_rationale": "The save rationale is coherent, but the Decision Log entry intentionally has no visible refs."
+    },
+    {
+      "decision_id": "g001_d008",
+      "quality_label": "random_or_default",
+      "evidence_alignment": "weak",
+      "reasoning_consistency": "thin",
+      "confidence": 0.63,
+      "short_rationale": "The decision_type is default, and the visible evidence gives only weak support for the vote."
+    },
+    {
+      "decision_id": "g001_d010",
+      "quality_label": "supported_good",
+      "evidence_alignment": "aligned",
+      "reasoning_consistency": "consistent",
+      "confidence": 0.82,
+      "short_rationale": "The final vote cites visible late-game evidence and targets a plausible wolf."
+    }
+  ]
+}
