@@ -17,6 +17,7 @@ Telegraph style. Root rules only. Read scoped AGENTS.md before subtree work. Ski
 - Game Log 校验命令：`PYTHONPATH=src python -m werewolf_eval.validate_game_log docs/gold-game/g001-game-log.json`。
 - Deterministic scorer 命令：`PYTHONPATH=src python -m werewolf_eval.score_game docs/gold-game/g001-game-log.json`。
 - Rule attribution 命令：`PYTHONPATH=src python -m werewolf_eval.attribute_game docs/gold-game/g001-game-log.json`。
+- Runtime demo HTML 命令：`PYTHONPATH=src python -m werewolf_eval.render_demo docs/gold-game/g001-game-log.json --html-out docs/demo/phase2-runtime-demo.html`。
 - 非显然的 lint / format / typecheck 命令：暂无。
 
 ## 架构边界
@@ -44,7 +45,10 @@ Telegraph style. Root rules only. Read scoped AGENTS.md before subtree work. Ski
 │   ├── SPIKES.md
 │   ├── TASKS.md
 │   ├── EVALUATION_RUBRIC.md
-│   └── CHECKPOINT_TEMPLATE.md
+│   ├── CHECKPOINT_TEMPLATE.md
+│   └── demo/
+│       ├── phase1-gold-demo.html
+│       └── phase2-runtime-demo.html
 ├── src/
 │   └── werewolf_eval/
 │       ├── __init__.py
@@ -53,11 +57,13 @@ Telegraph style. Root rules only. Read scoped AGENTS.md before subtree work. Ski
 │       ├── scoring.py
 │       ├── score_game.py
 │       ├── attribution.py
-│       └── attribute_game.py
+│       ├── attribute_game.py
+│       └── render_demo.py
 ├── tests/
 │   ├── test_game_log.py
 │   ├── test_scoring.py
-│   └── test_attribution.py
+│   ├── test_attribution.py
+│   └── test_render_demo.py
 ├── AGENTS.md
 └── README.md
 ```
@@ -67,7 +73,7 @@ Telegraph style. Root rules only. Read scoped AGENTS.md before subtree work. Ski
 - 生成代码目录：`src/werewolf_eval/`。
 - Phase 1 不创建 `src/` `apps/` `server/` `web/` 等实现目录。
 - Phase 1 closure 以 S0/S1/S2/S3/S6 为 deterministic MVP 验收链；S4/S5 延后到 Phase 2。
-- Phase 2 运行时代码必须绑定 Implementation Plan；当前已完成 runtime entries 为 E1/E2/E3，E4 仍需独立 Implementation Plan。
+- Phase 2 运行时代码必须绑定 Implementation Plan；当前已完成 runtime entries 为 E1/E2/E3/E4。
 
 ## 测试约束
 
