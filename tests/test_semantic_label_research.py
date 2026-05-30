@@ -34,5 +34,20 @@ class SemanticLabelFixtureTests(unittest.TestCase):
         self.assertEqual(actual, expected)
 
 
+class SemanticLabelEvaluatorTests(unittest.TestCase):
+    def test_evaluator_reports_exact_accuracy(self) -> None:
+        from scripts.research.evaluate_semantic_labels import evaluate_files
+
+        result = evaluate_files(
+            ROOT / "docs/gold-game/s5-semantic-label-eval-set.json",
+            ROOT / "docs/gold-game/s5-semantic-label-output.example.json",
+        )
+        self.assertTrue(result["valid"])
+        self.assertEqual(result["decision_count"], 5)
+        self.assertEqual(result["quality_label_accuracy"], 1.0)
+        self.assertEqual(result["evidence_alignment_accuracy"], 1.0)
+        self.assertEqual(result["reasoning_consistency_accuracy"], 1.0)
+
+
 if __name__ == "__main__":
     unittest.main()
