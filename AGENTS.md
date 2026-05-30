@@ -43,6 +43,13 @@ Telegraph style. Root rules only. Read scoped AGENTS.md before subtree work. Ski
 │   ├── TASKS.md
 │   ├── EVALUATION_RUBRIC.md
 │   └── CHECKPOINT_TEMPLATE.md
+├── src/
+│   └── werewolf_eval/
+│       ├── __init__.py
+│       ├── game_log.py
+│       └── validate_game_log.py
+├── tests/
+│   └── test_game_log.py
 ├── AGENTS.md
 └── README.md
 ```

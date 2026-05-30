@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 39
+- Entries: 60
 
 ```text
 ./
@@ -20,22 +20,22 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       ├── receiving-code-review/
 │       │   └── SKILL.md
 │       ├── systematic-debugging/
+│       │   ├── CREATION-LOG.md
+│       │   ├── LICENSE.upstream
+│       │   ├── SKILL.md
 │       │   ├── condition-based-waiting-example.ts
 │       │   ├── condition-based-waiting.md
-│       │   ├── CREATION-LOG.md
 │       │   ├── defense-in-depth.md
 │       │   ├── find-polluter.sh
-│       │   ├── LICENSE.upstream
 │       │   ├── root-cause-tracing.md
-│       │   ├── SKILL.md
 │       │   ├── test-academic.md
 │       │   ├── test-pressure-1.md
 │       │   ├── test-pressure-2.md
 │       │   └── test-pressure-3.md
 │       └── tdd/
 │           ├── LICENSE.upstream
-│           ├── mocking.md
 │           ├── SKILL.md
+│           ├── mocking.md
 │           └── tests.md
 ├── .codex/
 │   ├── hooks/
@@ -48,6 +48,26 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── codex-review-comment.md
 │   └── writing-plan.md
 ├── docs/
+│   ├── demo/
+│   │   └── phase1-gold-demo.html
+│   ├── gold-game/
+│   │   ├── g001-game-log.json
+│   │   ├── s0-gold-game-seed.md
+│   │   ├── s1-schema-validation.md
+│   │   ├── s2-metrics-summary.json
+│   │   ├── s2-score-log.json
+│   │   ├── s2-scoring-validation.md
+│   │   ├── s3-attribution-validation.md
+│   │   └── s3-rule-attribution.json
+│   ├── harness/
+│   │   └── plans/
+│   │       ├── 2026-05-29--e1-game-log-parser-validation-plan.md
+│   │       ├── 2026-05-29--phase1-closure-phase2-boundary-alignment-plan.md
+│   │       ├── 2026-05-29--s0-gold-game-seed-plan.md
+│   │       ├── 2026-05-29--s1-game-log-schema-validation-plan.md
+│   │       ├── 2026-05-29--s2-deterministic-scorer-validation-plan.md
+│   │       ├── 2026-05-29--s3-rule-attribution-validation-plan.md
+│   │       └── 2026-05-29--s6-leaderboard-ui-demo-validation-plan.md
 │   ├── specs/
 │   │   ├── agent-workflow.md
 │   │   └── review-guidelines.md
@@ -57,6 +77,13 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── PRODUCT_ONE_PAGER.md
 │   ├── SPIKES.md
 │   └── TASKS.md
+├── src/
+│   └── werewolf_eval/
+│       ├── __init__.py
+│       ├── game_log.py
+│       └── validate_game_log.py
+├── tests/
+│   └── test_game_log.py
 ├── .gitignore
 ├── AGENTS.md
 └── README.md
