@@ -2,7 +2,7 @@
 
 > **For agentic workers:** 步骤使用复选框（`- [ ]`）语法进行跟踪。
 
-**Goal:** Connect the existing D1 Decision Log runtime input to the E2 deterministic scorer so `decision_quality_score` is no longer globally fixed at 0 when a valid Decision Log is supplied.
+**Goal:** Connect the existing D1 Decision Log runtime input to the E2 deterministic scorer so Decision Log decisions are attached to score-relevant events via `decision_id`, illegal `visible_info_refs` trigger `rule_integrity_score` penalties, and traceability from Decision Log through Score Log to Metrics Summary is preserved. Positive `decision_quality_score` assignment remains out of scope and waits for S5 AI semantic judgment.
 
 **Architecture:** Keep the current Game Log-only scoring path backward compatible. Add an optional Decision Log input path that maps accepted decisions onto existing score-relevant Game Log events, applies deterministic Rubric G.1 Step 1-2 checks, and leaves AI semantic judgment for S5. Runtime demo generation should consume the same scorer path so the HTML boundary statement reflects D2 partial deterministic scoring instead of claiming decision quality is fixed at 0.
 
@@ -21,14 +21,15 @@ Current main facts:
 - D1 Decision Log parser / validator is implemented in `src/werewolf_eval/decision_log.py` and `src/werewolf_eval/validate_decision_log.py`.
 - `docs/gold-game/g001-decision-log.json` exists and validates against `docs/gold-game/g001-game-log.json`.
 
-D2 exists because `decision_quality_score` is still hardcoded to 0 inside `ScoreRecord` construction. This implementation must only implement deterministic Rubric G.1 Step 1-2:
+D2 exists because `decision_quality_score` is still hardcoded to 0 inside `ScoreRecord` construction, and there is no runtime connection from Decision Log to Score Log. This implementation implements Rubric G.1 Step 1-2 deterministic filters only:
 
 ```text
 Step 1 [deterministic]: check whether every visible_info_ref is visible to the decision actor.
-Step 2 [deterministic]: if refs are empty, or decision_type is random/default, decision_quality_score = 0.
+  → illegal refs trigger rule_integrity_score = -3.
+Step 2 [deterministic]: if refs are empty, or decision_type is random/default, record decision_id but keep decision_quality_score = 0.
 ```
 
-AI-assisted semantic support checks stay out of scope and remain S5.
+Step 3 (AI semantic judgment: whether refs logically support the decision) is the only Rubric entry point for positive `decision_quality_score`. D2 does NOT implement Step 3 — it stays in S5. Therefore D2 never assigns `decision_quality_score > 0`.
 
 ## Global Forbidden Scope
 
@@ -142,20 +143,20 @@ class DeterministicScorerTests(unittest.TestCase):
 在 `tests/test_scoring.py` 增加：
 
 ```python
-    def test_d2_decision_log_adds_deterministic_decision_quality(self) -> None:
+    def test_d2_decision_log_attaches_decision_id_and_preserves_quality_zero(self) -> None:
         records = {record.event_id: record for record in self.d2_score_log.records}
 
         self.assertEqual(records["g001_e019"].decision_id, "g001_d007")
-        self.assertEqual(records["g001_e019"].decision_quality_score, 1)
-        self.assertIn("rubric:G.1.deterministic_supported_decision", records["g001_e019"].rules_triggered)
+        self.assertEqual(records["g001_e019"].decision_quality_score, 0)
+        self.assertIn("rubric:G.1.decision_logged", records["g001_e019"].rules_triggered)
 
         self.assertEqual(records["g001_e025"].decision_id, "g001_d009")
-        self.assertEqual(records["g001_e025"].decision_quality_score, 1)
-        self.assertIn("rubric:G.1.deterministic_supported_decision", records["g001_e025"].rules_triggered)
+        self.assertEqual(records["g001_e025"].decision_quality_score, 0)
+        self.assertIn("rubric:G.1.decision_logged", records["g001_e025"].rules_triggered)
 
         self.assertEqual(records["g001_e035"].decision_id, "g001_d010")
-        self.assertEqual(records["g001_e035"].decision_quality_score, 1)
-        self.assertIn("rubric:G.1.deterministic_supported_decision", records["g001_e035"].rules_triggered)
+        self.assertEqual(records["g001_e035"].decision_quality_score, 0)
+        self.assertIn("rubric:G.1.decision_logged", records["g001_e035"].rules_triggered)
 ```
 
 Rationale for the expected records:
@@ -163,6 +164,8 @@ Rationale for the expected records:
 - `g001_e019` is p4 voting p1, matched to `g001_d007`.
 - `g001_e025` is p4 poisoning p2, matched to `g001_d009`.
 - `g001_e035` is p6 voting p1, matched to `g001_d010`.
+
+D2 does NOT assign `decision_quality_score > 0`. The rule `rubric:G.1.decision_logged` is a traceability marker, not a scoring rule. Positive decision quality waits for S5 AI semantic judgment (Rubric G.1 Step 3).
 
 - [ ] **步骤 5：新增 random/default 不加分测试**
 
@@ -188,7 +191,7 @@ Rationale for the expected records:
                 "consensus_id": None,
                 "phase": "day",
                 "action": "player_vote",
-                "target": "p1",
+                "target": "p3",
                 "visible_info_refs": ["g001_e008"],
                 "reason_summary": "p5 illegally relies on the seer-only check result.",
                 "decision_type": "inference_based",
@@ -210,12 +213,14 @@ Rationale for the expected records:
 - [ ] **步骤 7：新增 summary 聚合测试**
 
 ```python
-    def test_d2_metrics_summary_includes_player_decision_quality(self) -> None:
+    def test_d2_metrics_summary_reflects_decision_log_input(self) -> None:
         payload = metrics_summary_to_dict(self.d2_metrics)
         decision_scores = payload["score_summary"]["player_decision_quality_scores"]
 
-        self.assertGreater(decision_scores["p4"], 0)
-        self.assertGreater(decision_scores["p6"], 0)
+        # D2 does not assign positive decision_quality_score.
+        # All scores remain 0; the value is in decision_id traceability and rule_integrity checks.
+        self.assertEqual(decision_scores["p4"], 0)
+        self.assertEqual(decision_scores["p6"], 0)
         self.assertEqual(decision_scores["p5"], 0)
 ```
 
@@ -525,14 +530,17 @@ def _assess_decision(game: GameLog, decision: Decision | None) -> DecisionAssess
             notes=[f"Decision {decision.decision_id} is {decision.decision_type}; D2 keeps decision_quality_score 0."],
         )
 
+    # D2 does NOT assign decision_quality_score > 0.
+    # Positive scoring requires S5 AI semantic judgment (Rubric G.1 Step 3).
+    # This branch records the decision_id and marks traceability only.
     return DecisionAssessment(
         decision_id=decision.decision_id,
-        decision_quality_score=1,
+        decision_quality_score=0,
         rule_integrity_score=0,
-        rules_triggered=["rubric:G.1.deterministic_supported_decision"],
+        rules_triggered=["rubric:G.1.decision_logged"],
         evidence_event_ids=evidence_event_ids,
         notes=[
-            f"Decision {decision.decision_id} has visible refs and non-random type {decision.decision_type}; D2 assigns deterministic baseline decision_quality_score +1 without AI semantic validation."
+            f"Decision {decision.decision_id} has visible refs and non-random type {decision.decision_type}; D2 records decision_id and preserves decision_quality_score=0. Positive scoring requires S5 AI semantic judgment."
         ],
     )
 ```
@@ -620,11 +628,11 @@ Change it to:
 def _scoring_boundary(has_decision_log: bool = False) -> ScoringBoundary:
     if has_decision_log:
         return ScoringBoundary(
-            decision_quality_score=1,
-            decision_quality_reason="D2 uses deterministic Rubric G.1 Step 1-2 only: legal refs plus non-random decision type get baseline +1; empty refs or random/default stay 0; AI semantic support is not evaluated.",
+            decision_quality_score=0,
+            decision_quality_reason="D2 implements Rubric G.1 Step 1-2 only: deterministic visibility check and decision-to-event traceability. No AI semantic judgment; positive decision_quality_score waits for S5.",
             ai_annotations="none; S5 not enabled",
             rule_integrity_default=0,
-            rule_integrity_reason="Illegal visible_info_refs are deterministic rule-integrity violations; otherwise records default to 0.",
+            rule_integrity_reason="Illegal visible_info_refs are deterministic rule-integrity violations (-3); otherwise records default to 0.",
         )
     return ScoringBoundary(
         decision_quality_score=0,
@@ -857,7 +865,22 @@ PYTHONPATH=src python -m unittest tests.test_scoring tests.test_render_demo
 **文件：**
 - 修改：`docs/gold-game/s2-score-log.json`
 - 修改：`docs/gold-game/s2-metrics-summary.json`
+- 修改：`src/werewolf_eval/scoring.py`（`summarize_metrics` source_label 透传）
 - 测试：`tests/test_scoring.py`
+
+- [ ] **步骤 0：fix MetricsSummary source_label traceability**
+
+Before regenerating fixtures, update `summarize_metrics` in `src/werewolf_eval/scoring.py` to derive `source_label` from the ScoreLog instead of hardcoding `"[deterministic]"`:
+
+```python
+# Before (hardcoded):
+source_label="[deterministic]",
+
+# After (transparent from ScoreLog):
+source_label=score_log.source_label,
+```
+
+This ensures the MetricsSummary carries the same provenance label as the ScoreLog that produced it (e.g. `"[deterministic][decision-log]"` when Decision Log is supplied).
 
 - [ ] **步骤 1：regenerate fixtures with Decision Log enabled**
 
@@ -939,18 +962,12 @@ decision_quality_total = sum(record["decision_quality_score"] for record in scor
 decision_log_enabled = score_payload["phase"] == "Phase 2A-D2"
 ```
 
-- [ ] **步骤 2：update leaderboard deterministic row**
+- [ ] **步骤 2：keep leaderboard deterministic row at 0.0**
 
-Replace:
-
-```python
-"avg_decision_quality_score": 0.0,
-```
-
-for the `g001-runtime` row with:
+D2 does not assign positive `decision_quality_score`, so the leaderboard row stays at 0.0. Do not update the value. Add a comment noting this is a runtime demo convention — real multi-game Rubric-normalized `avg_decision_quality_score` (sum / total_actions) belongs to L1 real Leaderboard:
 
 ```python
-"avg_decision_quality_score": decision_quality_total,
+"avg_decision_quality_score": 0.0,  # D2 demo convention: decision_quality_score waits for S5 AI semantic judgment
 ```
 
 Do not update mock rows; keep them at 0.0.
@@ -976,11 +993,11 @@ with conditional Python-rendered text. Before the return string, define:
 
 ```python
 if context["score"]["decision_log_enabled"]:
-    boundary_copy = "This is not real AI Agent gameplay, not real Consensus Log collection, not AI semantic labeling, and not a real multi-model Leaderboard. 当前 decision_quality_score 来自 D2 deterministic Step 1-2，不包含 S5 AI 语义判断。"
-    decision_copy = f"decision_quality_score: D2 deterministic total = {context['score']['decision_quality_total']}，不含 AI semantic check。"
+    boundary_copy = "This is not real AI Agent gameplay, not real Consensus Log collection, not AI semantic labeling, and not a real multi-model Leaderboard. Decision Log is connected to scoring via D2 deterministic Step 1-2 (visibility check + decision_id traceability), but decision_quality_score remains 0 (positive scoring waits for S5 AI semantic judgment)."
+    decision_copy = "decision_quality_score: D2 visibility check + decision_id traceability complete; positive scoring still 0 (waiting for S5)."
 else:
-    boundary_copy = "This is not real AI Agent gameplay, not real Decision Log / Consensus Log collection, and not a real multi-model Leaderboard. 当前未传入 Decision Log，decision_quality_score 固定为 0。"
-    decision_copy = "decision_quality_score: 未传入 Decision Log，固定为 0。"
+    boundary_copy = "This is not real AI Agent gameplay, not real Decision Log / Consensus Log collection, and not a real multi-model Leaderboard. No Decision Log supplied; decision_quality_score fixed at 0."
+    decision_copy = "decision_quality_score: no Decision Log supplied; fixed at 0."
 ```
 
 Then use:
@@ -1010,8 +1027,8 @@ def test_write_demo_html_with_decision_log_shows_d2_boundary(self) -> None:
         )
         html = output.read_text(encoding="utf-8")
         self.assertIn("D2 deterministic Step 1-2", html)
-        self.assertIn("不包含 S5 AI 语义判断", html)
-        self.assertNotIn("decision_quality_score 固定为 0", html)
+        self.assertIn("D2 visibility check", html)
+        self.assertIn("waiting for S5", html)
     finally:
         output.unlink(missing_ok=True)
 ```
@@ -1082,7 +1099,7 @@ Under D2, add:
 Keep the no-AI boundary explicit:
 
 ```markdown
-- 边界：只实现 Rubric G.1 Step 1-2 deterministic scoring；不调用 AI，不启用 S5，不做 Consensus Log，不宣称 `decision_quality_score` 完整可用。
+- 边界：只实现 Rubric G.1 Step 1-2 deterministic visibility 检查和 decision_id 追溯；不调用 AI，不启用 S5，不做 Consensus Log，不宣称 `decision_quality_score` 完整可用（正向评分等待 S5 AI 语义判断）。
 ```
 
 - [ ] **步骤 4：add UX acceptance row**
@@ -1103,7 +1120,7 @@ After Demo 3, add:
 - 状态：`completed`（`docs/demo/phase2-runtime-demo.html` 使用 Decision Log 生成 D2 deterministic decision score）
 - 触发条件：D2 完成。
 - 演示内容：运行时读取 Game Log + Decision Log → 计算 Score Log / Metrics Summary → 输出带 D2 边界声明的 HTML demo。
-- 验收：同一输入稳定输出非零 `decision_quality_score` 总分；页面明确说明该分数来自 deterministic Step 1-2，不包含 S5 AI 语义判断。
+- 验收：同一输入稳定输出 `decision_id` 追溯到 Score Record，非法 refs 触发 `rule_integrity_score = -3`；页面明确说明 Decision Log 已接入但 `decision_quality_score` 仍为 0（正向评分等待 S5）。
 ```
 
 - [ ] **步骤 6：run docs checks**
@@ -1173,7 +1190,7 @@ decision_log=enabled
 decision_quality_total=
 ```
 
-The value after `decision_quality_total=` must be greater than 0.
+The value after `decision_quality_total=` will be 0. D2 does not assign positive decision_quality_score; the value is in decision_id traceability and rule_integrity checks.
 
 - [ ] **步骤 4：run HTML render command**
 
@@ -1250,7 +1267,7 @@ No Consensus Log / S4: confirmed
 No G1 gameplay: confirmed
 Validation commands: include outputs from steps 1-5
 Changed files: paste output from step 6
-Known limitation: D2 assigns baseline +1 for visible refs + non-random decision_type; semantic support remains S5
+Known limitation: D2 connects Decision Log to scoring with visibility checks and decision_id traceability, but decision_quality_score remains 0 across all records; positive semantic scoring is deferred to S5
 ```
 
 ---
@@ -1271,9 +1288,9 @@ Bound Implementation Plan:
 - Adds optional Decision Log input to the deterministic scorer.
 - Maps accepted Decision Log entries onto score-relevant Game Log events.
 - Implements Rubric G.1 Step 1-2 only:
-  - deterministic visibility checks for `visible_info_refs`
+  - deterministic visibility checks for `visible_info_refs` (illegal refs → `rule_integrity_score = -3`)
   - empty refs or `random/default` decision types keep `decision_quality_score = 0`
-  - legal refs plus non-random decision types receive deterministic baseline `decision_quality_score = +1`
+  - legal refs plus non-random decision types: `decision_id` attached, marked `rubric:G.1.decision_logged`, but `decision_quality_score` stays 0 (positive scoring waits for S5 AI semantic judgment)
 - Adds optional `--decision-log` support to `score_game.py` and `render_demo.py`.
 - Refreshes Score Log / Metrics Summary fixtures and Phase 2 runtime HTML demo.
 - Updates TASKS status and UX / demo acceptance for D2.
