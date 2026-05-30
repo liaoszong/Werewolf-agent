@@ -21,7 +21,8 @@
           "proposed_target": "p5",
           "visible_info_refs": ["g001_e001", "g001_e002"],
           "reason_summary": "p5 is an unprotected-looking villager candidate and avoids directly challenging the claimed information holder.",
-          "confidence": 0.66
+          "confidence": 0.66,
+          "action_round": 1
         },
         {
           "proposal_id": 2,
@@ -29,7 +30,8 @@
           "proposed_target": "p3",
           "visible_info_refs": ["g001_e001", "g001_e002"],
           "reason_summary": "p3 may become dangerous if allowed to speak, but killing p3 immediately could expose the wolf pair too early.",
-          "confidence": 0.58
+          "confidence": 0.58,
+          "action_round": 1
         }
       ],
       "responses": [
@@ -39,7 +41,8 @@
           "responder": "p2",
           "response_type": "support_with_reason",
           "reason_summary": "p5 is a safer first-night target than p3 because it keeps the daytime framing path open.",
-          "visible_info_refs": ["g001_e001", "g001_e002"]
+          "visible_info_refs": ["g001_e001", "g001_e002"],
+          "action_round": 2
         }
       ],
       "final_decision": {
@@ -61,7 +64,7 @@
       "coordinator": "p1",
       "max_rounds": 3,
       "actual_rounds": 1,
-      "status": "consensus",
+      "status": "coordinator_tie_break",
       "proposals": [
         {
           "proposal_id": 1,
@@ -69,7 +72,8 @@
           "proposed_target": "p5",
           "visible_info_refs": ["g001_e022", "g001_e023"],
           "reason_summary": "After p3 is eliminated and revealed as seer, killing p5 keeps pressure away from p1 before final daytime vote.",
-          "confidence": 0.7
+          "confidence": 0.7,
+          "action_round": 1
         },
         {
           "proposal_id": 2,
@@ -77,25 +81,17 @@
           "proposed_target": "p6",
           "visible_info_refs": ["g001_e015"],
           "reason_summary": "p6 is a quiet villager who voted for p3 in round 1; eliminating p6 avoids the seer-hunting narrative while keeping pressure diffuse.",
-          "confidence": 0.55
+          "confidence": 0.55,
+          "action_round": 1
         }
       ],
-      "responses": [
-        {
-          "response_id": 1,
-          "to_proposal_id": 2,
-          "responder": "p1",
-          "response_type": "oppose_with_reason",
-          "reason_summary": "p5 is a more consistent target than p6; p6 voted with the crowd and creates no special risk.",
-          "visible_info_refs": ["g001_e022", "g001_e023"]
-        }
-      ],
+      "responses": [],
       "final_decision": {
         "target": "p5",
-        "decision_type": "consensus",
+        "decision_type": "coordinator_tie_break",
         "primary_proposer": "p1",
         "supporters": ["p1"],
-        "dissenters": [],
+        "dissenters": ["p2"],
         "resolution_round": 1
       }
     }

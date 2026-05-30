@@ -33,6 +33,7 @@ class ConsensusProposal:
     visible_info_refs: list[str]
     reason_summary: str
     confidence: float | None
+    action_round: int
 
 
 @dataclass(frozen=True)
@@ -43,6 +44,7 @@ class ConsensusResponse:
     response_type: str
     reason_summary: str
     visible_info_refs: list[str]
+    action_round: int
 
 
 @dataclass(frozen=True)
@@ -208,6 +210,7 @@ def _parse_proposal(raw: Any) -> ConsensusProposal:
         visible_info_refs=[str(ref) for ref in visible_info_refs],
         reason_summary=str(raw["reason_summary"]),
         confidence=confidence,
+        action_round=int(raw.get("action_round", 1)),
     )
 
 
@@ -231,6 +234,7 @@ def _parse_response(raw: Any) -> ConsensusResponse:
         response_type=str(raw["response_type"]),
         reason_summary=str(raw["reason_summary"]),
         visible_info_refs=[str(ref) for ref in visible_info_refs],
+        action_round=int(raw.get("action_round", 1)),
     )
 
 
@@ -306,22 +310,20 @@ def _validate_consensus(consensus: Consensus, game: GameLog) -> None:
     if len(set(proposal_ids)) != len(proposal_ids):
         raise ConsensusLogValidationError(f"{consensus.consensus_id}: proposal_id values must be unique")
 
-    # Rubric B.2: each wolf may make at most 1 proposal and at most 1 response per round.
-    proposer_counts: dict[str, int] = {}
+    # Rubric B.2: per wolf, per action_round, at most 1 action (proposal or response).
+    action_counts: dict[tuple[str, int], int] = {}
     for proposal in consensus.proposals:
-        proposer_counts[proposal.proposer] = proposer_counts.get(proposal.proposer, 0) + 1
-    for proposer, count in proposer_counts.items():
-        if count > 1:
-            raise ConsensusLogValidationError(
-                f"{consensus.consensus_id}: participant {proposer} has {count} proposals; max 1 per round"
-            )
-    responder_counts: dict[str, int] = {}
+        _validate_action_round(consensus, proposal.action_round)
+        key = (proposal.proposer, proposal.action_round)
+        action_counts[key] = action_counts.get(key, 0) + 1
     for response in consensus.responses:
-        responder_counts[response.responder] = responder_counts.get(response.responder, 0) + 1
-    for responder, count in responder_counts.items():
+        _validate_action_round(consensus, response.action_round)
+        key = (response.responder, response.action_round)
+        action_counts[key] = action_counts.get(key, 0) + 1
+    for (participant, action_round), count in action_counts.items():
         if count > 1:
             raise ConsensusLogValidationError(
-                f"{consensus.consensus_id}: participant {responder} has {count} responses; max 1 per round"
+                f"{consensus.consensus_id}: participant {participant} has {count} actions in action_round {action_round}; max 1 per action_round"
             )
 
     for proposal in consensus.proposals:
@@ -398,6 +400,20 @@ def _validate_final_decision(consensus: Consensus, game: GameLog) -> None:
     if set(decision.supporters) & set(decision.dissenters):
         raise ConsensusLogValidationError(f"{consensus.consensus_id}: supporter cannot also be dissenter")
 
+    if decision.decision_type == "consensus" and decision.dissenters:
+        raise ConsensusLogValidationError(f"{consensus.consensus_id}: consensus decision_type requires 0 dissenters")
+    if decision.decision_type == "accepted_consensus" and decision.dissenters:
+        raise ConsensusLogValidationError(f"{consensus.consensus_id}: accepted_consensus decision_type requires 0 dissenters")
+    if decision.decision_type == "coordinator_tie_break" and not decision.dissenters:
+        raise ConsensusLogValidationError(f"{consensus.consensus_id}: coordinator_tie_break decision_type requires at least 1 dissenter")
+
+    covered = set(decision.supporters) | set(decision.dissenters)
+    if covered != set(consensus.participants):
+        missing = set(consensus.participants) - covered
+        raise ConsensusLogValidationError(
+            f"{consensus.consensus_id}: all participants must appear as supporter or dissenter; missing: {sorted(missing)}"
+        )
+
     if not 1 <= decision.resolution_round <= consensus.actual_rounds:
         raise ConsensusLogValidationError(f"{consensus.consensus_id}: resolution_round must be within actual_rounds")
 
@@ -421,6 +437,13 @@ def _validate_final_decision(consensus: Consensus, game: GameLog) -> None:
     if matching_kill is None:
         raise ConsensusLogValidationError(
             f"{consensus.consensus_id}: final target does not match werewolf_kill event for round {consensus.round}"
+        )
+
+
+def _validate_action_round(consensus: Consensus, action_round: int) -> None:
+    if not 1 <= action_round <= consensus.actual_rounds:
+        raise ConsensusLogValidationError(
+            f"{consensus.consensus_id}: action_round {action_round} must be between 1 and actual_rounds ({consensus.actual_rounds})"
         )
 
 

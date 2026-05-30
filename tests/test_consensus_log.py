@@ -96,6 +96,52 @@ class ConsensusLogTests(unittest.TestCase):
         with self.assertRaisesRegex(ConsensusLogValidationError, "invalid status"):
             parse_consensus_log(raw, self.game)
 
+    def test_rejects_decision_type_mismatch_with_dissenters(self) -> None:
+        raw = load_json("docs/gold-game/g001-consensus-log.json")
+        raw["consensuses"][0]["status"] = "consensus"
+        raw["consensuses"][0]["final_decision"]["decision_type"] = "consensus"
+        raw["consensuses"][0]["final_decision"]["dissenters"] = ["p2"]
+        raw["consensuses"][0]["final_decision"]["supporters"] = ["p1"]
+
+        with self.assertRaisesRegex(ConsensusLogValidationError, "consensus decision_type requires 0 dissenters"):
+            parse_consensus_log(raw, self.game)
+
+    def test_rejects_coordinator_tie_break_without_dissenters(self) -> None:
+        raw = load_json("docs/gold-game/g001-consensus-log.json")
+        raw["consensuses"][1]["status"] = "coordinator_tie_break"
+        raw["consensuses"][1]["final_decision"]["decision_type"] = "coordinator_tie_break"
+        raw["consensuses"][1]["final_decision"]["dissenters"] = []
+
+        with self.assertRaisesRegex(ConsensusLogValidationError, "coordinator_tie_break decision_type requires at least 1 dissenter"):
+            parse_consensus_log(raw, self.game)
+
+    def test_rejects_participant_not_covered_in_final_decision(self) -> None:
+        raw = load_json("docs/gold-game/g001-consensus-log.json")
+        raw["consensuses"][1]["final_decision"]["supporters"] = ["p1"]
+        raw["consensuses"][1]["final_decision"]["dissenters"] = []
+        raw["consensuses"][1]["status"] = "consensus"
+        raw["consensuses"][1]["final_decision"]["decision_type"] = "consensus"
+
+        with self.assertRaisesRegex(ConsensusLogValidationError, "all participants must appear as supporter or dissenter"):
+            parse_consensus_log(raw, self.game)
+
+    def test_rejects_two_actions_in_same_action_round(self) -> None:
+        raw = load_json("docs/gold-game/g001-consensus-log.json")
+        raw["consensuses"][0]["actual_rounds"] = 2
+        raw["consensuses"][0]["proposals"][0]["action_round"] = 1
+        raw["consensuses"][0]["proposals"].append({
+            "proposal_id": 3,
+            "proposer": "p1",
+            "proposed_target": "p4",
+            "visible_info_refs": ["g001_e001"],
+            "reason_summary": "alternative target.",
+            "confidence": 0.5,
+            "action_round": 1,
+        })
+
+        with self.assertRaisesRegex(ConsensusLogValidationError, "max 1 per action_round"):
+            parse_consensus_log(raw, self.game)
+
 
 if __name__ == "__main__":
     unittest.main()
