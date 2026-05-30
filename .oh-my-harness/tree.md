@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 76
+- Entries: 79
 
 ```text
 ./
@@ -73,7 +73,10 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │       ├── 2026-05-30--d1-decision-log-runtime-skeleton-plan.md
 │   │       ├── 2026-05-30--e2-deterministic-scorer-plan.md
 │   │       ├── 2026-05-30--e3-rule-attribution-engine-plan.md
-│   │       └── 2026-05-30--e4-runtime-demo-html-plan.md
+│   │       ├── 2026-05-30--e4-runtime-demo-html-plan.md
+│   │       └── 2026-05-30--roadmap-alignment-plan.md
+│   ├── prs/
+│   │   └── 2026-05-30--phase2-next-step-research.md
 │   ├── specs/
 │   │   ├── agent-workflow.md
 │   │   └── review-guidelines.md
@@ -81,6 +84,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── EVALUATION_RUBRIC.md
 │   ├── GOLD_DEMO.md
 │   ├── PRODUCT_ONE_PAGER.md
+│   ├── ROADMAP.md
 │   ├── SPIKES.md
 │   └── TASKS.md
 ├── src/

@@ -29,6 +29,7 @@ Telegraph style. Root rules only. Read scoped AGENTS.md before subtree work. Ski
 - 评分体系事实来源：`@docs/EVALUATION_RUBRIC.md`。不要在 AGENTS.md 中复制评分公式。
 - 产品定义事实来源：`@docs/PRODUCT_ONE_PAGER.md`。
 - Phase 1 / Phase 2 / Phase 3 切分定义：`@docs/PRODUCT_ONE_PAGER.md` 和 `@docs/TASKS.md`。
+- Phase 2 / Phase 3 总路线以 `@docs/ROADMAP.md` 为准；`docs/TASKS.md` 只记录任务状态和候选工程任务。
 - S4/S5 和 E1-E4 已转入 Phase 2 路由：Phase 1 closure 不再阻塞于人工 Consensus Log sample 或 AI 语义标注；E1-E4 只有在 Phase 2 Implementation Plan 明确允许业务代码后才能启动。
 
 ## 地图 MAP
@@ -47,6 +48,7 @@ Telegraph style. Root rules only. Read scoped AGENTS.md before subtree work. Ski
 │   ├── TASKS.md
 │   ├── EVALUATION_RUBRIC.md
 │   ├── CHECKPOINT_TEMPLATE.md
+│   ├── ROADMAP.md
 │   ├── demo/
 │   │   ├── phase1-gold-demo.html
 │   │   └── phase2-runtime-demo.html
