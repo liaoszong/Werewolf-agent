@@ -4,9 +4,9 @@
 
 **Goal:** Add a deterministic context-budget layer that prevents agents from repeatedly reading long plan files and full validation logs during Werewolf-agent implementation work.
 
-**Architecture:** This is workflow infrastructure, not game-domain feature work. The implementation adds two deterministic plan-context scripts, one validation-summary wrapper, tests for the scripts, and a strict AGENTS.md Context Budget Gate so local agents must use the new compressed entrypoints before opening long plans or full logs.
+**Architecture:** This is workflow infrastructure, not game-domain feature work. The implementation adds two deterministic plan-context scripts, one validation-summary wrapper, tests for the scripts, and a strict AGENTS.md Context Budget Gate so local agents must use the compressed entrypoints before opening long plans or full logs.
 
-**Tech Stack:** Python standard library only (`argparse`, `json`, `pathlib`, `re`, `subprocess`, `tempfile`, `unittest`), Markdown, existing repository validation commands, existing tree refresh hook `node .codex/hooks/tree.mjs --force`.
+**Tech Stack:** Python standard library only (`argparse`, `json`, `os`, `pathlib`, `re`, `subprocess`, `tempfile`, `unittest`), Markdown, existing repository validation commands, existing tree refresh hook `node .codex/hooks/tree.mjs --force`.
 
 ---
 
@@ -19,7 +19,7 @@ S4 implementation exposed a recurring token-cost failure mode:
 - Validation loops print long output while agents usually only need pass/fail, failing command, short reason, and a log pointer.
 - Source-code search tools help code exploration, but they do not solve Markdown plan re-reading or validation-log flooding.
 
-This plan deliberately implements only the P0 deterministic compression layer. Semble, Repomix, CodeGraph, and codebase-memory MCP are outside this task.
+This plan implements only the P0 deterministic compression layer. Semble, Repomix, CodeGraph, and codebase-memory MCP are outside this task.
 
 ## Research PR Decision
 
@@ -61,7 +61,7 @@ Implementation PR should create or modify exactly these files:
   - Runs the repository validation chain, writes full logs to `.logs/validate/latest/`, writes `.logs/validate/latest/summary.json`, and prints only the summary JSON.
 
 - Create: `tests/test_context_budget.py`
-  - Tests the plan index builder, task context builder, and validation summary data shape using temporary files and small deterministic fixtures.
+  - Tests the plan index builder, task context builder, validation summary data shape, and AGENTS / `.gitignore` contracts.
 
 - Modify: `AGENTS.md`
   - Adds a strict Context Budget Gate requiring the generated context and validation summary workflow.
@@ -80,12 +80,12 @@ No other files should be modified.
 
 **文件：**
 - 创建：`scripts/context/build_plan_index.py`
-- 修改：none
+- 创建：`tests/test_context_budget.py`
 - 测试：`tests/test_context_budget.py`
 
-- [ ] **步骤 1：创建脚本目录和 failing tests**
+- [ ] **步骤 1：创建 failing test skeleton**
 
-Create `tests/test_context_budget.py` with the initial tests below. These tests create a miniature plan in a temporary directory, run the future index builder, and assert line ranges, task ids, file refs, command refs, and acceptance hints.
+Create `tests/test_context_budget.py` with this content. `ROOT` is defined in the initial skeleton so later appended tests can read repository files without `NameError`.
 
 ```python
 from __future__ import annotations
@@ -95,7 +95,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from scripts.context.build_plan_index import build_plan_index
+ROOT = Path(__file__).resolve().parents[1]
 
 
 MINI_PLAN = """# S4.x Example Implementation Plan
@@ -142,6 +142,8 @@ Acceptance:
 
 class PlanIndexBuilderTests(unittest.TestCase):
     def test_build_plan_index_extracts_tasks_files_commands_and_lines(self) -> None:
+        from scripts.context.build_plan_index import build_plan_index
+
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             plan = root / "docs/harness/plans/2026-05-30--example-plan.md"
@@ -178,11 +180,11 @@ if __name__ == "__main__":
 PYTHONPATH=. python -m unittest tests.test_context_budget.PlanIndexBuilderTests -v
 ```
 
-预期：失败，显示 `ModuleNotFoundError: No module named 'scripts.context.build_plan_index'` 或 `ImportError`，因为脚本尚未创建。
+预期：失败，显示 `ModuleNotFoundError: No module named 'scripts.context.build_plan_index'`，因为脚本尚未创建。
 
 - [ ] **步骤 3：创建 deterministic index builder**
 
-Create `scripts/context/build_plan_index.py` with this implementation:
+Create `scripts/context/build_plan_index.py`:
 
 ```python
 from __future__ import annotations
@@ -198,12 +200,7 @@ FILE_LINE_RE = re.compile(r"^-\s*(创建|修改|测试|读取)：`([^`]+)`")
 COMMAND_FENCE_RE = re.compile(r"^```(?:bash|sh|shell|text)?\s*$")
 PATH_RE = re.compile(r"`([^`]+)`")
 
-FILE_BUCKETS = {
-    "创建": "create",
-    "修改": "modify",
-    "测试": "test",
-    "读取": "read",
-}
+FILE_BUCKETS = {"创建": "create", "修改": "modify", "测试": "test", "读取": "read"}
 
 
 def _repo_relative(path: Path, repo_root: Path) -> str:
@@ -245,7 +242,12 @@ def _extract_commands(section_lines: list[str]) -> list[str]:
         if COMMAND_FENCE_RE.match(line.strip()):
             if in_fence:
                 command = "\n".join(item for item in current if item.strip())
-                if command and (command.startswith("python ") or command.startswith("PYTHONPATH=") or command.startswith("node ") or command.startswith("git ")):
+                if command and (
+                    command.startswith("python ")
+                    or command.startswith("PYTHONPATH=")
+                    or command.startswith("node ")
+                    or command.startswith("git ")
+                ):
                     commands.append(command)
                 current = []
             in_fence = not in_fence
@@ -287,7 +289,7 @@ def build_plan_index(plan_path: Path, repo_root: Path | None = None) -> dict[str
     lines = text.splitlines()
     tasks = []
     for start, end, task_id, title in _line_ranges(lines):
-        section = lines[start - 1:end]
+        section = lines[start - 1 : end]
         tasks.append(
             {
                 "id": task_id,
@@ -301,12 +303,7 @@ def build_plan_index(plan_path: Path, repo_root: Path | None = None) -> dict[str
             }
         )
     plan_id = plan_path.stem.removesuffix("-plan")
-    return {
-        "plan_id": plan_id,
-        "source_path": _repo_relative(plan_path, root),
-        "task_count": len(tasks),
-        "tasks": tasks,
-    }
+    return {"plan_id": plan_id, "source_path": _repo_relative(plan_path, root), "task_count": len(tasks), "tasks": tasks}
 
 
 def main() -> int:
@@ -340,36 +337,14 @@ Ran 1 test
 OK
 ```
 
-- [ ] **步骤 5：对真实 S4 plan 生成 index smoke check**
-
-```bash
-python scripts/context/build_plan_index.py docs/harness/plans/2026-05-30--s4-consensus-log-runtime-input-plan.md
-python - <<'PY'
-import json
-from pathlib import Path
-path = Path('docs/generated-context/2026-05-30--s4-consensus-log-runtime-input.index.json')
-data = json.loads(path.read_text(encoding='utf-8'))
-assert data['task_count'] >= 1
-assert data['source_path'] == 'docs/harness/plans/2026-05-30--s4-consensus-log-runtime-input-plan.md'
-print('real plan index smoke passed')
-PY
-```
-
-预期：输出包含：
-
-```text
-wrote docs/generated-context/2026-05-30--s4-consensus-log-runtime-input.index.json tasks=
-real plan index smoke passed
-```
-
-- [ ] **步骤 6：提交 checkpoint**
+- [ ] **步骤 5：提交 checkpoint**
 
 ```bash
 git add scripts/context/build_plan_index.py tests/test_context_budget.py
 git commit -m "chore: add plan index builder"
 ```
 
-预期：提交成功，包含 `build_plan_index.py` 和 `test_context_budget.py`。
+预期：提交成功，包含 `scripts/context/build_plan_index.py` 和 `tests/test_context_budget.py`。
 
 ---
 
@@ -380,16 +355,16 @@ git commit -m "chore: add plan index builder"
 - 修改：`tests/test_context_budget.py`
 - 测试：`tests/test_context_budget.py`
 
-- [ ] **步骤 1：追加 task context tests**
+- [ ] **步骤 1：追加 task context failing tests**
 
-Append this test class to `tests/test_context_budget.py` before the `if __name__ == "__main__"` block:
+Insert this class before the existing `if __name__ == "__main__"` block in `tests/test_context_budget.py`:
 
 ```python
-from scripts.context.build_task_context import build_task_context
-
-
 class TaskContextBuilderTests(unittest.TestCase):
     def test_build_task_context_writes_minimal_markdown_for_selected_task(self) -> None:
+        from scripts.context.build_plan_index import build_plan_index
+        from scripts.context.build_task_context import build_task_context
+
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             plan = root / "docs/harness/plans/2026-05-30--example-plan.md"
@@ -399,8 +374,8 @@ class TaskContextBuilderTests(unittest.TestCase):
             out = root / "docs/generated-context/current-task.ctx.md"
 
             text = build_task_context(index=index, task_selector="1", out_path=out)
-
             written = out.read_text(encoding="utf-8")
+
         self.assertEqual(text, written)
         self.assertIn("# Current Task Context", text)
         self.assertIn("Plan: `2026-05-30--example-plan`", text)
@@ -416,7 +391,7 @@ class TaskContextBuilderTests(unittest.TestCase):
 PYTHONPATH=. python -m unittest tests.test_context_budget.TaskContextBuilderTests -v
 ```
 
-预期：失败，显示 `ModuleNotFoundError: No module named 'scripts.context.build_task_context'` 或 `ImportError`。
+预期：失败，显示 `ModuleNotFoundError: No module named 'scripts.context.build_task_context'`，因为脚本尚未创建。
 
 - [ ] **步骤 3：创建 task context builder**
 
@@ -476,8 +451,7 @@ def build_task_context(index: dict[str, Any], task_selector: str, out_path: Path
         for command in commands:
             lines.extend(["```bash", command, "```", ""])
     else:
-        lines.append("- none")
-        lines.append("")
+        lines.extend(["- none", ""])
     lines.extend(["## Acceptance Hints", ""])
     for item in task.get("acceptance", []) or ["Use the task-specific expected results in the source plan line range."]:
         lines.append(f"- {item}")
@@ -520,36 +494,14 @@ Ran 1 test
 OK
 ```
 
-- [ ] **步骤 5：对真实 S4 plan 生成 current-task context smoke check**
-
-```bash
-python scripts/context/build_task_context.py docs/generated-context/2026-05-30--s4-consensus-log-runtime-input.index.json 1
-python - <<'PY'
-from pathlib import Path
-text = Path('docs/generated-context/current-task.ctx.md').read_text(encoding='utf-8')
-assert text.startswith('# Current Task Context')
-assert 'Original plan lines:' in text
-assert '## Files' in text
-assert '## Commands' in text
-print('current task context smoke passed')
-PY
-```
-
-预期：输出包含：
-
-```text
-wrote docs/generated-context/current-task.ctx.md task=1
-current task context smoke passed
-```
-
-- [ ] **步骤 6：提交 checkpoint**
+- [ ] **步骤 5：提交 checkpoint**
 
 ```bash
 git add scripts/context/build_task_context.py tests/test_context_budget.py
 git commit -m "chore: add task context builder"
 ```
 
-预期：提交成功，包含 `build_task_context.py` 和更新后的 `test_context_budget.py`。
+预期：提交成功，包含 `scripts/context/build_task_context.py` 和更新后的 `tests/test_context_budget.py`。
 
 ---
 
@@ -560,16 +512,15 @@ git commit -m "chore: add task context builder"
 - 修改：`tests/test_context_budget.py`
 - 测试：`tests/test_context_budget.py`
 
-- [ ] **步骤 1：追加 validation summary tests**
+- [ ] **步骤 1：追加 validation summary failing tests**
 
-Append this test class to `tests/test_context_budget.py` before the `if __name__ == "__main__"` block:
+Insert this class before the existing `if __name__ == "__main__"` block in `tests/test_context_budget.py`. The `short_log.read_text()` and `full_log.read_text()` assertions stay inside the `TemporaryDirectory` lifetime.
 
 ```python
-from scripts.dev.validate_brief import summarize_completed_process
-
-
 class ValidationBriefTests(unittest.TestCase):
     def test_summarize_completed_process_records_logs_and_next_read(self) -> None:
+        from scripts.dev.validate_brief import summarize_completed_process
+
         with tempfile.TemporaryDirectory() as tmp:
             log_dir = Path(tmp)
             result = summarize_completed_process(
@@ -583,14 +534,14 @@ class ValidationBriefTests(unittest.TestCase):
 
             short_log = log_dir / "unit_tests.short.log"
             full_log = log_dir / "unit_tests.log"
-        self.assertFalse(result["ok"])
-        self.assertEqual(result["name"], "unit_tests")
-        self.assertEqual(result["exit_code"], 1)
-        self.assertEqual(result["short_log"], str(short_log))
-        self.assertEqual(result["full_log"], str(full_log))
-        self.assertEqual(result["next_read"], str(short_log))
-        self.assertIn("line three", short_log.read_text(encoding="utf-8"))
-        self.assertIn("failure detail", full_log.read_text(encoding="utf-8"))
+            self.assertFalse(result["ok"])
+            self.assertEqual(result["name"], "unit_tests")
+            self.assertEqual(result["exit_code"], 1)
+            self.assertEqual(result["short_log"], str(short_log))
+            self.assertEqual(result["full_log"], str(full_log))
+            self.assertEqual(result["next_read"], str(short_log))
+            self.assertIn("line three", short_log.read_text(encoding="utf-8"))
+            self.assertIn("failure detail", full_log.read_text(encoding="utf-8"))
 ```
 
 - [ ] **步骤 2：运行新增测试确认失败**
@@ -599,7 +550,7 @@ class ValidationBriefTests(unittest.TestCase):
 PYTHONPATH=. python -m unittest tests.test_context_budget.ValidationBriefTests -v
 ```
 
-预期：失败，显示 `ModuleNotFoundError: No module named 'scripts.dev.validate_brief'` 或 `ImportError`。
+预期：失败，显示 `ModuleNotFoundError: No module named 'scripts.dev.validate_brief'`，因为脚本尚未创建。
 
 - [ ] **步骤 3：创建 validation brief wrapper**
 
@@ -610,6 +561,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -656,8 +608,10 @@ def summarize_completed_process(
 
 def run_validation(log_dir: Path) -> dict[str, Any]:
     commands: list[dict[str, Any]] = []
+    env = os.environ.copy()
+    env["PYTHONPATH"] = "src"
     for name, argv in DEFAULT_COMMANDS:
-        completed = subprocess.run(argv, text=True, capture_output=True, env={**dict(), "PYTHONPATH": "src"})
+        completed = subprocess.run(argv, text=True, capture_output=True, env=env)
         command = "PYTHONPATH=src " + " ".join(argv)
         commands.append(
             summarize_completed_process(
@@ -710,7 +664,7 @@ OK
 PYTHONPATH=. python scripts/dev/validate_brief.py
 ```
 
-预期：如果当前 main 的 S4 validators 全部可用，输出 JSON 中包含：
+预期：当前 main 的 validators 全部可用时，输出 JSON 中包含：
 
 ```json
 {
@@ -735,7 +689,7 @@ git add scripts/dev/validate_brief.py tests/test_context_budget.py
 git commit -m "chore: add validation brief wrapper"
 ```
 
-预期：提交成功，包含 `validate_brief.py` 和更新后的测试。
+预期：提交成功，包含 `scripts/dev/validate_brief.py` 和更新后的 `tests/test_context_budget.py`。
 
 ---
 
@@ -744,11 +698,12 @@ git commit -m "chore: add validation brief wrapper"
 **文件：**
 - 修改：`AGENTS.md`
 - 修改：`.gitignore`
+- 修改：`tests/test_context_budget.py`
 - 测试：`tests/test_context_budget.py`
 
-- [ ] **步骤 1：追加 AGENTS.md gate contract test**
+- [ ] **步骤 1：追加 AGENTS / .gitignore contract tests**
 
-Append this test class to `tests/test_context_budget.py` before the `if __name__ == "__main__"` block:
+Insert this class before the existing `if __name__ == "__main__"` block in `tests/test_context_budget.py`:
 
 ```python
 class ContextBudgetGateDocsTests(unittest.TestCase):
