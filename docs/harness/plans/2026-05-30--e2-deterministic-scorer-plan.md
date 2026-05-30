@@ -438,13 +438,25 @@ def _score_werewolf_kill(game: GameLog, event: Event) -> ScoreRecord:
         notes = f"Wolf team killed {event.target}, who is revealed as villager."
 
     evidence = [event.event_id]
-    death_event = _death_event_for_target(game, event.target)
+    # Only consider death/save events from the same round as the kill.
+    # Without round filtering, g001_e007 (round 1 kill, p5 saved) would
+    # incorrectly find g001_e026 (p5's death in round 2) instead of the
+    # save event g001_e009.
+    death_event = next(
+        (e.event_id for e in game.events
+         if e.type == "player_died" and e.target == event.target and e.round == event.round),
+        None,
+    )
     if death_event:
         evidence.append(death_event)
     else:
-        # When the kill target was saved by witch (no player_died),
+        # When the kill target was saved by witch (no same-round player_died),
         # include the witch_save event as alternative evidence.
-        save_event = _save_event_for_target(game, event.target)
+        save_event = next(
+            (e.event_id for e in game.events
+             if e.type == "witch_save" and e.target == event.target and e.round == event.round),
+            None,
+        )
         if save_event:
             evidence.append(save_event)
     reveal_event = _reveal_event_for_target(game, event.target)
@@ -841,7 +853,9 @@ def _result_metrics(game: GameLog) -> ResultMetrics:
     alive_villagers = [player_id for player_id in villagers if player_id in alive]
     winner_alive = alive_villagers if game.result.winner == "villager" else alive_werewolves
     loser_alive = alive_werewolves if game.result.winner == "villager" else alive_villagers
-    eliminated_werewolves = [event.target for event in game.events if event.type == "player_eliminated" and players[event.target].team == "werewolf"]
+    # Gold counts ALL werewolf deaths (player_died + player_eliminated), not just eliminated ones.
+    # p2 was killed by witch poison (player_died), p1 was eliminated by vote. Both count.
+    werewolf_deaths = {event.target for event in game.events if event.type in {"player_died", "player_eliminated"} and players[event.target].team == "werewolf"}
     return ResultMetrics(
         winner=game.result.winner,
         game_length=game.result.end_round,
@@ -849,7 +863,7 @@ def _result_metrics(game: GameLog) -> ResultMetrics:
         villager_survival_rate=_round_float(len(alive_villagers) / len(villagers)),
         margin=len(winner_alive) - len(loser_alive),
         werewolf_win_speed=None if game.result.winner != "werewolf" else _round_float((len(alive_werewolves) - len(alive_villagers)) / game.result.end_round),
-        villager_win_efficiency=None if game.result.winner != "villager" else _round_float(len(eliminated_werewolves) / game.result.end_round),
+        villager_win_efficiency=None if game.result.winner != "villager" else _round_float(len(werewolf_deaths) / game.result.end_round),
     )
 
 
@@ -1301,25 +1315,27 @@ tasks = Path("docs/TASKS.md").read_text(encoding="utf-8")
 readme = Path("README.md").read_text(encoding="utf-8")
 tree = Path(".oh-my-harness/tree.md").read_text(encoding="utf-8")
 
-required = [
-    (agents, "src/werewolf_eval/scoring.py"),
-    (agents, "src/werewolf_eval/score_game.py"),
-    (agents, "tests/test_scoring.py"),
-    (agents, "PYTHONPATH=src python -m werewolf_eval.score_game docs/gold-game/g001-game-log.json"),
-    (tasks, "E2：确定性评分器"),
-    (tasks, "状态：`completed`（Phase 2 E2 deterministic scorer；Score Log / Metrics Summary runtime 已实现）"),
-    (tasks, "src/werewolf_eval/scoring.py"),
-    (tasks, "E1/E2 完成后可准备独立 Implementation Plan"),
-    (readme, "E2 deterministic scorer 运行时代码"),
-    (tree, "src/werewolf_eval/scoring.py"),
-    (tree, "src/werewolf_eval/score_game.py"),
-    (tree, "tests/test_scoring.py"),
+# AGENTS.md MAP and tree.md use branch-format trees, not full paths.
+# Check by filename for those; full paths for commands and TASKS.
+checks = [
+    ("AGENTS.md scoring.py", "scoring.py" in agents),
+    ("AGENTS.md score_game.py", "score_game.py" in agents),
+    ("AGENTS.md test_scoring.py", "test_scoring.py" in agents),
+    ("AGENTS.md CLI command", "score_game docs/gold-game/g001-game-log.json" in agents),
+    ("TASKS.md E2 title", "E2：确定性评分器" in tasks),
+    ("TASKS.md E2 completed", "状态：`completed`（Phase 2 E2 deterministic scorer" in tasks),
+    ("TASKS.md scoring.py", "src/werewolf_eval/scoring.py" in tasks),
+    ("TASKS.md E3 updated", "E1/E2 完成后可准备独立 Implementation Plan" in tasks),
+    ("README.md E2 mention", "E2 deterministic scorer 运行时代码" in readme),
+    ("README.md caveat AI", "真实 AI Agent 对局" in readme),
+    ("README.md caveat decision", "真实 `decision_quality_score` 可用" in readme),
+    ("tree.md scoring.py", "scoring.py" in tree),
+    ("tree.md score_game.py", "score_game.py" in tree),
+    ("tree.md test_scoring.py", "test_scoring.py" in tree),
 ]
 
-missing = [needle for text, needle in required if needle not in text]
-assert not missing, missing
-assert "真实 AI Agent 对局" in readme
-assert "真实 `decision_quality_score` 可用" in readme
+failed = [label for label, result in checks if not result]
+assert not failed, f"Failed: {failed}"
 
 print("E2 docs and tree validated")
 PY

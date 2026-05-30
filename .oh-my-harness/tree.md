@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 60
+- Entries: 64
 
 ```text
 ./
@@ -67,7 +67,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │       ├── 2026-05-29--s1-game-log-schema-validation-plan.md
 │   │       ├── 2026-05-29--s2-deterministic-scorer-validation-plan.md
 │   │       ├── 2026-05-29--s3-rule-attribution-validation-plan.md
-│   │       └── 2026-05-29--s6-leaderboard-ui-demo-validation-plan.md
+│   │       ├── 2026-05-29--s6-leaderboard-ui-demo-validation-plan.md
+│   │       └── 2026-05-30--e2-deterministic-scorer-plan.md
 │   ├── specs/
 │   │   ├── agent-workflow.md
 │   │   └── review-guidelines.md
@@ -81,9 +82,12 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   └── werewolf_eval/
 │       ├── __init__.py
 │       ├── game_log.py
-│       └── validate_game_log.py
+│       ├── validate_game_log.py
+│       ├── scoring.py
+│       └── score_game.py
 ├── tests/
-│   └── test_game_log.py
+│   ├── test_game_log.py
+│   └── test_scoring.py
 ├── .gitignore
 ├── AGENTS.md
 └── README.md
