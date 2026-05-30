@@ -15,6 +15,7 @@ Telegraph style. Root rules only. Read scoped AGENTS.md before subtree work. Ski
 - 非显然的 build 命令：暂无。
 - 非显然的 test 命令：`PYTHONPATH=src python -m unittest discover -s tests -p "test_*.py"`。
 - Game Log 校验命令：`PYTHONPATH=src python -m werewolf_eval.validate_game_log docs/gold-game/g001-game-log.json`。
+- Decision Log 校验命令：`PYTHONPATH=src python -m werewolf_eval.validate_decision_log docs/gold-game/g001-decision-log.json docs/gold-game/g001-game-log.json`。
 - Deterministic scorer 命令：`PYTHONPATH=src python -m werewolf_eval.score_game docs/gold-game/g001-game-log.json`。
 - Rule attribution 命令：`PYTHONPATH=src python -m werewolf_eval.attribute_game docs/gold-game/g001-game-log.json`。
 - Runtime demo HTML 命令：`PYTHONPATH=src python -m werewolf_eval.render_demo docs/gold-game/g001-game-log.json --html-out docs/demo/phase2-runtime-demo.html`。
@@ -46,9 +47,15 @@ Telegraph style. Root rules only. Read scoped AGENTS.md before subtree work. Ski
 │   ├── TASKS.md
 │   ├── EVALUATION_RUBRIC.md
 │   ├── CHECKPOINT_TEMPLATE.md
-│   └── demo/
-│       ├── phase1-gold-demo.html
-│       └── phase2-runtime-demo.html
+│   ├── demo/
+│   │   ├── phase1-gold-demo.html
+│   │   └── phase2-runtime-demo.html
+│   └── gold-game/
+│       ├── g001-game-log.json
+│       ├── g001-decision-log.json
+│       ├── s2-score-log.json
+│       ├── s2-metrics-summary.json
+│       └── s3-rule-attribution.json
 ├── src/
 │   └── werewolf_eval/
 │       ├── __init__.py
@@ -58,12 +65,15 @@ Telegraph style. Root rules only. Read scoped AGENTS.md before subtree work. Ski
 │       ├── score_game.py
 │       ├── attribution.py
 │       ├── attribute_game.py
+│       ├── decision_log.py
+│       ├── validate_decision_log.py
 │       └── render_demo.py
 ├── tests/
 │   ├── test_game_log.py
 │   ├── test_scoring.py
 │   ├── test_attribution.py
-│   └── test_render_demo.py
+│   ├── test_render_demo.py
+│   └── test_decision_log.py
 ├── AGENTS.md
 └── README.md
 ```
@@ -73,7 +83,7 @@ Telegraph style. Root rules only. Read scoped AGENTS.md before subtree work. Ski
 - 生成代码目录：`src/werewolf_eval/`。
 - Phase 1 不创建 `src/` `apps/` `server/` `web/` 等实现目录。
 - Phase 1 closure 以 S0/S1/S2/S3/S6 为 deterministic MVP 验收链；S4/S5 延后到 Phase 2。
-- Phase 2 运行时代码必须绑定 Implementation Plan；当前已完成 runtime entries 为 E1/E2/E3/E4。
+- Phase 2 运行时代码必须绑定 Implementation Plan；当前已完成 runtime entries 为 E1/E2/E3/E4/D1。
 
 ## 测试约束
 

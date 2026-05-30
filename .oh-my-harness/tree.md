@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 71
+- Entries: 76
 
 ```text
 ./
@@ -52,6 +52,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   ├── phase1-gold-demo.html
 │   │   └── phase2-runtime-demo.html
 │   ├── gold-game/
+│   │   ├── g001-decision-log.json
 │   │   ├── g001-game-log.json
 │   │   ├── s0-gold-game-seed.md
 │   │   ├── s1-schema-validation.md
@@ -69,6 +70,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │       ├── 2026-05-29--s2-deterministic-scorer-validation-plan.md
 │   │       ├── 2026-05-29--s3-rule-attribution-validation-plan.md
 │   │       ├── 2026-05-29--s6-leaderboard-ui-demo-validation-plan.md
+│   │       ├── 2026-05-30--d1-decision-log-runtime-skeleton-plan.md
 │   │       ├── 2026-05-30--e2-deterministic-scorer-plan.md
 │   │       ├── 2026-05-30--e3-rule-attribution-engine-plan.md
 │   │       └── 2026-05-30--e4-runtime-demo-html-plan.md
@@ -86,13 +88,16 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       ├── __init__.py
 │       ├── attribute_game.py
 │       ├── attribution.py
+│       ├── decision_log.py
 │       ├── game_log.py
 │       ├── render_demo.py
 │       ├── score_game.py
 │       ├── scoring.py
+│       ├── validate_decision_log.py
 │       └── validate_game_log.py
 ├── tests/
 │   ├── test_attribution.py
+│   ├── test_decision_log.py
 │   ├── test_game_log.py
 │   ├── test_render_demo.py
 │   └── test_scoring.py
