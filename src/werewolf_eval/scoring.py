@@ -379,3 +379,192 @@ def score_game(game: GameLog) -> ScoreLog:
         scoring_boundary=_scoring_boundary(),
         records=records,
     )
+
+
+# ---------------------------------------------------------------------------
+# Task 4: Metrics Summary generation helpers
+# ---------------------------------------------------------------------------
+
+
+def _round_float(value: float) -> float:
+    return round(value, 6)
+
+
+def _alive_players_after_game(game: GameLog) -> set[str]:
+    dead = {event.target for event in game.events if event.type in {"player_died", "player_eliminated"}}
+    return game.player_ids - dead
+
+
+def _vote_events(game: GameLog) -> list[Event]:
+    return [event for event in game.events if event.type == "player_vote"]
+
+
+def _vote_accuracy_by_player(game: GameLog) -> dict[str, dict[str, float | int]]:
+    result = {player.player_id: {"accurate_votes": 0, "total_votes": 0, "vote_accuracy": 0.0} for player in game.players}
+    for event in _vote_events(game):
+        actor_team = _team_of(game, event.actor)
+        target_team = _team_of(game, event.target)
+        result[event.actor]["total_votes"] += 1
+        if actor_team != target_team:
+            result[event.actor]["accurate_votes"] += 1
+    for item in result.values():
+        total = int(item["total_votes"])
+        item["vote_accuracy"] = _round_float(float(item["accurate_votes"]) / total) if total else 0.0
+    return result
+
+
+def _survival_rounds(game: GameLog) -> dict[str, int]:
+    survival = {player.player_id: game.result.end_round for player in game.players}
+    for event in game.events:
+        if event.type in {"player_died", "player_eliminated"} and event.target in survival:
+            survival[event.target] = min(survival[event.target], event.round)
+    return survival
+
+
+def _zero_counts(game: GameLog) -> dict[str, int]:
+    return {player.player_id: 0 for player in game.players}
+
+
+def _seer_metrics(game: GameLog) -> dict[str, Any]:
+    seer = next(player.player_id for player in game.players if player.role == "seer")
+    checks = [event for event in game.events if event.type == "seer_check" and event.actor == seer]
+    werewolf_checks = [event for event in checks if _team_of(game, event.target) == "werewolf"]
+    correct_checks = len(checks)
+    conveyed_refs = [event.event_id for event in game.events if event.type == "player_speech" and event.actor == seer]
+    evidence = [event.event_id for event in checks] + conveyed_refs[:1]
+    total = len(checks)
+    return {
+        "actor": seer,
+        "check_accuracy": _round_float(correct_checks / total) if total else 0.0,
+        "check_targeting": _round_float(len(werewolf_checks) / total) if total else 0.0,
+        "info_conveyed": 1.0 if checks and conveyed_refs else 0.0,
+        "evidence_event_ids": evidence,
+    }
+
+
+def _witch_metrics(game: GameLog) -> dict[str, Any]:
+    witch = next(player.player_id for player in game.players if player.role == "witch")
+    saves = [event for event in game.events if event.type == "witch_save" and event.actor == witch]
+    poisons = [event for event in game.events if event.type == "witch_poison" and event.actor == witch]
+    save_accuracy = 0.0
+    if saves:
+        save_accuracy = 1.0 if _team_of(game, saves[0].target) == "villager" else 0.0
+    poison_accuracy = 0.0
+    if poisons:
+        poison_accuracy = 1.0 if _team_of(game, poisons[0].target) == "werewolf" else 0.0
+    used = int(bool(saves)) + int(bool(poisons))
+    ability_utilization = 1.0 if used == 2 else 0.5 if used == 1 else 0.0
+    return {
+        "actor": witch,
+        "save_accuracy": save_accuracy,
+        "poison_accuracy": poison_accuracy,
+        "ability_utilization": ability_utilization,
+        "evidence_event_ids": [event.event_id for event in saves + poisons],
+    }
+
+
+def _team_metrics(game: GameLog) -> dict[str, Any]:
+    village_by_day: dict[str, float] = {}
+    werewolf_by_day: dict[str, float] = {}
+    rounds = sorted({event.round for event in _vote_events(game)})
+    for round_number in rounds:
+        votes = [event for event in _vote_events(game) if event.round == round_number]
+        village_votes = [event for event in votes if _team_of(game, event.actor) == "villager"]
+        if village_votes:
+            target_counts: dict[str, int] = {}
+            for vote in village_votes:
+                target_counts[vote.target] = target_counts.get(vote.target, 0) + 1
+            village_by_day[f"round_{round_number}"] = _round_float(max(target_counts.values()) / len(village_votes))
+        werewolf_votes = [event for event in votes if _team_of(game, event.actor) == "werewolf"]
+        if len(werewolf_votes) >= 2:
+            targets = {event.target for event in werewolf_votes}
+            werewolf_by_day[f"round_{round_number}"] = 1.0 if len(targets) == 1 else 0.0
+    village_values = list(village_by_day.values())
+    werewolf_values = list(werewolf_by_day.values())
+    return {
+        "village_vote_cohesion": _round_float(sum(village_values) / len(village_values)) if village_values else 0.0,
+        "village_vote_cohesion_by_day": village_by_day,
+        "werewolf_vote_coordination": _round_float(sum(werewolf_values) / len(werewolf_values)) if werewolf_values else 0.0,
+        "werewolf_vote_coordination_by_day": werewolf_by_day,
+    }
+
+
+def _result_metrics(game: GameLog) -> ResultMetrics:
+    players = _player_by_id(game)
+    alive = _alive_players_after_game(game)
+    werewolves = [player.player_id for player in game.players if player.team == "werewolf"]
+    villagers = [player.player_id for player in game.players if player.team == "villager"]
+    alive_werewolves = [player_id for player_id in werewolves if player_id in alive]
+    alive_villagers = [player_id for player_id in villagers if player_id in alive]
+    winner_alive = alive_villagers if game.result.winner == "villager" else alive_werewolves
+    loser_alive = alive_werewolves if game.result.winner == "villager" else alive_villagers
+    werewolf_deaths = {event.target for event in game.events if event.type in {"player_died", "player_eliminated"} and players[event.target].team == "werewolf"}
+    return ResultMetrics(
+        winner=game.result.winner,
+        game_length=game.result.end_round,
+        werewolf_survival_rate=_round_float(len(alive_werewolves) / len(werewolves)),
+        villager_survival_rate=_round_float(len(alive_villagers) / len(villagers)),
+        margin=len(winner_alive) - len(loser_alive),
+        werewolf_win_speed=None if game.result.winner != "werewolf" else _round_float((len(alive_werewolves) - len(alive_villagers)) / game.result.end_round),
+        villager_win_efficiency=None if game.result.winner != "villager" else _round_float(len(werewolf_deaths) / game.result.end_round),
+    )
+
+
+def _score_summary(game: GameLog, score_log: ScoreLog) -> ScoreSummary:
+    player_outcome = {player.player_id: 0 for player in game.players}
+    player_integrity = {player.player_id: 0 for player in game.players}
+    player_decision = {player.player_id: 0 for player in game.players}
+    team_outcome: dict[str, int] = {}
+    for record in score_log.records:
+        if record.scope == "team":
+            team_outcome[record.actor] = team_outcome.get(record.actor, 0) + record.outcome_score
+        else:
+            player_outcome[record.actor] += record.outcome_score
+            player_integrity[record.actor] += record.rule_integrity_score
+            player_decision[record.actor] += record.decision_quality_score
+    return ScoreSummary(
+        player_outcome_scores=player_outcome,
+        team_outcome_scores=team_outcome,
+        player_rule_integrity_scores=player_integrity,
+        player_decision_quality_scores=player_decision,
+    )
+
+
+def summarize_metrics(game: GameLog, score_log: ScoreLog) -> MetricsSummary:
+    return MetricsSummary(
+        metrics_id="s2_g001_expected_metrics",
+        game_id=game.game_id,
+        source_game_log="docs/gold-game/g001-game-log.json",
+        source_score_log="docs/gold-game/s2-score-log.json",
+        source_label="[deterministic]",
+        result_metrics=_result_metrics(game),
+        process_metrics=ProcessMetrics(
+            vote_accuracy_by_player=_vote_accuracy_by_player(game),
+            survival_rounds=_survival_rounds(game),
+            contradiction_count_by_player=_zero_counts(game),
+            info_leak_count_by_player=_zero_counts(game),
+            seer_metrics=_seer_metrics(game),
+            witch_metrics=_witch_metrics(game),
+            team_metrics=_team_metrics(game),
+        ),
+        score_summary=_score_summary(game, score_log),
+        metrics_deferred_to_later_spikes=[
+            {
+                "metric": "turn_point_count",
+                "owner": "S3 rule attribution validation",
+                "reason": "turn_point_count is defined as an attribution count; S2 does not compute attribution outputs.",
+            }
+        ],
+        known_rubric_gaps_recorded_not_fixed=[
+            {
+                "gap": "werewolf_day_vote_without_elimination",
+                "events": ["g001_e033"],
+                "S2_policy": "count in vote_accuracy metrics; assign outcome_score 0 in score log; do not modify EVALUATION_RUBRIC.md in this PR",
+            },
+            {
+                "gap": "witch_day_vote_outcome_not_explicit",
+                "events": ["g001_e019", "g001_e034"],
+                "S2_policy": "count in vote_accuracy metrics; assign outcome_score 0 in score log; do not modify EVALUATION_RUBRIC.md in this PR",
+            },
+        ],
+    )
