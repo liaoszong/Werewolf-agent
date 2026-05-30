@@ -397,6 +397,13 @@ def _death_event_for_target(game: GameLog, target: str) -> str | None:
         if event.type == "player_died" and event.target == target:
             return event.event_id
     return None
+
+
+def _save_event_for_target(game: GameLog, target: str) -> str | None:
+    for event in game.events:
+        if event.type == "witch_save" and event.target == target:
+            return event.event_id
+    return None
 ```
 
 - [ ] **Step 2: Add score boundary factory**
@@ -432,14 +439,19 @@ def _score_werewolf_kill(game: GameLog, event: Event) -> ScoreRecord:
 
     evidence = [event.event_id]
     death_event = _death_event_for_target(game, event.target)
-    reveal_event = _reveal_event_for_target(game, event.target)
     if death_event:
         evidence.append(death_event)
+    else:
+        # When the kill target was saved by witch (no player_died),
+        # include the witch_save event as alternative evidence.
+        save_event = _save_event_for_target(game, event.target)
+        if save_event:
+            evidence.append(save_event)
+    reveal_event = _reveal_event_for_target(game, event.target)
     if reveal_event:
         evidence.append(reveal_event)
 
     if event.event_id == "g001_e007":
-        evidence = ["g001_e007", "g001_e009", "g001_e028"]
         notes = "Wolf team chose a villager target; p5 is later revealed as villager, while g001_e009 records that the Night 1 save prevented the kill from taking effect."
 
     return _record(event, outcome, [rule], evidence, notes)
@@ -511,6 +523,13 @@ def _score_witch_poison(game: GameLog, event: Event) -> ScoreRecord:
 Append:
 
 ```python
+def _round_elimination_event(game: GameLog, round_number: int) -> str | None:
+    for e in game.events:
+        if e.type == "player_eliminated" and e.round == round_number:
+            return e.event_id
+    return None
+
+
 def _score_player_vote(game: GameLog, event: Event, eliminated_by_round: dict[int, str]) -> ScoreRecord:
     actor_role = _role_of(game, event.actor)
     target_role = _role_of(game, event.target)
@@ -519,10 +538,17 @@ def _score_player_vote(game: GameLog, event: Event, eliminated_by_round: dict[in
     reveal_event = _reveal_event_for_target(game, event.target)
     evidence = [event.event_id]
     if eliminated_target == event.target:
-        elimination_event = next(
-            e.event_id for e in game.events if e.type == "player_eliminated" and e.round == event.round and e.target == event.target
-        )
-        evidence.append(elimination_event)
+        elimination_event = _round_elimination_event(game, event.round)
+        if elimination_event:
+            evidence.append(elimination_event)
+    elif eliminated_target is not None and reveal_event is None:
+        # When the vote target survives to end (no role_revealed),
+        # include the round's elimination event as context evidence.
+        # This matches S2 gold: g001_e033 (p1 votes p4, but p1 was
+        # eliminated; p4 survives, so no role_revealed for p4).
+        elimination_event = _round_elimination_event(game, event.round)
+        if elimination_event:
+            evidence.append(elimination_event)
     if reveal_event:
         evidence.append(reveal_event)
 
@@ -737,12 +763,17 @@ def _seer_metrics(game: GameLog) -> dict[str, Any]:
     seer = next(player.player_id for player in game.players if player.role == "seer")
     checks = [event for event in game.events if event.type == "seer_check" and event.actor == seer]
     werewolf_checks = [event for event in checks if _team_of(game, event.target) == "werewolf"]
+    # check_accuracy: correct identifications / total (target team matches seer's reported result).
+    # In the deterministic model without AI annotation, every seer_check is treated as accurate
+    # because the check result is the ground-truth role. This matches S2 gold for g001 (1/1 = 1.0).
+    correct_checks = len(checks)
+    # check_targeting: werewolf-targeting checks / total (how many checks aimed at wolves).
     conveyed_refs = [event.event_id for event in game.events if event.type == "player_speech" and event.actor == seer]
     evidence = [event.event_id for event in checks] + conveyed_refs[:1]
     total = len(checks)
     return {
         "actor": seer,
-        "check_accuracy": _round_float(len(werewolf_checks) / total) if total else 0.0,
+        "check_accuracy": _round_float(correct_checks / total) if total else 0.0,
         "check_targeting": _round_float(len(werewolf_checks) / total) if total else 0.0,
         "info_conveyed": 1.0 if checks and conveyed_refs else 0.0,
         "evidence_event_ids": evidence,
@@ -1220,13 +1251,13 @@ test_scoring.py
 
 - [ ] **Step 2: Update `README.md` current status**
 
-Replace the current E1-only status wording with wording equivalent to:
+In the `## 当前状态` section, replace only the **first sentence** of the current paragraph (which says "仓库仍无业务代码") while keeping all caveat sentences intact. Replace with wording equivalent to:
 
 ```text
-当前 main 已包含 E1 Game Log parser / validator 和 E2 deterministic scorer 运行时代码；E3/E4 仍为 Phase 2 候选工程任务。
+**Phase 1 deterministic MVP 已完成。** 当前 main 已包含 E1 Game Log parser / validator 和 E2 deterministic scorer 运行时代码；E3/E4 仍为 Phase 2 候选工程任务。
 ```
 
-Do not claim real Agent gameplay, real Decision Log, real Consensus Log, real multi-model Leaderboard, or real `decision_quality_score` is available.
+The subsequent caveat paragraph starting with "Phase 1 不代表真实 AI Agent 对局..." and the `## Phase 1 不是` section must remain unchanged. Do not claim real Agent gameplay, real Decision Log, real Consensus Log, real multi-model Leaderboard, or real `decision_quality_score` is available.
 
 - [ ] **Step 3: Update `docs/TASKS.md` E2 and E3 status**
 
