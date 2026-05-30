@@ -79,7 +79,7 @@
 
 ## Phase 2 Candidate Engineering Tasks
 
-**Phase 1 不启动 E1-E4。** 这些任务是 Phase 2 候选工程任务，只有在 Phase 2 charter / Implementation Plan 明确允许业务代码后才能展开。此处只保留任务路由，不代表已开始实现。
+**E1-E4 已作为 Phase 2 runtime entries 完成。** S4/S5 仍延后到 Phase 2。以下记录各工程任务的完成状态与产物路径。
 
 ### E1：Game Log 解析器
 
@@ -116,7 +116,7 @@
 | E1 | 无独立 UX（被 E2 消费） | schema 验证通过 |
 | E2 | Score Log 可读摘要 | 每个评分能追溯到 rule_id 和 event_id |
 | E3 | 归因面板 | 每个 turn_point 可展开查看触发的规则 |
-| E4 | 页面截图（`docs/demo/phase1-gold-demo.html`） | 非技术用户 3 分钟能复述关键信息 |
+| E4 | 页面截图（`docs/demo/phase2-runtime-demo.html`） | 非技术用户 3 分钟能查看该页面，复述谁赢了、关键转折点是什么、评测系统如何打分，并能看到明确的 `[deterministic]` / `[mock]` 标签和 Phase 2 边界声明 |
 
 ---
 
@@ -134,7 +134,7 @@
 - 状态：`completed`（`docs/demo/phase2-runtime-demo.html`；仅表示 E1/E2/E3 runtime pipeline 可生成可视化 demo，不表示真实 AI Agent / Decision Log / Consensus Log 已启用）
 - 触发条件：Phase 2 charter 明确允许业务代码，并完成 E1-E4 或替代实现路径。
 - 演示内容：运行时读取 Game Log → 计算 Score Log → 计算 Attribution → 输出或刷新 UI。
-- 验收：后续 Phase 2 plan 定义。
+- 验收：同一 Game Log 可重新生成 `docs/demo/phase2-runtime-demo.html`，页面展示 Score / Metrics / Attribution / Leaderboard，并保留边界声明。
 
 ---
 

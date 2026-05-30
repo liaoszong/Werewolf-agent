@@ -45,10 +45,10 @@ Telegraph style. Root rules only. Read scoped AGENTS.md before subtree work. Ski
 │   ├── SPIKES.md
 │   ├── TASKS.md
 │   ├── EVALUATION_RUBRIC.md
-│   └── CHECKPOINT_TEMPLATE.md
-│   ├── demo/
-│   │   ├── phase1-gold-demo.html
-│   │   └── phase2-runtime-demo.html
+│   ├── CHECKPOINT_TEMPLATE.md
+│   └── demo/
+│       ├── phase1-gold-demo.html
+│       └── phase2-runtime-demo.html
 ├── src/
 │   └── werewolf_eval/
 │       ├── __init__.py
