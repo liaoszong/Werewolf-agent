@@ -79,7 +79,7 @@
 
 ## Phase 2 Candidate Engineering Tasks
 
-**E1-E4 已作为 Phase 2 runtime entries 完成。** S4/S5 仍延后到 Phase 2。以下记录各工程任务的完成状态与产物路径。
+**E1-E4 与 D1 已作为 Phase 2 runtime entries 完成。** S4/S5 仍延后到 Phase 2。以下记录各工程任务的完成状态与产物路径。
 
 ### E1：Game Log 解析器
 
@@ -105,6 +105,12 @@
 - 产出：`src/werewolf_eval/render_demo.py` + `tests/test_render_demo.py` + `docs/demo/phase2-runtime-demo.html`。
 - 说明：构建可双击打开的单文件静态 HTML，不依赖后端、不依赖构建工具、不引入 React/Vite。该页面从 E1/E2/E3 runtime pipeline 生成，包含时间线、状态表、投票表、指标表、评分卡、Leaderboard，并保留 Phase 2 边界声明。
 
+### D1：Decision Log runtime skeleton
+
+- 状态：`completed`（Phase 2 Decision Log runtime input；Decision Log parser / validator 已实现）
+- 产出：`docs/gold-game/g001-decision-log.json` + `src/werewolf_eval/decision_log.py` + `src/werewolf_eval/validate_decision_log.py` + `tests/test_decision_log.py`。
+- 说明：读取人工 gold Decision Log JSON，验证其 `game_id` 与 Game Log 一致，验证 actor / target / visible_info_refs / decision_type / confidence 等字段。D1 不调用 AI，不启用 S5，不修改 scoring，`decision_quality_score` 仍未接入评分链。
+
 ---
 
 ## UX Acceptance
@@ -117,6 +123,7 @@
 | E2 | Score Log 可读摘要 | 每个评分能追溯到 rule_id 和 event_id |
 | E3 | 归因面板 | 每个 turn_point 可展开查看触发的规则 |
 | E4 | 页面截图（`docs/demo/phase2-runtime-demo.html`） | 非技术用户 3 分钟能查看该页面，复述谁赢了、关键转折点是什么、评测系统如何打分，并能看到明确的 `[deterministic]` / `[mock]` 标签和 Phase 2 边界声明 |
+| D1 | Decision Log CLI 校验摘要 | 同一 Game Log + Decision Log 能稳定输出 `decision_log_id`、`game_id`、`decisions`、`source_label`，并拒绝非法 actor / refs / decision_type |
 
 ---
 
@@ -135,6 +142,13 @@
 - 触发条件：Phase 2 charter 明确允许业务代码，并完成 E1-E4 或替代实现路径。
 - 演示内容：运行时读取 Game Log → 计算 Score Log → 计算 Attribution → 输出或刷新 UI。
 - 验收：同一 Game Log 可重新生成 `docs/demo/phase2-runtime-demo.html`，页面展示 Score / Metrics / Attribution / Leaderboard，并保留边界声明。
+
+**Demo 3：Phase 2 Decision Log input validation**
+
+- 状态：`completed`（`docs/gold-game/g001-decision-log.json`；仅表示 Decision Log runtime input 可被验证，不表示 `decision_quality_score` 已接入评分链）
+- 触发条件：D1 完成。
+- 演示内容：运行时读取 Game Log + Decision Log → 校验结构化决策输入。
+- 验收：同一输入稳定输出 `validated decision_log_id=d1_g001_decision_log`、`game_id=g001`、`decisions=10`、`source_label=[人工 gold sample]`。
 
 ---
 
