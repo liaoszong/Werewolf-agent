@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 105
+- Entries: 110
 
 ```text
 ./
@@ -85,6 +85,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │       ├── 2026-05-30--s4-consensus-log-runtime-input-plan.md
 │   │       ├── 2026-05-30--s4x-context-budget-hardening-plan.md
 │   │       ├── 2026-05-30--s5-semantic-label-research-plan.md
+│   │       ├── 2026-05-31--g1-scripted-game-runner-plan.md
+│   │       ├── 2026-05-31--review-packet-gate-v1-plan.md
 │   │       └── 2026-05-31--s5-semantic-label-scoring-integration-plan.md
 │   ├── prs/
 │   │   ├── 2026-05-30--phase2-next-step-research.md
@@ -94,7 +96,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   └── s5-label-prompts.md
 │   ├── specs/
 │   │   ├── agent-workflow.md
-│   │   └── review-guidelines.md
+│   │   ├── review-guidelines.md
+│   │   └── review-packet-gate.md
 │   ├── CHECKPOINT_TEMPLATE.md
 │   ├── EVALUATION_RUBRIC.md
 │   ├── GOLD_DEMO.md
@@ -107,6 +110,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   ├── build_plan_index.py
 │   │   └── build_task_context.py
 │   ├── dev/
+│   │   ├── build_review_packet.py
 │   │   └── validate_brief.py
 │   └── research/
 │       └── evaluate_semantic_labels.py
@@ -128,6 +132,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       └── validate_semantic_labels.py
 ├── tests/
 │   ├── test_attribution.py
+│   ├── test_build_review_packet.py
 │   ├── test_consensus_log.py
 │   ├── test_context_budget.py
 │   ├── test_decision_log.py

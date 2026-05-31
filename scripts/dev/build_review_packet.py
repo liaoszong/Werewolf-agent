@@ -38,7 +38,13 @@ MAX_CHANGED_LINES_BEFORE_RISK = 500
 
 
 def run_git(args: list[str]) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(["git", *args], text=True, capture_output=True)
+    return subprocess.run(
+        ["git", *args],
+        text=True,
+        capture_output=True,
+        encoding="utf-8",
+        errors="replace",
+    )
 
 
 def git_diff_name_only(base: str) -> list[str]:
@@ -212,8 +218,15 @@ def detect_risk_triggers(
 def run_test_commands(commands: list[str]) -> list[str]:
     summaries: list[str] = []
     for cmd in commands:
-        result = subprocess.run(cmd, shell=True, text=True, capture_output=True)
-        combined = (result.stdout + result.stderr).strip()
+        result = subprocess.run(
+            cmd,
+            shell=True,
+            text=True,
+            capture_output=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+        combined = (result.stdout or "") + (result.stderr or "")
         tail = "\n".join(combined.splitlines()[-10:])
         status = "PASS" if result.returncode == 0 else "FAIL"
         summaries.append(
