@@ -118,5 +118,32 @@ class ScriptedGameCliTests(unittest.TestCase):
             )
 
 
+class ScriptedGameArtifactProvenanceTests(unittest.TestCase):
+    def test_generated_score_and_metrics_use_g1_ids(self) -> None:
+        score_path = ROOT / "docs/generated-games/g1-scripted-score-log.json"
+        metrics_path = ROOT / "docs/generated-games/g1-scripted-metrics-summary.json"
+        score = json.loads(score_path.read_text(encoding="utf-8"))
+        metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
+
+        combined = json.dumps({"score": score, "metrics": metrics}, ensure_ascii=False)
+        self.assertEqual(score["game_id"], "g1_scripted_001")
+        self.assertEqual(metrics["game_id"], "g1_scripted_001")
+        self.assertNotIn("s2_g001", combined)
+        self.assertNotIn("s5_g001", combined)
+        self.assertIn("[scripted deterministic output]", combined)
+        self.assertNotIn("[人工 gold sample]", combined)
+        self.assertNotIn("[AI 生成]", combined)
+
+    def test_generated_artifacts_are_not_written_to_gold_game(self) -> None:
+        generated = sorted(
+            (ROOT / "docs/generated-games").glob("g1-scripted-*.json")
+        )
+        self.assertGreaterEqual(len(generated), 5)
+        gold_names = {
+            path.name for path in (ROOT / "docs/gold-game").glob("g1-scripted-*.json")
+        }
+        self.assertEqual(gold_names, set())
+
+
 if __name__ == "__main__":
     unittest.main()

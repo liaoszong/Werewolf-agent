@@ -269,5 +269,22 @@ class DeterministicScorerTests(unittest.TestCase):
         self.assertEqual(metrics_payload, load_json("docs/gold-game/s5-metrics-summary.json"))
 
 
+    def test_non_g001_score_log_uses_dynamic_provenance(self) -> None:
+        game = load_game_log(
+            ROOT / "docs/generated-games/g1-scripted-game-log.json"
+        )
+        decision_log = load_decision_log(
+            ROOT / "docs/generated-games/g1-scripted-decision-log.json", game
+        )
+        score_log = score_game(game, decision_log=decision_log)
+        payload = score_log_to_dict(score_log)
+
+        self.assertEqual(payload["game_id"], "g1_scripted_001")
+        self.assertNotIn("s2_g001", json.dumps(payload, ensure_ascii=False))
+        self.assertEqual(
+            payload["source_label"], "[scripted deterministic output][decision-log]"
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -593,6 +593,31 @@ def _score_player_vote(game: GameLog, event: Event, eliminated_by_round: dict[in
     return _record(event, 0, ["rubric-gap:unscored_vote_role"], evidence, f"No explicit deterministic vote scoring row for role {actor_role}.", assessment)
 
 
+def _score_id_prefix(game: GameLog) -> str:
+    if game.game_id == "g001":
+        return "s2_g001"
+    return f"score_{game.game_id}"
+
+
+def _score_log_id(game: GameLog, semantic_labels_enabled: bool) -> str:
+    if game.game_id == "g001":
+        return "s5_g001_expected_score_log" if semantic_labels_enabled else "s2_g001_expected_score_log"
+    return f"{game.game_id}_score_log"
+
+
+def _score_source_label(game: GameLog, decision_log: DecisionLog | None, semantic_labels_enabled: bool) -> str:
+    if game.game_id != "g001" and decision_log is not None and decision_log.source_label == "[scripted deterministic output]":
+        return "[scripted deterministic output][decision-log]"
+    if semantic_labels_enabled:
+        return "[deterministic][decision-log][semantic-labels]"
+    if decision_log is not None:
+        return "[deterministic][decision-log]"
+    return "[deterministic]"
+
+
+_current_score_id_prefix: str = "s2_g001"
+
+
 def _record(
     event: Event,
     outcome_score: int,
@@ -605,7 +630,7 @@ def _record(
     decision_evidence = assessment.evidence_event_ids if assessment else []
     decision_notes = assessment.notes if assessment else []
     return ScoreRecord(
-        score_id=f"s2_g001_{event.event_id.split('_')[-1]}",
+        score_id=f"{_current_score_id_prefix}_{event.event_id.split('_')[-1]}",
         event_id=event.event_id,
         decision_id=assessment.decision_id if assessment else None,
         actor=event.actor,
@@ -624,12 +649,14 @@ def _record(
 
 
 def score_game(game: GameLog, decision_log: DecisionLog | None = None, semantic_label_log: SemanticLabelLog | None = None) -> ScoreLog:
+    global _current_score_id_prefix
     if semantic_label_log is not None and decision_log is None:
         raise ValueError("semantic_label_log requires decision_log")
     eliminated_by_round = _eliminated_target_by_round(game)
     decisions_by_event = _decision_by_event_id(game, decision_log)
     labels_by_decision = semantic_label_log.label_by_decision_id if semantic_label_log else {}
     semantic_labels_enabled = semantic_label_log is not None
+    _current_score_id_prefix = _score_id_prefix(game)
     records: list[ScoreRecord] = []
 
     for event in game.events:
@@ -649,26 +676,21 @@ def score_game(game: GameLog, decision_log: DecisionLog | None = None, semantic_
         elif event.type == "player_vote":
             records.append(_score_player_vote(game, event, eliminated_by_round, assessment))
 
+    score_log_id = _score_log_id(game, semantic_labels_enabled)
+    source_label = _score_source_label(game, decision_log, semantic_labels_enabled)
     if semantic_labels_enabled:
-        score_log_id = "s5_g001_expected_score_log"
-        source_label = "[deterministic][decision-log][semantic-labels]"
         phase = "Phase 2B-S5"
-        scoring_boundary_ai = "S5 saved semantic labels connected to deterministic decision_quality_score; no provider call is made during scoring."
     elif decision_log is not None:
-        score_log_id = "s2_g001_expected_score_log"
-        source_label = "[deterministic][decision-log]"
         phase = "Phase 2A-D2"
-        scoring_boundary_ai = "none; S5 not enabled"
     else:
-        score_log_id = "s2_g001_expected_score_log"
-        source_label = "[deterministic]"
         phase = "Phase 1"
-        scoring_boundary_ai = "none"
 
+    is_g001 = game.game_id == "g001"
+    source_game_log = "docs/gold-game/g001-game-log.json" if is_g001 else f"generated:{game.game_id}"
     return ScoreLog(
         score_log_id=score_log_id,
         game_id=game.game_id,
-        source_game_log="docs/gold-game/g001-game-log.json",
+        source_game_log=source_game_log,
         source_label=source_label,
         phase=phase,
         scoring_boundary=_scoring_boundary(decision_log is not None, semantic_labels_enabled),
@@ -827,11 +849,20 @@ def _score_summary(game: GameLog, score_log: ScoreLog) -> ScoreSummary:
 
 def summarize_metrics(game: GameLog, score_log: ScoreLog) -> MetricsSummary:
     s5_enabled = score_log.phase == "Phase 2B-S5"
+    is_g001 = game.game_id == "g001"
+    if is_g001:
+        metrics_id = "s5_g001_expected_metrics" if s5_enabled else "s2_g001_expected_metrics"
+        source_game_log = "docs/gold-game/g001-game-log.json"
+        source_score_log = "docs/gold-game/s5-score-log.json" if s5_enabled else "docs/gold-game/s2-score-log.json"
+    else:
+        metrics_id = f"{game.game_id}_metrics_summary"
+        source_game_log = f"generated:{game.game_id}"
+        source_score_log = f"score_log:{score_log.score_log_id}"
     return MetricsSummary(
-        metrics_id="s5_g001_expected_metrics" if s5_enabled else "s2_g001_expected_metrics",
+        metrics_id=metrics_id,
         game_id=game.game_id,
-        source_game_log="docs/gold-game/g001-game-log.json",
-        source_score_log="docs/gold-game/s5-score-log.json" if s5_enabled else "docs/gold-game/s2-score-log.json",
+        source_game_log=source_game_log,
+        source_score_log=source_score_log,
         source_label=score_log.source_label,
         result_metrics=_result_metrics(game),
         process_metrics=ProcessMetrics(

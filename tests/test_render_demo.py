@@ -129,5 +129,24 @@ class RuntimeDemoRenderTests(unittest.TestCase):
             output.unlink(missing_ok=True)
 
 
+    def test_g1a_scripted_demo_boundary(self) -> None:
+        game = load_game_log(
+            ROOT / "docs/generated-games/g1-scripted-game-log.json"
+        )
+        decision_log = load_decision_log(
+            ROOT / "docs/generated-games/g1-scripted-decision-log.json", game
+        )
+        score_log = score_game(game, decision_log=decision_log)
+        metrics = summarize_metrics(game, score_log)
+        attribution = attribute_game(game, score_log, metrics)
+        html = render_html(build_demo_context(game, score_log, metrics, attribution))
+
+        self.assertIn("G1a scripted deterministic fresh-log runner", html)
+        self.assertIn("not live AI Agent gameplay", html)
+        self.assertIn("[scripted deterministic output]", html)
+        self.assertNotIn("real AI Agent gameplay complete", html)
+        self.assertNotIn("G1 complete", html)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -251,14 +251,26 @@ def _validation_notes() -> list[ValidationNote]:
     ]
 
 
+def _source_game_log(game: GameLog) -> str:
+    return "docs/gold-game/g001-game-log.json" if game.game_id == "g001" else f"generated:{game.game_id}"
+
+
+def _source_score_log(game: GameLog, score_log: ScoreLog) -> str:
+    return "docs/gold-game/s2-score-log.json" if game.game_id == "g001" else f"score_log:{score_log.score_log_id}"
+
+
+def _source_metrics_summary(game: GameLog, metrics: MetricsSummary) -> str:
+    return "docs/gold-game/s2-metrics-summary.json" if game.game_id == "g001" else f"metrics:{metrics.metrics_id}"
+
+
 def attribute_game(game: GameLog, score_log: ScoreLog, metrics: MetricsSummary) -> AttributionResult:
     turn_points = _critical_vote_turn_points(game)
     return AttributionResult(
         attribution_id=f"s3_{game.game_id}_rule_attribution",
         game_id=game.game_id,
-        source_game_log="docs/gold-game/g001-game-log.json",
-        source_score_log="docs/gold-game/s2-score-log.json",
-        source_metrics_summary="docs/gold-game/s2-metrics-summary.json",
+        source_game_log=_source_game_log(game),
+        source_score_log=_source_score_log(game, score_log),
+        source_metrics_summary=_source_metrics_summary(game, metrics),
         source_label="[deterministic]",
         phase="Phase 1",
         attribution_boundary=_attribution_boundary(),

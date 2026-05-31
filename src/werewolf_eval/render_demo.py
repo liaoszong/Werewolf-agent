@@ -105,6 +105,8 @@ def build_demo_context(game: GameLog, score_log: Any, metrics: Any, attribution:
     decision_quality_total = sum(record["decision_quality_score"] for record in score_payload["records"])
     decision_log_enabled = score_payload["phase"] in ("Phase 2A-D2", "Phase 2B-S5")
     semantic_labels_enabled = score_payload["phase"] == "Phase 2B-S5"
+    is_g1a_scripted = "[scripted deterministic output]" in score_payload.get("source_label", "")
+
     games_played = 1
     single_game_outcome_total = (
         sum(score_summary["player_outcome_scores"].values())
@@ -114,12 +116,17 @@ def build_demo_context(game: GameLog, score_log: Any, metrics: Any, attribution:
     top_attribution = attribution_payload["top_attribution"]
 
     avg_decision_quality_score = decision_quality_total / max(len(score_payload["records"]), 1)
-    source_label = "[deterministic][semantic-labels]" if semantic_labels_enabled else "[deterministic]"
+    if is_g1a_scripted:
+        source_label = "[scripted deterministic output]"
+    elif semantic_labels_enabled:
+        source_label = "[deterministic][semantic-labels]"
+    else:
+        source_label = "[deterministic]"
 
     leaderboard = [
         {
-            "agent_id": "g001-runtime",
-            "model": "deterministic pipeline",
+            "agent_id": f"{game.game_id}-runtime",
+            "model": "scripted deterministic runner" if is_g1a_scripted else "deterministic pipeline",
             "games_played": games_played,
             "win_rate": 1.0 if game.result.winner == "villager" else 0.0,
             "avg_outcome_score": avg_outcome_score,
@@ -161,7 +168,7 @@ def build_demo_context(game: GameLog, score_log: Any, metrics: Any, attribution:
             "winner_label": _team_label(game.result.winner),
             "end_round": game.result.end_round,
             "end_condition": game.result.end_condition,
-            "source_label": "[人工 gold sample]",
+            "source_label": "[scripted deterministic output]" if is_g1a_scripted else "[人工 gold sample]",
         },
         "players": player_rows,
         "timeline": timeline,
@@ -229,22 +236,31 @@ def render_html(context: dict[str, Any]) -> str:
         for item in context["attribution"]["turn_point_rows"]
     )
 
-    if context["score"]["semantic_labels_enabled"]:
+    is_g1a = "[scripted deterministic output]" in context["score"].get("source_label", "")
+
+    if is_g1a:
+        boundary_copy = "This demo is generated from scripted deterministic Game Log / Decision Log / Consensus Log outputs. It is not Agent runtime output, not live AI Agent gameplay, not provider integration, not a Web live observer, and not human-vs-AI UI."
+        decision_copy = "G1a scripted deterministic fresh-log runner: decision_quality_score from scripted decisions; no provider call, no live AI reasoning."
+        title = "Werewolf-agent G1a Scripted Deterministic Fresh-Log Runner"
+    elif context["score"]["semantic_labels_enabled"]:
         boundary_copy = "This is not real AI Agent gameplay, not live AI labeling, and not a real multi-model Leaderboard. S5 saved semantic labels are connected to deterministic scoring; no provider call is made during rendering."
         decision_copy = f"decision_quality_score: S5 saved semantic labels enabled; decision_quality_total={context['score']['decision_quality_total']}."
+        title = "Werewolf-agent Phase 2 Runtime Demo"
     elif context["score"]["decision_log_enabled"]:
         boundary_copy = "This is not real AI Agent gameplay, not real Consensus Log collection, not AI semantic labeling, and not a real multi-model Leaderboard. Decision Log is connected to scoring via D2 deterministic Step 1-2 (visibility check + decision_id traceability), but decision_quality_score remains 0 (positive scoring waits for S5 AI semantic judgment)."
         decision_copy = "decision_quality_score: D2 visibility check + decision_id traceability complete; positive scoring still 0 (waiting for S5)."
+        title = "Werewolf-agent Phase 2 Runtime Demo"
     else:
         boundary_copy = "This is not real AI Agent gameplay, not real Decision Log / Consensus Log collection, and not a real multi-model Leaderboard. No Decision Log supplied; decision_quality_score fixed at 0."
         decision_copy = "decision_quality_score: no Decision Log supplied; fixed at 0."
+        title = "Werewolf-agent Phase 2 Runtime Demo"
 
     return f"""<!doctype html>
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Werewolf-agent Phase 2 Runtime Demo</title>
+  <title>{_html(title)}</title>
   <style>
     body {{ font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 32px; color: #172033; background: #f7f8fb; }}
     main {{ max-width: 1180px; margin: 0 auto; }}
@@ -259,8 +275,8 @@ def render_html(context: dict[str, Any]) -> str:
 </head>
 <body>
 <main>
-  <h1>Werewolf-agent Phase 2 Runtime Demo</h1>
-  <p><span class="badge">运行时生成</span><span class="badge">[deterministic]</span><span class="badge">[人工 gold sample]</span> This page is generated from the E1/E2/E3 runtime pipeline.</p>
+  <h1>{_html(title)}</h1>
+  <p><span class="badge">运行时生成</span><span class="badge">[deterministic]</span><span class="badge">{_html(context["game"]["source_label"])}</span> This page is generated from the E1/E2/E3 runtime pipeline.</p>
   <section class="warning"><h2>边界声明</h2><p>{_html(boundary_copy)}</p></section>
   <section><h2>对局摘要</h2><p>Game: {_html(game["game_id"])} / Winner: {_html(game["winner_label"])} / Players: {_html(game["players"])} / Events: {_html(game["events"])} / Source: {_html(game["source_label"])}</p></section>
   <section><h2>玩家状态</h2><div class="scroll"><table>{_head(["玩家", "角色", "阵营", "终局状态"])}{player_rows}</table></div></section>
