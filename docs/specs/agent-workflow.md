@@ -156,8 +156,17 @@ flowchart TD
 - 如果 GitHub 拒绝 `APPROVE` 或 `REQUEST_CHANGES`，因为当前账号不能 approve / request changes 自己的 PR，则改用 `COMMENT` review。
 - 不要因为 `APPROVE` / `REQUEST_CHANGES` 被拒绝就停止审查。
 - `COMMENT` review 规则：
-  - 有阻塞问题时，写：“不建议合并，需先修复：...”
-  - 无阻塞问题时，写：“No blocking findings / OK to merge from my side.”
+  - 有阻塞问题时，写：”不建议合并，需先修复：...”
+  - 无阻塞问题时，写：”No blocking findings / OK to merge from my side.”
+
+### Review Packet Gate v1
+
+- Implementation PRs should provide `.logs/review/latest/review-packet.md` before Codex review.
+- Codex A档 reviews only the Review Packet first.
+- Without a Review Packet, the reviewer should request packet generation instead of starting full-repository review.
+- A档 verdicts are limited to `PASS`, `BLOCK`, and `NEED_DEEP_REVIEW`.
+- `NEED_DEEP_REVIEW` must list explicit file paths and line ranges for B档.
+- Review Packet requirements are defined in `docs/specs/review-packet-gate.md`.
 
 ## Tree 与 MAP
 
