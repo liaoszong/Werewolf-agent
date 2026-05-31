@@ -40,5 +40,39 @@ class ScriptedGameFixtureTests(unittest.TestCase):
         )
 
 
+class ScriptedGameRunnerTests(unittest.TestCase):
+    def test_runner_emits_valid_log_dicts(self) -> None:
+        from werewolf_eval.consensus_log import parse_consensus_log
+        from werewolf_eval.decision_log import parse_decision_log
+        from werewolf_eval.game_log import parse_game_log
+        from werewolf_eval.scripted_game import load_scripted_game, run_scripted_game
+
+        script = load_scripted_game(ROOT / "docs/game-scripts/g1-scripted-game.json")
+        outputs = run_scripted_game(script)
+
+        game = parse_game_log(outputs.game_log)
+        decision_log = parse_decision_log(outputs.decision_log, game)
+        consensus_log = parse_consensus_log(outputs.consensus_log, game)
+
+        self.assertEqual(game.game_id, "g1_scripted_001")
+        self.assertEqual(outputs.game_log["source_label"], "[scripted deterministic output]")
+        self.assertEqual(decision_log.source_label, "[scripted deterministic output]")
+        self.assertEqual(consensus_log.source_label, "[scripted deterministic output]")
+        self.assertEqual(len(game.events), 15)
+        self.assertEqual(len(decision_log.decisions), 7)
+        self.assertEqual(len(consensus_log.consensuses), 2)
+
+    def test_runner_is_deterministic(self) -> None:
+        from werewolf_eval.scripted_game import load_scripted_game, run_scripted_game
+
+        script = load_scripted_game(ROOT / "docs/game-scripts/g1-scripted-game.json")
+        first = run_scripted_game(script)
+        second = run_scripted_game(script)
+
+        self.assertEqual(first.game_log, second.game_log)
+        self.assertEqual(first.decision_log, second.decision_log)
+        self.assertEqual(first.consensus_log, second.consensus_log)
+
+
 if __name__ == "__main__":
     unittest.main()
