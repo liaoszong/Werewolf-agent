@@ -1,0 +1,93 @@
+{
+  "consensus_log_id": "g1_scripted_001_consensus_log",
+  "game_id": "g1_scripted_001",
+  "source_label": "[scripted deterministic output]",
+  "consensuses": [
+    {
+      "consensus_id": "g1_scripted_001_c001",
+      "game_id": "g1_scripted_001",
+      "round": 1,
+      "phase": "night",
+      "team": "werewolf",
+      "participants": [
+        "p1",
+        "p2"
+      ],
+      "coordinator": "p1",
+      "max_rounds": 3,
+      "actual_rounds": 1,
+      "status": "consensus",
+      "proposals": [
+        {
+          "proposal_id": 1,
+          "proposer": "p1",
+          "proposed_target": "p5",
+          "visible_info_refs": [],
+          "reason_summary": "Wolf team selects p5 as a low-information villager target.",
+          "confidence": 1.0,
+          "action_round": 1
+        }
+      ],
+      "responses": [
+        {
+          "response_id": 2,
+          "to_proposal_id": 1,
+          "responder": "p2",
+          "response_type": "support_with_reason",
+          "reason_summary": "Scripted supporter accepts the deterministic target.",
+          "visible_info_refs": [],
+          "action_round": 1
+        }
+      ],
+      "final_decision": {
+        "target": "p5",
+        "decision_type": "consensus",
+        "primary_proposer": "p1",
+        "supporters": [
+          "p1",
+          "p2"
+        ],
+        "dissenters": [],
+        "resolution_round": 1
+      }
+    },
+    {
+      "consensus_id": "g1_scripted_001_c002",
+      "game_id": "g1_scripted_001",
+      "round": 2,
+      "phase": "night",
+      "team": "werewolf",
+      "participants": [
+        "p2"
+      ],
+      "coordinator": "p2",
+      "max_rounds": 3,
+      "actual_rounds": 1,
+      "status": "consensus",
+      "proposals": [
+        {
+          "proposal_id": 1,
+          "proposer": "p2",
+          "proposed_target": "p3",
+          "visible_info_refs": [
+            "g1_scripted_001_e009"
+          ],
+          "reason_summary": "Remaining wolf targets the confirmed seer p3.",
+          "confidence": 1.0,
+          "action_round": 1
+        }
+      ],
+      "responses": [],
+      "final_decision": {
+        "target": "p3",
+        "decision_type": "consensus",
+        "primary_proposer": "p2",
+        "supporters": [
+          "p2"
+        ],
+        "dissenters": [],
+        "resolution_round": 1
+      }
+    }
+  ]
+}

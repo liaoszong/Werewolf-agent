@@ -1,0 +1,121 @@
+{
+  "decision_log_id": "g1_scripted_001_decision_log",
+  "game_id": "g1_scripted_001",
+  "source_label": "[scripted deterministic output]",
+  "decisions": [
+    {
+      "decision_id": "g1_scripted_001_d001",
+      "game_id": "g1_scripted_001",
+      "actor": "wolf_team",
+      "decision_scope": "team",
+      "consensus_id": "g1_scripted_001_c001",
+      "phase": "night",
+      "action": "werewolf_kill",
+      "target": "p5",
+      "visible_info_refs": [],
+      "reason_summary": "Wolf team selects p5 as a low-information villager target.",
+      "decision_type": "team_coordinated",
+      "confidence": 1.0,
+      "strategy_tag": "scripted_deterministic"
+    },
+    {
+      "decision_id": "g1_scripted_001_d002",
+      "game_id": "g1_scripted_001",
+      "actor": "p3",
+      "decision_scope": "single",
+      "consensus_id": null,
+      "phase": "night",
+      "action": "seer_check",
+      "target": "p1",
+      "visible_info_refs": [],
+      "reason_summary": "Seer checks p1 as an early pressure target.",
+      "decision_type": "inference_based",
+      "confidence": 1.0,
+      "strategy_tag": "scripted_deterministic"
+    },
+    {
+      "decision_id": "g1_scripted_001_d003",
+      "game_id": "g1_scripted_001",
+      "actor": "p4",
+      "decision_scope": "single",
+      "consensus_id": null,
+      "phase": "night",
+      "action": "witch_save",
+      "target": "p5",
+      "visible_info_refs": [],
+      "reason_summary": "Witch saves p5 after seeing the night kill target.",
+      "decision_type": "inference_based",
+      "confidence": 1.0,
+      "strategy_tag": "scripted_deterministic"
+    },
+    {
+      "decision_id": "g1_scripted_001_d004",
+      "game_id": "g1_scripted_001",
+      "actor": "p4",
+      "decision_scope": "single",
+      "consensus_id": null,
+      "phase": "day",
+      "action": "player_vote",
+      "target": "p1",
+      "visible_info_refs": [
+        "g1_scripted_001_e005"
+      ],
+      "reason_summary": "p4 follows p3's pressure and votes p1.",
+      "decision_type": "inference_based",
+      "confidence": 1.0,
+      "strategy_tag": "scripted_deterministic"
+    },
+    {
+      "decision_id": "g1_scripted_001_d005",
+      "game_id": "g1_scripted_001",
+      "actor": "p5",
+      "decision_scope": "single",
+      "consensus_id": null,
+      "phase": "day",
+      "action": "player_vote",
+      "target": "p3",
+      "visible_info_refs": [
+        "g1_scripted_001_e005"
+      ],
+      "reason_summary": "p5 votes p3 because the public claim is not fully proven.",
+      "decision_type": "default",
+      "confidence": 1.0,
+      "strategy_tag": "scripted_deterministic"
+    },
+    {
+      "decision_id": "g1_scripted_001_d006",
+      "game_id": "g1_scripted_001",
+      "actor": "wolf_team",
+      "decision_scope": "team",
+      "consensus_id": "g1_scripted_001_c002",
+      "phase": "night",
+      "action": "werewolf_kill",
+      "target": "p3",
+      "visible_info_refs": [
+        "g1_scripted_001_e009"
+      ],
+      "reason_summary": "Remaining wolf targets the confirmed seer p3.",
+      "decision_type": "team_coordinated",
+      "confidence": 1.0,
+      "strategy_tag": "scripted_deterministic"
+    },
+    {
+      "decision_id": "g1_scripted_001_d007",
+      "game_id": "g1_scripted_001",
+      "actor": "p6",
+      "decision_scope": "single",
+      "consensus_id": null,
+      "phase": "day",
+      "action": "player_vote",
+      "target": "p2",
+      "visible_info_refs": [
+        "g1_scripted_001_e009",
+        "g1_scripted_001_e011"
+      ],
+      "reason_summary": "p6 votes p2 after p1's reveal and the seer death.",
+      "decision_type": "inference_based",
+      "confidence": 1.0,
+      "strategy_tag": "scripted_deterministic"
+    }
+  ]
+}

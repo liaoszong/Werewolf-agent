@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import subprocess
 import sys
+import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -72,6 +74,48 @@ class ScriptedGameRunnerTests(unittest.TestCase):
         self.assertEqual(first.game_log, second.game_log)
         self.assertEqual(first.decision_log, second.decision_log)
         self.assertEqual(first.consensus_log, second.consensus_log)
+
+
+class ScriptedGameCliTests(unittest.TestCase):
+    def test_run_scripted_game_cli_writes_logs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            out = Path(tmpdir)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "werewolf_eval.run_scripted_game",
+                    str(ROOT / "docs/game-scripts/g1-scripted-game.json"),
+                    "--game-log-out",
+                    str(out / "game.json"),
+                    "--decision-log-out",
+                    str(out / "decision.json"),
+                    "--consensus-log-out",
+                    str(out / "consensus.json"),
+                ],
+                cwd=ROOT,
+                env={"PYTHONPATH": str(ROOT / "src")},
+                text=True,
+                capture_output=True,
+                check=True,
+            )
+
+            self.assertIn("scripted_game_id=g1_scripted_001", result.stdout)
+            self.assertIn("events=15", result.stdout)
+            self.assertIn("decisions=7", result.stdout)
+            self.assertIn("consensuses=2", result.stdout)
+            self.assertEqual(
+                json.loads(
+                    (out / "decision.json").read_text(encoding="utf-8")
+                )["source_label"],
+                "[scripted deterministic output]",
+            )
+            self.assertEqual(
+                json.loads(
+                    (out / "consensus.json").read_text(encoding="utf-8")
+                )["source_label"],
+                "[scripted deterministic output]",
+            )
 
 
 if __name__ == "__main__":
