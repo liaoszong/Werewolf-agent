@@ -15,3 +15,15 @@
 - 审查评论不能带有```text --- IGNORE ---```标签。
 - 已修复上一轮行内审查意见时，必须回复对应 inline PR review comment。
 - 不要用普通 PR 顶层评论代替行内审查回复。
+
+## Review Packet Gate v1
+
+For Implementation PRs, start with `.logs/review/latest/review-packet.md` when available.
+
+A档 review output must use one verdict:
+
+- `PASS`
+- `BLOCK`
+- `NEED_DEEP_REVIEW`
+
+A档 should not perform repository-wide context discovery by default. If evidence is insufficient, output `Minimal Next Reads` with explicit file paths and line ranges.
