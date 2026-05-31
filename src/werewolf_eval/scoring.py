@@ -5,6 +5,7 @@ from typing import Any
 
 from werewolf_eval.decision_log import Decision, DecisionLog
 from werewolf_eval.game_log import Event, GameLog
+from werewolf_eval.semantic_labels import SemanticLabel, SemanticLabelLog
 
 
 @dataclass(frozen=True)
@@ -256,7 +257,25 @@ def _decision_by_event_id(game: GameLog, decision_log: DecisionLog | None) -> di
     return mapping
 
 
-def _assess_decision(game: GameLog, decision: Decision | None) -> DecisionAssessment:
+SEMANTIC_QUALITY_SCORE_BY_LABEL = {
+    "supported_good": 2,
+    "supported_neutral": 1,
+    "random_or_default": 0,
+    "unsupported": -1,
+    "contradicted": -2,
+}
+
+
+def _semantic_rule(label: SemanticLabel) -> str:
+    return f"rubric:G.1.semantic.{label.quality_label}"
+
+
+def _assess_decision(
+    game: GameLog,
+    decision: Decision | None,
+    semantic_label: SemanticLabel | None = None,
+    semantic_labels_enabled: bool = False,
+) -> DecisionAssessment:
     if decision is None:
         return DecisionAssessment(
             decision_id=None,
@@ -274,6 +293,8 @@ def _assess_decision(game: GameLog, decision: Decision | None) -> DecisionAssess
         if not _event_visible_to_decision_actor(game, game.event_by_id(ref), decision.actor)
     ]
 
+    s5_skip_note = "; S5 semantic label skipped because deterministic integrity check failed" if semantic_labels_enabled else ""
+
     if illegal_refs:
         return DecisionAssessment(
             decision_id=decision.decision_id,
@@ -282,11 +303,40 @@ def _assess_decision(game: GameLog, decision: Decision | None) -> DecisionAssess
             rules_triggered=["rubric:G.1.illegal_visible_info_ref"],
             evidence_event_ids=evidence_event_ids,
             notes=[
-                f"Decision {decision.decision_id} references non-visible events {illegal_refs}; D2 assigns no decision quality and applies rule_integrity_score -3."
+                f"Decision {decision.decision_id} references non-visible events {illegal_refs}; D2 assigns no decision quality and applies rule_integrity_score -3.{s5_skip_note}"
+            ],
+        )
+
+    # S5 enabled: semantic label presence takes priority over D2 no-refs / default checks.
+    if semantic_labels_enabled and semantic_label is not None:
+        quality_score = SEMANTIC_QUALITY_SCORE_BY_LABEL[semantic_label.quality_label]
+        return DecisionAssessment(
+            decision_id=decision.decision_id,
+            decision_quality_score=quality_score,
+            rule_integrity_score=0,
+            rules_triggered=[_semantic_rule(semantic_label)],
+            evidence_event_ids=evidence_event_ids,
+            notes=[
+                f"Decision {decision.decision_id} "
+                f"visible_refs={'present' if decision.visible_info_refs else 'none'} "
+                f"type={decision.decision_type}; "
+                f"S5 label={semantic_label.quality_label} "
+                f"evidence_alignment={semantic_label.evidence_alignment} "
+                f"reasoning_consistency={semantic_label.reasoning_consistency} "
+                f"rationale={semantic_label.short_rationale}"
             ],
         )
 
     if not decision.visible_info_refs:
+        if semantic_labels_enabled:
+            return DecisionAssessment(
+                decision_id=decision.decision_id,
+                decision_quality_score=0,
+                rule_integrity_score=0,
+                rules_triggered=["rubric:G.1.semantic_label_missing"],
+                evidence_event_ids=evidence_event_ids,
+                notes=[f"Decision {decision.decision_id} has no visible_info_refs and no S5 semantic label."],
+            )
         return DecisionAssessment(
             decision_id=decision.decision_id,
             decision_quality_score=0,
@@ -297,6 +347,19 @@ def _assess_decision(game: GameLog, decision: Decision | None) -> DecisionAssess
         )
 
     if decision.decision_type in {"random", "default"}:
+        if semantic_labels_enabled:
+            # semantic_label was None here (handled above), so it's missing
+            return DecisionAssessment(
+                decision_id=decision.decision_id,
+                decision_quality_score=0,
+                rule_integrity_score=0,
+                rules_triggered=[
+                    "rubric:G.1.no_decision_quality_for_default",
+                    "rubric:G.1.semantic_label_missing",
+                ],
+                evidence_event_ids=evidence_event_ids,
+                notes=[f"Decision {decision.decision_id} is {decision.decision_type} and has no S5 semantic label."],
+            )
         return DecisionAssessment(
             decision_id=decision.decision_id,
             decision_quality_score=0,
@@ -306,9 +369,20 @@ def _assess_decision(game: GameLog, decision: Decision | None) -> DecisionAssess
             notes=[f"Decision {decision.decision_id} is {decision.decision_type}; D2 keeps decision_quality_score 0."],
         )
 
+    # S5 enabled: no semantic label for this decision
+    if semantic_labels_enabled:
+        return DecisionAssessment(
+            decision_id=decision.decision_id,
+            decision_quality_score=0,
+            rule_integrity_score=0,
+            rules_triggered=["rubric:G.1.semantic_label_missing"],
+            evidence_event_ids=evidence_event_ids,
+            notes=[
+                f"Decision {decision.decision_id} has visible refs and non-random type {decision.decision_type} but no semantic label in S5 label log."
+            ],
+        )
+
     # D2 does NOT assign decision_quality_score > 0.
-    # Positive scoring requires S5 AI semantic judgment (Rubric G.1 Step 3).
-    # This branch records the decision_id and marks traceability only.
     return DecisionAssessment(
         decision_id=decision.decision_id,
         decision_quality_score=0,
@@ -321,7 +395,15 @@ def _assess_decision(game: GameLog, decision: Decision | None) -> DecisionAssess
     )
 
 
-def _scoring_boundary(has_decision_log: bool = False) -> ScoringBoundary:
+def _scoring_boundary(has_decision_log: bool = False, has_s5: bool = False) -> ScoringBoundary:
+    if has_s5:
+        return ScoringBoundary(
+            decision_quality_score=0,
+            decision_quality_reason="S5 saved semantic labels connected to deterministic decision_quality_score via SEMANTIC_QUALITY_SCORE_BY_LABEL mapping. No live AI labeling is performed during scoring.",
+            ai_annotations="saved S5 semantic labels; no provider call made during scoring",
+            rule_integrity_default=0,
+            rule_integrity_reason="Illegal visible_info_refs are deterministic rule-integrity violations (-3); otherwise records default to 0.",
+        )
     if has_decision_log:
         return ScoringBoundary(
             decision_quality_score=0,
@@ -541,15 +623,19 @@ def _record(
     )
 
 
-def score_game(game: GameLog, decision_log: DecisionLog | None = None) -> ScoreLog:
+def score_game(game: GameLog, decision_log: DecisionLog | None = None, semantic_label_log: SemanticLabelLog | None = None) -> ScoreLog:
     eliminated_by_round = _eliminated_target_by_round(game)
     decisions_by_event = _decision_by_event_id(game, decision_log)
+    labels_by_decision = semantic_label_log.label_by_decision_id if semantic_label_log else {}
+    semantic_labels_enabled = semantic_label_log is not None
     records: list[ScoreRecord] = []
 
     for event in game.events:
         if event.type not in SCORE_RELEVANT_EVENT_TYPES:
             continue
-        assessment = _assess_decision(game, decisions_by_event.get(event.event_id))
+        decision = decisions_by_event.get(event.event_id)
+        semantic_label = labels_by_decision.get(decision.decision_id) if decision else None
+        assessment = _assess_decision(game, decision, semantic_label, semantic_labels_enabled)
         if event.type == "werewolf_kill":
             records.append(_score_werewolf_kill(game, event, assessment))
         elif event.type == "seer_check":
@@ -561,13 +647,29 @@ def score_game(game: GameLog, decision_log: DecisionLog | None = None) -> ScoreL
         elif event.type == "player_vote":
             records.append(_score_player_vote(game, event, eliminated_by_round, assessment))
 
+    if semantic_labels_enabled:
+        score_log_id = "s5_g001_expected_score_log"
+        source_label = "[deterministic][decision-log][semantic-labels]"
+        phase = "Phase 2B-S5"
+        scoring_boundary_ai = "S5 saved semantic labels connected to deterministic decision_quality_score; no provider call is made during scoring."
+    elif decision_log is not None:
+        score_log_id = "s2_g001_expected_score_log"
+        source_label = "[deterministic][decision-log]"
+        phase = "Phase 2A-D2"
+        scoring_boundary_ai = "none; S5 not enabled"
+    else:
+        score_log_id = "s2_g001_expected_score_log"
+        source_label = "[deterministic]"
+        phase = "Phase 1"
+        scoring_boundary_ai = "none"
+
     return ScoreLog(
-        score_log_id="s2_g001_expected_score_log",
+        score_log_id=score_log_id,
         game_id=game.game_id,
         source_game_log="docs/gold-game/g001-game-log.json",
-        source_label="[deterministic]" if decision_log is None else "[deterministic][decision-log]",
-        phase="Phase 1" if decision_log is None else "Phase 2A-D2",
-        scoring_boundary=_scoring_boundary(decision_log is not None),
+        source_label=source_label,
+        phase=phase,
+        scoring_boundary=_scoring_boundary(decision_log is not None, semantic_labels_enabled),
         records=records,
     )
 
@@ -722,11 +824,12 @@ def _score_summary(game: GameLog, score_log: ScoreLog) -> ScoreSummary:
 
 
 def summarize_metrics(game: GameLog, score_log: ScoreLog) -> MetricsSummary:
+    s5_enabled = score_log.phase == "Phase 2B-S5"
     return MetricsSummary(
-        metrics_id="s2_g001_expected_metrics",
+        metrics_id="s5_g001_expected_metrics" if s5_enabled else "s2_g001_expected_metrics",
         game_id=game.game_id,
         source_game_log="docs/gold-game/g001-game-log.json",
-        source_score_log="docs/gold-game/s2-score-log.json",
+        source_score_log="docs/gold-game/s5-score-log.json" if s5_enabled else "docs/gold-game/s2-score-log.json",
         source_label=score_log.source_label,
         result_metrics=_result_metrics(game),
         process_metrics=ProcessMetrics(

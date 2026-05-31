@@ -17,6 +17,7 @@ from werewolf_eval.scoring import (
     score_log_to_dict,
     summarize_metrics,
 )
+from werewolf_eval.semantic_labels import load_semantic_label_log
 
 
 def load_json(path: str) -> dict:
@@ -31,6 +32,16 @@ class DeterministicScorerTests(unittest.TestCase):
         self.metrics = summarize_metrics(self.game, self.score_log)
         self.d2_score_log = score_game(self.game, decision_log=self.decision_log)
         self.d2_metrics = summarize_metrics(self.game, self.d2_score_log)
+        self.semantic_label_log = load_semantic_label_log(
+            ROOT / "docs/gold-game/s5-semantic-label-output.example.json",
+            self.decision_log,
+        )
+        self.s5_score_log = score_game(
+            self.game,
+            decision_log=self.decision_log,
+            semantic_label_log=self.semantic_label_log,
+        )
+        self.s5_metrics = summarize_metrics(self.game, self.s5_score_log)
 
     def test_score_log_matches_s2_expected_records(self) -> None:
         actual = score_log_to_dict(self.d2_score_log)
@@ -137,6 +148,11 @@ class DeterministicScorerTests(unittest.TestCase):
         self.assertEqual(decision_scores["p6"], 0)
         self.assertEqual(decision_scores["p5"], 0)
 
+        # D2-only mode must not add any semantic rules
+        d2_records = {record.event_id: record for record in self.d2_score_log.records}
+        self.assertNotIn("rubric:G.1.semantic_label_missing", d2_records["g001_e019"].rules_triggered)
+        self.assertNotIn("rubric:G.1.semantic.supported_good", d2_records["g001_e035"].rules_triggered)
+
     def test_score_game_cli_accepts_decision_log(self) -> None:
         result = subprocess.run(
             [
@@ -156,6 +172,55 @@ class DeterministicScorerTests(unittest.TestCase):
 
         self.assertIn("decision_log=enabled", result.stdout)
         self.assertIn("decision_quality_total=", result.stdout)
+
+    def test_s5_semantic_labels_assign_decision_quality_scores(self) -> None:
+        records = {record.event_id: record for record in self.s5_score_log.records}
+
+        self.assertEqual(records["g001_e007"].decision_id, "g001_d001")
+        self.assertEqual(records["g001_e007"].decision_quality_score, 1)
+        self.assertIn("rubric:G.1.semantic.supported_neutral", records["g001_e007"].rules_triggered)
+
+        self.assertEqual(records["g001_e008"].decision_id, "g001_d002")
+        self.assertEqual(records["g001_e008"].decision_quality_score, -1)
+        self.assertIn("rubric:G.1.semantic.unsupported", records["g001_e008"].rules_triggered)
+
+        self.assertEqual(records["g001_e009"].decision_id, "g001_d003")
+        self.assertEqual(records["g001_e009"].decision_quality_score, -1)
+        self.assertIn("rubric:G.1.semantic.unsupported", records["g001_e009"].rules_triggered)
+
+        self.assertEqual(records["g001_e020"].decision_id, "g001_d008")
+        self.assertEqual(records["g001_e020"].decision_quality_score, 0)
+        self.assertIn("rubric:G.1.semantic.random_or_default", records["g001_e020"].rules_triggered)
+
+        self.assertEqual(records["g001_e035"].decision_id, "g001_d010")
+        self.assertEqual(records["g001_e035"].decision_quality_score, 2)
+        self.assertIn("rubric:G.1.semantic.supported_good", records["g001_e035"].rules_triggered)
+
+    def test_s5_missing_label_keeps_score_zero_and_records_rule(self) -> None:
+        records = {record.event_id: record for record in self.s5_score_log.records}
+
+        self.assertEqual(records["g001_e019"].decision_id, "g001_d007")
+        self.assertEqual(records["g001_e019"].decision_quality_score, 0)
+        self.assertIn("rubric:G.1.semantic_label_missing", records["g001_e019"].rules_triggered)
+
+    def test_s5_metrics_summary_reflects_semantic_scores(self) -> None:
+        payload = metrics_summary_to_dict(self.s5_metrics)
+        decision_scores = payload["score_summary"]["player_decision_quality_scores"]
+        self.assertEqual(decision_scores["p3"], -1)
+        self.assertEqual(decision_scores["p4"], -1)
+        self.assertEqual(decision_scores["p6"], 2)
+        self.assertEqual(sum(decision_scores.values()), 0)
+        self.assertEqual(payload["score_summary"]["team_outcome_scores"]["wolf_team"], 2)
+
+    def test_s5_score_outputs_match_expected_files(self) -> None:
+        score_payload = score_log_to_dict(self.s5_score_log)
+        metrics_payload = metrics_summary_to_dict(self.s5_metrics)
+        self.assertEqual(score_payload["score_log_id"], "s5_g001_expected_score_log")
+        self.assertEqual(score_payload["phase"], "Phase 2B-S5")
+        self.assertEqual(metrics_payload["metrics_id"], "s5_g001_expected_metrics")
+        self.assertEqual(metrics_payload["source_score_log"], "docs/gold-game/s5-score-log.json")
+        self.assertEqual(score_payload, load_json("docs/gold-game/s5-score-log.json"))
+        self.assertEqual(metrics_payload, load_json("docs/gold-game/s5-metrics-summary.json"))
 
 
 if __name__ == "__main__":
