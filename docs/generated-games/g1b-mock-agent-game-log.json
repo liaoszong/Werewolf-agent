@@ -1,0 +1,300 @@
+{
+  "game_id": "g1b_mock_001",
+  "source_label": "[deterministic mock agent output]",
+  "players": [
+    {
+      "player_id": "p1",
+      "role": "werewolf",
+      "team": "werewolf"
+    },
+    {
+      "player_id": "p2",
+      "role": "werewolf",
+      "team": "werewolf"
+    },
+    {
+      "player_id": "p3",
+      "role": "seer",
+      "team": "villager"
+    },
+    {
+      "player_id": "p4",
+      "role": "witch",
+      "team": "villager"
+    },
+    {
+      "player_id": "p5",
+      "role": "villager",
+      "team": "villager"
+    },
+    {
+      "player_id": "p6",
+      "role": "villager",
+      "team": "villager"
+    }
+  ],
+  "events": [
+    {
+      "event_id": "g1b_mock_001_e001",
+      "sequence": 1,
+      "round": 0,
+      "phase": "setup",
+      "type": "role_assignment",
+      "actor": "system",
+      "target": "none",
+      "visibility": "all",
+      "data": {
+        "summary": "Roles assigned: 2 werewolves (p1, p2), 1 seer (p3), 1 witch (p4), 2 villagers (p5, p6).",
+        "visible_info_refs": []
+      }
+    },
+    {
+      "event_id": "g1b_mock_001_e002",
+      "sequence": 2,
+      "round": 1,
+      "phase": "night",
+      "type": "werewolf_kill",
+      "actor": "wolf_team",
+      "target": "p5",
+      "visibility": "werewolf_team",
+      "data": {
+        "summary": "Wolf team kills p5.",
+        "visible_info_refs": []
+      }
+    },
+    {
+      "event_id": "g1b_mock_001_e003",
+      "sequence": 3,
+      "round": 1,
+      "phase": "night",
+      "type": "seer_check",
+      "actor": "p3",
+      "target": "p1",
+      "visibility": "seer",
+      "data": {
+        "summary": "Seer p3 checks p1, result: werewolf.",
+        "visible_info_refs": []
+      }
+    },
+    {
+      "event_id": "g1b_mock_001_e004",
+      "sequence": 4,
+      "round": 1,
+      "phase": "night",
+      "type": "witch_save",
+      "actor": "p4",
+      "target": "p5",
+      "visibility": "witch",
+      "data": {
+        "summary": "Witch p4 saves p5.",
+        "visible_info_refs": []
+      }
+    },
+    {
+      "event_id": "g1b_mock_001_e005",
+      "sequence": 5,
+      "round": 1,
+      "phase": "day",
+      "type": "player_vote",
+      "actor": "p3",
+      "target": "p1",
+      "visibility": "public",
+      "data": {
+        "summary": "p3 votes p1.",
+        "visible_info_refs": []
+      }
+    },
+    {
+      "event_id": "g1b_mock_001_e006",
+      "sequence": 6,
+      "round": 1,
+      "phase": "day",
+      "type": "player_vote",
+      "actor": "p4",
+      "target": "p1",
+      "visibility": "public",
+      "data": {
+        "summary": "p4 votes p1.",
+        "visible_info_refs": []
+      }
+    },
+    {
+      "event_id": "g1b_mock_001_e007",
+      "sequence": 7,
+      "round": 1,
+      "phase": "day",
+      "type": "player_vote",
+      "actor": "p5",
+      "target": "p1",
+      "visibility": "public",
+      "data": {
+        "summary": "p5 votes p1.",
+        "visible_info_refs": []
+      }
+    },
+    {
+      "event_id": "g1b_mock_001_e008",
+      "sequence": 8,
+      "round": 1,
+      "phase": "day",
+      "type": "player_vote",
+      "actor": "p6",
+      "target": "p1",
+      "visibility": "public",
+      "data": {
+        "summary": "p6 votes p1.",
+        "visible_info_refs": []
+      }
+    },
+    {
+      "event_id": "g1b_mock_001_e009",
+      "sequence": 9,
+      "round": 1,
+      "phase": "day",
+      "type": "player_eliminated",
+      "actor": "system",
+      "target": "p1",
+      "visibility": "all",
+      "data": {
+        "summary": "p1 eliminated by vote.",
+        "visible_info_refs": []
+      }
+    },
+    {
+      "event_id": "g1b_mock_001_e010",
+      "sequence": 10,
+      "round": 1,
+      "phase": "day",
+      "type": "role_revealed",
+      "actor": "system",
+      "target": "p1",
+      "visibility": "all",
+      "data": {
+        "summary": "p1 revealed as werewolf.",
+        "visible_info_refs": []
+      }
+    },
+    {
+      "event_id": "g1b_mock_001_e011",
+      "sequence": 11,
+      "round": 2,
+      "phase": "night",
+      "type": "werewolf_kill",
+      "actor": "wolf_team",
+      "target": "p3",
+      "visibility": "werewolf_team",
+      "data": {
+        "summary": "Wolf team kills p3.",
+        "visible_info_refs": []
+      }
+    },
+    {
+      "event_id": "g1b_mock_001_e012",
+      "sequence": 12,
+      "round": 2,
+      "phase": "night",
+      "type": "player_died",
+      "actor": "system",
+      "target": "p3",
+      "visibility": "all",
+      "data": {
+        "summary": "p3 died during the night.",
+        "visible_info_refs": []
+      }
+    },
+    {
+      "event_id": "g1b_mock_001_e013",
+      "sequence": 13,
+      "round": 2,
+      "phase": "day",
+      "type": "player_vote",
+      "actor": "p4",
+      "target": "p2",
+      "visibility": "public",
+      "data": {
+        "summary": "p4 votes p2.",
+        "visible_info_refs": []
+      }
+    },
+    {
+      "event_id": "g1b_mock_001_e014",
+      "sequence": 14,
+      "round": 2,
+      "phase": "day",
+      "type": "player_vote",
+      "actor": "p5",
+      "target": "p2",
+      "visibility": "public",
+      "data": {
+        "summary": "p5 votes p2.",
+        "visible_info_refs": []
+      }
+    },
+    {
+      "event_id": "g1b_mock_001_e015",
+      "sequence": 15,
+      "round": 2,
+      "phase": "day",
+      "type": "player_vote",
+      "actor": "p6",
+      "target": "p2",
+      "visibility": "public",
+      "data": {
+        "summary": "p6 votes p2.",
+        "visible_info_refs": []
+      }
+    },
+    {
+      "event_id": "g1b_mock_001_e016",
+      "sequence": 16,
+      "round": 2,
+      "phase": "day",
+      "type": "player_eliminated",
+      "actor": "system",
+      "target": "p2",
+      "visibility": "all",
+      "data": {
+        "summary": "p2 eliminated by vote.",
+        "visible_info_refs": []
+      }
+    },
+    {
+      "event_id": "g1b_mock_001_e017",
+      "sequence": 17,
+      "round": 2,
+      "phase": "day",
+      "type": "role_revealed",
+      "actor": "system",
+      "target": "p2",
+      "visibility": "all",
+      "data": {
+        "summary": "p2 revealed as werewolf.",
+        "visible_info_refs": []
+      }
+    },
+    {
+      "event_id": "g1b_mock_001_e018",
+      "sequence": 18,
+      "round": 2,
+      "phase": "game_end",
+      "type": "game_over",
+      "actor": "system",
+      "target": "villager_team",
+      "visibility": "all",
+      "data": {
+        "summary": "All werewolves eliminated. Villager team wins.",
+        "visible_info_refs": []
+      }
+    }
+  ],
+  "result": {
+    "winner": "villager",
+    "end_round": 2,
+    "survivors": [
+      "p4",
+      "p5",
+      "p6"
+    ],
+    "end_condition": "all_werewolves_eliminated"
+  }
+}

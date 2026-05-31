@@ -88,5 +88,40 @@ class GameEngineOutputTests(unittest.TestCase):
         self.assertEqual(first.decision_log, second.decision_log)
 
 
+class GameEngineCliTests(unittest.TestCase):
+    def test_run_mock_game_cli_writes_game_and_decision_logs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            out = Path(tmpdir)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "werewolf_eval.run_mock_game",
+                    "--game-id",
+                    "g1b_mock_001",
+                    "--game-log-out",
+                    str(out / "game.json"),
+                    "--decision-log-out",
+                    str(out / "decision.json"),
+                ],
+                cwd=ROOT,
+                env={"PYTHONPATH": str(ROOT / "src")},
+                text=True,
+                capture_output=True,
+                check=True,
+            )
+
+            self.assertIn("mock_game_id=g1b_mock_001", result.stdout)
+            self.assertIn("events=18", result.stdout)
+            self.assertIn("decisions=11", result.stdout)
+            self.assertIn("consensus=not_generated", result.stdout)
+
+            game = json.loads((out / "game.json").read_text(encoding="utf-8"))
+            decision = json.loads((out / "decision.json").read_text(encoding="utf-8"))
+            self.assertEqual(game["game_id"], "g1b_mock_001")
+            self.assertEqual(game["source_label"], "[deterministic mock agent output]")
+            self.assertEqual(decision["source_label"], "[deterministic mock agent output]")
+
+
 if __name__ == "__main__":
     unittest.main()
