@@ -14,6 +14,7 @@ from werewolf_eval.scoring import (
     score_log_to_dict,
     summarize_metrics,
 )
+from werewolf_eval.semantic_labels import load_semantic_label_log
 
 ROLE_LABELS = {
     "werewolf": "狼人",
@@ -102,7 +103,8 @@ def build_demo_context(game: GameLog, score_log: Any, metrics: Any, attribution:
 
     score_summary = metrics_payload["score_summary"]
     decision_quality_total = sum(record["decision_quality_score"] for record in score_payload["records"])
-    decision_log_enabled = score_payload["phase"] == "Phase 2A-D2"
+    decision_log_enabled = score_payload["phase"] in ("Phase 2A-D2", "Phase 2B-S5")
+    semantic_labels_enabled = score_payload["phase"] == "Phase 2B-S5"
     games_played = 1
     single_game_outcome_total = (
         sum(score_summary["player_outcome_scores"].values())
@@ -111,6 +113,9 @@ def build_demo_context(game: GameLog, score_log: Any, metrics: Any, attribution:
     avg_outcome_score = single_game_outcome_total / games_played
     top_attribution = attribution_payload["top_attribution"]
 
+    avg_decision_quality_score = decision_quality_total / max(len(score_payload["records"]), 1)
+    source_label = "[deterministic][semantic-labels]" if semantic_labels_enabled else "[deterministic]"
+
     leaderboard = [
         {
             "agent_id": "g001-runtime",
@@ -118,10 +123,10 @@ def build_demo_context(game: GameLog, score_log: Any, metrics: Any, attribution:
             "games_played": games_played,
             "win_rate": 1.0 if game.result.winner == "villager" else 0.0,
             "avg_outcome_score": avg_outcome_score,
-            "avg_decision_quality_score": 0.0,  # D2 demo convention: decision_quality_score waits for S5 AI semantic judgment
+            "avg_decision_quality_score": avg_decision_quality_score,
             "avg_rule_integrity_score": 0.0,
             "top_attribution": top_attribution["turn_point_id"],
-            "source_label": "[deterministic]",
+            "source_label": source_label,
         },
         {
             "agent_id": "mock-baseline-a",
@@ -169,6 +174,7 @@ def build_demo_context(game: GameLog, score_log: Any, metrics: Any, attribution:
             "result_metrics": metrics_payload["result_metrics"],
             "process_metrics": metrics_payload["process_metrics"],
             "decision_log_enabled": decision_log_enabled,
+            "semantic_labels_enabled": semantic_labels_enabled,
             "decision_quality_total": decision_quality_total,
         },
         "attribution": {
@@ -223,7 +229,10 @@ def render_html(context: dict[str, Any]) -> str:
         for item in context["attribution"]["turn_point_rows"]
     )
 
-    if context["score"]["decision_log_enabled"]:
+    if context["score"]["semantic_labels_enabled"]:
+        boundary_copy = "This is not real AI Agent gameplay, not live AI labeling, and not a real multi-model Leaderboard. S5 saved semantic labels are connected to deterministic scoring; no provider call is made during rendering."
+        decision_copy = f"decision_quality_score: S5 saved semantic labels enabled; decision_quality_total={context['score']['decision_quality_total']}."
+    elif context["score"]["decision_log_enabled"]:
         boundary_copy = "This is not real AI Agent gameplay, not real Consensus Log collection, not AI semantic labeling, and not a real multi-model Leaderboard. Decision Log is connected to scoring via D2 deterministic Step 1-2 (visibility check + decision_id traceability), but decision_quality_score remains 0 (positive scoring waits for S5 AI semantic judgment)."
         decision_copy = "decision_quality_score: D2 visibility check + decision_id traceability complete; positive scoring still 0 (waiting for S5)."
     else:
@@ -266,10 +275,13 @@ def render_html(context: dict[str, Any]) -> str:
 """
 
 
-def write_demo_html(game_log_path: str | Path, output_path: str | Path, decision_log_path: str | Path | None = None) -> None:
+def write_demo_html(game_log_path: str | Path, output_path: str | Path, decision_log_path: str | Path | None = None, semantic_label_path: str | Path | None = None) -> None:
     game = load_game_log(game_log_path)
     decision_log = load_decision_log(decision_log_path, game) if decision_log_path else None
-    score_log = score_game(game, decision_log=decision_log)
+    if semantic_label_path and decision_log is None:
+        raise ValueError("semantic_label_path requires decision_log_path")
+    semantic_label_log = load_semantic_label_log(semantic_label_path, decision_log) if semantic_label_path else None
+    score_log = score_game(game, decision_log=decision_log, semantic_label_log=semantic_label_log)
     metrics = summarize_metrics(game, score_log)
     attribution = attribute_game(game, score_log, metrics)
     context = build_demo_context(game, score_log, metrics, attribution)
@@ -280,10 +292,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Generate Werewolf-agent Phase 2 runtime demo HTML.")
     parser.add_argument("path", help="Path to Game Log JSON")
     parser.add_argument("--decision-log", help="Optional path to Decision Log JSON for D2 deterministic decision-quality scoring")
+    parser.add_argument("--semantic-labels", help="Optional saved S5 Semantic Label Log JSON. Requires --decision-log.")
     parser.add_argument("--html-out", required=True, help="Output HTML file path")
     args = parser.parse_args()
 
-    write_demo_html(args.path, args.html_out, args.decision_log)
+    write_demo_html(args.path, args.html_out, args.decision_log, args.semantic_labels)
     print(f"rendered_demo_html={args.html_out}")
     return 0
 

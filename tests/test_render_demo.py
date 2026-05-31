@@ -9,6 +9,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from werewolf_eval.game_log import load_game_log
+from werewolf_eval.decision_log import load_decision_log
+from werewolf_eval.semantic_labels import load_semantic_label_log
 from werewolf_eval.scoring import score_game, summarize_metrics
 from werewolf_eval.attribution import attribute_game
 from werewolf_eval.render_demo import build_demo_context, render_html, write_demo_html
@@ -20,6 +22,18 @@ class RuntimeDemoRenderTests(unittest.TestCase):
         self.score_log = score_game(self.game)
         self.metrics = summarize_metrics(self.game, self.score_log)
         self.attribution = attribute_game(self.game, self.score_log, self.metrics)
+        self.decision_log = load_decision_log(ROOT / "docs/gold-game/g001-decision-log.json", self.game)
+        self.semantic_label_log = load_semantic_label_log(
+            ROOT / "docs/gold-game/s5-semantic-label-output.example.json",
+            self.decision_log,
+        )
+        self.s5_score_log = score_game(
+            self.game,
+            decision_log=self.decision_log,
+            semantic_label_log=self.semantic_label_log,
+        )
+        self.s5_metrics = summarize_metrics(self.game, self.s5_score_log)
+        self.s5_attribution = attribute_game(self.game, self.s5_score_log, self.s5_metrics)
 
     def test_build_demo_context_uses_runtime_outputs(self) -> None:
         context = build_demo_context(self.game, self.score_log, self.metrics, self.attribution)
@@ -88,6 +102,31 @@ class RuntimeDemoRenderTests(unittest.TestCase):
             self.assertIn("Werewolf-agent Phase 2 Runtime Demo", html)
             self.assertIn("g001", html)
             self.assertIn("s3_g001_tp001", html)
+
+    def test_render_html_with_semantic_labels_shows_s5_boundary(self) -> None:
+        context = build_demo_context(self.game, self.s5_score_log, self.s5_metrics, self.s5_attribution)
+        html = render_html(context)
+
+        self.assertIn("S5 saved semantic labels", html)
+        self.assertIn("decision_quality_total", html)
+        self.assertIn("not live AI labeling", html)
+        self.assertIn("[semantic-labels]", html)
+        self.assertNotIn("https://", html)
+
+    def test_write_demo_html_accepts_semantic_labels(self) -> None:
+        output = ROOT / "docs/demo/test-phase2-s5-runtime-demo.html"
+        try:
+            write_demo_html(
+                ROOT / "docs/gold-game/g001-game-log.json",
+                output,
+                ROOT / "docs/gold-game/g001-decision-log.json",
+                ROOT / "docs/gold-game/s5-semantic-label-output.example.json",
+            )
+            html = output.read_text(encoding="utf-8")
+            self.assertIn("S5 saved semantic labels", html)
+            self.assertIn("decision_quality_total", html)
+        finally:
+            output.unlink(missing_ok=True)
 
 
 if __name__ == "__main__":
