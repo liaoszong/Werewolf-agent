@@ -145,5 +145,44 @@ class ScriptedGameArtifactProvenanceTests(unittest.TestCase):
         self.assertEqual(gold_names, set())
 
 
+class ScriptedGameEvaluatorPipelineTests(unittest.TestCase):
+    def test_generated_logs_can_be_scored_and_rendered(self) -> None:
+        from werewolf_eval.attribution import attribute_game
+        from werewolf_eval.decision_log import load_decision_log
+        from werewolf_eval.game_log import load_game_log
+        from werewolf_eval.render_demo import build_demo_context, render_html
+        from werewolf_eval.scoring import (
+            score_game,
+            score_log_to_dict,
+            summarize_metrics,
+            metrics_summary_to_dict,
+        )
+
+        game = load_game_log(
+            ROOT / "docs/generated-games/g1-scripted-game-log.json"
+        )
+        decision_log = load_decision_log(
+            ROOT / "docs/generated-games/g1-scripted-decision-log.json", game
+        )
+        score_log = score_game(game, decision_log=decision_log)
+        metrics = summarize_metrics(game, score_log)
+        attribution = attribute_game(game, score_log, metrics)
+        html = render_html(build_demo_context(game, score_log, metrics, attribution))
+
+        score_payload = score_log_to_dict(score_log)
+        metrics_payload = metrics_summary_to_dict(metrics)
+        self.assertEqual(score_payload["game_id"], "g1_scripted_001")
+        self.assertEqual(metrics_payload["game_id"], "g1_scripted_001")
+        self.assertNotIn(
+            "s2_g001", json.dumps(score_payload, ensure_ascii=False)
+        )
+        self.assertNotIn(
+            "s2_g001", json.dumps(metrics_payload, ensure_ascii=False)
+        )
+        self.assertIn("G1a scripted deterministic fresh-log runner", html)
+        self.assertIn("not live AI Agent gameplay", html)
+        self.assertNotIn("https://", html)
+
+
 if __name__ == "__main__":
     unittest.main()
