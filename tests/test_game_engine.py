@@ -202,6 +202,46 @@ def run_mock_game_for_test(mode: str = "g1c_consensus") -> dict:
     }
 
 
+class GameEngineConsensusCliTests(unittest.TestCase):
+    def test_run_mock_game_g1c_cli_writes_all_four_artifacts(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            out = Path(tmpdir)
+            game_log_path = out / "game.json"
+            decision_log_path = out / "decision.json"
+            consensus_log_path = out / "consensus.json"
+            failure_audit_path = out / "failure.json"
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "werewolf_eval.run_mock_game",
+                    "--game-id", "g1c_wolf_consensus",
+                    "--mode", "g1c_consensus",
+                    "--game-log-out", str(game_log_path),
+                    "--decision-log-out", str(decision_log_path),
+                    "--consensus-log-out", str(consensus_log_path),
+                    "--failure-audit-out", str(failure_audit_path),
+                ],
+                cwd=ROOT,
+                env={"PYTHONPATH": str(ROOT / "src")},
+                text=True,
+                capture_output=True,
+                check=True,
+            )
+
+            self.assertIn("consensus_entries=2", result.stdout)
+            self.assertTrue(game_log_path.exists())
+            self.assertTrue(decision_log_path.exists())
+            self.assertTrue(consensus_log_path.exists())
+            self.assertTrue(failure_audit_path.exists())
+
+            consensus_log = json.loads(consensus_log_path.read_text(encoding="utf-8"))
+            failure_audit = json.loads(failure_audit_path.read_text(encoding="utf-8"))
+            self.assertEqual(consensus_log["source_label"], "[deterministic mock agent output]")
+            self.assertEqual(failure_audit["source_label"], "[deterministic mock agent output]")
+
+
 class GameEngineConsensusTests(unittest.TestCase):
     def test_g1c_wolf_consensus_log_is_emitted_for_valid_night_kill(self):
         result = run_mock_game_for_test(mode="g1c_consensus")
