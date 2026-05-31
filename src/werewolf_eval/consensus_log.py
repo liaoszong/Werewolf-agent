@@ -7,7 +7,7 @@ from typing import Any
 
 from werewolf_eval.game_log import GameLog
 
-VALID_SOURCE_LABELS = {"[人工 gold sample]", "[AI 生成]"}
+VALID_SOURCE_LABELS = {"[人工 gold sample]", "[AI 生成]", "[scripted deterministic output]"}
 VALID_CONSENSUS_PHASES = {"night"}
 VALID_TEAMS = {"werewolf"}
 VALID_CONSENSUS_STATUSES = {

@@ -159,5 +159,12 @@ class ConsensusLogTests(unittest.TestCase):
             parse_consensus_log(raw, self.game)
 
 
+    def test_accepts_scripted_deterministic_source_label(self) -> None:
+        raw = load_json("docs/gold-game/g001-consensus-log.json")
+        raw["source_label"] = "[scripted deterministic output]"
+        consensus_log = parse_consensus_log(raw, self.game)
+        self.assertEqual(consensus_log.source_label, "[scripted deterministic output]")
+
+
 if __name__ == "__main__":
     unittest.main()

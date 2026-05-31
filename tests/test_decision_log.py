@@ -120,5 +120,12 @@ class DecisionLogTests(unittest.TestCase):
         self.assertIn("source_label=[人工 gold sample]", result.stdout)
 
 
+    def test_accepts_scripted_deterministic_source_label(self) -> None:
+        raw = self._minimal_raw()
+        raw["source_label"] = "[scripted deterministic output]"
+        decision_log = parse_decision_log(raw, self.game)
+        self.assertEqual(decision_log.source_label, "[scripted deterministic output]")
+
+
 if __name__ == "__main__":
     unittest.main()
