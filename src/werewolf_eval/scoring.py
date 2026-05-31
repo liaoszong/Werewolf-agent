@@ -624,6 +624,8 @@ def _record(
 
 
 def score_game(game: GameLog, decision_log: DecisionLog | None = None, semantic_label_log: SemanticLabelLog | None = None) -> ScoreLog:
+    if semantic_label_log is not None and decision_log is None:
+        raise ValueError("semantic_label_log requires decision_log")
     eliminated_by_round = _eliminated_target_by_round(game)
     decisions_by_event = _decision_by_event_id(game, decision_log)
     labels_by_decision = semantic_label_log.label_by_decision_id if semantic_label_log else {}

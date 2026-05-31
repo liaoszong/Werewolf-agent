@@ -238,6 +238,10 @@ class DeterministicScorerTests(unittest.TestCase):
         self.assertEqual(records["g001_e035"].decision_quality_score, 2)
         self.assertIn("rubric:G.1.semantic.supported_good", records["g001_e035"].rules_triggered)
 
+    def test_s5_semantic_labels_without_decision_log_raises(self) -> None:
+        with self.assertRaisesRegex(ValueError, "semantic_label_log requires decision_log"):
+            score_game(self.game, semantic_label_log=self.semantic_label_log)
+
     def test_s5_missing_label_keeps_score_zero_and_records_rule(self) -> None:
         records = {record.event_id: record for record in self.s5_score_log.records}
 

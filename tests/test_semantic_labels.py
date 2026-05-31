@@ -54,6 +54,36 @@ class SemanticLabelLogTests(unittest.TestCase):
             from werewolf_eval.semantic_labels import parse_semantic_label_log
             parse_semantic_label_log(raw, self.decision_log)
 
+    def test_rejects_nan_confidence(self) -> None:
+        path = ROOT / "docs/gold-game/s5-semantic-label-output.example.json"
+        import json
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        raw["labels"][0]["confidence"] = float("nan")
+
+        with self.assertRaisesRegex(SemanticLabelValidationError, "not in"):
+            from werewolf_eval.semantic_labels import parse_semantic_label_log
+            parse_semantic_label_log(raw, self.decision_log)
+
+    def test_rejects_inf_confidence(self) -> None:
+        path = ROOT / "docs/gold-game/s5-semantic-label-output.example.json"
+        import json
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        raw["labels"][0]["confidence"] = float("inf")
+
+        with self.assertRaisesRegex(SemanticLabelValidationError, "not in"):
+            from werewolf_eval.semantic_labels import parse_semantic_label_log
+            parse_semantic_label_log(raw, self.decision_log)
+
+    def test_rejects_whitespace_only_short_rationale(self) -> None:
+        path = ROOT / "docs/gold-game/s5-semantic-label-output.example.json"
+        import json
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        raw["labels"][0]["short_rationale"] = "   "
+
+        with self.assertRaisesRegex(SemanticLabelValidationError, "non-empty"):
+            from werewolf_eval.semantic_labels import parse_semantic_label_log
+            parse_semantic_label_log(raw, self.decision_log)
+
     def test_validate_semantic_labels_cli(self) -> None:
         result = subprocess.run(
             [

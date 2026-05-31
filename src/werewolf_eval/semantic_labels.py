@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
+import math
 from pathlib import Path
 from typing import Any
 
@@ -107,13 +108,13 @@ def parse_semantic_label_log(raw: dict[str, Any], decision_log: DecisionLog) -> 
             raise SemanticLabelValidationError(
                 f"labels[{i}].confidence must be a number, got {type(confidence).__name__}"
             )
-        if confidence < 0.0 or confidence > 1.0:
+        if not math.isfinite(confidence) or confidence < 0.0 or confidence > 1.0:
             raise SemanticLabelValidationError(
                 f"labels[{i}].confidence {confidence} is not in [0.0, 1.0]"
             )
 
         short_rationale = item["short_rationale"]
-        if not isinstance(short_rationale, str) or short_rationale == "":
+        if not isinstance(short_rationale, str) or short_rationale.strip() == "":
             raise SemanticLabelValidationError(f"labels[{i}].short_rationale must be non-empty string")
         if len(short_rationale) > MAX_RATIONALE_CHARS:
             raise SemanticLabelValidationError(
