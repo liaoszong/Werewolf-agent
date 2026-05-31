@@ -882,7 +882,19 @@ def summarize_metrics(game: GameLog, score_log: ScoreLog) -> MetricsSummary:
                 "reason": "turn_point_count is defined as an attribution count; S2 does not compute attribution outputs.",
             }
         ],
-        known_rubric_gaps_recorded_not_fixed=[
+        known_rubric_gaps_recorded_not_fixed=_known_rubric_gaps(game),
+    )
+
+
+def _known_rubric_gaps(game: GameLog) -> list[dict[str, Any]]:
+    """Return rubric gap records using the current game's event IDs.
+
+    For g001, preserve the canonical gap list. For non-g001 games, derive
+    gap events from the current game or return an empty list when the game
+    does not hit a given rubric gap.
+    """
+    if game.game_id == "g001":
+        return [
             {
                 "gap": "werewolf_day_vote_without_elimination",
                 "events": ["g001_e033"],
@@ -893,5 +905,45 @@ def summarize_metrics(game: GameLog, score_log: ScoreLog) -> MetricsSummary:
                 "events": ["g001_e019", "g001_e034"],
                 "S2_policy": "count in vote_accuracy metrics; assign outcome_score 0 in score log; do not modify EVALUATION_RUBRIC.md in this PR",
             },
-        ],
-    )
+        ]
+    # For non-g001 games, scan for rubric-gap events in the current game.
+    gaps: list[dict[str, Any]] = []
+    players = {p.player_id for p in game.players}
+    # werewolf_day_vote_without_elimination: a werewolf voted in day phase
+    # but the vote target was not eliminated in the same round.
+    werewolf_no_elim: list[str] = []
+    for event in game.events:
+        if event.actor not in players:
+            continue
+        role = _role_of(game, event.actor)
+        if event.type == "player_vote" and role == "werewolf":
+            eliminated_this_round = any(
+                e.type == "player_eliminated"
+                and e.target == event.target
+                and e.round == event.round
+                for e in game.events
+            )
+            if not eliminated_this_round:
+                werewolf_no_elim.append(event.event_id)
+    if werewolf_no_elim:
+        gaps.append({
+            "gap": "werewolf_day_vote_without_elimination",
+            "events": werewolf_no_elim,
+            "policy": "count in vote_accuracy metrics; assign outcome_score 0 in score log; do not modify EVALUATION_RUBRIC.md in this PR",
+        })
+    # witch_day_vote_outcome_not_explicit: witch voted in day phase
+    # without an explicit score row for witch day votes.
+    witch_no_row: list[str] = []
+    for event in game.events:
+        if event.actor not in players:
+            continue
+        role = _role_of(game, event.actor)
+        if event.type == "player_vote" and role == "witch":
+            witch_no_row.append(event.event_id)
+    if witch_no_row:
+        gaps.append({
+            "gap": "witch_day_vote_outcome_not_explicit",
+            "events": witch_no_row,
+            "policy": "count in vote_accuracy metrics; assign outcome_score 0 in score log; do not modify EVALUATION_RUBRIC.md in this PR",
+        })
+    return gaps

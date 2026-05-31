@@ -122,8 +122,10 @@ class ScriptedGameArtifactProvenanceTests(unittest.TestCase):
     def test_generated_score_and_metrics_use_g1_ids(self) -> None:
         score_path = ROOT / "docs/generated-games/g1-scripted-score-log.json"
         metrics_path = ROOT / "docs/generated-games/g1-scripted-metrics-summary.json"
+        game_log_path = ROOT / "docs/generated-games/g1-scripted-game-log.json"
         score = json.loads(score_path.read_text(encoding="utf-8"))
         metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
+        game_log = json.loads(game_log_path.read_text(encoding="utf-8"))
 
         combined = json.dumps({"score": score, "metrics": metrics}, ensure_ascii=False)
         self.assertEqual(score["game_id"], "g1_scripted_001")
@@ -133,6 +135,34 @@ class ScriptedGameArtifactProvenanceTests(unittest.TestCase):
         self.assertIn("[scripted deterministic output]", combined)
         self.assertNotIn("[人工 gold sample]", combined)
         self.assertNotIn("[AI 生成]", combined)
+
+        # Stale provenance: no g001_ / S2_policy in generated artifacts
+        for forbidden in ["g001_", "g001_e", "s2_g001", "s5_g001", "S2_policy"]:
+            self.assertNotIn(forbidden, combined,
+                f"stale provenance token '{forbidden}' found in generated artifacts")
+
+        # All event_id-like values must belong to the generated game or use
+        # the g1_scripted_001_ prefix.
+        current_event_ids = {e["event_id"] for e in game_log["events"]}
+        self.assertGreater(len(current_event_ids), 0, "game log has no events")
+
+        def _check_event_refs(obj, path="root"):
+            if isinstance(obj, dict):
+                for k, v in obj.items():
+                    _check_event_refs(v, f"{path}.{k}")
+            elif isinstance(obj, list):
+                for i, v in enumerate(obj):
+                    _check_event_refs(v, f"{path}[{i}]")
+            elif isinstance(obj, str):
+                if obj.startswith("g1_scripted_001_e"):
+                    self.assertIn(obj, current_event_ids,
+                        f"event ref {obj!r} at {path} not found in generated game events")
+                elif obj.startswith("g001_e"):
+                    self.fail(
+                        f"stale g001 event ref {obj!r} at {path}")
+
+        _check_event_refs(score)
+        _check_event_refs(metrics)
 
     def test_generated_artifacts_are_not_written_to_gold_game(self) -> None:
         generated = sorted(

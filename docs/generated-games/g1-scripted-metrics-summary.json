@@ -137,19 +137,11 @@
   ],
   "known_rubric_gaps_recorded_not_fixed": [
     {
-      "gap": "werewolf_day_vote_without_elimination",
-      "events": [
-        "g001_e033"
-      ],
-      "S2_policy": "count in vote_accuracy metrics; assign outcome_score 0 in score log; do not modify EVALUATION_RUBRIC.md in this PR"
-    },
-    {
       "gap": "witch_day_vote_outcome_not_explicit",
       "events": [
-        "g001_e019",
-        "g001_e034"
+        "g1_scripted_001_e006"
       ],
-      "S2_policy": "count in vote_accuracy metrics; assign outcome_score 0 in score log; do not modify EVALUATION_RUBRIC.md in this PR"
+      "policy": "count in vote_accuracy metrics; assign outcome_score 0 in score log; do not modify EVALUATION_RUBRIC.md in this PR"
     }
   ]
 }
