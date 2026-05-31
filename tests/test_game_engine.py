@@ -131,7 +131,11 @@ class GameEngineEvaluatorPipelineTests(unittest.TestCase):
         from werewolf_eval.render_demo import build_demo_context, render_html
         from werewolf_eval.scoring import score_game, summarize_metrics
 
-        game = load_game_log(ROOT / "docs/generated-games/g1b-mock-agent-game-log.json")
+        game_log_path = ROOT / "docs/generated-games/g1b-mock-agent-game-log.json"
+        raw = json.loads(game_log_path.read_text(encoding="utf-8"))
+        game_source_label = raw["source_label"]
+
+        game = load_game_log(game_log_path)
         decision_log = load_decision_log(
             ROOT / "docs/generated-games/g1b-mock-agent-decision-log.json",
             game,
@@ -139,12 +143,14 @@ class GameEngineEvaluatorPipelineTests(unittest.TestCase):
         score_log = score_game(game, decision_log=decision_log)
         metrics = summarize_metrics(game, score_log)
         attribution = attribute_game(game, score_log, metrics)
-        html = render_html(build_demo_context(game, score_log, metrics, attribution))
+        html = render_html(build_demo_context(game, score_log, metrics, attribution, game_source_label=game_source_label))
 
         self.assertEqual(score_log.game_id, "g1b_mock_001")
         self.assertEqual(metrics.game_id, "g1b_mock_001")
         self.assertIn("g1b_mock_001", html)
         self.assertNotIn("https://", html)
+        self.assertIn("[deterministic mock agent output]", html)
+        self.assertNotIn("[人工 gold sample]", html)
 
     def test_g1b_artifacts_do_not_claim_provider_or_consensus(self) -> None:
         paths = [
@@ -165,8 +171,13 @@ class GameEngineEvaluatorPipelineTests(unittest.TestCase):
             "consensus_log_id",
             "g001_",
             "g1_scripted_001",
+            "[人工 gold sample]",
         ]:
             self.assertNotIn(forbidden, combined)
+
+        demo_html = (ROOT / "docs/demo/phase3-g1b-mock-agent-runtime-demo.html").read_text(encoding="utf-8")
+        self.assertIn("[deterministic mock agent output]", demo_html)
+        self.assertNotIn("[人工 gold sample]", demo_html)
 
         self.assertFalse((ROOT / "docs/generated-games/g1b-mock-agent-consensus-log.json").exists())
 

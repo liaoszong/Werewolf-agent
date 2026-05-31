@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 from html import escape
 from pathlib import Path
 from typing import Any
@@ -55,7 +56,7 @@ def _team_label(team: str) -> str:
     return TEAM_LABELS.get(team, team)
 
 
-def build_demo_context(game: GameLog, score_log: Any, metrics: Any, attribution: Any) -> dict[str, Any]:
+def build_demo_context(game: GameLog, score_log: Any, metrics: Any, attribution: Any, game_source_label: str = "[deterministic]") -> dict[str, Any]:
     score_payload = score_log_to_dict(score_log)
     metrics_payload = metrics_summary_to_dict(metrics)
     attribution_payload = attribution_to_dict(attribution)
@@ -168,7 +169,7 @@ def build_demo_context(game: GameLog, score_log: Any, metrics: Any, attribution:
             "winner_label": _team_label(game.result.winner),
             "end_round": game.result.end_round,
             "end_condition": game.result.end_condition,
-            "source_label": "[scripted deterministic output]" if is_g1a_scripted else "[人工 gold sample]",
+            "source_label": game_source_label,
         },
         "players": player_rows,
         "timeline": timeline,
@@ -292,6 +293,8 @@ def render_html(context: dict[str, Any]) -> str:
 
 
 def write_demo_html(game_log_path: str | Path, output_path: str | Path, decision_log_path: str | Path | None = None, semantic_label_path: str | Path | None = None) -> None:
+    raw = json.loads(Path(game_log_path).read_text(encoding="utf-8"))
+    game_source_label = str(raw.get("source_label", "[deterministic]"))
     game = load_game_log(game_log_path)
     decision_log = load_decision_log(decision_log_path, game) if decision_log_path else None
     if semantic_label_path and decision_log is None:
@@ -300,7 +303,7 @@ def write_demo_html(game_log_path: str | Path, output_path: str | Path, decision
     score_log = score_game(game, decision_log=decision_log, semantic_label_log=semantic_label_log)
     metrics = summarize_metrics(game, score_log)
     attribution = attribute_game(game, score_log, metrics)
-    context = build_demo_context(game, score_log, metrics, attribution)
+    context = build_demo_context(game, score_log, metrics, attribution, game_source_label=game_source_label)
     Path(output_path).write_text(render_html(context), encoding="utf-8")
 
 
