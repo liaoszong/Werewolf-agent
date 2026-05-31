@@ -130,12 +130,13 @@
 - 目标：验证狼人夜间协商层 Consensus Log 的 parser / validator / fixture / CLI。
 - 边界：不做 AI gameplay，不做 S5 语义标注，不接 scoring，不宣称 team coordination scoring 完整可用。
 
-### S5：AI semantic labeling research
+### S5：AI semantic labeling research and saved-label scoring integration
 
-- 状态：`candidate_after_D2_research_first`（Phase 2B semantic input）
-- 依赖：D1；integration 依赖 D2。
-- 目标：研究 provider、prompt、准确率、一致性、token 成本和失败降级。
-- 边界：先做 Research PR / spike，不直接进入 Implementation Plan。
+- 状态：`completed`（Phase 2B semantic input；saved semantic labels can feed deterministic `decision_quality_score`）
+- 产出：`docs/semantic-labeling/s5-label-contract.md` + `docs/gold-game/s5-semantic-label-output.example.json` + `src/werewolf_eval/semantic_labels.py` + `src/werewolf_eval/validate_semantic_labels.py` + `scripts/research/evaluate_semantic_labels.py` + `tests/test_semantic_labels.py` + `tests/test_semantic_label_research.py` + `docs/gold-game/s5-score-log.json` + `docs/gold-game/s5-metrics-summary.json` + `docs/demo/phase2-s5-runtime-demo.html`。
+- 依赖：D1 + D2。
+- 目标：用已保存的 Semantic Label Log 为 Decision Log 对应 Score Records 赋 deterministic `decision_quality_score`。
+- 边界：不做 provider integration，不做 live AI labeling，不做 gameplay，不做 multi-game Leaderboard。
 
 ### G1：Real AI Agent gameplay engine
 
@@ -205,6 +206,13 @@
 - 触发条件：S4 完成。
 - 演示内容：运行时读取 Game Log + Consensus Log → 校验狼人夜间协商结构化输入。
 - 验收：同一输入稳定输出 `validated consensus_log_id=s4_g001_consensus_log`、`game_id=g001`、`consensuses=2`、`source_label=[人工 gold sample]`；invalid participant / refs / status / final target 由 unit tests 覆盖并拒绝。
+
+**Demo 6：Phase 2 S5 saved semantic-label scoring**
+
+- 状态：`completed`（`docs/demo/phase2-s5-runtime-demo.html`）
+- 触发条件：S5 saved-label scoring integration 完成。
+- 演示内容：运行时读取 Game Log + Decision Log + saved Semantic Label Log → 计算 Score Log / Metrics Summary → 输出带 S5 边界声明的 HTML demo。
+- 验收：页面明确说明 semantic labels 来自 saved JSON，不是 live AI labeling；Score Log 中部分 `decision_quality_score` 不再全为 0；`decision_quality_total=1` 可追溯到 label rules。
 
 ---
 

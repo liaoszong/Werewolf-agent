@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 98
+- Entries: 105
 
 ```text
 ./
@@ -50,7 +50,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 ├── docs/
 │   ├── demo/
 │   │   ├── phase1-gold-demo.html
-│   │   └── phase2-runtime-demo.html
+│   │   ├── phase2-runtime-demo.html
+│   │   └── phase2-s5-runtime-demo.html
 │   ├── gold-game/
 │   │   ├── g001-consensus-log.json
 │   │   ├── g001-decision-log.json
@@ -62,6 +63,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   ├── s2-scoring-validation.md
 │   │   ├── s3-attribution-validation.md
 │   │   ├── s3-rule-attribution.json
+│   │   ├── s5-metrics-summary.json
+│   │   ├── s5-score-log.json
 │   │   ├── s5-semantic-label-eval-set.json
 │   │   └── s5-semantic-label-output.example.json
 │   ├── harness/
@@ -81,7 +84,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │       ├── 2026-05-30--roadmap-alignment-plan.md
 │   │       ├── 2026-05-30--s4-consensus-log-runtime-input-plan.md
 │   │       ├── 2026-05-30--s4x-context-budget-hardening-plan.md
-│   │       └── 2026-05-30--s5-semantic-label-research-plan.md
+│   │       ├── 2026-05-30--s5-semantic-label-research-plan.md
+│   │       └── 2026-05-31--s5-semantic-label-scoring-integration-plan.md
 │   ├── prs/
 │   │   ├── 2026-05-30--phase2-next-step-research.md
 │   │   └── 2026-05-30--s5-semantic-label-research.md
@@ -117,9 +121,11 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       ├── render_demo.py
 │       ├── score_game.py
 │       ├── scoring.py
+│       ├── semantic_labels.py
 │       ├── validate_consensus_log.py
 │       ├── validate_decision_log.py
-│       └── validate_game_log.py
+│       ├── validate_game_log.py
+│       └── validate_semantic_labels.py
 ├── tests/
 │   ├── test_attribution.py
 │   ├── test_consensus_log.py
@@ -128,7 +134,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── test_game_log.py
 │   ├── test_render_demo.py
 │   ├── test_scoring.py
-│   └── test_semantic_label_research.py
+│   ├── test_semantic_label_research.py
+│   └── test_semantic_labels.py
 ├── .gitignore
 ├── AGENTS.md
 └── README.md

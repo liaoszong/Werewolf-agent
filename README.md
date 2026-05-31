@@ -24,7 +24,7 @@ AI 狼人杀多智能体协作与博弈评测系统。
 
 ## 当前状态
 
-**Phase 1 deterministic MVP 已完成，Phase 2 evaluator runtime 正在收口。** 当前 main 已包含 E1 Game Log parser / validator、E2 deterministic scorer、E3 rule attribution engine、E4 runtime demo HTML exporter；D1 以 `docs/gold-game/g001-decision-log.json` + `src/werewolf_eval/decision_log.py` 提供 Phase 2 Decision Log runtime input skeleton。下一步路线以 `docs/ROADMAP.md` 为准，当前优先级是 D2 Decision Log scoring integration。当前仍不代表真实 AI Agent 对局、真实 Consensus Log、AI 语义标注或真实多模型 Leaderboard 已完成，`decision_quality_score` 仍未接入评分链。
+**Phase 1 deterministic MVP 已完成，Phase 2 evaluator runtime 已接入 saved S5 semantic labels。** 当前 main 已包含 E1 Game Log parser / validator、E2 deterministic scorer、E3 rule attribution engine、E4 runtime demo HTML exporter、D1 Decision Log runtime input、D2 Decision Log deterministic scoring integration、S4 Consensus Log runtime input、S5 saved semantic-label research harness and scoring integration。当前仍不代表真实 AI Agent 对局、live AI semantic labeling、真实多模型 Leaderboard 或 provider integration 已完成；S5 只消费已保存的 semantic-label JSON，不在运行时调用模型。
 
 Phase 1 不代表真实 AI Agent 对局、真实 Decision Log / Consensus Log 采集、真实多模型 Leaderboard 或真实 `decision_quality_score` 可用。
 
