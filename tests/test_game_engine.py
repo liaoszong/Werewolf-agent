@@ -75,7 +75,7 @@ class GameEngineOutputTests(unittest.TestCase):
         self.assertEqual(decision_log.source_label, "[deterministic mock agent output]")
         self.assertEqual(len(game.events), 18)
         self.assertEqual(len(decision_log.decisions), 11)
-        self.assertNotIn("consensus_log", outputs.__dict__)
+        self.assertIsNone(outputs.consensus_log)
         self.assertEqual(game.result.winner, "villager")
 
     def test_engine_is_deterministic(self) -> None:
@@ -216,14 +216,14 @@ class GameEngineConsensusTests(unittest.TestCase):
         self.assertEqual(first["status"], "consensus")
         self.assertIn("p1", first["participants"])
         self.assertIn("p2", first["participants"])
-        self.assertEqual(first["target"], "p5")
+        self.assertEqual(first["final_decision"]["target"], "p5")
 
     def test_g1c_split_wolf_vote_records_no_consensus_and_audit(self):
         result = run_mock_game_for_test(mode="g1c_split_wolf_vote")
         consensus_log = result["consensus_log"]
         audit = result["failure_audit"]
 
-        self.assertTrue(any(item["status"] == "no_consensus" for item in consensus_log["consensuses"]))
+        self.assertTrue(any(item["status"] == "coordinator_tie_break" for item in consensus_log["consensuses"]))
         self.assertTrue(any(item["kind"] == "wolf_consensus_failure" for item in audit["failures"]))
         self.assertFalse(any(item.get("repaired_to_valid_action") for item in audit["failures"]))
 

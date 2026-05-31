@@ -4,6 +4,20 @@ from dataclasses import dataclass, field
 from typing import Any
 
 MOCK_AGENT_SOURCE_LABEL = "[deterministic mock agent output]"
+CONSENSUS_SOURCE_LABEL = "[deterministic mock agent output]"
+
+
+def build_failure(game_id: str, round_number: int, phase: str, actor: str, kind: str, reason: str, target: str | None = None) -> dict:
+    return {
+        "game_id": game_id,
+        "round": round_number,
+        "phase": phase,
+        "actor": actor,
+        "kind": kind,
+        "target": target,
+        "reason": reason,
+        "repaired_to_valid_action": False,
+    }
 
 
 @dataclass(frozen=True)
@@ -65,6 +79,8 @@ class AgentAction:
 class EngineOutputs:
     game_log: dict[str, Any]
     decision_log: dict[str, Any]
+    consensus_log: dict[str, Any] | None = None
+    failure_audit: dict[str, Any] | None = None
 
 
 def build_default_config(game_id: str = "g1b_mock_001") -> GameConfig:
@@ -250,12 +266,127 @@ class GameEngine:
             known_roles=known_roles,
         )
 
-    def run(self) -> EngineOutputs:
+    def _resolve_wolf_consensus(self, game_id: str, round_num: int, phase: str, wolf_players: list[str], alive: set[str], mode: str, events: list[dict]) -> tuple[dict | None, list[dict], str | None]:
+        """Resolve wolf consensus for a night phase. Returns (consensus_entry, failures, resolved_target)."""
+        failures: list[dict] = []
+        consensus_id = f"{game_id}_consensus_r{round_num:02d}"
+        c_proposals: list[dict] = []
+        c_responses: list[dict] = []
+        valid_targets: list[tuple[str, str]] = []
+
+        for i, wolf_id in enumerate(wolf_players):
+            if mode == "g1c_timeout_parse_failure" and i == 0:
+                failures.append(build_failure(game_id, round_num, phase, wolf_id, "timeout", f"{wolf_id} timed out during night consensus"))
+                continue
+
+            if mode == "g1c_timeout_parse_failure" and i == 1:
+                failures.append(build_failure(game_id, round_num, phase, wolf_id, "parse_failure", f"{wolf_id} produced unparseable action"))
+                continue
+
+            if mode == "g1c_invalid_wolf_action" and i == 0:
+                invalid_target = "p99"
+                failures.append(build_failure(game_id, round_num, phase, wolf_id, "invalid_action", f"{wolf_id} proposed invalid target {invalid_target}", target=invalid_target))
+                continue
+
+            if mode == "g1c_split_wolf_vote":
+                target = "p5" if i == 0 else "p6"
+            else:
+                target = "p5" if round_num == 1 else "p3"
+
+            valid_targets.append((wolf_id, target))
+            c_proposals.append({
+                "proposal_id": i + 1,
+                "proposer": wolf_id,
+                "proposed_target": target,
+                "visible_info_refs": [e["event_id"] for e in events if e["visibility"] in ("public", "all")],
+                "reason_summary": f"{wolf_id} proposes {target}",
+                "confidence": 1.0,
+                "action_round": 1,
+            })
+
+        if not valid_targets:
+            consensus_entry = {
+                "consensus_id": consensus_id,
+                "game_id": game_id,
+                "round": round_num,
+                "phase": phase,
+                "team": "werewolf",
+                "participants": wolf_players,
+                "coordinator": wolf_players[0],
+                "max_rounds": 1,
+                "actual_rounds": 1,
+                "status": "forced_random",
+                "proposals": c_proposals,
+                "responses": c_responses,
+                "final_decision": {
+                    "target": "p5",
+                    "decision_type": "forced_random",
+                    "primary_proposer": wolf_players[0],
+                    "supporters": wolf_players,
+                    "dissenters": [],
+                    "resolution_round": 1,
+                },
+            }
+            return consensus_entry, failures, "p5"
+
+        unique_targets = set(t for _, t in valid_targets)
+        if len(unique_targets) == 1:
+            target = valid_targets[0][1]
+            status = "consensus"
+        else:
+            target = valid_targets[0][1]
+            status = "coordinator_tie_break"
+            failures.append(build_failure(game_id, round_num, phase, "wolf_team", "wolf_consensus_failure", f"split vote: targets {sorted(unique_targets)}", target=target))
+
+        supporters = [w for w, t in valid_targets if t == target]
+        dissenters = [w for w, t in valid_targets if t != target]
+
+        c_responses = [
+            {
+                "response_id": j + 1,
+                "to_proposal_id": j + 1,
+                "responder": w,
+                "response_type": "support_with_reason",
+                "reason_summary": f"{w} supports proposal",
+                "visible_info_refs": [],
+                "action_round": 1,
+            }
+            for j, (w, _) in enumerate(valid_targets)
+        ]
+
+        consensus_entry = {
+            "consensus_id": consensus_id,
+            "game_id": game_id,
+            "round": round_num,
+            "phase": phase,
+            "team": "werewolf",
+            "participants": wolf_players,
+            "coordinator": wolf_players[0],
+            "max_rounds": 1,
+            "actual_rounds": 1,
+            "status": status,
+            "proposals": c_proposals,
+            "responses": c_responses,
+            "final_decision": {
+                "target": target,
+                "decision_type": status,
+                "primary_proposer": supporters[0],
+                "supporters": supporters,
+                "dissenters": dissenters,
+                "resolution_round": 1,
+            },
+        }
+        return consensus_entry, failures, target
+
+    def run(self, mode: str = "g1b_default") -> EngineOutputs:
         game_id = self._config.game_id
         events: list[dict[str, Any]] = []
         decisions: list[dict[str, Any]] = []
         alive: set[str] = {p.player_id for p in self._config.players}
         d_counter = 0
+        is_g1c = mode.startswith("g1c_")
+        consensus_entries: list[dict[str, Any]] = []
+        failure_records: list[dict[str, Any]] = []
 
         def _event(seq: int, phase: str, rnd: int, etype: str, actor: str, target: str, visibility: str, summary: str, refs: list[str] | None = None) -> dict[str, Any]:
             return {
@@ -328,9 +459,19 @@ class GameEngine:
                              "Roles assigned to all 6 players."))
 
         # Night 1: wolf kill
-        wa1 = self._wolf_agent.decide(_wolf_obs("night", 1, ["p1", "p2"]))
-        decisions.append(_decision(wa1.actor, "team", wa1.phase, wa1.action, wa1.target, wa1.decision_type, wa1.reason_summary))
-        events.append(_event(2, "night", 1, wa1.action, wa1.actor, wa1.target, "werewolf_team", f"Wolf team kills {wa1.target}."))
+        if is_g1c:
+            n1_wolves = ["p1", "p2"]
+            c_entry, c_failures, c_target = self._resolve_wolf_consensus(game_id, 1, "night", n1_wolves, alive, mode, events)
+            if c_entry is not None:
+                consensus_entries.append(c_entry)
+            failure_records.extend(c_failures)
+            if c_target is not None:
+                decisions.append(_decision("wolf_team", "team", "night", "werewolf_kill", c_target, "team_coordinated", f"wolf team kills {c_target}"))
+                events.append(_event(2, "night", 1, "werewolf_kill", "wolf_team", c_target, "werewolf_team", f"Wolf team kills {c_target}."))
+        else:
+            wa1 = self._wolf_agent.decide(_wolf_obs("night", 1, ["p1", "p2"]))
+            decisions.append(_decision(wa1.actor, "team", wa1.phase, wa1.action, wa1.target, wa1.decision_type, wa1.reason_summary))
+            events.append(_event(2, "night", 1, wa1.action, wa1.actor, wa1.target, "werewolf_team", f"Wolf team kills {wa1.target}."))
 
         # Night 1: seer check
         sa1 = self._mock_agents["p3"].decide(_player_obs("p3", "night", 1))
@@ -358,9 +499,19 @@ class GameEngine:
         alive.discard("p1")
 
         # Night 2: wolf kill
-        wa3 = self._wolf_agent.decide(_wolf_obs("night", 2, ["p2"]))
-        decisions.append(_decision(wa3.actor, "team", wa3.phase, wa3.action, wa3.target, wa3.decision_type, wa3.reason_summary))
-        events.append(_event(11, "night", 2, wa3.action, wa3.actor, wa3.target, "werewolf_team", f"Wolf team kills {wa3.target}."))
+        if is_g1c:
+            n2_wolves = ["p2"]
+            c_entry, c_failures, c_target = self._resolve_wolf_consensus(game_id, 2, "night", n2_wolves, alive, mode, events)
+            if c_entry is not None:
+                consensus_entries.append(c_entry)
+            failure_records.extend(c_failures)
+            if c_target is not None:
+                decisions.append(_decision("wolf_team", "team", "night", "werewolf_kill", c_target, "team_coordinated", f"wolf team kills {c_target}"))
+                events.append(_event(11, "night", 2, "werewolf_kill", "wolf_team", c_target, "werewolf_team", f"Wolf team kills {c_target}."))
+        else:
+            wa3 = self._wolf_agent.decide(_wolf_obs("night", 2, ["p2"]))
+            decisions.append(_decision(wa3.actor, "team", wa3.phase, wa3.action, wa3.target, wa3.decision_type, wa3.reason_summary))
+            events.append(_event(11, "night", 2, wa3.action, wa3.actor, wa3.target, "werewolf_team", f"Wolf team kills {wa3.target}."))
         events.append(_event(12, "night", 2, "player_died", "system", "p3", "all", "p3 died during the night."))
         alive.discard("p3")
 
@@ -401,4 +552,19 @@ class GameEngine:
         self._decisions = decisions
         self._alive = alive
 
-        return EngineOutputs(game_log=game_log, decision_log=decision_log)
+        consensus_log: dict[str, Any] | None = None
+        failure_audit: dict[str, Any] | None = None
+        if is_g1c:
+            consensus_log = {
+                "consensus_log_id": f"{game_id}_consensus_log",
+                "game_id": game_id,
+                "source_label": CONSENSUS_SOURCE_LABEL,
+                "consensuses": consensus_entries,
+            }
+            failure_audit = {
+                "game_id": game_id,
+                "source_label": CONSENSUS_SOURCE_LABEL,
+                "failures": failure_records,
+            }
+
+        return EngineOutputs(game_log=game_log, decision_log=decision_log, consensus_log=consensus_log, failure_audit=failure_audit)
