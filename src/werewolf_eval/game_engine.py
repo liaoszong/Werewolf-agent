@@ -323,9 +323,9 @@ class GameEngine:
                 known_roles={player_id: p.role},
             )
 
-        # Event 1: setup
-        events.append(_event(1, "setup", 0, "role_assignment", "system", "none", "all",
-                             "Roles assigned: 2 werewolves (p1, p2), 1 seer (p3), 1 witch (p4), 2 villagers (p5, p6)."))
+        # Event 1: setup (public visibility — players know roles exist but not who has which role)
+        events.append(_event(1, "setup", 0, "role_assignment", "system", "none", "public",
+                             "Roles assigned to all 6 players."))
 
         # Night 1: wolf kill
         wa1 = self._wolf_agent.decide(_wolf_obs("night", 1, ["p1", "p2"]))
