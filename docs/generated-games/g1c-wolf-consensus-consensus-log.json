@@ -1,0 +1,101 @@
+{
+  "consensus_log_id": "g1c_wolf_consensus_consensus_log",
+  "game_id": "g1c_wolf_consensus",
+  "source_label": "[deterministic mock agent output]",
+  "consensuses": [
+    {
+      "consensus_id": "g1c_wolf_consensus_consensus_r01",
+      "game_id": "g1c_wolf_consensus",
+      "round": 1,
+      "phase": "night",
+      "team": "werewolf",
+      "participants": [
+        "p1",
+        "p2"
+      ],
+      "coordinator": "p1",
+      "max_rounds": 1,
+      "actual_rounds": 1,
+      "status": "consensus",
+      "proposals": [
+        {
+          "proposal_id": 1,
+          "proposer": "p1",
+          "proposed_target": "p5",
+          "visible_info_refs": [
+            "g1c_wolf_consensus_e001"
+          ],
+          "reason_summary": "p1 proposes p5",
+          "confidence": 1.0,
+          "action_round": 1
+        }
+      ],
+      "responses": [
+        {
+          "response_id": 2,
+          "to_proposal_id": 1,
+          "responder": "p2",
+          "response_type": "support_with_reason",
+          "reason_summary": "p2 supports p1 proposal",
+          "visible_info_refs": [],
+          "action_round": 1
+        }
+      ],
+      "final_decision": {
+        "target": "p5",
+        "decision_type": "consensus",
+        "primary_proposer": "p1",
+        "supporters": [
+          "p1",
+          "p2"
+        ],
+        "dissenters": [],
+        "resolution_round": 1
+      }
+    },
+    {
+      "consensus_id": "g1c_wolf_consensus_consensus_r02",
+      "game_id": "g1c_wolf_consensus",
+      "round": 2,
+      "phase": "night",
+      "team": "werewolf",
+      "participants": [
+        "p2"
+      ],
+      "coordinator": "p2",
+      "max_rounds": 1,
+      "actual_rounds": 1,
+      "status": "consensus",
+      "proposals": [
+        {
+          "proposal_id": 1,
+          "proposer": "p2",
+          "proposed_target": "p3",
+          "visible_info_refs": [
+            "g1c_wolf_consensus_e001",
+            "g1c_wolf_consensus_e005",
+            "g1c_wolf_consensus_e006",
+            "g1c_wolf_consensus_e007",
+            "g1c_wolf_consensus_e008",
+            "g1c_wolf_consensus_e009",
+            "g1c_wolf_consensus_e010"
+          ],
+          "reason_summary": "p2 proposes p3",
+          "confidence": 1.0,
+          "action_round": 1
+        }
+      ],
+      "responses": [],
+      "final_decision": {
+        "target": "p3",
+        "decision_type": "consensus",
+        "primary_proposer": "p2",
+        "supporters": [
+          "p2"
+        ],
+        "dissenters": [],
+        "resolution_round": 1
+      }
+    }
+  ]
+}

@@ -1,0 +1,147 @@
+{
+  "metrics_id": "g1c_wolf_consensus_metrics_summary",
+  "game_id": "g1c_wolf_consensus",
+  "source_game_log": "generated:g1c_wolf_consensus",
+  "source_score_log": "score_log:g1c_wolf_consensus_score_log",
+  "source_label": "[deterministic][decision-log]",
+  "result_metrics": {
+    "winner": "villager",
+    "game_length": 2,
+    "werewolf_survival_rate": 0.0,
+    "villager_survival_rate": 0.75,
+    "margin": 3,
+    "werewolf_win_speed": null,
+    "villager_win_efficiency": 1.0
+  },
+  "process_metrics": {
+    "vote_accuracy_by_player": {
+      "p1": {
+        "accurate_votes": 0,
+        "total_votes": 0,
+        "vote_accuracy": 0.0
+      },
+      "p2": {
+        "accurate_votes": 0,
+        "total_votes": 0,
+        "vote_accuracy": 0.0
+      },
+      "p3": {
+        "accurate_votes": 1,
+        "total_votes": 1,
+        "vote_accuracy": 1.0
+      },
+      "p4": {
+        "accurate_votes": 2,
+        "total_votes": 2,
+        "vote_accuracy": 1.0
+      },
+      "p5": {
+        "accurate_votes": 2,
+        "total_votes": 2,
+        "vote_accuracy": 1.0
+      },
+      "p6": {
+        "accurate_votes": 2,
+        "total_votes": 2,
+        "vote_accuracy": 1.0
+      }
+    },
+    "survival_rounds": {
+      "p1": 1,
+      "p2": 2,
+      "p3": 2,
+      "p4": 2,
+      "p5": 2,
+      "p6": 2
+    },
+    "contradiction_count_by_player": {
+      "p1": 0,
+      "p2": 0,
+      "p3": 0,
+      "p4": 0,
+      "p5": 0,
+      "p6": 0
+    },
+    "info_leak_count_by_player": {
+      "p1": 0,
+      "p2": 0,
+      "p3": 0,
+      "p4": 0,
+      "p5": 0,
+      "p6": 0
+    },
+    "seer_metrics": {
+      "actor": "p3",
+      "check_accuracy": 1.0,
+      "check_targeting": 1.0,
+      "info_conveyed": 0.0,
+      "evidence_event_ids": [
+        "g1c_wolf_consensus_e003"
+      ]
+    },
+    "witch_metrics": {
+      "actor": "p4",
+      "save_accuracy": 1.0,
+      "poison_accuracy": 0.0,
+      "ability_utilization": 0.5,
+      "evidence_event_ids": [
+        "g1c_wolf_consensus_e004"
+      ]
+    },
+    "team_metrics": {
+      "village_vote_cohesion": 1.0,
+      "village_vote_cohesion_by_day": {
+        "round_1": 1.0,
+        "round_2": 1.0
+      },
+      "werewolf_vote_coordination": 0.0,
+      "werewolf_vote_coordination_by_day": {}
+    }
+  },
+  "score_summary": {
+    "player_outcome_scores": {
+      "p1": 0,
+      "p2": 0,
+      "p3": 4,
+      "p4": 1,
+      "p5": 4,
+      "p6": 4
+    },
+    "team_outcome_scores": {
+      "wolf_team": 4
+    },
+    "player_rule_integrity_scores": {
+      "p1": 0,
+      "p2": 0,
+      "p3": 0,
+      "p4": 0,
+      "p5": 0,
+      "p6": 0
+    },
+    "player_decision_quality_scores": {
+      "p1": 0,
+      "p2": 0,
+      "p3": 0,
+      "p4": 0,
+      "p5": 0,
+      "p6": 0
+    }
+  },
+  "metrics_deferred_to_later_spikes": [
+    {
+      "metric": "turn_point_count",
+      "owner": "S3 rule attribution validation",
+      "reason": "turn_point_count is defined as an attribution count; S2 does not compute attribution outputs."
+    }
+  ],
+  "known_rubric_gaps_recorded_not_fixed": [
+    {
+      "gap": "witch_day_vote_outcome_not_explicit",
+      "events": [
+        "g1c_wolf_consensus_e006",
+        "g1c_wolf_consensus_e013"
+      ],
+      "policy": "count in vote_accuracy metrics; assign outcome_score 0 in score log; do not modify EVALUATION_RUBRIC.md in this PR"
+    }
+  ]
+}

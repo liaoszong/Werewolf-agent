@@ -1,0 +1,303 @@
+{
+  "score_log_id": "g1c_wolf_consensus_score_log",
+  "game_id": "g1c_wolf_consensus",
+  "source_game_log": "generated:g1c_wolf_consensus",
+  "source_label": "[deterministic][decision-log]",
+  "phase": "Phase 2A-D2",
+  "scoring_boundary": {
+    "decision_quality_score": 0,
+    "decision_quality_reason": "D2 implements Rubric G.1 Step 1-2 only: deterministic visibility check and decision-to-event traceability. No AI semantic judgment; positive decision_quality_score waits for S5.",
+    "ai_annotations": "none; S5 not enabled",
+    "rule_integrity_default": 0,
+    "rule_integrity_reason": "Illegal visible_info_refs are deterministic rule-integrity violations (-3); otherwise records default to 0."
+  },
+  "records": [
+    {
+      "score_id": "score_g1c_wolf_consensus_e002",
+      "event_id": "g1c_wolf_consensus_e002",
+      "decision_id": "g1c_wolf_consensus_d001",
+      "actor": "wolf_team",
+      "scope": "team",
+      "round": 1,
+      "phase": "night",
+      "action_type": "werewolf_kill",
+      "target": "p5",
+      "outcome_score": 1,
+      "decision_quality_score": 0,
+      "rule_integrity_score": 0,
+      "rules_triggered": [
+        "rubric:E.1.werewolf.kill_villager",
+        "rubric:G.1.no_decision_quality_without_refs"
+      ],
+      "evidence_event_ids": [
+        "g1c_wolf_consensus_e002",
+        "g1c_wolf_consensus_e004"
+      ],
+      "notes": "Wolf team killed p5, who is revealed as villager. Decision g1c_wolf_consensus_d001 has no visible_info_refs; D2 keeps decision_quality_score 0."
+    },
+    {
+      "score_id": "score_g1c_wolf_consensus_e003",
+      "event_id": "g1c_wolf_consensus_e003",
+      "decision_id": "g1c_wolf_consensus_d002",
+      "actor": "p3",
+      "scope": "player",
+      "round": 1,
+      "phase": "night",
+      "action_type": "seer_check",
+      "target": "p1",
+      "outcome_score": 2,
+      "decision_quality_score": 0,
+      "rule_integrity_score": 0,
+      "rules_triggered": [
+        "rubric:E.2.seer.check_werewolf",
+        "rubric:G.1.no_decision_quality_without_refs"
+      ],
+      "evidence_event_ids": [
+        "g1c_wolf_consensus_e003",
+        "g1c_wolf_consensus_e010"
+      ],
+      "notes": "Seer checked p1, who is later revealed as werewolf. Decision g1c_wolf_consensus_d002 has no visible_info_refs; D2 keeps decision_quality_score 0."
+    },
+    {
+      "score_id": "score_g1c_wolf_consensus_e004",
+      "event_id": "g1c_wolf_consensus_e004",
+      "decision_id": "g1c_wolf_consensus_d003",
+      "actor": "p4",
+      "scope": "player",
+      "round": 1,
+      "phase": "night",
+      "action_type": "witch_save",
+      "target": "p5",
+      "outcome_score": 1,
+      "decision_quality_score": 0,
+      "rule_integrity_score": 0,
+      "rules_triggered": [
+        "rubric:E.3.witch.save_villager",
+        "rubric:G.1.no_decision_quality_without_refs"
+      ],
+      "evidence_event_ids": [
+        "g1c_wolf_consensus_e004"
+      ],
+      "notes": "Witch saved p5, who is later revealed as villager. Decision g1c_wolf_consensus_d003 has no visible_info_refs; D2 keeps decision_quality_score 0."
+    },
+    {
+      "score_id": "score_g1c_wolf_consensus_e005",
+      "event_id": "g1c_wolf_consensus_e005",
+      "decision_id": "g1c_wolf_consensus_d004",
+      "actor": "p3",
+      "scope": "player",
+      "round": 1,
+      "phase": "day",
+      "action_type": "player_vote",
+      "target": "p1",
+      "outcome_score": 2,
+      "decision_quality_score": 0,
+      "rule_integrity_score": 0,
+      "rules_triggered": [
+        "rubric:E.2.seer.vote_eliminate_werewolf",
+        "rubric:G.1.decision_logged"
+      ],
+      "evidence_event_ids": [
+        "g1c_wolf_consensus_e005",
+        "g1c_wolf_consensus_e009",
+        "g1c_wolf_consensus_e010",
+        "g1c_wolf_consensus_e001"
+      ],
+      "notes": "Seer p3 voted for p1, who is later revealed as werewolf. Decision g1c_wolf_consensus_d004 has visible refs and non-random type inference_based; D2 records decision_id and preserves decision_quality_score=0. Positive scoring requires S5 AI semantic judgment."
+    },
+    {
+      "score_id": "score_g1c_wolf_consensus_e006",
+      "event_id": "g1c_wolf_consensus_e006",
+      "decision_id": "g1c_wolf_consensus_d005",
+      "actor": "p4",
+      "scope": "player",
+      "round": 1,
+      "phase": "day",
+      "action_type": "player_vote",
+      "target": "p1",
+      "outcome_score": 0,
+      "decision_quality_score": 0,
+      "rule_integrity_score": 0,
+      "rules_triggered": [
+        "rubric-gap:witch_day_vote_outcome_not_explicit",
+        "rubric:G.1.decision_logged"
+      ],
+      "evidence_event_ids": [
+        "g1c_wolf_consensus_e006",
+        "g1c_wolf_consensus_e009",
+        "g1c_wolf_consensus_e010",
+        "g1c_wolf_consensus_e001"
+      ],
+      "notes": "Witch daytime vote is counted in vote_accuracy metrics, but E.3 has no explicit vote outcome row. S2 assigns score 0 and records the rubric gap. Decision g1c_wolf_consensus_d005 has visible refs and non-random type inference_based; D2 records decision_id and preserves decision_quality_score=0. Positive scoring requires S5 AI semantic judgment."
+    },
+    {
+      "score_id": "score_g1c_wolf_consensus_e007",
+      "event_id": "g1c_wolf_consensus_e007",
+      "decision_id": "g1c_wolf_consensus_d006",
+      "actor": "p5",
+      "scope": "player",
+      "round": 1,
+      "phase": "day",
+      "action_type": "player_vote",
+      "target": "p1",
+      "outcome_score": 2,
+      "decision_quality_score": 0,
+      "rule_integrity_score": 0,
+      "rules_triggered": [
+        "rubric:E.4.villager.vote_eliminate_werewolf",
+        "rubric:G.1.decision_logged"
+      ],
+      "evidence_event_ids": [
+        "g1c_wolf_consensus_e007",
+        "g1c_wolf_consensus_e009",
+        "g1c_wolf_consensus_e010",
+        "g1c_wolf_consensus_e001"
+      ],
+      "notes": "Villager p5 voted to eliminate p1, who is revealed as werewolf. Decision g1c_wolf_consensus_d006 has visible refs and non-random type inference_based; D2 records decision_id and preserves decision_quality_score=0. Positive scoring requires S5 AI semantic judgment."
+    },
+    {
+      "score_id": "score_g1c_wolf_consensus_e008",
+      "event_id": "g1c_wolf_consensus_e008",
+      "decision_id": "g1c_wolf_consensus_d007",
+      "actor": "p6",
+      "scope": "player",
+      "round": 1,
+      "phase": "day",
+      "action_type": "player_vote",
+      "target": "p1",
+      "outcome_score": 2,
+      "decision_quality_score": 0,
+      "rule_integrity_score": 0,
+      "rules_triggered": [
+        "rubric:E.4.villager.vote_eliminate_werewolf",
+        "rubric:G.1.decision_logged"
+      ],
+      "evidence_event_ids": [
+        "g1c_wolf_consensus_e008",
+        "g1c_wolf_consensus_e009",
+        "g1c_wolf_consensus_e010",
+        "g1c_wolf_consensus_e001"
+      ],
+      "notes": "Villager p6 voted to eliminate p1, who is revealed as werewolf. Decision g1c_wolf_consensus_d007 has visible refs and non-random type inference_based; D2 records decision_id and preserves decision_quality_score=0. Positive scoring requires S5 AI semantic judgment."
+    },
+    {
+      "score_id": "score_g1c_wolf_consensus_e011",
+      "event_id": "g1c_wolf_consensus_e011",
+      "decision_id": "g1c_wolf_consensus_d008",
+      "actor": "wolf_team",
+      "scope": "team",
+      "round": 2,
+      "phase": "night",
+      "action_type": "werewolf_kill",
+      "target": "p3",
+      "outcome_score": 3,
+      "decision_quality_score": 0,
+      "rule_integrity_score": 0,
+      "rules_triggered": [
+        "rubric:E.1.werewolf.kill_key_villager",
+        "rubric:G.1.no_decision_quality_without_refs"
+      ],
+      "evidence_event_ids": [
+        "g1c_wolf_consensus_e011",
+        "g1c_wolf_consensus_e012"
+      ],
+      "notes": "Wolf team chose a key villager target; p3 is later revealed as seer. Decision g1c_wolf_consensus_d008 has no visible_info_refs; D2 keeps decision_quality_score 0."
+    },
+    {
+      "score_id": "score_g1c_wolf_consensus_e013",
+      "event_id": "g1c_wolf_consensus_e013",
+      "decision_id": "g1c_wolf_consensus_d009",
+      "actor": "p4",
+      "scope": "player",
+      "round": 2,
+      "phase": "day",
+      "action_type": "player_vote",
+      "target": "p2",
+      "outcome_score": 0,
+      "decision_quality_score": 0,
+      "rule_integrity_score": 0,
+      "rules_triggered": [
+        "rubric-gap:witch_day_vote_outcome_not_explicit",
+        "rubric:G.1.decision_logged"
+      ],
+      "evidence_event_ids": [
+        "g1c_wolf_consensus_e013",
+        "g1c_wolf_consensus_e016",
+        "g1c_wolf_consensus_e017",
+        "g1c_wolf_consensus_e001",
+        "g1c_wolf_consensus_e005",
+        "g1c_wolf_consensus_e006",
+        "g1c_wolf_consensus_e007",
+        "g1c_wolf_consensus_e008",
+        "g1c_wolf_consensus_e009",
+        "g1c_wolf_consensus_e010",
+        "g1c_wolf_consensus_e012"
+      ],
+      "notes": "Witch daytime vote is counted in vote_accuracy metrics, but E.3 has no explicit vote outcome row. S2 assigns score 0 and records the rubric gap. Decision g1c_wolf_consensus_d009 has visible refs and non-random type inference_based; D2 records decision_id and preserves decision_quality_score=0. Positive scoring requires S5 AI semantic judgment."
+    },
+    {
+      "score_id": "score_g1c_wolf_consensus_e014",
+      "event_id": "g1c_wolf_consensus_e014",
+      "decision_id": "g1c_wolf_consensus_d010",
+      "actor": "p5",
+      "scope": "player",
+      "round": 2,
+      "phase": "day",
+      "action_type": "player_vote",
+      "target": "p2",
+      "outcome_score": 2,
+      "decision_quality_score": 0,
+      "rule_integrity_score": 0,
+      "rules_triggered": [
+        "rubric:E.4.villager.vote_eliminate_werewolf",
+        "rubric:G.1.decision_logged"
+      ],
+      "evidence_event_ids": [
+        "g1c_wolf_consensus_e014",
+        "g1c_wolf_consensus_e016",
+        "g1c_wolf_consensus_e017",
+        "g1c_wolf_consensus_e001",
+        "g1c_wolf_consensus_e005",
+        "g1c_wolf_consensus_e006",
+        "g1c_wolf_consensus_e007",
+        "g1c_wolf_consensus_e008",
+        "g1c_wolf_consensus_e009",
+        "g1c_wolf_consensus_e010",
+        "g1c_wolf_consensus_e012"
+      ],
+      "notes": "Villager p5 voted to eliminate p2, who is revealed as werewolf. Decision g1c_wolf_consensus_d010 has visible refs and non-random type inference_based; D2 records decision_id and preserves decision_quality_score=0. Positive scoring requires S5 AI semantic judgment."
+    },
+    {
+      "score_id": "score_g1c_wolf_consensus_e015",
+      "event_id": "g1c_wolf_consensus_e015",
+      "decision_id": "g1c_wolf_consensus_d011",
+      "actor": "p6",
+      "scope": "player",
+      "round": 2,
+      "phase": "day",
+      "action_type": "player_vote",
+      "target": "p2",
+      "outcome_score": 2,
+      "decision_quality_score": 0,
+      "rule_integrity_score": 0,
+      "rules_triggered": [
+        "rubric:E.4.villager.vote_eliminate_werewolf",
+        "rubric:G.1.decision_logged"
+      ],
+      "evidence_event_ids": [
+        "g1c_wolf_consensus_e015",
+        "g1c_wolf_consensus_e016",
+        "g1c_wolf_consensus_e017",
+        "g1c_wolf_consensus_e001",
+        "g1c_wolf_consensus_e005",
+        "g1c_wolf_consensus_e006",
+        "g1c_wolf_consensus_e007",
+        "g1c_wolf_consensus_e008",
+        "g1c_wolf_consensus_e009",
+        "g1c_wolf_consensus_e010",
+        "g1c_wolf_consensus_e012"
+      ],
+      "notes": "Villager p6 voted to eliminate p2, who is revealed as werewolf. Decision g1c_wolf_consensus_d011 has visible refs and non-random type inference_based; D2 records decision_id and preserves decision_quality_score=0. Positive scoring requires S5 AI semantic judgment."
+    }
+  ]
+}
