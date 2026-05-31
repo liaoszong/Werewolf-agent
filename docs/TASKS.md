@@ -140,10 +140,11 @@
 
 ### G1：Real AI Agent gameplay engine
 
-- 状态：`phase_3_candidate`
-- 依赖：稳定的 Game Log / Decision Log / scoring contracts；S4 合同稳定后更安全。
-- 目标：实现真实 AI Agent 自动对局，产出结构化 Game Log / Decision Log / Consensus Log。
-- 边界：不属于 Phase 2A evaluator runtime closure。
+- 状态：`phase_3_candidate`; G1a scripted deterministic fresh-log runner completed after implementation.
+- 产出（G1a）：`docs/game-scripts/g1-scripted-game.json` + `src/werewolf_eval/scripted_game.py` + `src/werewolf_eval/run_scripted_game.py` + `docs/generated-games/g1-scripted-game-log.json` + `docs/generated-games/g1-scripted-decision-log.json` + `docs/generated-games/g1-scripted-consensus-log.json` + `docs/generated-games/g1-scripted-score-log.json` + `docs/generated-games/g1-scripted-metrics-summary.json` + `docs/demo/phase3-g1-scripted-runtime-demo.html`。
+- 依赖：稳定的 Game Log / Decision Log / Consensus Log / scoring contracts。
+- 目标：先以 scripted deterministic fresh-log runner 验证 fresh log generation，再进入后续真实 Agent runtime 设计。
+- 边界：G1a 的 Game Log / Decision Log / Consensus Log 是 scripted deterministic output；G1a 不是 Agent runtime output，不接 provider，不调用真实 API，不需要 secrets，不做 network calls，不实现真实狼人协商协议，不实现 live AI gameplay，不实现 Web live observer / human-vs-AI UI，不做 multi-game Leaderboard。
 
 ### L1：Real multi-game Leaderboard
 
@@ -213,6 +214,13 @@
 - 触发条件：S5 saved-label scoring integration 完成。
 - 演示内容：运行时读取 Game Log + Decision Log + saved Semantic Label Log → 计算 Score Log / Metrics Summary → 输出带 S5 边界声明的 HTML demo。
 - 验收：页面明确说明 semantic labels 来自 saved JSON，不是 live AI labeling；Score Log 中部分 `decision_quality_score` 不再全为 0；`decision_quality_total=1` 可追溯到 label rules。
+
+**Demo 7：Phase 3 G1a scripted deterministic fresh-log runner**
+
+- 状态：`completed`（`docs/demo/phase3-g1-scripted-runtime-demo.html`）
+- 触发条件：G1a scripted deterministic fresh-log runner 完成。
+- 演示内容：scripted scenario JSON → scripted deterministic Game Log / Decision Log / Consensus Log → Score Log / Metrics Summary → Runtime HTML Demo。
+- 验收：同一 script 两次生成完全一致；三个 generated logs 均通过现有 validators；generated score log / metrics summary 的 `game_id` 是 `g1_scripted_001` 且不残留 `s2_g001_*`；页面明确标注 scripted deterministic boundary，并明确不代表 live AI Agent gameplay。
 
 ---
 

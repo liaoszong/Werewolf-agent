@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 110
+- Entries: 120
 
 ```text
 ./
@@ -51,7 +51,16 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── demo/
 │   │   ├── phase1-gold-demo.html
 │   │   ├── phase2-runtime-demo.html
-│   │   └── phase2-s5-runtime-demo.html
+│   │   ├── phase2-s5-runtime-demo.html
+│   │   └── phase3-g1-scripted-runtime-demo.html
+│   ├── game-scripts/
+│   │   └── g1-scripted-game.json
+│   ├── generated-games/
+│   │   ├── g1-scripted-consensus-log.json
+│   │   ├── g1-scripted-decision-log.json
+│   │   ├── g1-scripted-game-log.json
+│   │   ├── g1-scripted-metrics-summary.json
+│   │   └── g1-scripted-score-log.json
 │   ├── gold-game/
 │   │   ├── g001-consensus-log.json
 │   │   ├── g001-decision-log.json
@@ -123,8 +132,10 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       ├── decision_log.py
 │       ├── game_log.py
 │       ├── render_demo.py
+│       ├── run_scripted_game.py
 │       ├── score_game.py
 │       ├── scoring.py
+│       ├── scripted_game.py
 │       ├── semantic_labels.py
 │       ├── validate_consensus_log.py
 │       ├── validate_decision_log.py
@@ -139,6 +150,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── test_game_log.py
 │   ├── test_render_demo.py
 │   ├── test_scoring.py
+│   ├── test_scripted_game_runner.py
 │   ├── test_semantic_label_research.py
 │   └── test_semantic_labels.py
 ├── .gitignore
