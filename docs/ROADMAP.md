@@ -38,6 +38,7 @@ The current main branch has completed:
 - S5 saved semantic-label research and scoring integration.
 - G1a scripted deterministic fresh-log runner.
 - G1b deterministic game engine + mock agent contract.
+- G1c wolf consensus + failure recovery.
 
 The current main branch has not completed:
 
@@ -109,7 +110,7 @@ G-track route:
 
 #### G1c: wolf consensus + failure recovery
 
-- Status: `next_candidate`.
+- Status: `completed`.
 - Role: handle werewolf night consensus protocol, invalid action, timeout, parse failure, and audit trail.
 - Boundary: no real provider integration and no repair path that forges valid logs from invalid behavior.
 
@@ -176,7 +177,7 @@ G1 multi-game outputs
 
 ## Current Priority
 
-The next G-track implementation candidate is G1c wolf consensus + failure recovery.
+The next G-track implementation candidate is G1d provider adapter research / fake-provider contract.
 
 Why G1c before G1d/G1e:
 

@@ -24,11 +24,11 @@ AI 狼人杀多智能体协作与博弈评测系统。
 
 ## 当前状态
 
-**Phase 1 deterministic MVP 已完成，Phase 2 evaluator runtime 已接入 saved S5 semantic labels。G1a scripted deterministic fresh-log runner 已完成，G1b deterministic game engine + mock agent contract 已完成。** 当前 main 已包含 E1 Game Log parser / validator、E2 deterministic scorer、E3 rule attribution engine、E4 runtime demo HTML exporter、D1 Decision Log runtime input、D2 Decision Log deterministic scoring integration、S4 Consensus Log runtime input、S5 saved semantic-label research harness and scoring integration、G1a scripted deterministic fresh-log runner、G1b deterministic game engine + mock agent contract（`src/werewolf_eval/game_engine.py` + `src/werewolf_eval/run_mock_game.py` → `docs/generated-games/g1b-mock-agent-*.json` → evaluator pipeline → `docs/demo/phase3-g1b-mock-agent-runtime-demo.html`）。
+**Phase 1 deterministic MVP 已完成，Phase 2 evaluator runtime 已接入 saved S5 semantic labels。G1a scripted deterministic fresh-log runner 已完成，G1b deterministic game engine + mock agent contract 已完成，G1c wolf consensus + failure recovery 已完成。** 当前 main 已包含 E1 Game Log parser / validator、E2 deterministic scorer、E3 rule attribution engine、E4 runtime demo HTML exporter、D1 Decision Log runtime input、D2 Decision Log deterministic scoring integration、S4 Consensus Log runtime input、S5 saved semantic-label research harness and scoring integration、G1a scripted deterministic fresh-log runner、G1b deterministic game engine + mock agent contract、G1c wolf consensus + failure recovery（`src/werewolf_eval/game_engine.py` + `src/werewolf_eval/run_mock_game.py` → `docs/generated-games/g1c-wolf-consensus-*.json` → evaluator pipeline → `docs/demo/phase3-g1c-wolf-consensus-runtime-demo.html`）。
 
-G1b deterministic game engine + mock agent contract 已完成，可用最小 6 人状态机、private observation 和 structured mock `AgentAction` 生成 Game Log / Decision Log，并通过 evaluator pipeline 生成 `docs/demo/phase3-g1b-mock-agent-runtime-demo.html`。这仍不代表 provider-backed gameplay、live AI Agent gameplay、Web live observer、human-vs-AI UI 或 real multi-game Leaderboard 已完成。
+G1c wolf consensus + failure recovery 已完成，可用 WolfTeamMockAgent 方案收集狼人夜间提案、执行确定性共识决议、产生可验证 Consensus Log，并记录 invalid action / timeout / parse failure 审计记录。这仍不代表 provider-backed gameplay、live AI Agent gameplay、Web live observer、human-vs-AI UI 或 real multi-game Leaderboard 已完成。
 
-G-track 后续路线已在 `docs/ROADMAP.md` 固化：G1b 是 deterministic game engine + mock agent contract；G1c 才处理 wolf consensus + failure recovery；G1d 先做 provider adapter research / fake-provider contract；G1e 才允许本地预算受控的 provider-backed single-game smoke。完整 G1 real AI Agent gameplay 仍未完成。
+G-track 后续路线已在 `docs/ROADMAP.md` 固化：G1d 是 provider adapter research / fake-provider contract；G1e 才允许本地预算受控的 provider-backed single-game smoke。完整 G1 real AI Agent gameplay 仍未完成。
 
 Phase 1 不代表真实 AI Agent 对局、真实 Decision Log / Consensus Log 采集、真实多模型 Leaderboard 或真实 `decision_quality_score` 可用。
 

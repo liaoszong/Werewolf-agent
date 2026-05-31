@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 129
+- Entries: 137
 
 ```text
 ./
@@ -53,7 +53,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   ├── phase2-runtime-demo.html
 │   │   ├── phase2-s5-runtime-demo.html
 │   │   ├── phase3-g1-scripted-runtime-demo.html
-│   │   └── phase3-g1b-mock-agent-runtime-demo.html
+│   │   ├── phase3-g1b-mock-agent-runtime-demo.html
+│   │   └── phase3-g1c-wolf-consensus-runtime-demo.html
 │   ├── game-scripts/
 │   │   └── g1-scripted-game.json
 │   ├── generated-games/
@@ -65,7 +66,13 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   ├── g1b-mock-agent-decision-log.json
 │   │   ├── g1b-mock-agent-game-log.json
 │   │   ├── g1b-mock-agent-metrics-summary.json
-│   │   └── g1b-mock-agent-score-log.json
+│   │   ├── g1b-mock-agent-score-log.json
+│   │   ├── g1c-wolf-consensus-consensus-log.json
+│   │   ├── g1c-wolf-consensus-decision-log.json
+│   │   ├── g1c-wolf-consensus-failure-audit.json
+│   │   ├── g1c-wolf-consensus-game-log.json
+│   │   ├── g1c-wolf-consensus-metrics-summary.json
+│   │   └── g1c-wolf-consensus-score-log.json
 │   ├── gold-game/
 │   │   ├── g001-consensus-log.json
 │   │   ├── g001-decision-log.json
@@ -101,6 +108,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │       ├── 2026-05-30--s5-semantic-label-research-plan.md
 │   │       ├── 2026-05-31--g1-scripted-game-runner-plan.md
 │   │       ├── 2026-05-31--g1b-engine-mock-agent-contract-plan.md
+│   │       ├── 2026-05-31--g1c-wolf-consensus-failure-recovery-plan.md
 │   │       ├── 2026-05-31--review-packet-gate-v1-plan.md
 │   │       └── 2026-05-31--s5-semantic-label-scoring-integration-plan.md
 │   ├── prs/
