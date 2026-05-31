@@ -16,7 +16,12 @@ VALID_DECISION_TYPES = {
     "team_coordinated",
     "default",
 }
-VALID_SOURCE_LABELS = {"[人工 gold sample]", "[AI 生成]", "[scripted deterministic output]"}
+VALID_SOURCE_LABELS = {
+    "[人工 gold sample]",
+    "[AI 生成]",
+    "[scripted deterministic output]",
+    "[deterministic mock agent output]",
+}
 ALLOWED_NON_PLAYER_ACTORS = {"wolf_team"}
 ALLOWED_NON_PLAYER_TARGETS = {"none", "villager_team", "werewolf_team"}
 MAX_REASON_SUMMARY_CHARS = 200

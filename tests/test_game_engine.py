@@ -60,5 +60,33 @@ class GameEngineContractTests(unittest.TestCase):
         self.assertEqual(action.source_label, "[deterministic mock agent output]")
 
 
+class GameEngineOutputTests(unittest.TestCase):
+    def test_engine_emits_valid_game_and_decision_logs(self) -> None:
+        from werewolf_eval.decision_log import parse_decision_log
+        from werewolf_eval.game_engine import build_default_config, GameEngine
+        from werewolf_eval.game_log import parse_game_log
+
+        outputs = GameEngine.from_config(build_default_config()).run()
+        game = parse_game_log(outputs.game_log)
+        decision_log = parse_decision_log(outputs.decision_log, game)
+
+        self.assertEqual(game.game_id, "g1b_mock_001")
+        self.assertEqual(outputs.game_log["source_label"], "[deterministic mock agent output]")
+        self.assertEqual(decision_log.source_label, "[deterministic mock agent output]")
+        self.assertEqual(len(game.events), 18)
+        self.assertEqual(len(decision_log.decisions), 11)
+        self.assertNotIn("consensus_log", outputs.__dict__)
+        self.assertEqual(game.result.winner, "villager")
+
+    def test_engine_is_deterministic(self) -> None:
+        from werewolf_eval.game_engine import build_default_config, GameEngine
+
+        first = GameEngine.from_config(build_default_config()).run()
+        second = GameEngine.from_config(build_default_config()).run()
+
+        self.assertEqual(first.game_log, second.game_log)
+        self.assertEqual(first.decision_log, second.decision_log)
+
+
 if __name__ == "__main__":
     unittest.main()

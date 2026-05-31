@@ -126,6 +126,19 @@ class DecisionLogTests(unittest.TestCase):
         decision_log = parse_decision_log(raw, self.game)
         self.assertEqual(decision_log.source_label, "[scripted deterministic output]")
 
+    def test_accepts_deterministic_mock_agent_source_label(self) -> None:
+        raw = self._minimal_raw()
+        raw["source_label"] = "[deterministic mock agent output]"
+        decision_log = parse_decision_log(raw, self.game)
+        self.assertEqual(decision_log.source_label, "[deterministic mock agent output]")
+
+    def test_rejects_freeform_mock_output_label(self) -> None:
+        raw = self._minimal_raw()
+        raw["source_label"] = "[freeform mock output]"
+
+        with self.assertRaisesRegex(DecisionLogValidationError, "invalid source_label"):
+            parse_decision_log(raw, self.game)
+
 
 if __name__ == "__main__":
     unittest.main()
