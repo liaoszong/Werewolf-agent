@@ -17,3 +17,4 @@ __pycache__/
 docs/generated-context/*.index.json
 docs/generated-context/current-task.ctx.md
 .logs/validate/
+.logs/review/
