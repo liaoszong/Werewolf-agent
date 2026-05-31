@@ -37,6 +37,7 @@ The current main branch has completed:
 - S4 Consensus Log runtime/input.
 - S5 saved semantic-label research and scoring integration.
 - G1a scripted deterministic fresh-log runner.
+- G1b deterministic game engine + mock agent contract.
 
 The current main branch has not completed:
 
@@ -102,13 +103,13 @@ G-track route:
 
 #### G1b: deterministic game engine + mock agent contract
 
-- Status: `next_candidate`.
+- Status: `completed`.
 - Role: establish the minimal 6-player Werewolf state machine, private observation model, structured `AgentAction`, and mock agents.
 - Boundary: no provider integration, no live AI, no Web live observer.
 
 #### G1c: wolf consensus + failure recovery
 
-- Status: `future_candidate`.
+- Status: `next_candidate`.
 - Role: handle werewolf night consensus protocol, invalid action, timeout, parse failure, and audit trail.
 - Boundary: no real provider integration and no repair path that forges valid logs from invalid behavior.
 
@@ -175,12 +176,12 @@ G1 multi-game outputs
 
 ## Current Priority
 
-The next G-track implementation candidate is G1b deterministic game engine + mock agent contract.
+The next G-track implementation candidate is G1c wolf consensus + failure recovery.
 
-Why G1b before G1c/G1d/G1e:
+Why G1c before G1d/G1e:
 
 - G1a already proves fresh generated logs can feed validators, scoring, metrics, and replay demo.
-- G1b supplies the deterministic state machine, private observations, and structured `AgentAction` contract needed before consensus or provider work.
+- G1b supplies the deterministic state machine, private observations, and structured `AgentAction` contract.
 - G1c failure recovery needs a real engine/action contract to reject invalid behavior without forging valid logs.
 - G1d provider research needs a fake-provider contract so cost, timeout, secrets, and adapter behavior can be studied before live API calls.
 - G1e must wait for G1d and remains a single-game smoke, not a CI job, multi-game Leaderboard, or human-vs-AI product.

@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 120
+- Entries: 129
 
 ```text
 ./
@@ -52,7 +52,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   ├── phase1-gold-demo.html
 │   │   ├── phase2-runtime-demo.html
 │   │   ├── phase2-s5-runtime-demo.html
-│   │   └── phase3-g1-scripted-runtime-demo.html
+│   │   ├── phase3-g1-scripted-runtime-demo.html
+│   │   └── phase3-g1b-mock-agent-runtime-demo.html
 │   ├── game-scripts/
 │   │   └── g1-scripted-game.json
 │   ├── generated-games/
@@ -60,7 +61,11 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   ├── g1-scripted-decision-log.json
 │   │   ├── g1-scripted-game-log.json
 │   │   ├── g1-scripted-metrics-summary.json
-│   │   └── g1-scripted-score-log.json
+│   │   ├── g1-scripted-score-log.json
+│   │   ├── g1b-mock-agent-decision-log.json
+│   │   ├── g1b-mock-agent-game-log.json
+│   │   ├── g1b-mock-agent-metrics-summary.json
+│   │   └── g1b-mock-agent-score-log.json
 │   ├── gold-game/
 │   │   ├── g001-consensus-log.json
 │   │   ├── g001-decision-log.json
@@ -95,6 +100,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │       ├── 2026-05-30--s4x-context-budget-hardening-plan.md
 │   │       ├── 2026-05-30--s5-semantic-label-research-plan.md
 │   │       ├── 2026-05-31--g1-scripted-game-runner-plan.md
+│   │       ├── 2026-05-31--g1b-engine-mock-agent-contract-plan.md
 │   │       ├── 2026-05-31--review-packet-gate-v1-plan.md
 │   │       └── 2026-05-31--s5-semantic-label-scoring-integration-plan.md
 │   ├── prs/
@@ -130,8 +136,10 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       ├── attribution.py
 │       ├── consensus_log.py
 │       ├── decision_log.py
+│       ├── game_engine.py
 │       ├── game_log.py
 │       ├── render_demo.py
+│       ├── run_mock_game.py
 │       ├── run_scripted_game.py
 │       ├── score_game.py
 │       ├── scoring.py
@@ -147,6 +155,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── test_consensus_log.py
 │   ├── test_context_budget.py
 │   ├── test_decision_log.py
+│   ├── test_game_engine.py
 │   ├── test_game_log.py
 │   ├── test_render_demo.py
 │   ├── test_scoring.py
