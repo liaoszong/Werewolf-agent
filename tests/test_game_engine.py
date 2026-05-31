@@ -123,5 +123,53 @@ class GameEngineCliTests(unittest.TestCase):
             self.assertEqual(decision["source_label"], "[deterministic mock agent output]")
 
 
+class GameEngineEvaluatorPipelineTests(unittest.TestCase):
+    def test_g1b_generated_logs_can_be_scored_and_rendered(self) -> None:
+        from werewolf_eval.attribution import attribute_game
+        from werewolf_eval.decision_log import load_decision_log
+        from werewolf_eval.game_log import load_game_log
+        from werewolf_eval.render_demo import build_demo_context, render_html
+        from werewolf_eval.scoring import score_game, summarize_metrics
+
+        game = load_game_log(ROOT / "docs/generated-games/g1b-mock-agent-game-log.json")
+        decision_log = load_decision_log(
+            ROOT / "docs/generated-games/g1b-mock-agent-decision-log.json",
+            game,
+        )
+        score_log = score_game(game, decision_log=decision_log)
+        metrics = summarize_metrics(game, score_log)
+        attribution = attribute_game(game, score_log, metrics)
+        html = render_html(build_demo_context(game, score_log, metrics, attribution))
+
+        self.assertEqual(score_log.game_id, "g1b_mock_001")
+        self.assertEqual(metrics.game_id, "g1b_mock_001")
+        self.assertIn("g1b_mock_001", html)
+        self.assertNotIn("https://", html)
+
+    def test_g1b_artifacts_do_not_claim_provider_or_consensus(self) -> None:
+        paths = [
+            ROOT / "docs/generated-games/g1b-mock-agent-game-log.json",
+            ROOT / "docs/generated-games/g1b-mock-agent-decision-log.json",
+            ROOT / "docs/generated-games/g1b-mock-agent-score-log.json",
+            ROOT / "docs/generated-games/g1b-mock-agent-metrics-summary.json",
+            ROOT / "docs/demo/phase3-g1b-mock-agent-runtime-demo.html",
+        ]
+        combined = "\n".join(path.read_text(encoding="utf-8") for path in paths)
+
+        self.assertIn("[deterministic mock agent output]", combined)
+        for forbidden in [
+            "provider-backed",
+            "live AI Agent gameplay",
+            "human-vs-AI UI",
+            "real multi-game Leaderboard",
+            "consensus_log_id",
+            "g001_",
+            "g1_scripted_001",
+        ]:
+            self.assertNotIn(forbidden, combined)
+
+        self.assertFalse((ROOT / "docs/generated-games/g1b-mock-agent-consensus-log.json").exists())
+
+
 if __name__ == "__main__":
     unittest.main()
