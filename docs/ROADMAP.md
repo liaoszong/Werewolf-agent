@@ -2,7 +2,7 @@
 
 ## Purpose
 
-`ROADMAP.md` is the canonical route alignment document for Phase 2 / Phase 3 planning. It explains what the project is ultimately trying to become, where the current main branch stands, and why the next task order is D2 before S4/S5/G1.
+`ROADMAP.md` is the canonical route alignment document for Phase 2 / Phase 3 planning. It explains what the project is ultimately trying to become, where the current main branch stands, and how the G-track proceeds after G1a.
 
 This document does not replace `docs/TASKS.md`. `TASKS.md` tracks task status and implementation candidates. Implementation details still live in bound plans under `docs/harness/plans/`.
 
@@ -33,13 +33,16 @@ The current main branch has completed:
 - E4 runtime demo HTML exporter.
 - D1 Decision Log runtime input skeleton.
 - R1 Phase 2 next-step research.
+- D2 Decision Log scoring integration.
+- S4 Consensus Log runtime/input.
+- S5 saved semantic-label research and scoring integration.
+- G1a scripted deterministic fresh-log runner.
 
 The current main branch has not completed:
 
-- D2 Decision Log scoring integration.
-- S4 Consensus Log runtime/input.
-- S5 AI semantic labeling research or integration.
 - G1 real AI Agent gameplay engine.
+- live provider integration.
+- human-vs-AI UI.
 - L1 real multi-game Leaderboard.
 
 ## Phase Boundaries
@@ -68,36 +71,60 @@ Minimum closure route:
 Game Log + Decision Log -> Score Log / Metrics Summary -> Rule Attribution -> Runtime HTML Demo
 ```
 
-Current priority: D2 Decision Log scoring integration.
+Status: completed.
 
-D2 must connect D1 Decision Log input to scoring so `decision_quality_score` is no longer globally fixed at 0. D2 is deterministic and does not call AI.
+D2 connected D1 Decision Log input to scoring through deterministic visibility checks and decision-to-event traceability. Positive semantic decision-quality scoring is handled only by saved S5 semantic labels; Phase 2A does not call live AI.
 
 ### Phase 2B: collaboration and semantic inputs
 
-Goal: add the next runtime inputs needed for stronger evaluation.
+Goal: add collaboration and semantic inputs needed for stronger evaluation.
 
-Candidate tasks:
+Completed entries:
 
 - S4 Consensus Log runtime/input: validate wolf-team coordination logs.
-- S5 AI semantic labeling research: evaluate provider, prompt, accuracy, consistency, token cost, and fallback behavior.
+- S5 saved semantic-label research and scoring integration: consume saved semantic-label JSON and map it into deterministic `decision_quality_score`.
 
-Boundary: S5 integration should not happen before D2 because AI labels need a scoring consumer.
+Status: completed for S4 runtime/input and S5 saved-label scoring integration.
 
-### Phase 3 / G-track: real AI Agent gameplay
+Boundary: S5 consumes saved semantic-label JSON. It does not perform live AI labeling, provider integration, gameplay, or multi-game Leaderboard aggregation.
 
-Goal: introduce real AI Agent automatic gameplay after evaluator and log contracts are stable.
+### Phase 3 / G-track: gameplay route
 
-G1 requires:
+Goal: move from scripted fresh-log generation toward real AI Agent gameplay without skipping deterministic engine, action-contract, failure-recovery, and provider-boundary gates.
 
-- game engine or round driver
-- Agent runtime
-- provider adapter boundary
-- structured Game Log generation
-- structured Decision Log generation
-- Consensus Log generation for wolf-team nights
-- failure recovery and invalid-output handling
+G-track route:
 
-Boundary: G1 is not Phase 2A. It is a later gameplay track.
+#### G1a: scripted deterministic fresh-log runner
+
+- Status: `completed`.
+- Role: reads scripted scenario JSON and deterministically generates fresh Game Log / Decision Log / Consensus Log, then connects those logs to the evaluator and replay demo.
+- Boundary: not Agent runtime, not provider integration, not live AI gameplay.
+
+#### G1b: deterministic game engine + mock agent contract
+
+- Status: `next_candidate`.
+- Role: establish the minimal 6-player Werewolf state machine, private observation model, structured `AgentAction`, and mock agents.
+- Boundary: no provider integration, no live AI, no Web live observer.
+
+#### G1c: wolf consensus + failure recovery
+
+- Status: `future_candidate`.
+- Role: handle werewolf night consensus protocol, invalid action, timeout, parse failure, and audit trail.
+- Boundary: no real provider integration and no repair path that forges valid logs from invalid behavior.
+
+#### G1d: provider adapter research / fake-provider contract
+
+- Status: `future_research_candidate`.
+- Role: research provider boundary, secrets, cost, timeout behavior, and fake-provider contract.
+- Boundary: Research PR first; do not connect live APIs directly from this route note.
+
+#### G1e: provider-backed single-game smoke
+
+- Status: `future_candidate_after_G1d`.
+- Role: run one local, budget-controlled provider-backed game after G1d establishes the boundary.
+- Boundary: no CI live calls, no multi-game Leaderboard, no human-vs-AI UI.
+
+Full G1 real AI Agent gameplay is not complete until the G1b-G1e gates establish a real engine, real action loop, provider boundary, failure recovery, and a provider-backed single-game smoke. G1a alone proves fresh-log generation and evaluator compatibility, not live Agent gameplay.
 
 ### Phase 3+ / L-track: real multi-game Leaderboard
 
@@ -129,14 +156,18 @@ E1 Game Log parser
   -> S4 Consensus Log runtime/input
 
 D1 Decision Log input
-  -> S5 AI semantic labeling research / spike
+  -> S5 saved semantic-label research / spike
 
 D1 Decision Log input
   + D2 Decision Log scoring integration
-  -> S5 AI semantic labeling scoring integration
+  -> S5 saved semantic-label scoring integration
 
 E1 + D1 + D2 + S4 contracts
-  -> G1 real AI Agent gameplay
+  -> G1a scripted deterministic fresh-log runner
+  -> G1b deterministic game engine + mock agent contract
+  -> G1c wolf consensus + failure recovery
+  -> G1d provider adapter research / fake-provider contract
+  -> G1e provider-backed single-game smoke
 
 G1 multi-game outputs
   -> L1 real multi-game Leaderboard
@@ -144,14 +175,15 @@ G1 multi-game outputs
 
 ## Current Priority
 
-The next implementation priority is D2 Decision Log scoring integration.
+The next G-track implementation candidate is G1b deterministic game engine + mock agent contract.
 
-Why D2 before S4/S5/G1:
+Why G1b before G1c/G1d/G1e:
 
-- D2 closes the most important current scoring gap: `decision_quality_score` is still not connected to scoring.
-- S4 is valuable but only covers wolf-team coordination.
-- S5 needs D2 because semantic labels need a scoring consumer.
-- G1 real gameplay should wait until evaluator and log contracts are stable enough to score generated games.
+- G1a already proves fresh generated logs can feed validators, scoring, metrics, and replay demo.
+- G1b supplies the deterministic state machine, private observations, and structured `AgentAction` contract needed before consensus or provider work.
+- G1c failure recovery needs a real engine/action contract to reject invalid behavior without forging valid logs.
+- G1d provider research needs a fake-provider contract so cost, timeout, secrets, and adapter behavior can be studied before live API calls.
+- G1e must wait for G1d and remains a single-game smoke, not a CI job, multi-game Leaderboard, or human-vs-AI product.
 
 ## Explicit Non-goals
 
@@ -165,7 +197,9 @@ Current Phase 2A does not do:
 - full natural-language review reports
 - human-vs-AI UI
 
-D2 specifically must not claim full `decision_quality_score` quality. It only starts the deterministic scoring path. AI-assisted semantic checks remain S5.
+`decision_quality_score` quality beyond deterministic visibility checks comes only from saved S5 semantic-label JSON. Live AI semantic labeling remains outside the completed runtime.
+
+G1a specifically must not be described as live AI Agent gameplay, provider-backed gameplay, Web live observer, human-vs-AI UI, or real multi-game Leaderboard. It is scripted deterministic fresh-log generation plus evaluator/replay compatibility only.
 
 ## Document Responsibility Map
 

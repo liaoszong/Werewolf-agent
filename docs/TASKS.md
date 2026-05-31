@@ -81,7 +81,7 @@
 
 ## Phase 2 Candidate Engineering Tasks
 
-**E1-E4 与 D1 已作为 Phase 2 runtime entries 完成。** 当前 Phase 2A 优先级是 D2 Decision Log scoring integration。S4/S5 在 D2 后推进；G1/L1 属于 Phase 3 / Phase 3+ 路线。以下记录各工程任务的完成状态与产物路径，阶段边界以 `docs/ROADMAP.md` 为准。
+**E1-E4、D1/D2、S4/S5 已作为 Phase 2 runtime / input entries 完成，G1a 已作为 Phase 3 scripted deterministic fresh-log runner 完成。** 下一候选开发点是 G1b deterministic game engine + mock agent contract；G1 完整 real AI Agent gameplay 和 L1 real multi-game Leaderboard 仍未完成。以下记录各工程任务的完成状态与产物路径，阶段边界以 `docs/ROADMAP.md` 为准。
 
 ### E1：Game Log 解析器
 
@@ -140,11 +140,38 @@
 
 ### G1：Real AI Agent gameplay engine
 
-- 状态：`phase_3_candidate`; G1a scripted deterministic fresh-log runner completed after implementation.
-- 产出（G1a）：`docs/game-scripts/g1-scripted-game.json` + `src/werewolf_eval/scripted_game.py` + `src/werewolf_eval/run_scripted_game.py` + `docs/generated-games/g1-scripted-game-log.json` + `docs/generated-games/g1-scripted-decision-log.json` + `docs/generated-games/g1-scripted-consensus-log.json` + `docs/generated-games/g1-scripted-score-log.json` + `docs/generated-games/g1-scripted-metrics-summary.json` + `docs/demo/phase3-g1-scripted-runtime-demo.html`。
-- 依赖：稳定的 Game Log / Decision Log / Consensus Log / scoring contracts。
-- 目标：先以 scripted deterministic fresh-log runner 验证 fresh log generation，再进入后续真实 Agent runtime 设计。
-- 边界：G1a 的 Game Log / Decision Log / Consensus Log 是 scripted deterministic output；G1a 不是 Agent runtime output，不接 provider，不调用真实 API，不需要 secrets，不做 network calls，不实现真实狼人协商协议，不实现 live AI gameplay，不实现 Web live observer / human-vs-AI UI，不做 multi-game Leaderboard。
+G-track 子阶段以 `docs/ROADMAP.md` 为准；这里记录执行状态和候选工程任务。
+
+#### G1a：scripted deterministic fresh-log runner
+
+- 状态：`completed`
+- 产出：`docs/game-scripts/g1-scripted-game.json` + `src/werewolf_eval/scripted_game.py` + `src/werewolf_eval/run_scripted_game.py` + `docs/generated-games/g1-scripted-game-log.json` + `docs/generated-games/g1-scripted-decision-log.json` + `docs/generated-games/g1-scripted-consensus-log.json` + `docs/generated-games/g1-scripted-score-log.json` + `docs/generated-games/g1-scripted-metrics-summary.json` + `docs/demo/phase3-g1-scripted-runtime-demo.html`。
+- 作用：从 scripted scenario JSON 确定性生成 Game Log / Decision Log / Consensus Log，并接入 evaluator + replay demo。
+- 边界：不是 Agent runtime，不接 provider，不做 live AI gameplay，不做 Web live observer / human-vs-AI UI，不做 real multi-game Leaderboard。
+
+#### G1b：deterministic game engine + mock agent contract
+
+- 状态：`next_candidate`
+- 作用：建立最小 6 人狼人杀状态机、private observation、structured `AgentAction`、mock agent。
+- 边界：不接 provider，不做 live AI，不做 Web live observer。
+
+#### G1c：wolf consensus + failure recovery
+
+- 状态：`future_candidate`
+- 作用：处理狼人夜间协商协议、invalid action、timeout、parse failure、audit trail。
+- 边界：不做真实 provider，不伪造合法日志。
+
+#### G1d：provider adapter research / fake-provider contract
+
+- 状态：`future_research_candidate`
+- 作用：研究 provider boundary、secrets、成本、超时、fake provider contract。
+- 边界：Research PR 优先，不直接接 live API。
+
+#### G1e：provider-backed single-game smoke
+
+- 状态：`future_candidate_after_G1d`
+- 作用：本地预算受控地跑一局 provider-backed game。
+- 边界：不做 CI live calls，不做 multi-game Leaderboard，不做人机 UI。
 
 ### L1：Real multi-game Leaderboard
 

@@ -29,7 +29,7 @@ Telegraph style. Root rules only. Read scoped AGENTS.md before subtree work. Ski
 - 评分体系事实来源：`@docs/EVALUATION_RUBRIC.md`。不要在 AGENTS.md 中复制评分公式。
 - 产品定义事实来源：`@docs/PRODUCT_ONE_PAGER.md`。
 - Phase 1 / Phase 2 / Phase 3 切分定义：`@docs/PRODUCT_ONE_PAGER.md` 和 `@docs/TASKS.md`。
-- Phase 2 / Phase 3 总路线以 `@docs/ROADMAP.md` 为准；`docs/TASKS.md` 只记录任务状态和候选工程任务。
+- Phase 2 / Phase 3 总路线以 `@docs/ROADMAP.md` 为准；G-track 子阶段（G1a-G1e）也以 `@docs/ROADMAP.md` 为准；`docs/TASKS.md` 只记录任务状态和候选工程任务。
 - S4/S5 和 E1-E4 已转入 Phase 2 路由：Phase 1 closure 不再阻塞于人工 Consensus Log sample 或 AI 语义标注；E1-E4 只有在 Phase 2 Implementation Plan 明确允许业务代码后才能启动。
 
 ## 地图 MAP
@@ -85,7 +85,7 @@ Telegraph style. Root rules only. Read scoped AGENTS.md before subtree work. Ski
 - 生成代码目录：`src/werewolf_eval/`。
 - Phase 1 不创建 `src/` `apps/` `server/` `web/` 等实现目录。
 - Phase 1 closure 以 S0/S1/S2/S3/S6 为 deterministic MVP 验收链；S4/S5 延后到 Phase 2。
-- Phase 2 运行时代码必须绑定 Implementation Plan；当前已完成 runtime entries 为 E1/E2/E3/E4/D1。
+- Phase 2 / Phase 3 运行时代码必须绑定 Implementation Plan；当前已完成 runtime entries 和 G-track 产物见 `@docs/TASKS.md`，当前路线事实见 `@docs/ROADMAP.md`。
 
 ## 测试约束
 
