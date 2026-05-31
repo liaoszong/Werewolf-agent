@@ -173,6 +173,48 @@ class DeterministicScorerTests(unittest.TestCase):
         self.assertIn("decision_log=enabled", result.stdout)
         self.assertIn("decision_quality_total=", result.stdout)
 
+    def test_score_game_cli_accepts_semantic_labels(self) -> None:
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "werewolf_eval.score_game",
+                str(ROOT / "docs/gold-game/g001-game-log.json"),
+                "--decision-log",
+                str(ROOT / "docs/gold-game/g001-decision-log.json"),
+                "--semantic-labels",
+                str(ROOT / "docs/gold-game/s5-semantic-label-output.example.json"),
+            ],
+            cwd=ROOT,
+            env={"PYTHONPATH": str(ROOT / "src")},
+            text=True,
+            capture_output=True,
+            check=True,
+        )
+
+        self.assertIn("decision_log=enabled", result.stdout)
+        self.assertIn("semantic_labels=enabled", result.stdout)
+        self.assertIn("decision_quality_total=1", result.stdout)
+
+    def test_score_game_cli_rejects_semantic_labels_without_decision_log(self) -> None:
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "werewolf_eval.score_game",
+                str(ROOT / "docs/gold-game/g001-game-log.json"),
+                "--semantic-labels",
+                str(ROOT / "docs/gold-game/s5-semantic-label-output.example.json"),
+            ],
+            cwd=ROOT,
+            env={"PYTHONPATH": str(ROOT / "src")},
+            text=True,
+            capture_output=True,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("--semantic-labels requires --decision-log", result.stderr)
+
     def test_s5_semantic_labels_assign_decision_quality_scores(self) -> None:
         records = {record.event_id: record for record in self.s5_score_log.records}
 

@@ -12,6 +12,7 @@ from werewolf_eval.scoring import (
     score_log_to_dict,
     summarize_metrics,
 )
+from werewolf_eval.semantic_labels import load_semantic_label_log
 
 
 def _write_json(path: str, payload: dict) -> None:
@@ -22,13 +23,18 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Compute deterministic Werewolf-agent Score Log and Metrics Summary.")
     parser.add_argument("path", help="Path to Game Log JSON")
     parser.add_argument("--decision-log", help="Optional path to Decision Log JSON for D2 deterministic decision-quality scoring")
+    parser.add_argument("--semantic-labels", help="Optional path to saved S5 Semantic Label Log JSON. Requires --decision-log.")
     parser.add_argument("--score-log-out", help="Optional path for generated Score Log JSON")
     parser.add_argument("--metrics-out", help="Optional path for generated Metrics Summary JSON")
     args = parser.parse_args()
 
     game = load_game_log(args.path)
     decision_log = load_decision_log(args.decision_log, game) if args.decision_log else None
-    score_log = score_game(game, decision_log=decision_log)
+
+    if args.semantic_labels and decision_log is None:
+        parser.error("--semantic-labels requires --decision-log")
+    semantic_label_log = load_semantic_label_log(args.semantic_labels, decision_log) if args.semantic_labels else None
+    score_log = score_game(game, decision_log=decision_log, semantic_label_log=semantic_label_log)
     metrics = summarize_metrics(game, score_log)
 
     score_payload = score_log_to_dict(score_log)
@@ -45,6 +51,7 @@ def main() -> int:
     print(f"game_length={metrics.result_metrics.game_length}")
     print(f"wolf_team_outcome_score={metrics.score_summary.team_outcome_scores.get('wolf_team', 0)}")
     print(f"decision_log={'enabled' if decision_log else 'disabled'}")
+    print(f"semantic_labels={'enabled' if semantic_label_log else 'disabled'}")
     print(f"decision_quality_total={sum(record.decision_quality_score for record in score_log.records)}")
     return 0
 
