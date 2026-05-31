@@ -182,5 +182,68 @@ class GameEngineEvaluatorPipelineTests(unittest.TestCase):
         self.assertFalse((ROOT / "docs/generated-games/g1b-mock-agent-consensus-log.json").exists())
 
 
+def run_mock_game_for_test(mode: str = "g1c_consensus") -> dict:
+    from werewolf_eval.game_engine import GameEngine, build_default_config
+
+    game_id_map = {
+        "g1c_consensus": "g1c_wolf_consensus",
+        "g1c_split_wolf_vote": "g1c_split_wolf_vote",
+        "g1c_invalid_wolf_action": "g1c_invalid_wolf_action",
+        "g1c_timeout_parse_failure": "g1c_timeout_parse_failure",
+    }
+    game_id = game_id_map.get(mode, "g1c_wolf_consensus")
+    outputs = GameEngine.from_config(build_default_config(game_id=game_id)).run(mode=mode)
+
+    return {
+        "game_log": outputs.game_log,
+        "decision_log": outputs.decision_log,
+        "consensus_log": getattr(outputs, "consensus_log", {}),
+        "failure_audit": getattr(outputs, "failure_audit", {}),
+    }
+
+
+class GameEngineConsensusTests(unittest.TestCase):
+    def test_g1c_wolf_consensus_log_is_emitted_for_valid_night_kill(self):
+        result = run_mock_game_for_test(mode="g1c_consensus")
+        consensus_log = result["consensus_log"]
+
+        self.assertEqual(consensus_log["game_id"], result["game_log"]["game_id"])
+        self.assertEqual(consensus_log["source_label"], "[deterministic mock agent output]")
+        self.assertGreaterEqual(len(consensus_log["consensuses"]), 1)
+
+        first = consensus_log["consensuses"][0]
+        self.assertEqual(first["phase"], "night")
+        self.assertEqual(first["status"], "consensus")
+        self.assertIn("p1", first["participants"])
+        self.assertIn("p2", first["participants"])
+        self.assertEqual(first["target"], "p5")
+
+    def test_g1c_split_wolf_vote_records_no_consensus_and_audit(self):
+        result = run_mock_game_for_test(mode="g1c_split_wolf_vote")
+        consensus_log = result["consensus_log"]
+        audit = result["failure_audit"]
+
+        self.assertTrue(any(item["status"] == "no_consensus" for item in consensus_log["consensuses"]))
+        self.assertTrue(any(item["kind"] == "wolf_consensus_failure" for item in audit["failures"]))
+        self.assertFalse(any(item.get("repaired_to_valid_action") for item in audit["failures"]))
+
+    def test_g1c_invalid_wolf_action_is_rejected_not_repaired(self):
+        result = run_mock_game_for_test(mode="g1c_invalid_wolf_action")
+        audit = result["failure_audit"]
+        decision_log = result["decision_log"]
+
+        self.assertTrue(any(item["kind"] == "invalid_action" for item in audit["failures"]))
+        invalid_targets = {item["target"] for item in audit["failures"] if item["kind"] == "invalid_action"}
+        valid_decision_targets = {item.get("target") for item in decision_log["decisions"]}
+        self.assertTrue(invalid_targets.isdisjoint(valid_decision_targets))
+
+    def test_g1c_timeout_and_parse_failure_are_audited(self):
+        result = run_mock_game_for_test(mode="g1c_timeout_parse_failure")
+        kinds = {item["kind"] for item in result["failure_audit"]["failures"]}
+
+        self.assertIn("timeout", kinds)
+        self.assertIn("parse_failure", kinds)
+
+
 if __name__ == "__main__":
     unittest.main()
