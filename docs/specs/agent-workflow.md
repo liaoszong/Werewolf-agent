@@ -2,7 +2,7 @@
 
 ## 定位
 
-- 本项目采用 PR-first agent 工作流。GitHub PR 是任务上下文、审查和追踪的主要单元。
+- 本项目采用任务事实优先、PR 承载交付的 agent 工作流。`docs/TASKS.md` / `docs/ROADMAP.md` / 实际文件状态用于判断项目进度和下一步；GitHub PR 是审查、交付和追踪的重要单元，但不是唯一或最高事实源。
 - 本文件主要服务于不能直接进入本地 `harness` 的 agent，例如通过 GitHub connector / 云端项目接入的 agent。
 - 如果你是`codex`,`claude code`或者`open code`等本地 agent，请跳过该文件。
 - 如果当前环境可以直接使用本地 `harness`，实现类任务从一开始就应进入 `harness`；本文件只作为 artifact 关系、云端边界和交接规则参考。
@@ -101,13 +101,14 @@ Spec PR 只用于更新稳定规范。
 ## 路由规则
 
 - `Research PR` 不是必须的。
-- 分析当前最应该推进的下一个开发点时，必须先读取最近 PR 列表。
-- 只有 merged PR 才算 main 事实；open PR 只能作为未收口上下文。
-- 如果上一个 Implementation PR 仍 open，下一步默认是审查 / 收口该 PR，而不是启动后续任务。
-- 确认 main 事实后，再读取 `AGENTS.md` / `README.md` / `docs/TASKS.md` / `.oh-my-harness/tree.md` / 相关源码入口。
+- 分析当前最应该推进的下一个开发点时，必须综合读取 `docs/TASKS.md`、`docs/ROADMAP.md`、`.oh-my-harness/tree.md`、相关源码入口和最近 PR 列表；其中 `docs/TASKS.md` 是任务进度和候选优先级的首要事实来源。
+- PR 状态只能说明某项工作是否完成了 GitHub 交付 / 审查闭环，不能单独说明功能是否已经完成。
+- merged PR 是已进入 `main` 的交付事实；open PR 是未收口交付上下文；未开 PR 的本地 / harness 已完成工作，需要结合 `docs/TASKS.md`、生成产物、测试结果和实际文件状态判断，不得直接视为“未完成”。
+- 如果上一个 Implementation PR 仍 open，下一步默认是审查 / 收口该 PR；但如果 `docs/TASKS.md` 或用户明确说明该工作已由本地 / harness 完成而仅缺 PR，应优先准备交付归档 / PR 化，而不是重新规划同一功能。
+- 如果 `docs/TASKS.md` 与 PR 历史冲突，先指出冲突并读取相关文件状态；不要只按 PR 历史下结论。
 - 然后判断是否需要 Research PR。
 - 若任务边界清楚，直接准备 Implementation Plan。
-- 若边界不清楚，输出研究问题、风险点、建议拆分。
+- 若任务边界不清楚，输出研究问题、风险点、建议拆分。
 - 满足以下任一条件时，先创建或更新 `Research PR`：
   - 需要判断问题是否成立；
   - 需要共享目标表现或验收边界；
@@ -186,10 +187,14 @@ flowchart TD
 |---|---|
 | 工程硬约束 | 根级和相关子目录 `AGENTS.md` |
 | 云端桥接规则 | `docs/specs/agent-workflow.md` |
+| 项目路线与阶段边界 | `docs/ROADMAP.md` |
+| 任务进度、候选优先级、下一步判断 | `docs/TASKS.md` |
+| 实际完成状态 | 相关源码、生成产物、测试结果、review packet / validation output |
+| GitHub 交付与审查状态 | Implementation PR / Research PR / PR 评论 |
 | 本地实现流程 | `harness` |
-| 单次任务上下文 | PR 描述和 PR 评论 |
+| 单次任务上下文 | 用户当前指令、Implementation Plan、PR 描述和 PR 评论 |
 | 研究结论 | Research PR 描述、评论和 `docs/prs/` 研究报告；不作为长期规范 |
-| 代码变更 | Implementation PR |
+| 代码变更 | Git diff、Implementation PR、实际文件状态 |
 
 ## 维护边界
 
