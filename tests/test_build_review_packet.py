@@ -30,6 +30,47 @@ class BuildReviewPacketTests(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
+    def _minimal_args(self):
+        return {
+            "base": "main",
+            "branch": "main",
+            "changed_files": ["sample.py"],
+            "diff_stat": "sample.py | 2 +-",
+            "diff_check": "(clean)",
+            "diff_text": "",
+            "shortstat": "1 file changed, 1 insertion(+), 1 deletion(-)",
+            "allowlist": ["sample.py"],
+            "test_commands": [],
+            "acceptance_items": [],
+        }
+
+    def test_packet_too_large_reported_when_acceptance_pushes_over_300_lines(self):
+        from scripts.dev.build_review_packet import MAX_PACKET_LINES, build_packet
+
+        args = self._minimal_args()
+        # Each acceptance item renders ~2 lines (1 evidence map row + 1 checklist row).
+        # The minimal packet with 0 acceptance items is ~60 lines.
+        # To push pre_lines past (MAX_PACKET_LINES - trigger_overhead) = 280,
+        # we need ~110+ acceptance items.
+        args["acceptance_items"] = [
+            f"item_{i:03d} | test_{i:03d} PASS | PASS" for i in range(130)
+        ]
+
+        packet = build_packet(**args)
+        self.assertIn("PACKET_TOO_LARGE = YES", packet)
+        self.assertIn("PACKET_TOO_LARGE=YES", packet)
+
+    def test_packet_too_large_not_reported_when_under_300_lines(self):
+        from scripts.dev.build_review_packet import build_packet
+
+        args = self._minimal_args()
+        args["acceptance_items"] = [
+            "single item | test PASS | PASS"
+        ]
+
+        packet = build_packet(**args)
+        self.assertIn("PACKET_TOO_LARGE = NO", packet)
+
     def test_packet_contains_required_sections(self):
         out = self.repo / ".logs" / "review" / "latest" / "review-packet.md"
         run(

@@ -3,7 +3,7 @@
 ## Metadata
 - Base: `355a053`
 - Branch: `main`
-- Generated: 2026-06-01T13:43:20.532673+00:00
+- Generated: 2026-06-01T13:45:54.646022+00:00
 
 ## Changed Files
 - `.logs/review/latest/review-packet.md`
@@ -25,6 +25,7 @@
 - `src/werewolf_eval/validate_failure_audit.py`
 - `src/werewolf_eval/validate_game_log.py`
 - `src/werewolf_eval/validate_log_bundle.py`
+- `tests/test_build_review_packet.py`
 - `tests/test_context_budget.py`
 - `tests/test_failure_audit.py`
 - `tests/test_game_log.py`
@@ -35,7 +36,7 @@
 
 ## Diff Stat
 ```
-.logs/review/latest/review-packet.md               | 319 +++++++++++++++++++++
+.logs/review/latest/review-packet.md               | 234 +++++++++++++++++++++
  .oh-my-harness/tree.md                             |  15 +-
  .../phase3-g1c-wolf-consensus-runtime-demo.html    |   2 +-
  .../g1c-wolf-consensus-metrics-summary.json        |   9 +-
@@ -45,39 +46,38 @@
  scripts/dev/build_review_packet.py                 |   8 +-
  src/werewolf_eval/consensus_log.py                 |   7 +-
  src/werewolf_eval/decision_log.py                  |   7 +-
- src/werewolf_eval/failure_audit.py                 | 131 +++++++++
+ src/werewolf_eval/failure_audit.py                 | 131 ++++++++++++
  src/werewolf_eval/game_log.py                      |   8 +-
- src/werewolf_eval/log_bundle.py                    | 116 ++++++++
- src/werewolf_eval/render_demo.py                   |  41 ++-
- src/werewolf_eval/score_game.py                    |  31 ++
+ src/werewolf_eval/log_bundle.py                    | 116 ++++++++++
+ src/werewolf_eval/render_demo.py                   |  41 +++-
+ src/werewolf_eval/score_game.py                    |  31 +++
  src/werewolf_eval/source_labels.py                 |   8 +
- src/werewolf_eval/validate_failure_audit.py        |  25 ++
+ src/werewolf_eval/validate_failure_audit.py        |  25 +++
  src/werewolf_eval/validate_game_log.py             |   1 +
- src/werewolf_eval/validate_log_bundle.py           |  41 +++
- tests/test_context_budget.py                       |  96 +++++++
- tests/test_failure_audit.py                        | 107 +++++++
- tests/test_game_log.py                             |  15 +
- tests/test_log_bundle.py                           |  82 ++++++
+ src/werewolf_eval/validate_log_bundle.py           |  41 ++++
+ tests/test_build_review_packet.py                  |  41 ++++
+ tests/test_context_budget.py                       |  96 +++++++++
+ tests/test_failure_audit.py                        | 107 ++++++++++
+ tests/test_game_log.py                             |  15 ++
+ tests/test_log_bundle.py                           |  82 ++++++++
  tests/test_render_demo.py                          |  16 ++
- tests/test_scoring.py                              |  42 +++
- tests/test_source_labels.py                        |  24 ++
- 26 files changed, 1137 insertions(+), 29 deletions(-)
+ tests/test_scoring.py                              |  42 ++++
+ tests/test_source_labels.py                        |  24 +++
+ 27 files changed, 1093 insertions(+), 29 deletions(-)
 ```
 
 ## Diff Check
 ```
-.logs/review/latest/review-packet.md:129: trailing whitespace.
-+ 
-.logs/review/latest/review-packet.md:133: trailing whitespace.
-+ 
-.logs/review/latest/review-packet.md:203: trailing whitespace.
-+ 
-.logs/review/latest/review-packet.md:219: trailing whitespace.
-+ 
-.logs/review/latest/review-packet.md:228: trailing whitespace.
-+ 
-.logs/review/latest/review-packet.md:231: trailing whitespace.
-+
+.logs/review/latest/review-packet.md:70: trailing whitespace.
+++ 
+.logs/review/latest/review-packet.md:72: trailing whitespace.
+++ 
+.logs/review/latest/review-packet.md:74: trailing whitespace.
+++ 
+.logs/review/latest/review-packet.md:76: trailing whitespace.
+++ 
+.logs/review/latest/review-packet.md:78: trailing whitespace.
+++
 ```
 
 ## Allowed Files Check
@@ -88,6 +88,12 @@ ALLOWLIST_CHECK = FAIL
 FORBIDDEN_PATTERN_SCAN = WARN
 
 **Real risk (forbidden term in runtime code):**
+- optional: - optional: - optional: parser.add_argument("--consensus-log", help="Optional pa
+- optional: - optional: - optional: parser.add_argument("--failure-audit", help="Optional pa
+- env: - env: - env: env={"PYTHONPATH": str(ROOT / "src")},
+- dependency: - dependency: ## Dependency / Import Diff
+- dependency: - dependency: ### Dependency manifest changes
+- env: - env: - forbidden_pattern_risk=env
 - optional: - optional: parser.add_argument("--consensus-log", help="Optional path to Consen
 - optional: - optional: parser.add_argument("--failure-audit", help="Optional path to Failur
 - env: - env: env={"PYTHONPATH": str(ROOT / "src")},
@@ -103,8 +109,6 @@ FORBIDDEN_PATTERN_SCAN = WARN
 (none)
 
 ### Added imports
-- `import re`
-- `from typing import Any`
 - `from __future__ import annotations`
 - `from dataclasses import dataclass`
 - `import json`
@@ -138,7 +142,7 @@ test_expected_labels_present (test_source_labels.SourceLabelsTests.test_expected
 test_rejects_unknown_label (test_source_labels.SourceLabelsTests.test_rejects_unknown_label) ... ok
 
 ----------------------------------------------------------------------
-Ran 128 tests in 2.512s
+Ran 130 tests in 2.527s
 
 OK
 ```
@@ -159,63 +163,65 @@ If B档 is needed, Minimal Next Reads (line ranges):
 ## Evidence Map
 | Acceptance | Evidence | Status |
 |---|---|---|
-| T1: Missing Game Log source_label fails validation | test_rejects_missing_source_label PASS | PASS |
-| T1: Unknown Game Log source_label fails validation | test_rejects_unknown_source_label PASS | PASS |
-| T1: Gold and G1c Game Logs validate with source_label | validate_game_log gold+g1c both exit 0 | PASS |
-| T1: Decision/Consensus Log use shared source_labels import | VALID_SOURCE_LABELS imported from source_labels.py | PASS |
-| T1: validate_game_log CLI prints source_label | CLI outputs source_label=... | PASS |
-| T2: Valid empty G1c failure audit passes | test_accepts_empty_valid_audit PASS | PASS |
+| T1: Missing Game Log source_label fails | test_rejects_missing_source_label PASS | PASS |
+| T1: Unknown Game Log source_label fails | test_rejects_unknown_source_label PASS | PASS |
+| T1: Gold and G1c Game Logs validate | validate_game_log both exit 0 | PASS |
+| T1: Decision/Consensus Log use shared labels | source_labels.py import | PASS |
+| T1: validate_game_log prints source_label | CLI output includes source_label | PASS |
+| T2: Empty G1c failure audit passes | test_accepts_empty_valid_audit PASS | PASS |
 | T2: Missing failure kind fails | test_rejects_missing_kind PASS | PASS |
 | T2: repaired_to_valid_action=true fails | test_rejects_repaired_to_valid_action_true PASS | PASS |
 | T2: Unknown failure actor fails | test_rejects_unknown_failure_actor PASS | PASS |
-| T2: Invalid rejected target preserved in audit | test_rejects_unknown_valid_target_for_invalid_action PASS | PASS |
-| T3: Valid G1c bundle passes team_consensus_links=2 | test_valid_g1c_bundle_passes + CLI output | PASS |
-| T3: Team decision without consensus link fails | test_team_decision_requires_consensus_id... PASS | PASS |
+| T2: Invalid target preserved in audit | test target p99 preserved | PASS |
+| T3: G1c bundle passes team_consensus_links=2 | test_valid_g1c_bundle_passes + CLI | PASS |
+| T3: Team decision w/o consensus link fails | test_team_decision_requires_consensus_id PASS | PASS |
 | T3: Unknown consensus link fails | test_team_decision_rejects_unknown_consensus_id PASS | PASS |
 | T3: Consensus target mismatch fails | test_team_decision_rejects_consensus_target_mismatch PASS | PASS |
 | T3: Source label mismatch fails | test_failure_audit_source_label_must_match... PASS | PASS |
-| T4: Score command records bundle_validation | test_score_game_cli_records_bundle_validation PASS | PASS |
-| T4: Render command shows bundle validation | test_g1c_demo_with_bundle_validation_shows_provenance PASS | PASS |
-| T4: No-bundle calls remain valid without bundle claim | existing tests unchanged, all PASS | PASS |
-| T4: G1c artifacts updated only where schema changed | git diff shows additive bundle_validation block | PASS |
-| T5: English Task headings index correctly | test_plan_index_accepts_english_level2/3_task_heading PASS | PASS |
-| T5: Chinese 任务 headings still index correctly | test_plan_index_accepts_chinese_level2/3_task_heading PASS | PASS |
-| T5: G1c plan no longer produces tasks=0 | build_plan_index reports tasks=5 | PASS |
+| T4: Score cmd records bundle_validation | test_score_game_cli_records_bundle_validation PASS | PASS |
+| T4: Render cmd shows bundle validation | test_g1c_demo_with_bundle_validation_shows_provenance PASS | PASS |
+| T4: No-bundle calls remain valid | existing tests unchanged, all PASS | PASS |
+| T4: G1c artifacts additive only | git diff shows bundle_validation block appended | PASS |
+| T5: English Task headings index | test_plan_index_accepts_english_level2/3 PASS | PASS |
+| T5: Chinese 任务 headings index | test_plan_index_accepts_chinese_level2/3 PASS | PASS |
+| T5: G1c plan tasks>0 | build_plan_index tasks=5 | PASS |
+| T6: PACKET_TOO_LARGE correctly reported | test_packet_too_large_reported/not_reported PASS | PASS |
 
 ## Acceptance Checklist
-- [x] T1: Missing Game Log source_label fails validation
-- [x] T1: Unknown Game Log source_label fails validation
-- [x] T1: Gold and G1c Game Logs validate with source_label
-- [x] T1: Decision/Consensus Log use shared source_labels import
-- [x] T1: validate_game_log CLI prints source_label
-- [x] T2: Valid empty G1c failure audit passes
+- [x] T1: Missing Game Log source_label fails
+- [x] T1: Unknown Game Log source_label fails
+- [x] T1: Gold and G1c Game Logs validate
+- [x] T1: Decision/Consensus Log use shared labels
+- [x] T1: validate_game_log prints source_label
+- [x] T2: Empty G1c failure audit passes
 - [x] T2: Missing failure kind fails
 - [x] T2: repaired_to_valid_action=true fails
 - [x] T2: Unknown failure actor fails
-- [x] T2: Invalid rejected target preserved in audit
-- [x] T3: Valid G1c bundle passes team_consensus_links=2
-- [x] T3: Team decision without consensus link fails
+- [x] T2: Invalid target preserved in audit
+- [x] T3: G1c bundle passes team_consensus_links=2
+- [x] T3: Team decision w/o consensus link fails
 - [x] T3: Unknown consensus link fails
 - [x] T3: Consensus target mismatch fails
 - [x] T3: Source label mismatch fails
-- [x] T4: Score command records bundle_validation
-- [x] T4: Render command shows bundle validation
-- [x] T4: No-bundle calls remain valid without bundle claim
-- [x] T4: G1c artifacts updated only where schema changed
-- [x] T5: English Task headings index correctly
-- [x] T5: Chinese 任务 headings still index correctly
-- [x] T5: G1c plan no longer produces tasks=0
+- [x] T4: Score cmd records bundle_validation
+- [x] T4: Render cmd shows bundle validation
+- [x] T4: No-bundle calls remain valid
+- [x] T4: G1c artifacts additive only
+- [x] T5: English Task headings index
+- [x] T5: Chinese 任务 headings index
+- [x] T5: G1c plan tasks>0
+- [x] T6: PACKET_TOO_LARGE correctly reported
 
 ## Implementer Risk Notes
-- SCOPE_EXCEPTION: scripts/dev/build_review_packet.py was modified (plan-forbidden-scope) — PACKET_TOO_LARGE check fixed from under-counting (pre-trigger-section) to conservative pre-estimate with +20 trigger overhead; required to satisfy Review Packet Gate consistency; no CLI workaround existed
-- Plan inconsistency in Task 5: specified regex only matched ### but G1c plan uses ## Task N headings; corrected to #{2,3}
-- KEY_HUNKS_TRUNCATED due to 25-file cumulative scope across 6 tasks; individual hunks are small, additive, validated by 128 tests; Codex A to decide PASS vs NEED_DEEP_REVIEW
-- Codex B档 LIKELY for scripts/dev/build_review_packet.py:77-95 (PACKET_TOO_LARGE check logic) and tests/test_build_review_packet.py:1-75 (generator test assertions)
+- SCOPE_EXCEPTION: scripts/dev/build_review_packet.py — PACKET_TOO_LARGE check fixed from pre-trigger-section under-count to conservative +20 overhead estimate; regression test at test_packet_too_large_reported_when_acceptance_pushes_over_300_lines
+- Plan inconsistency in Task 5: regex only matched ### but G1c plan uses ## Task N; corrected to #{2,3}
+- KEY_HUNKS_TRUNCATED from 26-file cumulative scope across 6 tasks; individual hunks are small additive changes; 130 tests PASS
+- Codex B档 LIKELY: scripts/dev/build_review_packet.py:468-493 (PACKET_TOO_LARGE estimation) + tests/test_build_review_packet.py:41-69 (regression tests)
 
 ## Review Trigger Result
 **RISK_TRIGGERS_FIRED**
-- changed_file_count=26 > 8
-- changed_lines=1166 > 500
+- changed_file_count=27 > 8
+- changed_lines=1122 > 500
 - key_hunks_truncated
 - allowlist_check=FAIL
 - forbidden_pattern_risk=env
