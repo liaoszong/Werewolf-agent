@@ -465,11 +465,14 @@ def build_packet(
         sections.append("(to be filled by implementer)")
     sections.append("")
 
-    # Pre-compute packet size check
+    # Compute PACKET_TOO_LARGE from sections before trigger block
     packet_pre = "\n".join(sections)
     pre_lines = packet_pre.count("\n") + 1
-    packet_too_large = pre_lines > MAX_PACKET_LINES
+    # Estimate overhead: trigger header (~3 lines) + worst-case triggers + PACKET line (~1)
+    trigger_overhead = 20
+    packet_too_large = (pre_lines + trigger_overhead) > MAX_PACKET_LINES
 
+    # Review Trigger Result
     changed_lines = parse_changed_lines(shortstat)
 
     triggers = detect_risk_triggers(
@@ -481,7 +484,6 @@ def build_packet(
         allowlist_result,
     )
 
-    # Review Trigger Result
     sections.append("## Review Trigger Result")
     if triggers:
         sections.append("**RISK_TRIGGERS_FIRED**")

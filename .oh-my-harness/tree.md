@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 140
+- Entries: 149
 
 ```text
 ./
@@ -110,7 +110,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   │   ├── 2026-05-31--g1b-engine-mock-agent-contract-plan.md
 │   │   │   ├── 2026-05-31--g1c-wolf-consensus-failure-recovery-plan.md
 │   │   │   ├── 2026-05-31--review-packet-gate-v1-plan.md
-│   │   │   └── 2026-05-31--s5-semantic-label-scoring-integration-plan.md
+│   │   │   ├── 2026-05-31--s5-semantic-label-scoring-integration-plan.md
+│   │   │   └── 2026-06-01--pre-g1d-evaluation-trust-hardening-plan.md
 │   │   └── reviews/
 │   │       ├── 2026-06-01--g1c-project-healthcheck-final.md
 │   │       ├── 2026-06-01--g1c-project-healthcheck.md
@@ -148,8 +149,10 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       ├── attribution.py
 │       ├── consensus_log.py
 │       ├── decision_log.py
+│       ├── failure_audit.py
 │       ├── game_engine.py
 │       ├── game_log.py
+│       ├── log_bundle.py
 │       ├── render_demo.py
 │       ├── run_mock_game.py
 │       ├── run_scripted_game.py
@@ -157,9 +160,12 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       ├── scoring.py
 │       ├── scripted_game.py
 │       ├── semantic_labels.py
+│       ├── source_labels.py
 │       ├── validate_consensus_log.py
 │       ├── validate_decision_log.py
+│       ├── validate_failure_audit.py
 │       ├── validate_game_log.py
+│       ├── validate_log_bundle.py
 │       └── validate_semantic_labels.py
 ├── tests/
 │   ├── test_attribution.py
@@ -167,13 +173,16 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── test_consensus_log.py
 │   ├── test_context_budget.py
 │   ├── test_decision_log.py
+│   ├── test_failure_audit.py
 │   ├── test_game_engine.py
 │   ├── test_game_log.py
+│   ├── test_log_bundle.py
 │   ├── test_render_demo.py
 │   ├── test_scoring.py
 │   ├── test_scripted_game_runner.py
 │   ├── test_semantic_label_research.py
-│   └── test_semantic_labels.py
+│   ├── test_semantic_labels.py
+│   └── test_source_labels.py
 ├── .gitignore
 ├── AGENTS.md
 └── README.md
