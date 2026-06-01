@@ -20,7 +20,7 @@
 <main>
   <h1>Werewolf-agent Phase 2 Runtime Demo</h1>
   <p><span class="badge">运行时生成</span><span class="badge">[deterministic]</span><span class="badge">[deterministic mock agent output]</span> This page is generated from the E1/E2/E3 runtime pipeline.</p>
-  <section class="warning"><h2>边界声明</h2><p>This is not real AI Agent gameplay, not real Consensus Log collection, not AI semantic labeling, and not a real multi-model Leaderboard. Decision Log is connected to scoring via D2 deterministic Step 1-2 (visibility check + decision_id traceability), but decision_quality_score remains 0 (positive scoring waits for S5 AI semantic judgment).</p></section>
+  <section class="warning"><h2>边界声明</h2><p>This is not real AI Agent gameplay, not AI semantic labeling, and not a real multi-model Leaderboard. Consensus Log is generated from deterministic mock-agent wolf team proposals. Decision Log is connected to scoring via D2 deterministic Step 1-2 (visibility check + decision_id traceability), but decision_quality_score remains 0 (positive scoring waits for S5 AI semantic judgment).</p></section>
   <section><h2>对局摘要</h2><p>Game: g1c_wolf_consensus / Winner: 村民阵营 / Players: 6 / Events: 18 / Source: [deterministic mock agent output]</p></section>
   <section><h2>玩家状态</h2><div class="scroll"><table><tr><th>玩家</th><th>角色</th><th>阵营</th><th>终局状态</th></tr><tr><td>p1</td><td>狼人</td><td>狼人阵营</td><td>出局 / 死亡</td></tr>
 <tr><td>p2</td><td>狼人</td><td>狼人阵营</td><td>出局 / 死亡</td></tr>
@@ -55,7 +55,7 @@
 <tr><td>2</td><td>g1c_wolf_consensus_e015</td><td>p6</td><td>p2</td><td>p6 votes p2.</td></tr></table></div></section>
   <section><h2>确定性指标</h2><p>Score records: 11 [deterministic][decision-log]。decision_quality_score: D2 visibility check + decision_id traceability complete; positive scoring still 0 (waiting for S5).</p></section>
   <section><h2>规则归因</h2><p>无确定性归因转折点。 [deterministic]</p><div class="scroll"><table><tr><th>转折点</th><th>规则</th><th>轮次</th><th>主体</th><th>影响分</th><th>描述</th></tr></table></div></section>
-  <section><h2>Leaderboard</h2><div class="scroll"><table><tr><th>Agent</th><th>Model</th><th>Games</th><th>Win rate</th><th>Outcome</th><th>Decision</th><th>Integrity</th><th>Top attribution</th><th>Source</th></tr><tr><td>g1c_wolf_consensus-runtime</td><td>deterministic pipeline</td><td>1</td><td>1.0</td><td>17.0</td><td>0.0</td><td>0.0</td><td>none</td><td>[deterministic]</td></tr>
+  <section><h2>Leaderboard</h2><div class="scroll"><table><tr><th>Agent</th><th>Model</th><th>Games</th><th>Win rate</th><th>Outcome</th><th>Decision</th><th>Integrity</th><th>Top attribution</th><th>Source</th></tr><tr><td>g1c_wolf_consensus-runtime</td><td>deterministic mock agent</td><td>1</td><td>1.0</td><td>17.0</td><td>0.0</td><td>0.0</td><td>none</td><td>[deterministic mock agent output]</td></tr>
 <tr><td>mock-baseline-a</td><td>mock</td><td>3</td><td>0.33</td><td>1.0</td><td>0.0</td><td>0.0</td><td>mock</td><td>[mock]</td></tr>
 <tr><td>mock-baseline-b</td><td>mock</td><td>3</td><td>0.67</td><td>2.0</td><td>0.0</td><td>0.0</td><td>mock</td><td>[mock]</td></tr></table></div></section>
 </main>

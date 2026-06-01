@@ -409,10 +409,10 @@ def build_packet(
         sections.append("**KEY_HUNKS_TRUNCATED = YES**")
         sections.append("")
         sections.append(
-            "Truncation does not block A档 for this PR: all changed files are "
-            "new docs/specs, dev scripts, or tests. The Evidence Map covers "
-            "acceptance items via doc checks and test assertions. "
-            "No runtime code under `src/werewolf_eval/` was modified."
+            "Truncation does not block A档 for this PR. Key hunks were omitted "
+            "because the diff exceeds the packet size limit. Verify hunks by "
+            "reading the changed files directly or running `git diff` with "
+            "narrowed paths."
         )
         sections.append("")
         sections.append(

@@ -81,7 +81,7 @@
 
 ## Phase 2 Candidate Engineering Tasks
 
-**E1-E4、D1/D2、S4/S5 已作为 Phase 2 runtime / input entries 完成，G1a 已作为 Phase 3 scripted deterministic fresh-log runner 完成，G1b deterministic game engine + mock agent contract 已完成。** 下一候选开发点是 G1c wolf consensus + failure recovery；G1 完整 real AI Agent gameplay 和 L1 real multi-game Leaderboard 仍未完成。以下记录各工程任务的完成状态与产物路径，阶段边界以 `docs/ROADMAP.md` 为准。
+**E1-E4、D1/D2、S4/S5 已作为 Phase 2 runtime / input entries 完成，G1a 已作为 Phase 3 scripted deterministic fresh-log runner 完成，G1b deterministic game engine + mock agent contract 已完成，G1c wolf consensus + failure recovery 已完成。** 下一候选开发点是 G1d provider adapter research / fake-provider contract；G1 完整 real AI Agent gameplay 和 L1 real multi-game Leaderboard 仍未完成。以下记录各工程任务的完成状态与产物路径，阶段边界以 `docs/ROADMAP.md` 为准。
 
 ### E1：Game Log 解析器
 

@@ -147,6 +147,33 @@ class RuntimeDemoRenderTests(unittest.TestCase):
         self.assertNotIn("real AI Agent gameplay complete", html)
         self.assertNotIn("G1 complete", html)
 
+    def test_g1c_mock_agent_demo_messaging(self) -> None:
+        game = load_game_log(
+            ROOT / "docs/generated-games/g1c-wolf-consensus-game-log.json"
+        )
+        decision_log = load_decision_log(
+            ROOT / "docs/generated-games/g1c-wolf-consensus-decision-log.json", game
+        )
+        score_log = score_game(game, decision_log=decision_log)
+        metrics = summarize_metrics(game, score_log)
+        attribution = attribute_game(game, score_log, metrics)
+        context = build_demo_context(game, score_log, metrics, attribution,
+                                     game_source_label="[deterministic mock agent output]")
+        html = render_html(context)
+
+        # Source label preserved in Leaderboard
+        self.assertIn("[deterministic mock agent output]", html)
+        self.assertIn("deterministic mock agent", html)
+
+        # Boundary copy acknowledges mock-agent Consensus Log, not "not real Consensus Log collection"
+        self.assertNotIn("not real Consensus Log collection", html)
+
+        # Leaderboard row preserves mock-agent provenance
+        self.assertTrue(
+            any(row["source_label"] == "[deterministic mock agent output]" for row in context["leaderboard"]),
+            "Leaderboard row must preserve [deterministic mock agent output] source_label",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

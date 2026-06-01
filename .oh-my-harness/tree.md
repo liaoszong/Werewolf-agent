@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 137
+- Entries: 140
 
 ```text
 ./
@@ -89,28 +89,32 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   ├── s5-semantic-label-eval-set.json
 │   │   └── s5-semantic-label-output.example.json
 │   ├── harness/
-│   │   └── plans/
-│   │       ├── 2026-05-29--e1-game-log-parser-validation-plan.md
-│   │       ├── 2026-05-29--phase1-closure-phase2-boundary-alignment-plan.md
-│   │       ├── 2026-05-29--s0-gold-game-seed-plan.md
-│   │       ├── 2026-05-29--s1-game-log-schema-validation-plan.md
-│   │       ├── 2026-05-29--s2-deterministic-scorer-validation-plan.md
-│   │       ├── 2026-05-29--s3-rule-attribution-validation-plan.md
-│   │       ├── 2026-05-29--s6-leaderboard-ui-demo-validation-plan.md
-│   │       ├── 2026-05-30--d1-decision-log-runtime-skeleton-plan.md
-│   │       ├── 2026-05-30--d2-decision-log-scoring-integration-plan.md
-│   │       ├── 2026-05-30--e2-deterministic-scorer-plan.md
-│   │       ├── 2026-05-30--e3-rule-attribution-engine-plan.md
-│   │       ├── 2026-05-30--e4-runtime-demo-html-plan.md
-│   │       ├── 2026-05-30--roadmap-alignment-plan.md
-│   │       ├── 2026-05-30--s4-consensus-log-runtime-input-plan.md
-│   │       ├── 2026-05-30--s4x-context-budget-hardening-plan.md
-│   │       ├── 2026-05-30--s5-semantic-label-research-plan.md
-│   │       ├── 2026-05-31--g1-scripted-game-runner-plan.md
-│   │       ├── 2026-05-31--g1b-engine-mock-agent-contract-plan.md
-│   │       ├── 2026-05-31--g1c-wolf-consensus-failure-recovery-plan.md
-│   │       ├── 2026-05-31--review-packet-gate-v1-plan.md
-│   │       └── 2026-05-31--s5-semantic-label-scoring-integration-plan.md
+│   │   ├── plans/
+│   │   │   ├── 2026-05-29--e1-game-log-parser-validation-plan.md
+│   │   │   ├── 2026-05-29--phase1-closure-phase2-boundary-alignment-plan.md
+│   │   │   ├── 2026-05-29--s0-gold-game-seed-plan.md
+│   │   │   ├── 2026-05-29--s1-game-log-schema-validation-plan.md
+│   │   │   ├── 2026-05-29--s2-deterministic-scorer-validation-plan.md
+│   │   │   ├── 2026-05-29--s3-rule-attribution-validation-plan.md
+│   │   │   ├── 2026-05-29--s6-leaderboard-ui-demo-validation-plan.md
+│   │   │   ├── 2026-05-30--d1-decision-log-runtime-skeleton-plan.md
+│   │   │   ├── 2026-05-30--d2-decision-log-scoring-integration-plan.md
+│   │   │   ├── 2026-05-30--e2-deterministic-scorer-plan.md
+│   │   │   ├── 2026-05-30--e3-rule-attribution-engine-plan.md
+│   │   │   ├── 2026-05-30--e4-runtime-demo-html-plan.md
+│   │   │   ├── 2026-05-30--roadmap-alignment-plan.md
+│   │   │   ├── 2026-05-30--s4-consensus-log-runtime-input-plan.md
+│   │   │   ├── 2026-05-30--s4x-context-budget-hardening-plan.md
+│   │   │   ├── 2026-05-30--s5-semantic-label-research-plan.md
+│   │   │   ├── 2026-05-31--g1-scripted-game-runner-plan.md
+│   │   │   ├── 2026-05-31--g1b-engine-mock-agent-contract-plan.md
+│   │   │   ├── 2026-05-31--g1c-wolf-consensus-failure-recovery-plan.md
+│   │   │   ├── 2026-05-31--review-packet-gate-v1-plan.md
+│   │   │   └── 2026-05-31--s5-semantic-label-scoring-integration-plan.md
+│   │   └── reviews/
+│   │       ├── 2026-06-01--g1c-project-healthcheck-final.md
+│   │       ├── 2026-06-01--g1c-project-healthcheck.md
+│   │       └── 2026-06-01--project-wide-healthcheck-v2.md
 │   ├── prs/
 │   │   ├── 2026-05-30--phase2-next-step-research.md
 │   │   └── 2026-05-30--s5-semantic-label-research.md
