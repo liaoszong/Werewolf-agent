@@ -79,6 +79,102 @@ class PlanIndexBuilderTests(unittest.TestCase):
         )
         self.assertTrue(any("task id `1`" in item for item in task["acceptance"]))
 
+    def test_plan_index_accepts_english_level2_task_heading(self) -> None:
+        from scripts.context.build_plan_index import build_plan_index
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            plan = root / "docs/harness/plans/english-l2-plan.md"
+            plan.parent.mkdir(parents=True)
+            plan.write_text(
+                "# Example Plan\n\n"
+                "## Task 1: English level-2 heading\n\n"
+                "**文件：**\n"
+                "- 修改：`src/werewolf_eval/game_log.py`\n\n"
+                "```bash\n"
+                "PYTHONPATH=src python -m unittest tests.test_game_log -v\n"
+                "```\n",
+                encoding="utf-8",
+            )
+
+            index = build_plan_index(plan, repo_root=root)
+
+        self.assertEqual(index["task_count"], 1)
+        self.assertEqual(index["tasks"][0]["id"], "1")
+        self.assertEqual(index["tasks"][0]["title"], "English level-2 heading")
+
+    def test_plan_index_accepts_english_level3_task_heading(self) -> None:
+        from scripts.context.build_plan_index import build_plan_index
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            plan = root / "docs/harness/plans/english-l3-plan.md"
+            plan.parent.mkdir(parents=True)
+            plan.write_text(
+                "# Example Plan\n\n"
+                "### Task 2: English level-3 heading\n\n"
+                "**文件：**\n"
+                "- 修改：`src/werewolf_eval/game_log.py`\n\n"
+                "```bash\n"
+                "PYTHONPATH=src python -m unittest tests.test_game_log -v\n"
+                "```\n",
+                encoding="utf-8",
+            )
+
+            index = build_plan_index(plan, repo_root=root)
+
+        self.assertEqual(index["task_count"], 1)
+        self.assertEqual(index["tasks"][0]["id"], "2")
+        self.assertEqual(index["tasks"][0]["title"], "English level-3 heading")
+
+    def test_plan_index_accepts_chinese_level3_task_heading(self) -> None:
+        from scripts.context.build_plan_index import build_plan_index
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            plan = root / "docs/harness/plans/chinese-l3-plan.md"
+            plan.parent.mkdir(parents=True)
+            plan.write_text(
+                "# Example Plan\n\n"
+                "### 任务 3：中文 level-3 heading\n\n"
+                "**文件：**\n"
+                "- 修改：`src/werewolf_eval/game_log.py`\n\n"
+                "```bash\n"
+                "PYTHONPATH=src python -m unittest tests.test_game_log -v\n"
+                "```\n",
+                encoding="utf-8",
+            )
+
+            index = build_plan_index(plan, repo_root=root)
+
+        self.assertEqual(index["task_count"], 1)
+        self.assertEqual(index["tasks"][0]["id"], "3")
+        self.assertEqual(index["tasks"][0]["title"], "中文 level-3 heading")
+
+    def test_plan_index_accepts_chinese_level2_task_heading(self) -> None:
+        from scripts.context.build_plan_index import build_plan_index
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            plan = root / "docs/harness/plans/chinese-l2-plan.md"
+            plan.parent.mkdir(parents=True)
+            plan.write_text(
+                "# Example Plan\n\n"
+                "## 任务 4：中文 level-2 heading\n\n"
+                "**文件：**\n"
+                "- 修改：`src/werewolf_eval/game_log.py`\n\n"
+                "```bash\n"
+                "PYTHONPATH=src python -m unittest tests.test_game_log -v\n"
+                "```\n",
+                encoding="utf-8",
+            )
+
+            index = build_plan_index(plan, repo_root=root)
+
+        self.assertEqual(index["task_count"], 1)
+        self.assertEqual(index["tasks"][0]["id"], "4")
+        self.assertEqual(index["tasks"][0]["title"], "中文 level-2 heading")
+
 
 class TaskContextBuilderTests(unittest.TestCase):
     def test_build_task_context_writes_minimal_markdown_for_selected_task(self) -> None:

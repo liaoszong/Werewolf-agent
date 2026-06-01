@@ -6,7 +6,10 @@ from pathlib import Path
 import re
 from typing import Any
 
-TASK_HEADING_RE = re.compile(r"^###\s+任务\s+([^：:]+)[：:]\s*(.+?)\s*$")
+TASK_HEADING_RE = re.compile(
+    r"^#{2,3}\s+(?:任务|Task)\s+([^：:]+)[：:]\s*(.+?)\s*$",
+    re.IGNORECASE,
+)
 FILE_LINE_RE = re.compile(r"^-\s*(创建|修改|测试|读取)：`([^`]+)`")
 COMMAND_FENCE_RE = re.compile(r"^```(?:bash|sh|shell|text)?\s*$")
 PATH_RE = re.compile(r"`([^`]+)`")
