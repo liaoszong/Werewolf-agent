@@ -13,6 +13,7 @@ def main() -> int:
     game = load_game_log(args.path)
 
     print(f"validated game_id={game.game_id}")
+    print(f"source_label={game.source_label}")
     print(f"players={len(game.players)}")
     print(f"events={len(game.events)}")
     print(f"winner={game.result.winner}")
