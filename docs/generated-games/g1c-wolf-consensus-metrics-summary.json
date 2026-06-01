@@ -143,5 +143,12 @@
       ],
       "policy": "count in vote_accuracy metrics; assign outcome_score 0 in score log; do not modify EVALUATION_RUBRIC.md in this PR"
     }
-  ]
+  ],
+  "bundle_validation": {
+    "enabled": true,
+    "decision_log": true,
+    "consensus_log": true,
+    "failure_audit": true,
+    "team_consensus_links": 2
+  }
 }

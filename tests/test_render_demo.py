@@ -129,6 +129,22 @@ class RuntimeDemoRenderTests(unittest.TestCase):
             output.unlink(missing_ok=True)
 
 
+    def test_g1c_demo_with_bundle_validation_shows_provenance(self) -> None:
+        output = ROOT / "docs/demo/test-bundle-validation.html"
+        try:
+            write_demo_html(
+                ROOT / "docs/generated-games/g1c-wolf-consensus-game-log.json",
+                output,
+                ROOT / "docs/generated-games/g1c-wolf-consensus-decision-log.json",
+                consensus_log_path=ROOT / "docs/generated-games/g1c-wolf-consensus-consensus-log.json",
+                failure_audit_path=ROOT / "docs/generated-games/g1c-wolf-consensus-failure-audit.json",
+            )
+            html = output.read_text(encoding="utf-8")
+            self.assertIn("Bundle validation: enabled", html)
+            self.assertIn("team_consensus_links=2", html)
+        finally:
+            output.unlink(missing_ok=True)
+
     def test_g1a_scripted_demo_boundary(self) -> None:
         game = load_game_log(
             ROOT / "docs/generated-games/g1-scripted-game-log.json"

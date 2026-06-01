@@ -299,5 +299,12 @@
       ],
       "notes": "Villager p6 voted to eliminate p2, who is revealed as werewolf. Decision g1c_wolf_consensus_d011 has visible refs and non-random type inference_based; D2 records decision_id and preserves decision_quality_score=0. Positive scoring requires S5 AI semantic judgment."
     }
-  ]
+  ],
+  "bundle_validation": {
+    "enabled": true,
+    "decision_log": true,
+    "consensus_log": true,
+    "failure_audit": true,
+    "team_consensus_links": 2
+  }
 }

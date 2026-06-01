@@ -269,6 +269,48 @@ class DeterministicScorerTests(unittest.TestCase):
         self.assertEqual(metrics_payload, load_json("docs/gold-game/s5-metrics-summary.json"))
 
 
+    def test_score_game_cli_records_bundle_validation(self) -> None:
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmpdir:
+            score_path = Path(tmpdir) / "score.json"
+            metrics_path = Path(tmpdir) / "metrics.json"
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "werewolf_eval.score_game",
+                    str(ROOT / "docs/generated-games/g1c-wolf-consensus-game-log.json"),
+                    "--decision-log",
+                    str(ROOT / "docs/generated-games/g1c-wolf-consensus-decision-log.json"),
+                    "--consensus-log",
+                    str(ROOT / "docs/generated-games/g1c-wolf-consensus-consensus-log.json"),
+                    "--failure-audit",
+                    str(ROOT / "docs/generated-games/g1c-wolf-consensus-failure-audit.json"),
+                    "--score-log-out",
+                    str(score_path),
+                    "--metrics-out",
+                    str(metrics_path),
+                ],
+                cwd=ROOT,
+                env={"PYTHONPATH": str(ROOT / "src")},
+                text=True,
+                capture_output=True,
+                check=True,
+            )
+
+            self.assertIn("bundle_validation=enabled", result.stdout)
+            self.assertIn("team_consensus_links=2", result.stdout)
+
+            score_payload = json.loads(score_path.read_text(encoding="utf-8"))
+            self.assertEqual(score_payload["bundle_validation"]["enabled"], True)
+            self.assertEqual(score_payload["bundle_validation"]["decision_log"], True)
+            self.assertEqual(score_payload["bundle_validation"]["consensus_log"], True)
+            self.assertEqual(score_payload["bundle_validation"]["failure_audit"], True)
+            self.assertEqual(score_payload["bundle_validation"]["team_consensus_links"], 2)
+
+            metrics_payload = json.loads(metrics_path.read_text(encoding="utf-8"))
+            self.assertEqual(metrics_payload["bundle_validation"]["enabled"], True)
+
     def test_non_g001_score_log_uses_dynamic_provenance(self) -> None:
         game = load_game_log(
             ROOT / "docs/generated-games/g1-scripted-game-log.json"

@@ -7,8 +7,11 @@ from pathlib import Path
 from typing import Any
 
 from werewolf_eval.attribution import attribute_game, attribution_to_dict
+from werewolf_eval.consensus_log import load_consensus_log
 from werewolf_eval.decision_log import load_decision_log
+from werewolf_eval.failure_audit import load_failure_audit
 from werewolf_eval.game_log import GameLog, load_game_log
+from werewolf_eval.log_bundle import LogBundleValidationResult, validate_log_bundle
 from werewolf_eval.scoring import (
     metrics_summary_to_dict,
     score_game,
@@ -56,7 +59,7 @@ def _team_label(team: str) -> str:
     return TEAM_LABELS.get(team, team)
 
 
-def build_demo_context(game: GameLog, score_log: Any, metrics: Any, attribution: Any, game_source_label: str = "[deterministic]") -> dict[str, Any]:
+def build_demo_context(game: GameLog, score_log: Any, metrics: Any, attribution: Any, game_source_label: str = "[deterministic]", bundle_result: LogBundleValidationResult | None = None) -> dict[str, Any]:
     score_payload = score_log_to_dict(score_log)
     metrics_payload = metrics_summary_to_dict(metrics)
     attribution_payload = attribution_to_dict(attribution)
@@ -160,7 +163,14 @@ def build_demo_context(game: GameLog, score_log: Any, metrics: Any, attribution:
         },
     ]
 
+    bundle_enabled = bundle_result is not None
+    bundle_team_links = bundle_result.team_consensus_links if bundle_result else 0
+
     return {
+        "bundle": {
+            "enabled": bundle_enabled,
+            "team_consensus_links": bundle_team_links,
+        },
         "game": {
             "game_id": game.game_id,
             "players": len(game.players),
@@ -237,6 +247,9 @@ def render_html(context: dict[str, Any]) -> str:
         for item in context["attribution"]["turn_point_rows"]
     )
 
+    bundle = context.get("bundle", {})
+    bundle_enabled = bundle.get("enabled", False)
+
     is_g1a = "[scripted deterministic output]" in context["score"].get("source_label", "")
     is_mock_agent = "[deterministic mock agent output]" in context["game"].get("source_label", "")
 
@@ -281,7 +294,7 @@ def render_html(context: dict[str, Any]) -> str:
 <body>
 <main>
   <h1>{_html(title)}</h1>
-  <p><span class="badge">运行时生成</span><span class="badge">[deterministic]</span><span class="badge">{_html(context["game"]["source_label"])}</span> This page is generated from the E1/E2/E3 runtime pipeline.</p>
+  <p><span class="badge">运行时生成</span><span class="badge">[deterministic]</span><span class="badge">{_html(context["game"]["source_label"])}</span> {" "}<span class="badge">Bundle validation: {"enabled" if bundle_enabled else "disabled"}</span>{" "}{f'<span class="badge">team_consensus_links={bundle["team_consensus_links"]}</span>' if bundle_enabled else ""}This page is generated from the E1/E2/E3 runtime pipeline.</p>
   <section class="warning"><h2>边界声明</h2><p>{_html(boundary_copy)}</p></section>
   <section><h2>对局摘要</h2><p>Game: {_html(game["game_id"])} / Winner: {_html(game["winner_label"])} / Players: {_html(game["players"])} / Events: {_html(game["events"])} / Source: {_html(game["source_label"])}</p></section>
   <section><h2>玩家状态</h2><div class="scroll"><table>{_head(["玩家", "角色", "阵营", "终局状态"])}{player_rows}</table></div></section>
@@ -296,7 +309,7 @@ def render_html(context: dict[str, Any]) -> str:
 """
 
 
-def write_demo_html(game_log_path: str | Path, output_path: str | Path, decision_log_path: str | Path | None = None, semantic_label_path: str | Path | None = None) -> None:
+def write_demo_html(game_log_path: str | Path, output_path: str | Path, decision_log_path: str | Path | None = None, semantic_label_path: str | Path | None = None, *, consensus_log_path: str | Path | None = None, failure_audit_path: str | Path | None = None) -> None:
     raw = json.loads(Path(game_log_path).read_text(encoding="utf-8"))
     game_source_label = str(raw.get("source_label", "[deterministic]"))
     game = load_game_log(game_log_path)
@@ -304,10 +317,22 @@ def write_demo_html(game_log_path: str | Path, output_path: str | Path, decision
     if semantic_label_path and decision_log is None:
         raise ValueError("semantic_label_path requires decision_log_path")
     semantic_label_log = load_semantic_label_log(semantic_label_path, decision_log) if semantic_label_path else None
+
+    consensus_log = load_consensus_log(consensus_log_path, game) if consensus_log_path else None
+    failure_audit = load_failure_audit(failure_audit_path, game) if failure_audit_path else None
+    bundle_result = None
+    if decision_log or consensus_log or failure_audit:
+        bundle_result = validate_log_bundle(
+            game,
+            decision_log=decision_log,
+            consensus_log=consensus_log,
+            failure_audit=failure_audit,
+        )
+
     score_log = score_game(game, decision_log=decision_log, semantic_label_log=semantic_label_log)
     metrics = summarize_metrics(game, score_log)
     attribution = attribute_game(game, score_log, metrics)
-    context = build_demo_context(game, score_log, metrics, attribution, game_source_label=game_source_label)
+    context = build_demo_context(game, score_log, metrics, attribution, game_source_label=game_source_label, bundle_result=bundle_result)
     Path(output_path).write_text(render_html(context), encoding="utf-8")
 
 
@@ -316,11 +341,15 @@ def main() -> int:
     parser.add_argument("path", help="Path to Game Log JSON")
     parser.add_argument("--decision-log", help="Optional path to Decision Log JSON for D2 deterministic decision-quality scoring")
     parser.add_argument("--semantic-labels", help="Optional saved S5 Semantic Label Log JSON. Requires --decision-log.")
+    parser.add_argument("--consensus-log", help="Optional path to Consensus Log JSON for bundle validation")
+    parser.add_argument("--failure-audit", help="Optional path to Failure Audit JSON for bundle validation")
     parser.add_argument("--html-out", required=True, help="Output HTML file path")
     args = parser.parse_args()
 
-    write_demo_html(args.path, args.html_out, args.decision_log, args.semantic_labels)
-    print(f"rendered_demo_html={args.html_out}")
+    write_demo_html(args.path, args.html_out, args.decision_log, args.semantic_labels, consensus_log_path=args.consensus_log, failure_audit_path=args.failure_audit)
+    print(f"wrote {args.html_out}")
+    bundle_supplied = bool(args.consensus_log or args.failure_audit)
+    print(f"bundle_validation={'enabled' if bundle_supplied else 'disabled'}")
     return 0
 
 
