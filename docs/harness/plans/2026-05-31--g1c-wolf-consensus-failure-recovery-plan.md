@@ -47,7 +47,11 @@ The Implementation PR may modify only these paths:
 ```text
 src/werewolf_eval/game_engine.py
 src/werewolf_eval/run_mock_game.py
+src/werewolf_eval/consensus_log.py
+src/werewolf_eval/decision_log.py
+src/werewolf_eval/render_demo.py
 tests/test_game_engine.py
+tests/test_decision_log.py
 docs/generated-games/g1c-wolf-consensus-game-log.json
 docs/generated-games/g1c-wolf-consensus-decision-log.json
 docs/generated-games/g1c-wolf-consensus-consensus-log.json
@@ -58,8 +62,22 @@ docs/demo/phase3-g1c-wolf-consensus-runtime-demo.html
 README.md
 docs/TASKS.md
 docs/ROADMAP.md
+docs/specs/agent-workflow.md
+docs/harness/plans/2026-05-31--g1c-wolf-consensus-failure-recovery-plan.md
+docs/generated-games/g1b-mock-agent-game-log.json
+docs/generated-games/g1b-mock-agent-decision-log.json
+docs/generated-games/g1b-mock-agent-score-log.json
+docs/generated-games/g1b-mock-agent-metrics-summary.json
+docs/demo/phase3-g1b-mock-agent-runtime-demo.html
 .oh-my-harness/tree.md
 ```
+
+**Risk notes:**
+- `src/werewolf_eval/consensus_log.py`: Narrow source-label compatibility — added `[deterministic mock agent output]` to `VALID_SOURCE_LABELS`. No validator semantics changed.
+- `src/werewolf_eval/decision_log.py`: Narrow source-label compatibility — added `[deterministic mock agent output]` to `VALID_SOURCE_LABELS`. No validator semantics changed.
+- `src/werewolf_eval/render_demo.py`: Narrow source-label propagation — reads actual `source_label` from game log JSON instead of hardcoding. No rendering semantics changed.
+- `tests/test_decision_log.py`: Tests for new `[deterministic mock agent output]` source label.
+- `docs/generated-games/g1b-mock-agent-*.json` and `docs/demo/phase3-g1b-mock-agent-runtime-demo.html`: Prior-phase G1b artifacts present on branch.
 
 If `.logs/review/latest/review-packet.md` is generated locally, it must stay untracked.
 
@@ -72,11 +90,9 @@ src/werewolf_eval/scoring.py
 src/werewolf_eval/score_game.py
 src/werewolf_eval/semantic_labels.py
 src/werewolf_eval/validate_semantic_labels.py
-src/werewolf_eval/consensus_log.py
 src/werewolf_eval/validate_consensus_log.py
-src/werewolf_eval/decision_log.py
 src/werewolf_eval/validate_decision_log.py
-src/werewolf_eval/render_demo.py
+src/werewolf_eval/validate_game_log.py
 docs/gold-game/**
 docs/semantic-labeling/**
 docs/EVALUATION_RUBRIC.md
@@ -87,6 +103,8 @@ package.json
 package-lock.json
 pnpm-lock.yaml
 ```
+
+`src/werewolf_eval/consensus_log.py`, `src/werewolf_eval/decision_log.py`, and `src/werewolf_eval/render_demo.py` are removed from forbidden scope above — only narrow source-label compatibility changes are permitted (see allowlist risk notes).
 
 Do not introduce:
 

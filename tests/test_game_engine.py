@@ -259,6 +259,8 @@ class GameEngineConsensusTests(unittest.TestCase):
         self.assertEqual(first["final_decision"]["target"], "p5")
 
     def test_g1c_split_wolf_vote_records_no_consensus_and_audit(self):
+        from werewolf_eval.game_log import parse_game_log
+
         result = run_mock_game_for_test(mode="g1c_split_wolf_vote")
         consensus_log = result["consensus_log"]
         audit = result["failure_audit"]
@@ -267,22 +269,104 @@ class GameEngineConsensusTests(unittest.TestCase):
         self.assertTrue(any(item["kind"] == "wolf_consensus_failure" for item in audit["failures"]))
         self.assertFalse(any(item.get("repaired_to_valid_action") for item in audit["failures"]))
 
+        # Game Log must validate
+        game = parse_game_log(result["game_log"])
+        self.assertEqual(game.game_id, "g1c_split_wolf_vote")
+
+        # where both werewolf_kill and player_died exist for the same round, targets must match
+        kill_by_round: dict[int, str] = {}
+        died_by_round: dict[int, str] = {}
+        for e in game.events:
+            if e.type == "werewolf_kill":
+                kill_by_round[e.round] = e.target
+            elif e.type == "player_died":
+                died_by_round[e.round] = e.target
+        for rnd in sorted(set(kill_by_round) & set(died_by_round)):
+            self.assertEqual(kill_by_round[rnd], died_by_round[rnd],
+                             f"round {rnd}: kill target={kill_by_round[rnd]} != died target={died_by_round[rnd]}")
+
     def test_g1c_invalid_wolf_action_is_rejected_not_repaired(self):
+        from werewolf_eval.consensus_log import parse_consensus_log
+        from werewolf_eval.game_log import parse_game_log
+
         result = run_mock_game_for_test(mode="g1c_invalid_wolf_action")
         audit = result["failure_audit"]
         decision_log = result["decision_log"]
+        consensus_log = result["consensus_log"]
 
         self.assertTrue(any(item["kind"] == "invalid_action" for item in audit["failures"]))
-        invalid_targets = {item["target"] for item in audit["failures"] if item["kind"] == "invalid_action"}
+        invalid_actions = [item for item in audit["failures"] if item["kind"] == "invalid_action"]
+        invalid_targets = {item["target"] for item in invalid_actions}
         valid_decision_targets = {item.get("target") for item in decision_log["decisions"]}
         self.assertTrue(invalid_targets.isdisjoint(valid_decision_targets))
 
+        # p1 invalid p99 is audited
+        p1_invalid = [item for item in invalid_actions if item["actor"] == "p1" and item.get("target") == "p99"]
+        self.assertTrue(len(p1_invalid) > 0, "p1 invalid p99 must be audited")
+
+        # p99 does not appear as a valid Decision Log target
+        self.assertNotIn("p99", valid_decision_targets)
+
+        # Consensus Log validates
+        game = parse_game_log(result["game_log"])
+        parsed_cl = parse_consensus_log(consensus_log, game)
+        self.assertIsNotNone(parsed_cl)
+
+        # p1 is covered by supporters or dissenters
+        r1_consensus = consensus_log["consensuses"][0]
+        fd = r1_consensus["final_decision"]
+        self.assertIn("p1", r1_consensus["participants"])
+        covered = set(fd["supporters"]) | set(fd["dissenters"])
+        self.assertIn("p1", covered)
+
     def test_g1c_timeout_and_parse_failure_are_audited(self):
+        from werewolf_eval.game_log import parse_game_log
+
         result = run_mock_game_for_test(mode="g1c_timeout_parse_failure")
+
+        # Failure-mode Game Log must validate (continuous sequence even when events are skipped)
+        game = parse_game_log(result["game_log"])
+        self.assertEqual(game.game_id, "g1c_timeout_parse_failure")
+
         kinds = {item["kind"] for item in result["failure_audit"]["failures"]}
 
         self.assertIn("timeout", kinds)
         self.assertIn("parse_failure", kinds)
+
+        # No wolf_team werewolf_kill Decision Log entry is produced from the failed round 1 actions
+        wolf_kill_decisions = [
+            item for item in result["decision_log"]["decisions"]
+            if item["actor"] == "wolf_team" and item["action"] == "werewolf_kill"
+        ]
+        # Round 2 produces a valid kill; ensure none have forced_random decision_type
+        self.assertFalse(
+            any(item.get("decision_type") == "forced_random" for item in wolf_kill_decisions),
+            "no forced_random kill decision from timeout/parse_failure")
+        # The failed round 1 must not produce a kill targeting p5 via forced_random
+        forced_p5 = [
+            item for item in wolf_kill_decisions
+            if item.get("target") == "p5" and item.get("decision_type") == "forced_random"
+        ]
+        self.assertEqual(len(forced_p5), 0,
+                         "no forced_random p5 target from timeout/parse_failure")
+
+        # No werewolf_kill events in game log from the failed round 1 consensus
+        kill_events = [
+            e for e in result["game_log"]["events"]
+            if e["type"] == "werewolf_kill"
+        ]
+        # Round 2 produces a valid kill event (target p3); verify none are forced_random-derived
+        forced_kill_events = [
+            e for e in kill_events
+            if e["target"] == "p5" and e["round"] == 1
+        ]
+        self.assertEqual(len(forced_kill_events), 0,
+                         "no werewolf_kill event from failed round 1 actions")
+
+        # timeout/parse_failure entries have repaired_to_valid_action=false
+        for item in result["failure_audit"]["failures"]:
+            self.assertFalse(item.get("repaired_to_valid_action"),
+                             f"{item['kind']} must not be marked repaired_to_valid_action")
 
 
 if __name__ == "__main__":
