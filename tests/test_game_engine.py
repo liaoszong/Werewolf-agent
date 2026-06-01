@@ -258,6 +258,21 @@ class GameEngineConsensusTests(unittest.TestCase):
         self.assertIn("p2", first["participants"])
         self.assertEqual(first["final_decision"]["target"], "p5")
 
+        # wolf_team Decision Log entries carry matching consensus_id
+        wolf_team_decisions = [
+            d for d in result["decision_log"]["decisions"]
+            if d["actor"] == "wolf_team" and d["action"] == "werewolf_kill"
+        ]
+        self.assertGreaterEqual(len(wolf_team_decisions), 1)
+        for wtd in wolf_team_decisions:
+            self.assertIsNotNone(wtd["consensus_id"],
+                                 f"wolf_team decision {wtd['decision_id']} has null consensus_id")
+            self.assertIn(
+                wtd["consensus_id"],
+                {c["consensus_id"] for c in consensus_log["consensuses"]},
+                f"wolf_team decision consensus_id {wtd['consensus_id']!r} not found in Consensus Log",
+            )
+
     def test_g1c_split_wolf_vote_records_no_consensus_and_audit(self):
         from werewolf_eval.game_log import parse_game_log
 

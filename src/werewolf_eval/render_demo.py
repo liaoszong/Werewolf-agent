@@ -122,12 +122,12 @@ def build_demo_context(game: GameLog, score_log: Any, metrics: Any, attribution:
     elif semantic_labels_enabled:
         source_label = "[deterministic][semantic-labels]"
     else:
-        source_label = "[deterministic]"
+        source_label = game_source_label
 
     leaderboard = [
         {
             "agent_id": f"{game.game_id}-runtime",
-            "model": "scripted deterministic runner" if is_g1a_scripted else "deterministic pipeline",
+            "model": "scripted deterministic runner" if is_g1a_scripted else "deterministic mock agent" if game_source_label == "[deterministic mock agent output]" else "deterministic pipeline",
             "games_played": games_played,
             "win_rate": 1.0 if game.result.winner == "villager" else 0.0,
             "avg_outcome_score": avg_outcome_score,
@@ -238,6 +238,7 @@ def render_html(context: dict[str, Any]) -> str:
     )
 
     is_g1a = "[scripted deterministic output]" in context["score"].get("source_label", "")
+    is_mock_agent = "[deterministic mock agent output]" in context["game"].get("source_label", "")
 
     if is_g1a:
         boundary_copy = "This demo is generated from scripted deterministic Game Log / Decision Log / Consensus Log outputs. It is not Agent runtime output, not live AI Agent gameplay, not provider integration, not a Web live observer, and not human-vs-AI UI."
@@ -248,7 +249,10 @@ def render_html(context: dict[str, Any]) -> str:
         decision_copy = f"decision_quality_score: S5 saved semantic labels enabled; decision_quality_total={context['score']['decision_quality_total']}."
         title = "Werewolf-agent Phase 2 Runtime Demo"
     elif context["score"]["decision_log_enabled"]:
-        boundary_copy = "This is not real AI Agent gameplay, not real Consensus Log collection, not AI semantic labeling, and not a real multi-model Leaderboard. Decision Log is connected to scoring via D2 deterministic Step 1-2 (visibility check + decision_id traceability), but decision_quality_score remains 0 (positive scoring waits for S5 AI semantic judgment)."
+        if is_mock_agent:
+            boundary_copy = "This is not real AI Agent gameplay, not AI semantic labeling, and not a real multi-model Leaderboard. Consensus Log is generated from deterministic mock-agent wolf team proposals. Decision Log is connected to scoring via D2 deterministic Step 1-2 (visibility check + decision_id traceability), but decision_quality_score remains 0 (positive scoring waits for S5 AI semantic judgment)."
+        else:
+            boundary_copy = "This is not real AI Agent gameplay, not real Consensus Log collection, not AI semantic labeling, and not a real multi-model Leaderboard. Decision Log is connected to scoring via D2 deterministic Step 1-2 (visibility check + decision_id traceability), but decision_quality_score remains 0 (positive scoring waits for S5 AI semantic judgment)."
         decision_copy = "decision_quality_score: D2 visibility check + decision_id traceability complete; positive scoring still 0 (waiting for S5)."
         title = "Werewolf-agent Phase 2 Runtime Demo"
     else:

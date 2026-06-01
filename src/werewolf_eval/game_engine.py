@@ -408,14 +408,14 @@ class GameEngine:
             _event_seq += 1
             return evt
 
-        def _decision(actor: str, scope: str, phase: str, action: str, target: str, dtype: str, reason: str, refs: list[str] | None = None) -> dict[str, Any]:
+        def _decision(actor: str, scope: str, phase: str, action: str, target: str, dtype: str, reason: str, refs: list[str] | None = None, consensus_id: str | None = None) -> dict[str, Any]:
             nonlocal d_counter
             d_counter += 1
             return {
                 "decision_id": f"{game_id}_d{d_counter:03d}",
                 "actor": actor,
                 "decision_scope": scope,
-                "consensus_id": None,
+                "consensus_id": consensus_id,
                 "phase": phase,
                 "action": action,
                 "target": target,
@@ -473,7 +473,8 @@ class GameEngine:
                 consensus_entries.append(c_entry)
             failure_records.extend(c_failures)
             if c_target is not None:
-                decisions.append(_decision("wolf_team", "team", "night", "werewolf_kill", c_target, "team_coordinated", f"wolf team kills {c_target}"))
+                cid = c_entry["consensus_id"] if c_entry is not None else None
+                decisions.append(_decision("wolf_team", "team", "night", "werewolf_kill", c_target, "team_coordinated", f"wolf team kills {c_target}", consensus_id=cid))
                 _emit("night", 1, "werewolf_kill", "wolf_team", c_target, "werewolf_team", f"Wolf team kills {c_target}.")
         else:
             wa1 = self._wolf_agent.decide(_wolf_obs("night", 1, ["p1", "p2"]))
@@ -511,7 +512,8 @@ class GameEngine:
                 consensus_entries.append(c_entry)
             failure_records.extend(c_failures)
             if c_target is not None:
-                decisions.append(_decision("wolf_team", "team", "night", "werewolf_kill", c_target, "team_coordinated", f"wolf team kills {c_target}"))
+                cid = c_entry["consensus_id"] if c_entry is not None else None
+                decisions.append(_decision("wolf_team", "team", "night", "werewolf_kill", c_target, "team_coordinated", f"wolf team kills {c_target}", consensus_id=cid))
                 _emit("night", 2, "werewolf_kill", "wolf_team", c_target, "werewolf_team", f"Wolf team kills {c_target}.")
         else:
             wa3 = self._wolf_agent.decide(_wolf_obs("night", 2, ["p2"]))
