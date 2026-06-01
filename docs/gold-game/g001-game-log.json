@@ -1,5 +1,6 @@
 {
   "game_id": "g001",
+  "source_label": "[人工 gold sample]",
   "source": {
     "source_type": "manually_authored_virtual_game",
     "source_file": "docs/gold-game/s0-gold-game-seed.md",

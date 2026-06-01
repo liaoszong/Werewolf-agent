@@ -6,13 +6,8 @@ from pathlib import Path
 from typing import Any
 
 from werewolf_eval.game_log import GameLog
+from werewolf_eval.source_labels import VALID_SOURCE_LABELS
 
-VALID_SOURCE_LABELS = {
-    "[人工 gold sample]",
-    "[AI 生成]",
-    "[scripted deterministic output]",
-    "[deterministic mock agent output]",
-}
 VALID_CONSENSUS_PHASES = {"night"}
 VALID_TEAMS = {"werewolf"}
 VALID_CONSENSUS_STATUSES = {

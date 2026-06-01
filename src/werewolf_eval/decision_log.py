@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from werewolf_eval.game_log import GameLog
+from werewolf_eval.source_labels import VALID_SOURCE_LABELS
 
 VALID_DECISION_SCOPES = {"single", "team"}
 VALID_DECISION_PHASES = {"night", "day"}
@@ -15,12 +16,6 @@ VALID_DECISION_TYPES = {
     "retaliatory",
     "team_coordinated",
     "default",
-}
-VALID_SOURCE_LABELS = {
-    "[人工 gold sample]",
-    "[AI 生成]",
-    "[scripted deterministic output]",
-    "[deterministic mock agent output]",
 }
 ALLOWED_NON_PLAYER_ACTORS = {"wolf_team"}
 ALLOWED_NON_PLAYER_TARGETS = {"none", "villager_team", "werewolf_team"}

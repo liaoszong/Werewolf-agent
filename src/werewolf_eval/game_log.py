@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from werewolf_eval.source_labels import VALID_SOURCE_LABELS
 
 VALID_PHASES = {"setup", "night", "day", "game_end"}
 VALID_VISIBILITIES = {
@@ -49,6 +50,7 @@ class GameResult:
 @dataclass(frozen=True)
 class GameLog:
     game_id: str
+    source_label: str
     players: list[Player]
     events: list[Event]
     result: GameResult
@@ -80,7 +82,7 @@ def load_game_log(path: str | Path) -> GameLog:
 
 
 def parse_game_log(raw: dict[str, Any]) -> GameLog:
-    required_top_level = {"game_id", "players", "events", "result"}
+    required_top_level = {"game_id", "source_label", "players", "events", "result"}
     missing = required_top_level - set(raw)
     if missing:
         raise GameLogValidationError(f"missing top-level fields: {sorted(missing)}")
@@ -91,6 +93,7 @@ def parse_game_log(raw: dict[str, Any]) -> GameLog:
 
     game = GameLog(
         game_id=str(raw["game_id"]),
+        source_label=str(raw["source_label"]),
         players=players,
         events=events,
         result=result,
@@ -102,6 +105,9 @@ def parse_game_log(raw: dict[str, Any]) -> GameLog:
 def validate_game_log(game: GameLog) -> None:
     if not game.game_id:
         raise GameLogValidationError("game_id must not be empty")
+
+    if game.source_label not in VALID_SOURCE_LABELS:
+        raise GameLogValidationError(f"invalid source_label: {game.source_label!r}")
 
     if len(game.players) != 6:
         raise GameLogValidationError(f"expected 6 players, got {len(game.players)}")

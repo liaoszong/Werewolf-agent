@@ -21,12 +21,27 @@ class GameLogParserTests(unittest.TestCase):
         game = load_game_log(ROOT / "docs/gold-game/g001-game-log.json")
 
         self.assertEqual(game.game_id, "g001")
+        self.assertEqual(game.source_label, "[人工 gold sample]")
         self.assertEqual(len(game.players), 6)
         self.assertEqual(len(game.events), 38)
         self.assertEqual(game.events[0].event_id, "g001_e001")
         self.assertEqual(game.events[-1].type, "game_over")
         self.assertEqual(game.result.winner, "villager")
         self.assertEqual(game.result.survivors, ["p4", "p6"])
+
+    def test_rejects_missing_source_label(self) -> None:
+        raw = load_raw_gold_game()
+        del raw["source_label"]
+
+        with self.assertRaisesRegex(GameLogValidationError, "missing top-level fields"):
+            parse_game_log(raw)
+
+    def test_rejects_unknown_source_label(self) -> None:
+        raw = load_raw_gold_game()
+        raw["source_label"] = "[unknown mystery label]"
+
+        with self.assertRaisesRegex(GameLogValidationError, "invalid source_label"):
+            parse_game_log(raw)
 
     def test_rejects_duplicate_event_id(self) -> None:
         raw = load_raw_gold_game()
