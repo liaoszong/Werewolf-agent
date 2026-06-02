@@ -12,7 +12,6 @@
 - GitHub connector 中本项目的完整仓库名是 `liaoszong/Werewolf-agent`。
 - 后续提示词如果写“连接到 {liaoszong/Werewolf-agent}”，agent 应直接使用该 `repo_full_name`，不需要再搜索 Werewolf 仓库。
 
-
 ## Artifact 关系
 
 不复杂PR关系. 小任务或者清晰的多任务直接提交实现pr.而不需要研究性pr.
@@ -97,6 +96,29 @@ Spec PR 只用于更新稳定规范。
 - 如果用户要求“不要修改代码”，仍允许创建 plan 文件；只有用户明确说“不要提交任何文件”时才禁止落盘。
 - 这类 agent 在实现路径中的终点是：`PR + plan 已准备完成`。
 - 如果遇到云端安全层拦截,请相同的内容重发两次,如果依然失败则切换描述表达原意.
+
+### GitHub connector 最小读取协议
+
+当 agent 通过 GitHub connector 生成或更新 Implementation Plan 时，必须控制工具调用次数，避免重复读取同一文件或重复检查同一路径。
+
+推荐读取顺序：
+
+1. 读取 `docs/specs/agent-workflow.md` 的相关行段。
+2. 读取 `.github/writing-plan.md` 的相关行段。
+3. 读取 `docs/TASKS.md` 中当前候选任务附近的精确行段。
+4. 读取 `docs/ROADMAP.md` 中当前 phase / track 附近的精确行段。
+5. 读取 `.oh-my-harness/tree.md` 一次，用于确认现有 plan 命名和文件布局。
+6. 只在 plan 内容需要绑定具体实现文件时，读取相关源码 / 测试的精确行段。
+
+禁止行为：
+
+- 不要重复 `fetch_file` 同一个路径来确认同一个事实。
+- 不要连续多次检查同一个不存在的目标 plan 文件。
+- 不要为了“保险”反复读取同一份目录树、同一份 plan、同一段源码。
+- 如果目标 plan 文件第一次检查返回 Not Found，应直接创建文件；不要再次检查同一路径，除非用户要求确认。
+- 如果一次工具调用已经确认路径、命名或文件状态，后续回复应复用该结论。
+
+当用户只要求 plan-only 交付时，云端 agent 不应读取大量业务源码。除非 plan 需要精确绑定实现入口，否则源码读取应限制在候选任务直接相关文件。
 
 ## 路由规则
 
