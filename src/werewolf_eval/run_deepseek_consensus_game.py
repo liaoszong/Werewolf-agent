@@ -35,7 +35,6 @@ def _write_json(path: str, payload: dict) -> None:
 def _collect_trace(
     game_id: str,
     agents: dict[str, object],
-    wolf_agent: object,
     failures: list[ProviderFailure],
 ) -> ProviderTrace:
     seen_req: set[str] = set()
@@ -43,7 +42,7 @@ def _collect_trace(
     all_requests: list[ProviderRequest] = []
     all_responses: list = []
 
-    for agent in list(agents.values()) + [wolf_agent]:
+    for agent in list(agents.values()):
         if isinstance(agent, ProviderAgent):
             for req in agent.provider.requests:
                 if req.request_id not in seen_req:
@@ -74,12 +73,10 @@ def run_deepseek_consensus_game_with_provider_factory(
     provider_factory: ProviderFactory,
 ) -> int:
     agents = {pid: provider_factory(pid) for pid in ["p1", "p2", "p3", "p4", "p5", "p6"]}
-    wolf_agent = provider_factory("wolf_team")
 
     engine = GameEngine.from_config(
         build_default_config(game_id=game_id),
         agents=agents,
-        wolf_agent=wolf_agent,
         source_label=DEEPSEEK_PROVIDER_SOURCE_LABEL,
     )
 
@@ -89,7 +86,7 @@ def run_deepseek_consensus_game_with_provider_factory(
         outputs = engine.run(mode="g1f_provider_consensus")
     except ProviderActionError as exc:
         failures.append(exc.failure)
-        trace = _collect_trace(game_id, agents, wolf_agent, failures)
+        trace = _collect_trace(game_id, agents, failures)
         trace_payload = provider_trace_to_dict(trace)
         _write_json(str(out_dir / "provider-trace.json"), trace_payload)
 
@@ -118,7 +115,7 @@ def run_deepseek_consensus_game_with_provider_factory(
     if outputs.consensus_log is not None:
         _write_json(str(out_dir / "consensus-log.json"), outputs.consensus_log)
 
-    trace = _collect_trace(game_id, agents, wolf_agent, [])
+    trace = _collect_trace(game_id, agents, [])
     trace_payload = provider_trace_to_dict(trace)
     _write_json(str(out_dir / "provider-trace.json"), trace_payload)
 

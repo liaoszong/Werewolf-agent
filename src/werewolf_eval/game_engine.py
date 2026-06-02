@@ -568,8 +568,9 @@ class GameEngine:
             failure_records.extend(c_failures)
             if c_target is not None:
                 cid = c_entry["consensus_id"] if c_entry is not None else None
-                decisions.append(_decision("wolf_team", "team", "night", "werewolf_kill", c_target, "team_coordinated", f"wolf team kills {c_target}", consensus_id=cid))
-                _emit("night", 1, "werewolf_kill", "wolf_team", c_target, "werewolf_team", f"Wolf team kills {c_target}.")
+                d_actor = c_entry["coordinator"] if mode == "g1f_provider_consensus" else "wolf_team"
+                decisions.append(_decision(d_actor, "team", "night", "werewolf_kill", c_target, "team_coordinated", f"wolf team kills {c_target}", consensus_id=cid))
+                _emit("night", 1, "werewolf_kill", d_actor, c_target, "werewolf_team", f"Wolf team kills {c_target}.")
         else:
             wa1 = self._wolf_agent.decide(_wolf_obs("night", 1, ["p1", "p2"]))
             decisions.append(_decision(wa1.actor, "team", wa1.phase, wa1.action, wa1.target, wa1.decision_type, wa1.reason_summary))
@@ -599,44 +600,7 @@ class GameEngine:
         alive.discard("p1")
 
         # Night 2: wolf kill
-        if mode == "g1f_provider_consensus":
-            n2_wolves = ["p2"]
-            wa3 = self._wolf_agent.decide(_wolf_obs("night", 2, n2_wolves))
-            cid2 = f"{game_id}_consensus_r02"
-            n2_consensus = {
-                "consensus_id": cid2,
-                "game_id": game_id,
-                "round": 2,
-                "phase": "night",
-                "team": "werewolf",
-                "participants": n2_wolves,
-                "coordinator": n2_wolves[0],
-                "max_rounds": 1,
-                "actual_rounds": 1,
-                "status": "consensus",
-                "proposals": [{
-                    "proposal_id": 1,
-                    "proposer": n2_wolves[0],
-                    "proposed_target": wa3.target,
-                    "visible_info_refs": _public_refs(),
-                    "reason_summary": wa3.reason_summary,
-                    "confidence": wa3.confidence,
-                    "action_round": 1,
-                }],
-                "responses": [],
-                "final_decision": {
-                    "target": wa3.target,
-                    "decision_type": "consensus",
-                    "primary_proposer": n2_wolves[0],
-                    "supporters": list(n2_wolves),
-                    "dissenters": [],
-                    "resolution_round": 1,
-                },
-            }
-            consensus_entries.append(n2_consensus)
-            decisions.append(_decision(wa3.actor, "team", wa3.phase, wa3.action, wa3.target, wa3.decision_type, wa3.reason_summary, consensus_id=cid2))
-            _emit("night", 2, wa3.action, wa3.actor, wa3.target, "werewolf_team", f"Wolf team kills {wa3.target}.")
-        elif is_consensus_mode:
+        if is_consensus_mode:
             n2_wolves = ["p2"]
             c_entry, c_failures, c_target = self._resolve_wolf_consensus(game_id, 2, "night", n2_wolves, alive, mode, events)
             if c_entry is not None:
@@ -644,8 +608,9 @@ class GameEngine:
             failure_records.extend(c_failures)
             if c_target is not None:
                 cid = c_entry["consensus_id"] if c_entry is not None else None
-                decisions.append(_decision("wolf_team", "team", "night", "werewolf_kill", c_target, "team_coordinated", f"wolf team kills {c_target}", consensus_id=cid))
-                _emit("night", 2, "werewolf_kill", "wolf_team", c_target, "werewolf_team", f"Wolf team kills {c_target}.")
+                d_actor = c_entry["coordinator"] if mode == "g1f_provider_consensus" else "wolf_team"
+                decisions.append(_decision(d_actor, "team", "night", "werewolf_kill", c_target, "team_coordinated", f"wolf team kills {c_target}", consensus_id=cid))
+                _emit("night", 2, "werewolf_kill", d_actor, c_target, "werewolf_team", f"Wolf team kills {c_target}.")
         else:
             wa3 = self._wolf_agent.decide(_wolf_obs("night", 2, ["p2"]))
             decisions.append(_decision(wa3.actor, "team", wa3.phase, wa3.action, wa3.target, wa3.decision_type, wa3.reason_summary))

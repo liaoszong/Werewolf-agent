@@ -283,11 +283,17 @@ class GameEngineConsensusTests(unittest.TestCase):
         )
         outputs = engine.run(mode="g1f_provider_consensus")
         self.assertIsNotNone(outputs.consensus_log)
+        self.assertEqual(len(outputs.consensus_log["consensuses"]), 2)
+
         first = outputs.consensus_log["consensuses"][0]
+        second = outputs.consensus_log["consensuses"][1]
         self.assertEqual(first["participants"], ["p1", "p2"])
         self.assertEqual(first["final_decision"]["target"], "p5")
+        self.assertEqual(second["participants"], ["p2"])
+
+        # Each wolf agent is called once per alive wolf night
         self.assertEqual([obs.player_id for obs in p1.observations], ["p1"])
-        self.assertEqual([obs.player_id for obs in p2.observations], ["p2"])
+        self.assertEqual([obs.player_id for obs in p2.observations], ["p2", "p2"])
         self.assertEqual([obs.phase for obs in p1.observations], ["night"])
         self.assertEqual([obs.round for obs in p1.observations], [1])
         self.assertEqual(
@@ -295,6 +301,124 @@ class GameEngineConsensusTests(unittest.TestCase):
             {"p1": "werewolf", "p2": "werewolf"},
         )
         self.assertIn("g1f_provider_consensus_unit_e001", p1.observations[0].public_event_ids)
+
+        # No werewolf_kill decisions use actor="wolf_team" in g1f_provider_consensus mode
+        wolf_team_kill_decisions = [
+            d for d in outputs.decision_log["decisions"]
+            if d["actor"] == "wolf_team" and d["action"] == "werewolf_kill"
+        ]
+        self.assertEqual(len(wolf_team_kill_decisions), 0)
+
+    def test_provider_consensus_mode_emits_night2_consensus_without_wolf_team(self):
+        """Night 2 in g1f mode goes through _resolve_wolf_consensus, no wolf_team actor."""
+        from werewolf_eval.game_engine import AgentAction, GameEngine, build_default_config, MockAgent
+
+        class Recorder:
+            def __init__(self, player_id: str) -> None:
+                self.player_id = player_id
+                self.calls = 0
+
+            def decide(self, observation):
+                self.calls += 1
+                return AgentAction(
+                    actor=self.player_id,
+                    action="werewolf_kill",
+                    target="p5",
+                    phase=observation.phase,
+                    round=observation.round,
+                    reason_summary=f"{self.player_id} proposes p5",
+                    decision_type="team_coordinated",
+                    confidence=1.0,
+                    source_label="[DeepSeek API output]",
+                    visible_info_refs=[],
+                )
+
+        p1 = Recorder("p1")
+        p2 = Recorder("p2")
+        engine = GameEngine.from_config(
+            build_default_config(game_id="g1f_n2_test"),
+            agents={
+                "p1": p1,
+                "p2": p2,
+                "p3": MockAgent("p3"),
+                "p4": MockAgent("p4"),
+                "p5": MockAgent("p5"),
+                "p6": MockAgent("p6"),
+            },
+            source_label="[DeepSeek API output]",
+        )
+        outputs = engine.run(mode="g1f_provider_consensus")
+        cl = outputs.consensus_log
+        self.assertIsNotNone(cl)
+        self.assertEqual(len(cl["consensuses"]), 2)
+
+        second = cl["consensuses"][1]
+        self.assertEqual(second["participants"], ["p2"])
+        self.assertEqual(second["round"], 2)
+
+        # No actor="wolf_team" in werewolf_kill decision entries
+        for d in outputs.decision_log["decisions"]:
+            if d["action"] == "werewolf_kill":
+                with self.subTest(actor=d["actor"]):
+                    self.assertNotEqual(d["actor"], "wolf_team")
+
+    def test_provider_consensus_mode_rejects_wolf_target(self):
+        """Wolf agent targeting another werewolf is rejected and audited, not repaired."""
+        from werewolf_eval.game_engine import AgentAction, GameEngine, build_default_config, MockAgent
+
+        class WolfTargetingWolfAgent:
+            def __init__(self, player_id: str) -> None:
+                self.player_id = player_id
+
+            def decide(self, observation):
+                # Target p2, which is also a werewolf → should be rejected
+                return AgentAction(
+                    actor=self.player_id,
+                    action="werewolf_kill",
+                    target="p2",
+                    phase=observation.phase,
+                    round=observation.round,
+                    reason_summary=f"{self.player_id} targets wolf p2",
+                    decision_type="team_coordinated",
+                    confidence=1.0,
+                    source_label="[DeepSeek API output]",
+                    visible_info_refs=list(observation.private_event_ids),
+                )
+
+        p1 = WolfTargetingWolfAgent("p1")
+        p2 = WolfTargetingWolfAgent("p2")
+        engine = GameEngine.from_config(
+            build_default_config(game_id="g1f_wolf_target_test"),
+            agents={
+                "p1": p1,
+                "p2": p2,
+                "p3": MockAgent("p3"),
+                "p4": MockAgent("p4"),
+                "p5": MockAgent("p5"),
+                "p6": MockAgent("p6"),
+            },
+            source_label="[DeepSeek API output]",
+        )
+        outputs = engine.run(mode="g1f_provider_consensus")
+        self.assertIsNotNone(outputs.failure_audit)
+
+        # Both wolves target each other → both invalid → no valid night 1 kill
+        rejected = [
+            f for f in outputs.failure_audit["failures"]
+            if f["kind"] == "invalid_action" and f.get("target") == "p2"
+        ]
+        self.assertGreaterEqual(len(rejected), 1)
+
+        # The invalid target must NOT appear as a final decision target
+        if outputs.consensus_log and outputs.consensus_log["consensuses"]:
+            fd_target = outputs.consensus_log["consensuses"][0]["final_decision"]["target"]
+            self.assertNotEqual(fd_target, "p2")
+
+        # No werewolf_kill decision should have target="p2"
+        for d in outputs.decision_log["decisions"]:
+            if d["action"] == "werewolf_kill":
+                with self.subTest(target=d.get("target")):
+                    self.assertNotEqual(d.get("target"), "p2")
 
     def test_g1c_wolf_consensus_log_is_emitted_for_valid_night_kill(self):
         result = run_mock_game_for_test(mode="g1c_consensus")
