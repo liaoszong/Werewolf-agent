@@ -1,9 +1,9 @@
 # Review Packet
 
 ## Metadata
-- Base: `main`
+- Base: `ffcbb0f`
 - Branch: `main`
-- Generated: 2026-06-02T06:31:22.896645+00:00
+- Generated: 2026-06-02T06:56:22.050266+00:00
 
 ## Changed Files
 - `src/werewolf_eval/provider_agent.py`
@@ -14,12 +14,13 @@
 
 ## Diff Stat
 ```
-src/werewolf_eval/provider_agent.py         |  38 ++++++++-
- src/werewolf_eval/run_fake_provider_game.py |  16 ++++
- tests/test_build_review_packet.py           | 122 ++++++++++++++++++++++++++++
- tests/test_fake_provider.py                 |  53 ++++++++++++
- tests/test_fake_provider_game.py            |  39 +++++++++
- 5 files changed, 265 insertions(+), 3 deletions(-)
+.logs/review/latest/review-packet.md        | 398 ++++++++++++++--------------
+ src/werewolf_eval/provider_agent.py         |  38 ++-
+ src/werewolf_eval/run_fake_provider_game.py |  16 ++
+ tests/test_build_review_packet.py           | 122 +++++++++
+ tests/test_fake_provider.py                 |  53 ++++
+ tests/test_fake_provider_game.py            |  39 +++
+ 6 files changed, 457 insertions(+), 209 deletions(-)
 ```
 
 ## Diff Check
@@ -68,25 +69,50 @@ FORBIDDEN_PATTERN_SCAN = WARN
 - `import sys`
 
 ## Test Summary
-### `PYTHONPATH=src python -m unittest tests.test_fake_provider tests.test_fake_provider_game tests.test_build_review_packet -v`
-Exit: 1 (FAIL)
+### `python -c "import subprocess, sys; raise SystemExit(subprocess.run([sys.executable, 'scripts/dev/validate_brief.py']).returncode)"`
+Exit: 0 (PASS)
 ```
-'PYTHONPATH' �����ڲ����ⲿ���Ҳ���ǿ����еĳ���
-���������ļ���
+      "command": "PYTHONPATH=src C:\\Users\\jinqi\\AppData\\Local\\Programs\\Python\\Python312\\python.exe -m unittest discover -s tests -p test_*.py",
+      "ok": true,
+      "exit_code": 0,
+      "short_log": ".logs\\validate\\latest\\unit_tests.short.log",
+      "full_log": ".logs\\validate\\latest\\unit_tests.log",
+      "next_read": null
+    }
+  ],
+  "next_read": []
+}
 ```
 
-### `PYTHONPATH=src python -m unittest tests.test_provider_contract tests.test_fake_provider tests.test_fake_provider_game tests.test_game_engine tests.test_source_labels tests.test_build_review_packet -v`
-Exit: 1 (FAIL)
+### `python -c "import os, subprocess, sys; env=os.environ.copy(); env['PYTHONPATH']='src'; raise SystemExit(subprocess.run([sys.executable, '-m', 'unittest', 'tests.test_fake_provider', 'tests.test_fake_provider_game', 'tests.test_build_review_packet', '-v'], env=env).returncode)"`
+Exit: 0 (PASS)
 ```
-'PYTHONPATH' �����ڲ����ⲿ���Ҳ���ǿ����еĳ���
-���������ļ���
+A large hunk that exceeds budget alone is skipped; small hunks still appear. ... ok
+test_small_hunks_prioritized_over_large_hunks (tests.test_build_review_packet.KeyHunkOrderingTests.test_small_hunks_prioritized_over_large_hunks)
+Within the same priority tier, smaller hunks should appear before larger ones. ... ok
+test_truncation_flag_true_when_budget_exceeded (tests.test_build_review_packet.KeyHunkOrderingTests.test_truncation_flag_true_when_budget_exceeded)
+When hunks exceed budget, extract_key_hunks should return truncated=True. ... ok
+
+----------------------------------------------------------------------
+Ran 34 tests in 2.490s
+
+OK
 ```
 
-### `PYTHONPATH=src python -m unittest discover -s tests -p "test_*.py"`
-Exit: 1 (FAIL)
+### `python -c "import os, subprocess, sys; env=os.environ.copy(); env['PYTHONPATH']='src'; raise SystemExit(subprocess.run([sys.executable, '-m', 'unittest', 'discover', '-s', 'tests', '-p', 'test_*.py'], env=env).returncode)"`
+Exit: 0 (PASS)
 ```
-'PYTHONPATH' �����ڲ����ⲿ���Ҳ���ǿ����еĳ���
-���������ļ���
+.....................................................................................................................................................................
+----------------------------------------------------------------------
+Ran 165 tests in 3.298s
+
+OK
+```
+
+### `python -c "import subprocess, sys; raise SystemExit(subprocess.run(['git', 'diff', '--check']).returncode)"`
+Exit: 0 (PASS)
+```
+
 ```
 
 ## Key Hunks
@@ -221,49 +247,35 @@ If B档 is needed, Minimal Next Reads (line ranges):
 ## Evidence Map
 | Acceptance | Evidence | Status |
 |---|---|---|
-| failure-mode only accepts parse_failure timeout invalid_target | test_unknown_failure_mode_is_rejected_before_success_path PASS | PASS |
-| unknown failure-mode exits non-zero with no valid game/decision log | test_unknown_failure_mode_is_rejected_before_success_path PASS | PASS |
-| invalid_target goes to failure path (no valid game_log) | test_invalid_target_failure_mode_does_not_write_valid_logs PASS | PASS |
-| provider JSON missing reason_summary → ProviderActionError (repaired_to_valid_action=False) | test_missing_reason_summary_raises_provider_action_error PASS | PASS |
-| provider JSON missing decision_type → ProviderActionError (repaired_to_valid_action=False) | test_missing_decision_type_raises_provider_action_error PASS | PASS |
-| provider JSON missing confidence → ProviderActionError (repaired_to_valid_action=False) | test_missing_confidence_raises_provider_action_error PASS | PASS |
-| provider JSON invalid confidence type → ProviderActionError (repaired_to_valid_action=False) | test_invalid_confidence_type_raises_provider_action_error PASS | PASS |
-| key-hunk ordering: small hunks prioritized over large | test_small_hunks_prioritized_over_large_hunks PASS | PASS |
-| key-hunk ordering: priority src before docs before logs | test_priority_ordering_src_before_docs_before_logs PASS | PASS |
-| key-hunk ordering: truncation flag and indicator | test_truncation_flag_true_when_budget_exceeded PASS | PASS |
-| key-hunk ordering: large hunk does not prevent small | test_single_large_hunk_does_not_prevent_small_hunks_from_appearing PASS | PASS |
-| validate_brief all green | validate_brief.py ok=true PASS | PASS |
-| compile all source | python -m compileall src tests -q PASS | PASS |
-| validate game log | validate_game_log ok PASS | PASS |
-| validate decision log | validate_decision_log ok PASS | PASS |
-| git diff --check clean | no whitespace errors PASS | PASS |
+| A-1 fake provider source label registered | tests/test_provider_contract.py + tests/test_source_labels.py | PASS |
+| A-2 provider request/response/failure/trace are JSON-safe | tests/test_provider_contract.py | PASS |
+| A-3 fake provider valid response converts to AgentAction | tests/test_fake_provider.py | PASS |
+| A-4 provider invalid/parse/timeout failures are not repaired | tests/test_fake_provider.py + failure audit example | PASS |
+| A-5 GameEngine default mock behavior unchanged | tests/test_game_engine.py | PASS |
+| A-6 injected fake-provider game emits valid Game/Decision logs | tests/test_game_engine.py + validators | PASS |
+| A-7 CLI writes provider trace and refuses forged valid logs on failure | tests/test_fake_provider_game.py | PASS |
+| A-8 generated score/metrics/demo artifacts are reproducible | score/render commands + generated files | PASS |
+| A-9 no live provider/network/secret/dependency capability | packet forbidden/dependency checks | PASS |
+| A-10 packet contains machine evidence and PACKET_TOO_LARGE status | .logs/review/latest/review-packet.md | PASS |
 
 ## Acceptance Checklist
-- [x] failure-mode only accepts parse_failure timeout invalid_target
-- [x] unknown failure-mode exits non-zero with no valid game/decision log
-- [x] invalid_target goes to failure path (no valid game_log)
-- [x] provider JSON missing reason_summary → ProviderActionError (repaired_to_valid_action=False)
-- [x] provider JSON missing decision_type → ProviderActionError (repaired_to_valid_action=False)
-- [x] provider JSON missing confidence → ProviderActionError (repaired_to_valid_action=False)
-- [x] provider JSON invalid confidence type → ProviderActionError (repaired_to_valid_action=False)
-- [x] key-hunk ordering: small hunks prioritized over large
-- [x] key-hunk ordering: priority src before docs before logs
-- [x] key-hunk ordering: truncation flag and indicator
-- [x] key-hunk ordering: large hunk does not prevent small
-- [x] validate_brief all green
-- [x] compile all source
-- [x] validate game log
-- [x] validate decision log
-- [x] git diff --check clean
+- [x] A-1 fake provider source label registered
+- [x] A-2 provider request/response/failure/trace are JSON-safe
+- [x] A-3 fake provider valid response converts to AgentAction
+- [x] A-4 provider invalid/parse/timeout failures are not repaired
+- [x] A-5 GameEngine default mock behavior unchanged
+- [x] A-6 injected fake-provider game emits valid Game/Decision logs
+- [x] A-7 CLI writes provider trace and refuses forged valid logs on failure
+- [x] A-8 generated score/metrics/demo artifacts are reproducible
+- [x] A-9 no live provider/network/secret/dependency capability
+- [x] A-10 packet contains machine evidence and PACKET_TOO_LARGE status
 
 ## Implementer Risk Notes
-- Blocker 1 fixed: --failure-mode now strictly validates against (parse_failure, timeout, invalid_target); unknown values exit non-zero before success path
-- Blocker 2 fixed: provider JSON no longer falls back for missing reason_summary/decision_type/confidence; invalid confidence type also raises ProviderActionError (repaired_to_valid_action=False)
-- Blocker 3 fixed: key-hunk ordering/truncation now covered by KeyHunkOrderingTests (6 tests: small-hunk priority, src-before-docs, truncation flag, large-hunk budget guard, multi-small budget, within-budget no-truncation)
-- Codex B concerns addressed: provider no-repair, failure-mode validation, build_review_packet key-hunk ordering test coverage
+(to be filled by implementer)
 
 ## Review Trigger Result
 **RISK_TRIGGERS_FIRED**
+- changed_lines=666 > 500
 - key_hunks_truncated
 - forbidden_pattern_risk=provider
 
