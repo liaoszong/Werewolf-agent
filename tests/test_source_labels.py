@@ -13,12 +13,17 @@ class SourceLabelsTests(unittest.TestCase):
             "[scripted deterministic output]",
             "[deterministic mock agent output]",
             "[deterministic fake provider output]",
+            "[DeepSeek API output]",
         }
         self.assertEqual(VALID_SOURCE_LABELS, expected)
 
     def test_rejects_unknown_label(self) -> None:
         self.assertNotIn("[freeform mock output]", VALID_SOURCE_LABELS)
         self.assertNotIn("[unknown label]", VALID_SOURCE_LABELS)
+
+    def test_rejects_generic_provider_labels(self) -> None:
+        self.assertNotIn("[provider output]", VALID_SOURCE_LABELS)
+        self.assertNotIn("[live provider output]", VALID_SOURCE_LABELS)
 
 
 if __name__ == "__main__":

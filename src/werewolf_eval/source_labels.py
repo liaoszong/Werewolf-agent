@@ -6,4 +6,5 @@ VALID_SOURCE_LABELS = {
     "[scripted deterministic output]",
     "[deterministic mock agent output]",
     "[deterministic fake provider output]",
+    "[DeepSeek API output]",
 }

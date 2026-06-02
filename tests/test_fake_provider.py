@@ -162,7 +162,24 @@ class FakeProviderAdapterTests(unittest.TestCase):
         self.assertEqual(action.source_label, FAKE_PROVIDER_SOURCE_LABEL)
 
 
-# --- 10. Missing reason_summary → ProviderActionError ---
+# --- 10. ProviderAgent preserves provider response source_label ---
+    def test_provider_agent_preserves_provider_response_source_label(self) -> None:
+        class TestLocalProvider:
+            def respond(self, request: ProviderRequest) -> ProviderResponse:
+                return ProviderResponse(
+                    request_id=request.request_id,
+                    provider_name="test-deepseek",
+                    source_label="[DeepSeek API output]",
+                    raw_content='{"action":"seer_check","target":"p1","reason_summary":"test","decision_type":"inference_based","confidence":1.0}',
+                    latency_ms=100,
+                    token_usage={"prompt": 10, "completion": 20},
+                )
+
+        agent = ProviderAgent("p3", TestLocalProvider())
+        action = agent.decide(self._p3_night_obs())
+        self.assertEqual(action.source_label, "[DeepSeek API output]")
+
+# --- 11. Missing reason_summary → ProviderActionError ---
     def test_missing_reason_summary_raises_provider_action_error(self) -> None:
         agent = build_default_fake_provider_agent(
             "p3",
