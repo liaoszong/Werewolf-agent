@@ -602,7 +602,39 @@ class GameEngine:
         if mode == "g1f_provider_consensus":
             n2_wolves = ["p2"]
             wa3 = self._wolf_agent.decide(_wolf_obs("night", 2, n2_wolves))
-            decisions.append(_decision(wa3.actor, "team", wa3.phase, wa3.action, wa3.target, wa3.decision_type, wa3.reason_summary))
+            cid2 = f"{game_id}_consensus_r02"
+            n2_consensus = {
+                "consensus_id": cid2,
+                "game_id": game_id,
+                "round": 2,
+                "phase": "night",
+                "team": "werewolf",
+                "participants": n2_wolves,
+                "coordinator": n2_wolves[0],
+                "max_rounds": 1,
+                "actual_rounds": 1,
+                "status": "consensus",
+                "proposals": [{
+                    "proposal_id": 1,
+                    "proposer": n2_wolves[0],
+                    "proposed_target": wa3.target,
+                    "visible_info_refs": _public_refs(),
+                    "reason_summary": wa3.reason_summary,
+                    "confidence": wa3.confidence,
+                    "action_round": 1,
+                }],
+                "responses": [],
+                "final_decision": {
+                    "target": wa3.target,
+                    "decision_type": "consensus",
+                    "primary_proposer": n2_wolves[0],
+                    "supporters": list(n2_wolves),
+                    "dissenters": [],
+                    "resolution_round": 1,
+                },
+            }
+            consensus_entries.append(n2_consensus)
+            decisions.append(_decision(wa3.actor, "team", wa3.phase, wa3.action, wa3.target, wa3.decision_type, wa3.reason_summary, consensus_id=cid2))
             _emit("night", 2, wa3.action, wa3.actor, wa3.target, "werewolf_team", f"Wolf team kills {wa3.target}.")
         elif is_consensus_mode:
             n2_wolves = ["p2"]
@@ -662,12 +694,12 @@ class GameEngine:
             consensus_log = {
                 "consensus_log_id": f"{game_id}_consensus_log",
                 "game_id": game_id,
-                "source_label": CONSENSUS_SOURCE_LABEL,
+                "source_label": self._source_label,
                 "consensuses": consensus_entries,
             }
             failure_audit = {
                 "game_id": game_id,
-                "source_label": CONSENSUS_SOURCE_LABEL,
+                "source_label": self._source_label,
                 "failures": failure_records,
             }
 

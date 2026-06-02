@@ -1,3 +1,6 @@
+"""Run DeepSeek consensus smoke for G1f milestone.
+
+Requires a DeepSeek API key. See docs/secrets/api-keys.md for setup."""
 from __future__ import annotations
 
 import argparse
