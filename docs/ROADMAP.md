@@ -39,6 +39,7 @@ The current main branch has completed:
 - G1a scripted deterministic fresh-log runner.
 - G1b deterministic game engine + mock agent contract.
 - G1c wolf consensus + failure recovery.
+- G1d provider adapter research / fake-provider contract.
 
 The current main branch has not completed:
 
@@ -116,13 +117,13 @@ G-track route:
 
 #### G1d: provider adapter research / fake-provider contract
 
-- Status: `future_research_candidate`.
+- Status: `completed`.
 - Role: research provider boundary, secrets, cost, timeout behavior, and fake-provider contract.
 - Boundary: Research PR first; do not connect live APIs directly from this route note.
 
 #### G1e: provider-backed single-game smoke
 
-- Status: `future_candidate_after_G1d`.
+- Status: `next_candidate`.
 - Role: run one local, budget-controlled provider-backed game after G1d establishes the boundary.
 - Boundary: no CI live calls, no multi-game Leaderboard, no human-vs-AI UI.
 
@@ -177,7 +178,7 @@ G1 multi-game outputs
 
 ## Current Priority
 
-The next G-track implementation candidate is G1d provider adapter research / fake-provider contract.
+The next G-track implementation candidate is G1e provider-backed single-game smoke.
 
 Why G1c before G1d/G1e:
 
