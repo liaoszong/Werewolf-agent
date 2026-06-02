@@ -162,5 +162,58 @@ class FakeProviderAdapterTests(unittest.TestCase):
         self.assertEqual(action.source_label, FAKE_PROVIDER_SOURCE_LABEL)
 
 
+# --- 10. Missing reason_summary → ProviderActionError ---
+    def test_missing_reason_summary_raises_provider_action_error(self) -> None:
+        agent = build_default_fake_provider_agent(
+            "p3",
+            override_raw_content='{"action":"seer_check","target":"p1","decision_type":"inference_based","confidence":1.0}',
+        )
+        with self.assertRaises(ProviderActionError) as ctx:
+            agent.decide(self._p3_night_obs())
+        failure = ctx.exception.failure
+        self.assertEqual(failure.kind, "parse_failure")
+        self.assertIn("reason_summary", failure.reason)
+        self.assertFalse(failure.repaired_to_valid_action)
+
+    # --- 11. Missing decision_type → ProviderActionError ---
+    def test_missing_decision_type_raises_provider_action_error(self) -> None:
+        agent = build_default_fake_provider_agent(
+            "p3",
+            override_raw_content='{"action":"seer_check","target":"p1","reason_summary":"check","confidence":1.0}',
+        )
+        with self.assertRaises(ProviderActionError) as ctx:
+            agent.decide(self._p3_night_obs())
+        failure = ctx.exception.failure
+        self.assertEqual(failure.kind, "parse_failure")
+        self.assertIn("decision_type", failure.reason)
+        self.assertFalse(failure.repaired_to_valid_action)
+
+    # --- 12. Missing confidence → ProviderActionError ---
+    def test_missing_confidence_raises_provider_action_error(self) -> None:
+        agent = build_default_fake_provider_agent(
+            "p3",
+            override_raw_content='{"action":"seer_check","target":"p1","reason_summary":"check","decision_type":"inference_based"}',
+        )
+        with self.assertRaises(ProviderActionError) as ctx:
+            agent.decide(self._p3_night_obs())
+        failure = ctx.exception.failure
+        self.assertEqual(failure.kind, "parse_failure")
+        self.assertIn("confidence", failure.reason)
+        self.assertFalse(failure.repaired_to_valid_action)
+
+    # --- 13. Invalid confidence type → ProviderActionError ---
+    def test_invalid_confidence_type_raises_provider_action_error(self) -> None:
+        agent = build_default_fake_provider_agent(
+            "p3",
+            override_raw_content='{"action":"seer_check","target":"p1","reason_summary":"check","decision_type":"inference_based","confidence":"high"}',
+        )
+        with self.assertRaises(ProviderActionError) as ctx:
+            agent.decide(self._p3_night_obs())
+        failure = ctx.exception.failure
+        self.assertEqual(failure.kind, "parse_failure")
+        self.assertIn("confidence", failure.reason)
+        self.assertFalse(failure.repaired_to_valid_action)
+
+
 if __name__ == "__main__":
     unittest.main()

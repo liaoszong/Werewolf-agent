@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
 from werewolf_eval.fake_provider import build_default_fake_provider_agent
@@ -61,6 +62,16 @@ def main() -> int:
     parser.add_argument("--failure-mode", default=None)
     args = parser.parse_args()
 
+    VALID_FAILURE_MODES = ("parse_failure", "timeout", "invalid_target")
+
+    if args.failure_mode is not None and args.failure_mode not in VALID_FAILURE_MODES:
+        print(
+            f"error: --failure-mode must be one of {VALID_FAILURE_MODES}, "
+            f"got '{args.failure_mode}'",
+            file=sys.stderr,
+        )
+        return 1
+
     agents = {
         pid: build_default_fake_provider_agent(pid)
         for pid in ["p3", "p4", "p5", "p6"]
@@ -74,6 +85,11 @@ def main() -> int:
     elif args.failure_mode == "timeout":
         agents["p3"] = build_default_fake_provider_agent(
             "p3", failure_mode="timeout",
+        )
+    elif args.failure_mode == "invalid_target":
+        agents["p3"] = build_default_fake_provider_agent(
+            "p3",
+            override_raw_content='{"action":"seer_check","target":"p99","reason_summary":"bad","decision_type":"inference_based","confidence":1.0}',
         )
 
     engine = GameEngine.from_config(

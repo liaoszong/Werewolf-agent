@@ -143,9 +143,26 @@ class ProviderAgent:
 
         action_name = parsed.get("action")
         target = parsed.get("target")
-        reason_summary = parsed.get("reason_summary", "")
-        decision_type = parsed.get("decision_type", "inference_based")
-        confidence = float(parsed.get("confidence", 1.0))
+
+        # All five fields are mandatory — no fallback defaults allowed.
+        # Missing fields must produce a ProviderFailure, not a repaired valid action.
+        _REQUIRED_FIELDS = ("action", "target", "reason_summary", "decision_type", "confidence")
+        missing = [f for f in _REQUIRED_FIELDS if f not in parsed]
+        if missing:
+            failure = ProviderFailure(
+                request_id=request_id,
+                game_id=game_id,
+                round=round_num,
+                phase=phase,
+                actor=actor,
+                kind="parse_failure",
+                reason=f"provider response missing required field(s): {', '.join(missing)}",
+            )
+            raise ProviderActionError(failure)
+
+        reason_summary = parsed["reason_summary"]
+        decision_type = parsed["decision_type"]
+        confidence_raw = parsed["confidence"]
 
         if not action_name or not isinstance(action_name, str):
             failure = ProviderFailure(
@@ -156,6 +173,21 @@ class ProviderAgent:
                 actor=actor,
                 kind="parse_failure",
                 reason="provider response missing valid 'action' field",
+            )
+            raise ProviderActionError(failure)
+
+        # confidence must be a valid number
+        try:
+            confidence = float(confidence_raw)
+        except (TypeError, ValueError):
+            failure = ProviderFailure(
+                request_id=request_id,
+                game_id=game_id,
+                round=round_num,
+                phase=phase,
+                actor=actor,
+                kind="parse_failure",
+                reason=f"provider response has invalid confidence: {confidence_raw!r} is not a number",
             )
             raise ProviderActionError(failure)
 

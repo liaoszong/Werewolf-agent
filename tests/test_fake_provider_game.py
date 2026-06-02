@@ -104,6 +104,45 @@ class FakeProviderGameCliTests(unittest.TestCase):
             self.assertFalse((out / "game.json").exists())
             self.assertFalse((out / "decision.json").exists())
 
+    def test_invalid_target_failure_mode_does_not_write_valid_logs(self) -> None:
+        """invalid_target must go through failure path: no valid game/decision log written."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            out = Path(tmpdir)
+            result = self._run_cli(
+                "--game-id", "g1d_invalid_target",
+                "--game-log-out", str(out / "game.json"),
+                "--decision-log-out", str(out / "decision.json"),
+                "--provider-trace-out", str(out / "provider-trace.json"),
+                "--failure-audit-out", str(out / "failure-audit.json"),
+                "--failure-mode", "invalid_target",
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("failure_kind=invalid_action", result.stdout)
+            self.assertIn("game_log=not_written", result.stdout)
+            self.assertIn("decision_log=not_written", result.stdout)
+            # Game log and decision log must NOT exist
+            self.assertFalse((out / "game.json").exists())
+            self.assertFalse((out / "decision.json").exists())
+            # Failure audit and provider trace must exist
+            self.assertTrue((out / "failure-audit.json").exists())
+            self.assertTrue((out / "provider-trace.json").exists())
+
+    def test_unknown_failure_mode_is_rejected_before_success_path(self) -> None:
+        """Typo or unknown --failure-mode must exit non-zero with no valid artifacts."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            out = Path(tmpdir)
+            result = self._run_cli(
+                "--game-id", "g1d_typo",
+                "--game-log-out", str(out / "game.json"),
+                "--decision-log-out", str(out / "decision.json"),
+                "--provider-trace-out", str(out / "provider-trace.json"),
+                "--failure-mode", "typo_mode",
+            )
+            self.assertNotEqual(result.returncode, 0)
+            # No valid game/decision log should be written
+            self.assertFalse((out / "game.json").exists())
+            self.assertFalse((out / "decision.json").exists())
+
 
 class FakeProviderGameArtifactTests(unittest.TestCase):
     def test_generated_html_includes_fake_provider_label(self) -> None:

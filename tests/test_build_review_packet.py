@@ -14,6 +14,17 @@ def run(cmd, cwd):
     return subprocess.run(cmd, cwd=cwd, text=True, capture_output=True, check=True)
 
 
+def _make_diff_block(filepath: str, lines: list[str]) -> str:
+    """Build a minimal unified diff block for a single file with added lines."""
+    header = f"diff --git a/{filepath} b/{filepath}"
+    index_line = f"index 0000000..1111111 100644"
+    old_line = "--- a/" + filepath
+    new_line = "+++ b/" + filepath
+    hunk_header = "@@ -0,0 +0," + str(len(lines)) + " @@"
+    body = "\n".join("+" + l for l in lines)
+    return f"{header}\n{index_line}\n{old_line}\n{new_line}\n{hunk_header}\n{body}\n"
+
+
 class BuildReviewPacketTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -142,6 +153,117 @@ class BuildReviewPacketTests(unittest.TestCase):
         packet = out.read_text(encoding="utf-8")
         self.assertIn("FORBIDDEN_PATTERN_SCAN = WARN", packet)
         self.assertIn("provider", packet)
+
+
+class KeyHunkOrderingTests(unittest.TestCase):
+    """Tests for extract_key_hunks ordering, prioritization, and truncation."""
+
+    def _extract(self, diff_text: str, changed_files: list[str]):
+        from scripts.dev.build_review_packet import extract_key_hunks
+        return extract_key_hunks(diff_text, changed_files)
+
+    def test_small_hunks_prioritized_over_large_hunks(self) -> None:
+        """Within the same priority tier, smaller hunks should appear before larger ones."""
+        small_block = _make_diff_block("src/small.py", ["x = 1"])
+        # Large block: 50 added lines
+        large_block = _make_diff_block(
+            "src/large.py", [f"line_{i} = {i}" for i in range(50)]
+        )
+        diff_text = large_block + "\n" + small_block
+
+        result, truncated = self._extract(diff_text, ["src/small.py", "src/large.py"])
+        # Both are priority 0 (src/), so small should come first
+        small_pos = result.find("### src/small.py")
+        large_pos = result.find("### src/large.py")
+        self.assertLess(small_pos, large_pos, "small hunk should appear before large hunk")
+
+    def test_single_large_hunk_does_not_prevent_small_hunks_from_appearing(self) -> None:
+        """A large hunk that exceeds budget alone is skipped; small hunks still appear.
+
+        When tiny hunks fit and a giant one does not, the tiny ones should be
+        included and the giant one should be truncated away, not crowd out
+        the small ones.
+        """
+        # A very large block that exceeds MAX_KEY_HUNK_LINES alone
+        very_large = _make_diff_block(
+            "src/huge.py", [f"big_line_{i} = {i}" for i in range(150)]
+        )
+        small_block = _make_diff_block("src/small.py", ["y = 2"])
+        # Put large first so natural order would be large→small;
+        # but extract_key_hunks sorts by size (small first).
+        diff_text = very_large + "\n" + small_block
+
+        result, truncated = self._extract(diff_text, ["src/huge.py", "src/small.py"])
+        # The small hunk should appear (it fits)
+        self.assertIn("### src/small.py", result)
+        # The large hunk is truncated away because it exceeds remaining budget
+        self.assertNotIn("### src/huge.py", result)
+        # Truncation flag should be True
+        self.assertTrue(truncated)
+
+    def test_multiple_small_hunks_fit_within_budget_and_late_large_is_truncated(self) -> None:
+        """Many small hunks fit within budget, then a large hunk gets truncated."""
+        # 5 small hunks of ~5 lines each = ~45 lines + overhead ≈ 65 total
+        small_files = []
+        for i in range(5):
+            small_files.append(("src", f"small_{i}.py"))
+        # One large hunk that would exceed the remaining budget
+        large_lines = [f"class MyClass_{j}:" for j in range(80)]
+
+        blocks = []
+        changed = []
+        for prefix, name in small_files:
+            filepath = f"{prefix}/{name}"
+            blocks.append(_make_diff_block(filepath, [f"x = {i}"]))
+            changed.append(filepath)
+        filepath = "src/large.py"
+        blocks.append(_make_diff_block(filepath, large_lines))
+        changed.append(filepath)
+
+        diff_text = "\n".join(blocks)
+
+        result, truncated = self._extract(diff_text, changed)
+        # Small hunks should all appear
+        for _, name in small_files:
+            self.assertIn(f"### src/{name}", result)
+        # Large hunk may or may not appear depending on budget
+        # But truncation flag should indicate budget was exceeded
+        # The key invariant: truncation note or omitted indication appears
+        if truncated:
+            # Packet should indicate truncation
+            self.assertIn("KEY_HUNKS_TRUNCATED = YES", result)
+
+    def test_priority_ordering_src_before_docs_before_logs(self) -> None:
+        """src/ files (priority 0) should appear before docs/ (priority 1) and .logs/ (priority 2)."""
+        src_block = _make_diff_block("src/app.py", ["a = 1"] * 10)
+        docs_block = _make_diff_block("docs/README.md", ["# Doc"] * 10)
+        logs_block = _make_diff_block(".logs/output.log", ["log line"] * 10)
+        diff_text = logs_block + "\n" + docs_block + "\n" + src_block
+
+        result, _ = self._extract(
+            diff_text,
+            ["src/app.py", "docs/README.md", ".logs/output.log"],
+        )
+        src_pos = result.find("### src/app.py")
+        docs_pos = result.find("### docs/README.md")
+        logs_pos = result.find("### .logs/output.log")
+        self.assertLess(src_pos, docs_pos, "src files should come before docs")
+        self.assertLess(docs_pos, logs_pos, "docs should come before .logs")
+
+    def test_truncation_flag_true_when_budget_exceeded(self) -> None:
+        """When hunks exceed budget, extract_key_hunks should return truncated=True."""
+        large = _make_diff_block("src/big.py", [f"x = {i}" for i in range(150)])
+        result, truncated = self._extract(large, ["src/big.py"])
+        self.assertTrue(truncated)
+        # The large hunk is included as the sole entry even though it exceeds budget
+        self.assertIn("### src/big.py", result)
+
+    def test_no_truncation_when_within_budget(self) -> None:
+        """When all hunks fit within budget, truncated should be False."""
+        small = _make_diff_block("src/tiny.py", ["x = 1"])
+        result, truncated = self._extract(small, ["src/tiny.py"])
+        self.assertFalse(truncated)
+        self.assertNotIn("KEY_HUNKS_TRUNCATED", result)
 
 
 if __name__ == "__main__":
