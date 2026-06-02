@@ -4,39 +4,23 @@
 
 **Goal:** Add a local, opt-in, budget-bounded DeepSeek API single-game smoke path that proves G1 can run one provider-backed game without CI live calls, multi-game leaderboard claims, or human-vs-AI UI scope creep.
 
-**Architecture:** Build on the completed G1d provider contract harness instead of adding provider logic to the game engine. Add a DeepSeek provider adapter that implements the existing `respond(ProviderRequest) -> ProviderResponse` shape, make `ProviderAgent` preserve the provider response `source_label`, and add a guarded CLI that only performs live calls when the operator explicitly passes `--allow-live-api` and supplies `DEEPSEEK_API_KEY`. All automated tests must use fake transports or fake providers; the real DeepSeek smoke command is a manual local validation step and must write only to `.tmp/`.
+**Decision:** The next development point is **G1e provider-backed single-game smoke**, narrowed to **DeepSeek API**. The repository route already marks G1d complete and G1e as the next candidate, so this plan must not revisit G1c/G1d runtime, generated artifacts, or roadmap status.
 
-**Tech Stack:** Python standard library only (`argparse`, `dataclasses`, `json`, `os`, `time`, `urllib.request`, `urllib.error`, `unittest`, `pathlib`, `typing`), existing G1d provider contract, existing game engine, existing validators, existing review-packet generator.
+**Architecture:** Build on the completed G1d provider contract harness. Add a DeepSeek provider adapter that implements the existing `respond(ProviderRequest) -> ProviderResponse` shape, make `ProviderAgent` preserve provider response provenance, and add a guarded CLI that performs live calls only when the operator passes `--allow-live-api` and supplies the configured API-key environment variable.
+
+**Tech stack:** Python standard library only: `argparse`, `dataclasses`, `json`, `os`, `re`, `sys`, `time`, `urllib.request`, `urllib.error`, `unittest`, `pathlib`, and `typing`. Do not add provider SDKs or dependencies.
 
 ---
 
-## Decision
+## Implementation PR Draft
 
-The next development point is **G1e provider-backed single-game smoke**, narrowed to **DeepSeek API** because the operator will run the real AI test with DeepSeek.
-
-This follows the current route:
-
-- `docs/TASKS.md` marks G1e as `next_candidate` and describes it as a local, budget-controlled provider-backed game.
-- `docs/ROADMAP.md` states that G1e follows G1d and must remain a single-game smoke, not CI live calls, multi-game leaderboard, or human-vs-AI UI.
-- The repository already has G1d fake-provider files and generated artifacts, so this plan must not reimplement fake-provider contract work.
-
-No Research PR is needed. Provider selection is already resolved by the user: DeepSeek API. This is a bound implementation slice.
-
-## Bound Implementation PR
-
-Future Implementation PR title:
+Title:
 
 ```text
 feat: add G1e DeepSeek provider smoke
 ```
 
-Bound plan path:
-
-```text
-docs/harness/plans/2026-06-02--g1e-deepseek-provider-smoke-plan.md
-```
-
-Implementation PR description draft:
+Body:
 
 ```markdown
 ## Summary
@@ -58,17 +42,17 @@ Bound plan: `docs/harness/plans/2026-06-02--g1e-deepseek-provider-smoke-plan.md`
 - `python -m compileall src/werewolf_eval scripts`
 - `PYTHONPATH=src python -m unittest tests.test_source_labels tests.test_fake_provider tests.test_deepseek_provider tests.test_deepseek_provider_game -v`
 - `PYTHONPATH=src python -m unittest discover -s tests -v`
-- No-live CLI guard exits non-zero and writes no artifacts.
-- Manual DeepSeek smoke command is recorded in the review packet when run locally with `DEEPSEEK_API_KEY`.
+- no-live CLI guard exits non-zero and writes no valid logs
+- manual DeepSeek smoke result is recorded in the review packet when run locally with `DEEPSEEK_API_KEY`
 
 ## Boundaries
 
-This PR does not add CI live calls, dependency changes, provider SDKs, multi-game leaderboard aggregation, human-vs-AI UI, or any repair path that turns invalid provider output into valid logs.
+No CI live calls, dependency changes, provider SDKs, multi-game leaderboard aggregation, human-vs-AI UI, or repair path that turns invalid provider output into valid logs.
 ```
 
 ## Context Budget Gate for Claude Code
 
-Do not read this full plan during implementation. Use the existing context tools.
+Do not read this full plan during implementation. Use the context workflow.
 
 ```bash
 python scripts/context/build_plan_index.py docs/harness/plans/2026-06-02--g1e-deepseek-provider-smoke-plan.md
@@ -93,17 +77,15 @@ For each task:
 python scripts/context/build_task_context.py docs/generated-context/2026-06-02--g1e-deepseek-provider-smoke-plan.index.json <TASK_ID>
 ```
 
-Then read only:
+Read only:
 
 ```text
 docs/generated-context/current-task.ctx.md
 ```
 
-If the generated context is insufficient, read only the exact original plan line range referenced inside `current-task.ctx.md`.
+If insufficient, read only the exact original plan lines referenced inside `current-task.ctx.md`.
 
 ## DeepSeek API Boundary
-
-Use the OpenAI-compatible DeepSeek endpoint in the adapter, but do not add the OpenAI SDK or any other dependency.
 
 Implementation constants:
 
@@ -129,22 +111,18 @@ Request payload requirements:
 
 Prompt requirements:
 
-- The system or user prompt must contain the word `json`.
-- The prompt must include one exact example JSON object with these fields:
-  - `action`
-  - `target`
-  - `reason_summary`
-  - `decision_type`
-  - `confidence`
+- The prompt must contain the word `json`.
+- The prompt must include one exact example JSON object with `action`, `target`, `reason_summary`, `decision_type`, and `confidence`.
 - The prompt must include `allowed_actions` and `allowed_targets` from `ProviderRequest`.
-- The prompt must instruct the model to choose only from those allowed values.
+- The prompt must instruct the model to choose only from allowed values.
 - The adapter must not insert fallback action defaults.
 
-Secret requirements:
+Secret and evidence boundary:
 
 - Read only the environment variable named by `--api-key-env`, default `DEEPSEEK_API_KEY`.
-- Never write the API key, Authorization header value, or environment dump into ProviderTrace, Failure Audit, stdout, stderr, generated logs, review packet, or tests.
-- Error messages may say the named environment variable is missing, but must not echo any value.
+- Never write a real API key, captured `Authorization` header value, shell environment dump, or raw provider credential into ProviderTrace, Failure Audit, stdout, stderr, generated logs, tests, or review packet.
+- Tests and review packets may contain field names and harmless literals such as `Authorization` and `"Bearer "` because they are necessary to prove header construction. Secret checks must block real values, not those field names.
+- Error messages may say the configured environment variable is missing but must not echo any value.
 
 Live-call requirements:
 
@@ -159,123 +137,28 @@ Live-call requirements:
 
 ```text
 src/werewolf_eval/deepseek_provider.py
-```
-
-Responsible for:
-
-- DeepSeek adapter config.
-- HTTP request construction via `urllib.request`.
-- Request/response recording through existing `ProviderRequest` / `ProviderResponse`.
-- Budget and request-count checks.
-- No SDK imports and no dependency changes.
-
-```text
-src/werewolf_eval/run_deepseek_provider_game.py
-```
-
-Responsible for:
-
-- Manual local CLI for one DeepSeek-backed game.
-- Guarding live calls behind `--allow-live-api`.
-- Writing `.tmp` Game Log, Decision Log, Provider Trace, and Failure Audit.
-- Refusing to write valid Game Log / Decision Log artifacts when provider output fails parse, validation, timeout, or budget checks.
-
-```text
 tests/test_deepseek_provider.py
-```
-
-Responsible for:
-
-- Non-network DeepSeek adapter tests using fake transport callables.
-- Payload shape, source label, token usage, missing API key, HTTP error, empty content, and secret-redaction checks.
-
-```text
+src/werewolf_eval/run_deepseek_provider_game.py
 tests/test_deepseek_provider_game.py
 ```
-
-Responsible for:
-
-- CLI guard tests with no live calls.
-- Helper-level smoke tests with fake providers or fake provider factories.
-- Artifact policy checks that generated live outputs stay under `.tmp`.
 
 ### Modify
 
 ```text
 src/werewolf_eval/provider_contract.py
-```
-
-Add exactly one exported constant:
-
-```python
-DEEPSEEK_PROVIDER_SOURCE_LABEL = "[DeepSeek API output]"
-```
-
-Do not change existing G1d dataclass fields unless a test in this plan explicitly requires it.
-
-```text
 src/werewolf_eval/source_labels.py
-```
-
-Add exactly one accepted label:
-
-```python
-"[DeepSeek API output]"
-```
-
-Do not remove or rename existing source labels.
-
-```text
 src/werewolf_eval/provider_agent.py
-```
-
-Change the valid action return path so `AgentAction.source_label` comes from `response.source_label`, not the fake-provider constant.
-
-Required final behavior:
-
-```python
-return AgentAction(
-    actor=actor,
-    action=action_name,
-    target=target,
-    phase=phase,
-    round=round_num,
-    reason_summary=reason_summary,
-    decision_type=decision_type,
-    confidence=confidence,
-    source_label=response.source_label,
-)
-```
-
-Keep the no-repair invariant: parse failure, invalid action, invalid target, timeout, and provider transport failure must raise `ProviderActionError` or fail the CLI without writing valid logs.
-
-```text
 tests/test_source_labels.py
-```
-
-Update the exact expected set to include `[DeepSeek API output]`.
-
-```text
 tests/test_fake_provider.py
-```
-
-Add a regression assertion that existing fake-provider actions still carry `[deterministic fake provider output]` after `ProviderAgent` starts preserving provider labels.
-
-```text
 .oh-my-harness/tree.md
-```
-
-Refresh after new files are created.
-
-```text
 .logs/review/latest/review-packet.md
 ```
 
-Generate after implementation for Codex A档 review. Do not commit this file unless the repository currently tracks it as part of the review workflow. If it is untracked locally, attach or paste the content in the PR review handoff instead.
+Implementation branches must not modify this plan file unless a reviewer explicitly asks for a plan-only correction. This planning PR itself may modify only this plan file.
 
 ## Global Allowlist
 
-The implementation branch may modify only these paths:
+Implementation branches may modify only these paths:
 
 ```text
 src/werewolf_eval/provider_contract.py
@@ -345,35 +228,36 @@ human-vs-AI UI
 random provider retries without a hard cap
 fallback defaults that repair invalid provider output into valid actions
 committed `.tmp` live outputs
-committed API keys, tokens, Authorization header values, or environment dumps
+committed API keys, tokens, captured Authorization header values, or environment dumps
 ```
 
 ## Task 1: Preserve provider source labels through ProviderAgent
 
-**Files:**
+**Files to modify:**
 
-- Modify: `src/werewolf_eval/provider_contract.py`
-- Modify: `src/werewolf_eval/source_labels.py`
-- Modify: `src/werewolf_eval/provider_agent.py`
-- Modify: `tests/test_source_labels.py`
-- Modify: `tests/test_fake_provider.py`
-
-- [ ] **Step 1: Add failing source-label tests**
-
-In `tests/test_source_labels.py`, update `expected` to include:
-
-```python
-"[DeepSeek API output]"
+```text
+src/werewolf_eval/provider_contract.py
+src/werewolf_eval/source_labels.py
+src/werewolf_eval/provider_agent.py
+tests/test_source_labels.py
+tests/test_fake_provider.py
 ```
 
-Also add:
+**Test files to add/modify:**
+
+```text
+tests/test_source_labels.py
+tests/test_fake_provider.py
+```
+
+- [ ] Add `[DeepSeek API output]` to the expected source-label set and assert generic labels remain rejected:
 
 ```python
 self.assertNotIn("[provider output]", VALID_SOURCE_LABELS)
 self.assertNotIn("[live provider output]", VALID_SOURCE_LABELS)
 ```
 
-Run:
+Run before implementation:
 
 ```bash
 PYTHONPATH=src python -m unittest tests.test_source_labels -v
@@ -385,11 +269,7 @@ Expected result before implementation:
 FAIL: test_expected_labels_present
 ```
 
-The failure must be caused only by the missing DeepSeek source label.
-
-- [ ] **Step 2: Add failing ProviderAgent source-label regression**
-
-In `tests/test_fake_provider.py`, add a test-local provider class that returns a `ProviderResponse` with `source_label="[DeepSeek API output]"`, then pass it through `ProviderAgent`.
+- [ ] Add a `ProviderAgent` regression test with a test-local provider that returns `ProviderResponse(source_label="[DeepSeek API output]", raw_content=...)`.
 
 Required assertion:
 
@@ -397,7 +277,7 @@ Required assertion:
 self.assertEqual(action.source_label, "[DeepSeek API output]")
 ```
 
-Run:
+Run before implementation:
 
 ```bash
 PYTHONPATH=src python -m unittest tests.test_fake_provider.FakeProviderAdapterTests.test_provider_agent_preserves_provider_response_source_label -v
@@ -409,29 +289,21 @@ Expected result before implementation:
 FAIL
 ```
 
-The failure must show that `ProviderAgent` still returns `[deterministic fake provider output]` instead of preserving the provider response label.
-
-- [ ] **Step 3: Implement the source-label changes**
-
-In `src/werewolf_eval/provider_contract.py`, add:
+- [ ] Implement only these source-label changes:
 
 ```python
 DEEPSEEK_PROVIDER_SOURCE_LABEL = "[DeepSeek API output]"
 ```
 
-In `src/werewolf_eval/source_labels.py`, add the same string to `VALID_SOURCE_LABELS`.
-
-In `src/werewolf_eval/provider_agent.py`, change only the successful `AgentAction` return path from the fake-provider constant to:
+and in `ProviderAgent` successful return path:
 
 ```python
 source_label=response.source_label,
 ```
 
-Do not change parse, invalid-action, invalid-target, timeout, or no-repair behavior in this task.
+Do not change parse-failure, invalid-action, invalid-target, timeout, or no-repair behavior.
 
-- [ ] **Step 4: Validate Task 1**
-
-Run:
+Run after implementation:
 
 ```bash
 PYTHONPATH=src python -m unittest tests.test_source_labels tests.test_fake_provider -v
@@ -443,7 +315,7 @@ Expected result:
 OK
 ```
 
-- [ ] **Step 5: Commit Task 1**
+Commit:
 
 ```bash
 git add src/werewolf_eval/provider_contract.py src/werewolf_eval/source_labels.py src/werewolf_eval/provider_agent.py tests/test_source_labels.py tests/test_fake_provider.py
@@ -453,19 +325,25 @@ git commit -m "feat: preserve provider source labels"
 Expected result:
 
 ```text
-[branch] feat: preserve provider source labels
+commit created
 ```
 
 ## Task 2: Add DeepSeek provider adapter with fake-transport tests
 
-**Files:**
+**Files to create:**
 
-- Create: `src/werewolf_eval/deepseek_provider.py`
-- Create: `tests/test_deepseek_provider.py`
+```text
+src/werewolf_eval/deepseek_provider.py
+tests/test_deepseek_provider.py
+```
 
-- [ ] **Step 1: Add failing adapter tests**
+**Test files to add/modify:**
 
-Create `tests/test_deepseek_provider.py` with these test cases:
+```text
+tests/test_deepseek_provider.py
+```
+
+Add tests:
 
 ```python
 class DeepSeekProviderTests(unittest.TestCase):
@@ -478,7 +356,7 @@ class DeepSeekProviderTests(unittest.TestCase):
     def test_response_trace_contains_no_authorization_value(self): ...
 ```
 
-Use a fake transport callable with this signature:
+Use injected fake transport only. The fake transport must capture payload and headers in memory and return deterministic JSON:
 
 ```python
 def fake_transport(url: str, headers: dict[str, str], payload: dict, timeout_seconds: int) -> dict:
@@ -488,19 +366,22 @@ def fake_transport(url: str, headers: dict[str, str], payload: dict, timeout_sec
     }
 ```
 
-Required assertions:
+Required assertions are intentionally allowed and must not be blocked by secret checks:
 
 ```python
 self.assertEqual(captured["payload"]["model"], "deepseek-v4-flash")
 self.assertEqual(captured["payload"]["response_format"], {"type": "json_object"})
 self.assertEqual(captured["payload"]["stream"], False)
 self.assertEqual(captured["payload"]["thinking"], {"type": "disabled"})
+self.assertIn("Authorization", captured["headers"])
 self.assertIn("Bearer ", captured["headers"]["Authorization"])
 self.assertEqual(response.source_label, "[DeepSeek API output]")
 self.assertEqual(response.token_usage["total_tokens"], 30)
 ```
 
-Run:
+Important: tests may contain the field name `Authorization` and literal `"Bearer "`, but must not contain a real token, a captured full header value, or environment dump.
+
+Run before implementation:
 
 ```bash
 PYTHONPATH=src python -m unittest tests.test_deepseek_provider -v
@@ -509,14 +390,10 @@ PYTHONPATH=src python -m unittest tests.test_deepseek_provider -v
 Expected result before implementation:
 
 ```text
-FAILED
+FAILED due to missing werewolf_eval.deepseek_provider
 ```
 
-The failure must be caused by the missing `werewolf_eval.deepseek_provider` module.
-
-- [ ] **Step 2: Implement `src/werewolf_eval/deepseek_provider.py`**
-
-Public API:
+Implement `src/werewolf_eval/deepseek_provider.py`:
 
 ```python
 from __future__ import annotations
@@ -546,21 +423,18 @@ class DeepSeekProvider:
     def respond(self, request: ProviderRequest) -> ProviderResponse: ...
 ```
 
-Implementation requirements:
+Adapter requirements:
 
 - Strip trailing slash from `base_url` and post to `{base_url}/chat/completions`.
-- Use `urllib.request` for the default transport.
-- Keep the injected `transport` path as the only path used by tests.
-- Increment request count only after validating the request can be sent.
-- Enforce `max_requests`; when exceeded, raise an exception whose message contains `request budget exceeded` and does not contain the API key.
-- Parse `choices[0].message.content` as the raw provider content string; do not parse action JSON inside the DeepSeek adapter.
-- Return `ProviderResponse` with `provider_name="deepseek"` and `source_label=DEEPSEEK_PROVIDER_SOURCE_LABEL`.
-- Store `token_usage` from response `usage`, defaulting missing token fields to `0`.
+- Use `urllib.request` for default transport.
+- Tests must use only injected transport.
+- Enforce `max_requests`; exception text includes `request budget exceeded` and does not contain the API key.
+- Do not parse the action JSON inside the DeepSeek adapter; return raw content through `ProviderResponse.raw_content`.
+- Return `ProviderResponse(provider_name="deepseek", source_label=DEEPSEEK_PROVIDER_SOURCE_LABEL, ...)`.
+- Store token usage from response `usage`, defaulting missing values to `0`.
 - Never store headers or API key in `ProviderRequest`, `ProviderResponse`, stdout, or exceptions.
 
-- [ ] **Step 3: Validate Task 2**
-
-Run:
+Run after implementation:
 
 ```bash
 PYTHONPATH=src python -m unittest tests.test_deepseek_provider -v
@@ -572,7 +446,7 @@ Expected result:
 OK
 ```
 
-- [ ] **Step 4: Commit Task 2**
+Commit:
 
 ```bash
 git add src/werewolf_eval/deepseek_provider.py tests/test_deepseek_provider.py
@@ -582,19 +456,25 @@ git commit -m "feat: add DeepSeek provider adapter"
 Expected result:
 
 ```text
-[branch] feat: add DeepSeek provider adapter
+commit created
 ```
 
 ## Task 3: Add guarded DeepSeek single-game smoke CLI
 
-**Files:**
+**Files to create:**
 
-- Create: `src/werewolf_eval/run_deepseek_provider_game.py`
-- Create: `tests/test_deepseek_provider_game.py`
+```text
+src/werewolf_eval/run_deepseek_provider_game.py
+tests/test_deepseek_provider_game.py
+```
 
-- [ ] **Step 1: Add failing CLI guard tests**
+**Test files to add/modify:**
 
-Create `tests/test_deepseek_provider_game.py` with these cases:
+```text
+tests/test_deepseek_provider_game.py
+```
+
+Add tests:
 
 ```python
 class DeepSeekProviderGameCliTests(unittest.TestCase):
@@ -604,7 +484,7 @@ class DeepSeekProviderGameCliTests(unittest.TestCase):
     def test_helper_failure_writes_failure_audit_but_no_valid_logs(self): ...
 ```
 
-The tests must call the CLI without real network access. For the helper tests, expose a pure helper from the CLI module:
+Expose this helper for non-live tests:
 
 ```python
 def run_deepseek_game_with_provider_factory(
@@ -616,9 +496,9 @@ def run_deepseek_game_with_provider_factory(
     ...
 ```
 
-Use `DeterministicFakeProvider` or a local provider factory in tests to simulate the provider responses; do not call DeepSeek from tests.
+Tests must use deterministic fake providers or fake provider factories and must not call DeepSeek.
 
-Run:
+Run before implementation:
 
 ```bash
 PYTHONPATH=src python -m unittest tests.test_deepseek_provider_game -v
@@ -627,12 +507,8 @@ PYTHONPATH=src python -m unittest tests.test_deepseek_provider_game -v
 Expected result before implementation:
 
 ```text
-FAILED
+FAILED due to missing werewolf_eval.run_deepseek_provider_game
 ```
-
-The failure must be caused by the missing `werewolf_eval.run_deepseek_provider_game` module.
-
-- [ ] **Step 2: Implement `run_deepseek_provider_game.py` CLI**
 
 CLI arguments:
 
@@ -648,7 +524,7 @@ CLI arguments:
 --allow-live-api default false
 ```
 
-Behavior when `--allow-live-api` is absent:
+No-live guard expected behavior:
 
 ```text
 exit code: 1
@@ -657,7 +533,7 @@ stdout includes: game_log=not_written
 stdout includes: decision_log=not_written
 ```
 
-Behavior when `--allow-live-api` is present but the API key env var is missing:
+Missing-key expected behavior:
 
 ```text
 exit code: 1
@@ -666,7 +542,7 @@ stdout includes: game_log=not_written
 stdout includes: decision_log=not_written
 ```
 
-Behavior on provider success:
+Provider success expected behavior:
 
 ```text
 exit code: 0
@@ -685,7 +561,7 @@ stdout includes: provider_trace=written
 stdout includes: failure_audit=written
 ```
 
-Behavior on provider failure:
+Provider failure expected behavior:
 
 ```text
 exit code: 2
@@ -702,14 +578,12 @@ Implementation notes:
 
 - Build DeepSeek-backed `ProviderAgent` instances for `p3`, `p4`, `p5`, `p6`, and `wolf_team`.
 - Reuse `GameEngine.from_config(build_default_config(game_id=...), agents=..., wolf_agent=..., source_label=DEEPSEEK_PROVIDER_SOURCE_LABEL)`.
-- Collect trace from provider `.requests` and `.responses` the same way `run_fake_provider_game.py` does.
-- Write JSON with `ensure_ascii=False`, `indent=2`, and a trailing newline.
-- Do not write any artifact outside `--out-dir`.
-- Do not add generated live outputs to `docs/generated-games/` or `docs/demo/` in this task.
+- Collect provider `.requests` and `.responses` like `run_fake_provider_game.py`.
+- Write JSON with `ensure_ascii=False`, `indent=2`, and trailing newline.
+- Do not write artifacts outside `--out-dir`.
+- Do not add generated live outputs to `docs/generated-games/` or `docs/demo/`.
 
-- [ ] **Step 3: Validate Task 3**
-
-Run:
+Run after implementation:
 
 ```bash
 PYTHONPATH=src python -m unittest tests.test_deepseek_provider_game -v
@@ -721,7 +595,7 @@ Expected result:
 OK
 ```
 
-Run the no-live guard:
+No-live guard validation:
 
 ```bash
 set +e
@@ -741,7 +615,7 @@ live_api=disabled
 exit_code=1
 ```
 
-- [ ] **Step 4: Commit Task 3**
+Commit:
 
 ```bash
 git add src/werewolf_eval/run_deepseek_provider_game.py tests/test_deepseek_provider_game.py
@@ -751,18 +625,24 @@ git commit -m "feat: add DeepSeek provider smoke CLI"
 Expected result:
 
 ```text
-[branch] feat: add DeepSeek provider smoke CLI
+commit created
 ```
 
 ## Task 4: Refresh tree and run validation
 
-**Files:**
+**Files to modify:**
 
-- Modify: `.oh-my-harness/tree.md`
-- Generated locally only: `.tmp/g1e-deepseek-provider-smoke/**`
-- Generated locally only: `.logs/review/latest/review-packet.md`
+```text
+.oh-my-harness/tree.md
+.logs/review/latest/review-packet.md
+```
 
-- [ ] **Step 1: Refresh tree**
+**Generated locally only:**
+
+```text
+.tmp/g1e-deepseek-provider-smoke/**
+.tmp/g1e-deepseek-provider-smoke-guard/**
+```
 
 Run:
 
@@ -773,19 +653,10 @@ node .codex/hooks/tree.mjs --force
 Expected result:
 
 ```text
-.oh-my-harness/tree.md refreshed
+.oh-my-harness/tree.md includes deepseek_provider.py, run_deepseek_provider_game.py, test_deepseek_provider.py, and test_deepseek_provider_game.py
 ```
 
-If the hook prints a different success message, record the exact output in the review packet and verify that `.oh-my-harness/tree.md` contains these filenames:
-
-```text
-deepseek_provider.py
-run_deepseek_provider_game.py
-test_deepseek_provider.py
-test_deepseek_provider_game.py
-```
-
-- [ ] **Step 2: Run targeted tests**
+Run targeted tests:
 
 ```bash
 PYTHONPATH=src python -m unittest tests.test_source_labels tests.test_fake_provider tests.test_deepseek_provider tests.test_deepseek_provider_game -v
@@ -797,7 +668,7 @@ Expected result:
 OK
 ```
 
-- [ ] **Step 3: Run full tests**
+Run full tests:
 
 ```bash
 PYTHONPATH=src python -m unittest discover -s tests -v
@@ -809,7 +680,7 @@ Expected result:
 OK
 ```
 
-- [ ] **Step 4: Run compile check**
+Run compile check:
 
 ```bash
 python -m compileall src/werewolf_eval scripts
@@ -821,7 +692,7 @@ Expected result:
 0 compile errors
 ```
 
-- [ ] **Step 5: Run no-live CLI guard**
+Run no-live CLI guard:
 
 ```bash
 set +e
@@ -841,9 +712,7 @@ live_api=disabled
 exit_code=1
 ```
 
-- [ ] **Step 6: Run manual DeepSeek live smoke only when explicitly allowed locally**
-
-This command is not for CI. Run it only in a local shell where the operator has set a valid key.
+Manual live smoke, local only:
 
 ```bash
 rm -rf .tmp/g1e-deepseek-provider-smoke
@@ -871,7 +740,7 @@ provider_trace=written
 failure_audit=written
 ```
 
-If the command exits `2`, the failure path is safe only when these conditions hold:
+If exit code is `2`, the failure path is safe only when these hold:
 
 ```text
 provider_trace=written
@@ -880,9 +749,9 @@ game_log=not_written
 decision_log=not_written
 ```
 
-Exit `2` is not G1e smoke completion. It is a blocking implementation or prompt-contract finding that must be fixed inside this plan's allowlist before claiming G1e completion.
+Exit `2` is not G1e completion. It is a blocking implementation or prompt-contract finding that must be fixed within the allowlist before claiming G1e completion.
 
-- [ ] **Step 7: Validate live smoke outputs when Step 6 exits 0**
+Validate live smoke outputs when live smoke exits `0`:
 
 ```bash
 PYTHONPATH=src python -m werewolf_eval.validate_game_log .tmp/g1e-deepseek-provider-smoke/game-log.json
@@ -907,7 +776,7 @@ game_id=g1e_deepseek_smoke
 source_label=[DeepSeek API output]
 ```
 
-- [ ] **Step 8: Confirm no live artifacts are staged**
+Confirm no live artifacts are staged:
 
 ```bash
 git status --short
@@ -919,24 +788,9 @@ Expected result:
 No `.tmp/` files are staged or tracked.
 ```
 
-- [ ] **Step 9: Commit Task 4**
-
-```bash
-git add .oh-my-harness/tree.md
-git commit -m "chore: refresh tree for DeepSeek provider smoke"
-```
-
-Expected result:
-
-```text
-[branch] chore: refresh tree for DeepSeek provider smoke
-```
-
-If `.oh-my-harness/tree.md` is unchanged after refresh, do not create an empty commit. Record `tree refresh: no changes` in the review packet.
-
 ## Review Packet Requirements
 
-After implementation, generate or prepare `.logs/review/latest/review-packet.md` for Codex A档. The packet must include machine-generated evidence, not only prose.
+After implementation, generate or prepare `.logs/review/latest/review-packet.md` for Codex A档. The packet must contain machine-generated evidence, not only prose.
 
 Minimum required evidence:
 
@@ -953,18 +807,32 @@ Minimum required evidence:
 10. implementer risk notes
 ```
 
-The review packet must also include:
+It must also include:
 
 ```text
 - exact base..head review range
 - whether manual DeepSeek live smoke was run
 - if live smoke was run: sanitized command, exit code, stdout summary, validator summaries
 - if live smoke was not run: exact reason, such as missing key or operator did not authorize live call
-- confirmation that no API key, Authorization value, or environment dump appears in tracked files or review packet
+- confirmation that no real API key, captured Authorization header value, or environment dump appears in tracked files or review packet
 - confirmation that `.tmp/g1e-deepseek-provider-smoke/**` is not committed
 ```
 
-Required allowlist check command:
+Review packet key hunk excerpts must include:
+
+```text
+- `provider_agent.py` hunk proving `source_label=response.source_label`
+- `deepseek_provider.py` hunk proving stdlib HTTP, JSON object response_format, thinking disabled, max_requests, and no SDK import
+- `run_deepseek_provider_game.py` hunk proving `--allow-live-api` guard and `.tmp` output default
+- `tests/test_deepseek_provider.py` hunk proving fake transport tests and no live network
+- `tests/test_deepseek_provider_game.py` hunk proving no-live guard and failure audit behavior
+```
+
+Important: the review packet may contain the field name `Authorization`, the literal `"Bearer "`, or source-code hunks that construct a header from an env-provided key. That is allowed. The review packet must not contain a real token, a captured full header value from runtime, a shell environment dump, or the actual API key value.
+
+## Required Review Checks
+
+Changed-files allowlist check:
 
 ```bash
 python - <<'PY'
@@ -1000,7 +868,7 @@ Expected result:
 ALLOWLIST_CHECK=PASS
 ```
 
-Required forbidden-pattern checks:
+Forbidden import/dependency check:
 
 ```bash
 python - <<'PY'
@@ -1009,36 +877,31 @@ import subprocess
 import sys
 
 changed = subprocess.check_output(["git", "diff", "--name-only", "main...HEAD"], text=True).splitlines()
-tracked_text = []
+forbidden = ["import requests", "import httpx", "import aiohttp", "from openai", "import openai"]
+violations = []
 for name in changed:
     path = Path(name)
     if path.exists() and path.is_file():
-        tracked_text.append((name, path.read_text(encoding="utf-8", errors="replace")))
-
-forbidden_imports = ["import requests", "import httpx", "import aiohttp", "from openai", "import openai"]
-forbidden_secret_literals = ["sk-", "Bearer ${", "Authorization: Bearer "]
-violations = []
-for name, text in tracked_text:
-    for pattern in forbidden_imports + forbidden_secret_literals:
-        if pattern in text:
-            violations.append(f"{name}: {pattern}")
-
+        text = path.read_text(encoding="utf-8", errors="replace")
+        for pattern in forbidden:
+            if pattern in text:
+                violations.append(f"{name}: {pattern}")
 if violations:
-    print("FORBIDDEN_PATTERN_CHECK=FAIL")
+    print("FORBIDDEN_IMPORT_CHECK=FAIL")
     for item in violations:
         print(item)
     sys.exit(1)
-print("FORBIDDEN_PATTERN_CHECK=PASS")
+print("FORBIDDEN_IMPORT_CHECK=PASS")
 PY
 ```
 
 Expected result:
 
 ```text
-FORBIDDEN_PATTERN_CHECK=PASS
+FORBIDDEN_IMPORT_CHECK=PASS
 ```
 
-Required dependency/import diff check:
+Dependency diff check:
 
 ```bash
 git diff -- package.json package-lock.json pyproject.toml requirements.txt requirements-dev.txt
@@ -1050,25 +913,47 @@ Expected result:
 (no output)
 ```
 
-Required tracked-secret check:
+Tracked-secret check:
 
 ```bash
 python - <<'PY'
 from pathlib import Path
+import re
 import subprocess
 import sys
 
 changed = subprocess.check_output(["git", "diff", "--name-only", "main...HEAD"], text=True).splitlines()
-secret_patterns = ["DEEPSEEK_API_KEY=", "api_key=", "Authorization", "Bearer "]
+
+# Allowed everywhere: field names, source-code snippets, and harmless literals such as
+# `Authorization`, `"Bearer "`, `f"Bearer {api_key}"`, and test assertions that inspect headers.
+# Forbidden: real key-like values, captured full Authorization header values, env dumps, or committed .tmp outputs.
+real_secret_patterns = [
+    re.compile(r"sk-[A-Za-z0-9][A-Za-z0-9_-]{15,}"),
+    re.compile(r"Bearer\\s+(?!\\{)(?!<)(?!REDACTED)(?!redacted)(?!\\$)([A-Za-z0-9._-]{32,})"),
+    re.compile(r"DEEPSEEK_API_KEY\\s*=\\s*['\"]?(?!\\$DEEPSEEK_API_KEY)(?!<redacted>)(?!REDACTED)([A-Za-z0-9._-]{16,})", re.IGNORECASE),
+]
+allowed_header_literals = [
+    '"Bearer "',
+    "'Bearer '",
+    'f"Bearer {',
+    "f'Bearer {",
+]
 violations = []
 for name in changed:
+    if name.startswith(".tmp/"):
+        violations.append(f"{name}: committed live-smoke artifact path")
+        continue
     path = Path(name)
     if not path.exists() or not path.is_file():
         continue
     text = path.read_text(encoding="utf-8", errors="replace")
-    for pattern in secret_patterns:
-        if pattern in text and name not in {"src/werewolf_eval/deepseek_provider.py", "src/werewolf_eval/run_deepseek_provider_game.py", "docs/harness/plans/2026-06-02--g1e-deepseek-provider-smoke-plan.md"}:
-            violations.append(f"{name}: {pattern}")
+    for lineno, line in enumerate(text.splitlines(), start=1):
+        for pattern in real_secret_patterns:
+            if pattern.search(line):
+                # Allow source/test literals that do not contain a concrete token value.
+                if any(lit in line for lit in allowed_header_literals):
+                    continue
+                violations.append(f"{name}:{lineno}: possible real secret or captured header value")
 if violations:
     print("TRACKED_SECRET_CHECK=FAIL")
     for item in violations:
@@ -1084,86 +969,55 @@ Expected result:
 TRACKED_SECRET_CHECK=PASS
 ```
 
-Key hunk excerpts must include:
-
-```text
-- `provider_agent.py` hunk proving `source_label=response.source_label`
-- `deepseek_provider.py` hunk proving stdlib HTTP, response_format json_object, thinking disabled, max_requests, and no SDK import
-- `run_deepseek_provider_game.py` hunk proving `--allow-live-api` guard and `.tmp` output default
-- `tests/test_deepseek_provider.py` hunk proving fake transport tests and no live network
-- `tests/test_deepseek_provider_game.py` hunk proving no-live guard and failure audit behavior
-```
-
-Acceptance checklist with evidence pointers must include:
-
-```text
-| Acceptance | Evidence | Status |
-|---|---|---|
-| A1: DeepSeek source label is accepted and propagated | `tests.test_source_labels`; `tests.test_fake_provider...preserves_provider_response_source_label`; key hunk in `provider_agent.py` | PASS/FAIL |
-| A2: DeepSeek adapter builds OpenAI-compatible JSON request without SDK dependency | `tests.test_deepseek_provider`; key hunk in `deepseek_provider.py`; dependency diff check | PASS/FAIL |
-| A3: live API cannot run accidentally | no-live CLI guard command; `tests.test_deepseek_provider_game` | PASS/FAIL |
-| A4: provider failures do not write valid logs | `tests.test_deepseek_provider_game`; failure-path stdout if live failure occurred | PASS/FAIL |
-| A5: manual DeepSeek single-game smoke completed or is explicitly not run | live command output and validators, or explicit not-run reason | PASS/FAIL/MANUAL_NOT_RUN |
-| A6: no secrets or live `.tmp` artifacts are committed | tracked-secret check; `git status --short`; allowlist check | PASS/FAIL |
-```
-
-Implementer risk notes must mention:
-
-```text
-- whether DeepSeek live smoke was run
-- exact model used, default `deepseek-v4-flash`
-- total provider request count
-- any provider failure kind observed
-- whether prompt/schema had to be adjusted to achieve valid actions
-- whether review packet contains any intended `Authorization` code hunk and why no secret value is present
-```
+This check intentionally allows tests and review packets to contain `Authorization` and `"Bearer "` as field names or code literals. It blocks real token-shaped values, captured full runtime header values, environment dumps, and committed `.tmp` artifacts.
 
 ## Acceptance Criteria
 
-The implementation is accepted only when all of these are true:
+Implementation acceptance:
 
 ```text
-A1. Only allowlisted files changed, except locally generated `.tmp` files that are not committed.
+A1. Only allowlisted files changed, except uncommitted local `.tmp` files.
 A2. `ProviderAgent` preserves provider response source labels.
-A3. `[DeepSeek API output]` is accepted by source label validation.
+A3. `[DeepSeek API output]` is accepted by source label validation; generic provider labels remain rejected.
 A4. DeepSeek adapter uses stdlib HTTP only and adds no dependency or provider SDK.
 A5. DeepSeek adapter sends JSON-output request shape and enforces `max_requests`.
-A6. CLI refuses live calls without `--allow-live-api`.
-A7. CLI refuses missing `DEEPSEEK_API_KEY` without writing valid logs.
-A8. Automated tests do not perform network access.
-A9. Provider parse/invalid/timeout/transport failures do not write valid Game Log or Decision Log.
-A10. Full unittest discovery passes.
-A11. Compile check passes.
-A12. Review packet contains all required machine evidence and sanitized live-smoke status.
+A6. Secret check allows harmless `Authorization` / `"Bearer "` evidence but rejects real secrets, captured header values, env dumps, and `.tmp` artifacts.
+A7. CLI refuses live calls without `--allow-live-api`.
+A8. CLI refuses missing `DEEPSEEK_API_KEY` without writing valid logs.
+A9. Automated tests do not perform network access.
+A10. Provider parse/invalid/timeout/transport failures do not write valid Game Log or Decision Log.
+A11. Full unittest discovery passes.
+A12. Compile check passes.
+A13. Review packet contains all required machine evidence and sanitized live-smoke status.
 ```
 
 G1e milestone completion additionally requires:
 
 ```text
-A13. Manual local DeepSeek smoke exits 0.
-A14. Smoke output validates through `validate_game_log` and `validate_decision_log`.
-A15. Smoke used no more than 11 provider requests and `max_tokens_per_request=256` unless the operator explicitly records a different budget in implementer risk notes.
+A14. Manual local DeepSeek smoke exits 0.
+A15. Smoke output validates through `validate_game_log` and `validate_decision_log`.
+A16. Smoke used no more than 11 provider requests and `max_tokens_per_request=256` unless the operator explicitly records a different budget in implementer risk notes.
 ```
 
-If A1-A12 pass but A13-A15 are not run because the operator did not provide a key, the Implementation PR may be reviewed as `harness ready`, but `docs/TASKS.md` must not be changed to mark G1e completed in the same PR.
+If A1-A13 pass but A14-A16 are not run because the operator did not provide a key, the Implementation PR may be reviewed as `harness ready`, but `docs/TASKS.md` must not be changed to mark G1e completed in the same PR.
 
 ## Codex B档 Deep Review Risk Points
 
-This plan can trigger B档 because it intentionally introduces a live-provider adapter boundary. Codex should inspect only the explicit hunks if A档 needs escalation.
+This plan may trigger B档 because it introduces a network-capable provider adapter boundary. Inspect only explicit hunks if A档 escalates.
 
 Risk points:
 
 ```text
-1. `deepseek_provider.py` contains network-capable code; verify it is stdlib-only, opt-in, budget-capped, and secret-safe.
+1. `deepseek_provider.py` contains network-capable code; verify stdlib-only, opt-in, budget-capped, and secret-safe behavior.
 2. `run_deepseek_provider_game.py` can perform live API calls; verify `--allow-live-api` and missing-key guards cannot be bypassed.
 3. `ProviderAgent` source-label propagation affects all providers; verify fake-provider outputs still keep `[deterministic fake provider output]`.
 4. Adding `[DeepSeek API output]` broadens accepted provenance labels; verify no generic provider label is accepted.
 5. Provider failures must not be repaired into valid Decision Log or Game Log actions.
-6. Review packet may contain intentional `Authorization` code hunk; verify it never contains a real key or captured header value.
+6. Tests and review packet may contain `Authorization` and `"Bearer "`; verify they contain no real token or captured full header value.
 7. Live smoke artifacts under `.tmp/` must not be committed.
 8. Dependency manifests must not change.
-9. Any prompt/schema adjustment must remain inside DeepSeek adapter or CLI tests, not inside `game_engine.py`.
-10. The PR must not update `docs/TASKS.md` or `docs/ROADMAP.md` to claim G1e completion unless the manual DeepSeek smoke evidence is present.
+9. Prompt/schema adjustment must remain inside DeepSeek adapter or CLI tests, not inside `game_engine.py`.
+10. The PR must not update `docs/TASKS.md` or `docs/ROADMAP.md` to claim G1e completion unless manual DeepSeek smoke evidence is present.
 ```
 
 ## Final Verification Command Set
