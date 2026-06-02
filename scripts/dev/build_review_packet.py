@@ -520,20 +520,19 @@ def build_packet(
         sections.append("(to be filled by implementer)")
     sections.append("")
 
-    # Compute PACKET_TOO_LARGE from sections before trigger block
-    packet_pre = "\n".join(sections)
-    pre_lines = packet_pre.count("\n") + 1
-    # Estimate overhead: trigger header (~3 lines) + worst-case triggers + PACKET line (~1)
-    trigger_overhead = 20
-    packet_too_large = (pre_lines + trigger_overhead) > MAX_PACKET_LINES
-
     # Review Trigger Result
     changed_lines = parse_changed_lines(shortstat)
+
+    # Use a rough initial estimate for trigger detection only.
+    # The real PACKET_TOO_LARGE is computed from the actual rendered packet below.
+    packet_pre = "\n".join(sections)
+    pre_lines = packet_pre.count("\n") + 1
+    estimated_too_large = pre_lines > MAX_PACKET_LINES
 
     triggers = detect_risk_triggers(
         changed_files,
         changed_lines,
-        packet_too_large,
+        estimated_too_large,
         forbidden_hits,
         hunks_truncated,
         allowlist_result,
@@ -548,13 +547,49 @@ def build_packet(
         sections.append("(no risk triggers fired)")
     sections.append("")
 
-    sections.append(
-        f"PACKET_TOO_LARGE = {'YES' if packet_too_large else 'NO'}"
-    )
+    # Placeholder — replaced after counting actual rendered lines
+    sections.append("PACKET_TOO_LARGE = PLACEHOLDER")
 
     packet = "\n".join(sections)
     # Strip trailing whitespace to keep git diff --check clean
     packet = "\n".join(line.rstrip() for line in packet.splitlines())
+
+    # Compute PACKET_TOO_LARGE from the actual final rendered packet
+    actual_lines = packet.count("\n") + 1
+    packet_too_large = actual_lines > MAX_PACKET_LINES
+
+    # Fix up trigger section and PACKET_TOO_LARGE line if the estimate was wrong
+    if estimated_too_large != packet_too_large:
+        if packet_too_large and "PACKET_TOO_LARGE=YES" not in triggers:
+            triggers.append("PACKET_TOO_LARGE=YES")
+        elif not packet_too_large:
+            triggers = [t for t in triggers if t != "PACKET_TOO_LARGE=YES"]
+
+        # Rebuild from trigger section onward
+        trigger_idx = next(
+            i for i, s in enumerate(sections) if s == "## Review Trigger Result"
+        )
+        sections = sections[:trigger_idx]
+        sections.append("## Review Trigger Result")
+        if triggers:
+            sections.append("**RISK_TRIGGERS_FIRED**")
+            for t in triggers:
+                sections.append(f"- {t}")
+        else:
+            sections.append("(no risk triggers fired)")
+        sections.append("")
+        sections.append(
+            f"PACKET_TOO_LARGE = {'YES' if packet_too_large else 'NO'}"
+        )
+
+        packet = "\n".join(sections)
+        packet = "\n".join(line.rstrip() for line in packet.splitlines())
+    else:
+        packet = packet.replace(
+            "PACKET_TOO_LARGE = PLACEHOLDER",
+            f"PACKET_TOO_LARGE = {'YES' if packet_too_large else 'NO'}",
+        )
+
     return packet
 
 
