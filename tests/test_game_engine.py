@@ -288,6 +288,13 @@ class GameEngineConsensusTests(unittest.TestCase):
         self.assertEqual(first["final_decision"]["target"], "p5")
         self.assertEqual([obs.player_id for obs in p1.observations], ["p1"])
         self.assertEqual([obs.player_id for obs in p2.observations], ["p2"])
+        self.assertEqual([obs.phase for obs in p1.observations], ["night"])
+        self.assertEqual([obs.round for obs in p1.observations], [1])
+        self.assertEqual(
+            p1.observations[0].known_roles,
+            {"p1": "werewolf", "p2": "werewolf"},
+        )
+        self.assertIn("g1f_provider_consensus_unit_e001", p1.observations[0].public_event_ids)
 
     def test_g1c_wolf_consensus_log_is_emitted_for_valid_night_kill(self):
         result = run_mock_game_for_test(mode="g1c_consensus")

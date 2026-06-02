@@ -293,17 +293,42 @@ class GameEngine:
 
         for i, wolf_id in enumerate(wolf_players):
             if mode == "g1f_provider_consensus":
-                obs = self._mock_agents[wolf_id].observation_for if hasattr(self._mock_agents[wolf_id], "observation_for") else None
+                player = self._players_by_id[wolf_id]
+                known_roles = {
+                    pid: self._players_by_id[pid].role
+                    for pid in wolf_players
+                    if pid in alive and self._players_by_id[pid].role == "werewolf"
+                }
+                public_event_ids: list[str] = []
+                private_event_ids: list[str] = []
+                for event in events:
+                    visibility = event["visibility"]
+                    event_id = event["event_id"]
+                    if visibility in ("public", "all"):
+                        public_event_ids.append(event_id)
+                    if visibility == "all":
+                        private_event_ids.append(event_id)
+                    elif visibility == player.role:
+                        private_event_ids.append(event_id)
+                    elif visibility == "werewolf_team" and player.role == "werewolf":
+                        private_event_ids.append(event_id)
+
+                obs = AgentObservation(
+                    game_id=game_id,
+                    player_id=wolf_id,
+                    role=player.role,
+                    team=player.team,
+                    phase=phase,
+                    round=round_num,
+                    alive_players=sorted(alive),
+                    public_event_ids=public_event_ids,
+                    private_event_ids=private_event_ids,
+                    known_roles=known_roles,
+                )
                 try:
-                    action = self._mock_agents[wolf_id].decide(self.observation_for(wolf_id))
+                    action = self._mock_agents[wolf_id].decide(obs)
                 except Exception as exc:
                     failures.append(build_failure(game_id, round_num, phase, wolf_id, "agent_error", f"{wolf_id} raised {type(exc).__name__}: {exc}"))
-                    failed_participants.append(wolf_id)
-                    continue
-
-                # Validate returned action
-                if not isinstance(action.target, str) or action.target not in alive:
-                    failures.append(build_failure(game_id, round_num, phase, wolf_id, "invalid_action", f"{wolf_id} proposed invalid target {action.target}", target=action.target))
                     failed_participants.append(wolf_id)
                     continue
 
@@ -314,6 +339,21 @@ class GameEngine:
 
                 if action.action != "werewolf_kill":
                     failures.append(build_failure(game_id, round_num, phase, wolf_id, "invalid_action", f"{wolf_id} returned action={action.action} not werewolf_kill", target=action.target))
+                    failed_participants.append(wolf_id)
+                    continue
+
+                if action.phase != phase:
+                    failures.append(build_failure(game_id, round_num, phase, wolf_id, "invalid_action", f"{wolf_id} returned phase={action.phase}", target=action.target))
+                    failed_participants.append(wolf_id)
+                    continue
+
+                if action.round != round_num:
+                    failures.append(build_failure(game_id, round_num, phase, wolf_id, "invalid_action", f"{wolf_id} returned round={action.round}", target=action.target))
+                    failed_participants.append(wolf_id)
+                    continue
+
+                if not (isinstance(action.target, str) and action.target in alive and action.target not in set(wolf_players)):
+                    failures.append(build_failure(game_id, round_num, phase, wolf_id, "invalid_action", f"{wolf_id} proposed invalid target {action.target}", target=action.target))
                     failed_participants.append(wolf_id)
                     continue
 
