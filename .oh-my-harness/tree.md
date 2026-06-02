@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 185
+- Entries: 187
 
 ```text
 ./
@@ -189,6 +189,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       ├── provider_agent.py
 │       ├── provider_contract.py
 │       ├── render_demo.py
+│       ├── run_deepseek_consensus_game.py
 │       ├── run_deepseek_provider_game.py
 │       ├── run_fake_provider_game.py
 │       ├── run_mock_game.py
@@ -210,6 +211,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── test_consensus_log.py
 │   ├── test_context_budget.py
 │   ├── test_decision_log.py
+│   ├── test_deepseek_consensus_game.py
 │   ├── test_deepseek_provider_game.py
 │   ├── test_deepseek_provider.py
 │   ├── test_failure_audit.py
