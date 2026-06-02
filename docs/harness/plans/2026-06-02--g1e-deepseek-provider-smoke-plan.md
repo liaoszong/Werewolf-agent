@@ -929,8 +929,8 @@ changed = subprocess.check_output(["git", "diff", "--name-only", "main...HEAD"],
 # Forbidden: real key-like values, captured full Authorization header values, env dumps, or committed .tmp outputs.
 real_secret_patterns = [
     re.compile(r"sk-[A-Za-z0-9][A-Za-z0-9_-]{15,}"),
-    re.compile(r"Bearer\\s+(?!\\{)(?!<)(?!REDACTED)(?!redacted)(?!\\$)([A-Za-z0-9._-]{32,})"),
-    re.compile(r"DEEPSEEK_API_KEY\\s*=\\s*['\"]?(?!\\$DEEPSEEK_API_KEY)(?!<redacted>)(?!REDACTED)([A-Za-z0-9._-]{16,})", re.IGNORECASE),
+    re.compile(r"Bearer\s+(?!\{)(?!<)(?!REDACTED)(?!redacted)(?!\$)([A-Za-z0-9._-]{32,})"),
+    re.compile(r"DEEPSEEK_API_KEY\s*=\s*['\"]?(?!\$DEEPSEEK_API_KEY)(?!<redacted>)(?!REDACTED)([A-Za-z0-9._-]{16,})", re.IGNORECASE),
 ]
 allowed_header_literals = [
     '"Bearer "',
