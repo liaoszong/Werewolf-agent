@@ -123,7 +123,7 @@ G-track route:
 
 #### G1e: provider-backed single-game smoke
 
-- Status: `next_candidate`.
+- Status: `completed`.
 - Role: run one local, budget-controlled provider-backed game after G1d establishes the boundary.
 - Boundary: no CI live calls, no multi-game Leaderboard, no human-vs-AI UI.
 
@@ -178,15 +178,14 @@ G1 multi-game outputs
 
 ## Current Priority
 
-The next G-track implementation candidate is G1e provider-backed single-game smoke.
+G1e provider-backed single-game smoke is now `completed`. The next implementation candidate is L1 real multi-game Leaderboard (see Phase 3+ section above).
 
-Why G1c before G1d/G1e:
-
-- G1a already proves fresh generated logs can feed validators, scoring, metrics, and replay demo.
-- G1b supplies the deterministic state machine, private observations, and structured `AgentAction` contract.
-- G1c failure recovery needs a real engine/action contract to reject invalid behavior without forging valid logs.
-- G1d provider research needs a fake-provider contract so cost, timeout, secrets, and adapter behavior can be studied before live API calls.
-- G1e must wait for G1d and remains a single-game smoke, not a CI job, multi-game Leaderboard, or human-vs-AI product.
+G1 series retrospective:
+- G1a proved fresh generated logs can feed validators, scoring, metrics, and replay demo.
+- G1b supplied the deterministic state machine, private observations, and structured `AgentAction` contract.
+- G1c added failure recovery, wolf consensus, and audit trail.
+- G1d researched provider boundary and established the fake-provider contract.
+- G1e delivered a budget-controlled, provider-backed single-game smoke CLI with a DeepSeek adapter and offline guard.
 
 ## Explicit Non-goals
 
