@@ -1,0 +1,545 @@
+{
+  "game_id": "g1e_live_smoke_2",
+  "provider_name": "deepseek",
+  "source_label": "[DeepSeek API output]",
+  "requests": [
+    {
+      "request_id": "g1e_live_smoke_2_r01_wolf_team",
+      "game_id": "g1e_live_smoke_2",
+      "actor": "wolf_team",
+      "phase": "night",
+      "round": 1,
+      "observation": {
+        "game_id": "g1e_live_smoke_2",
+        "player_id": "wolf_team",
+        "role": "werewolf",
+        "team": "werewolf",
+        "phase": "night",
+        "round": 1,
+        "alive_players": [
+          "p1",
+          "p2",
+          "p3",
+          "p4",
+          "p5",
+          "p6"
+        ],
+        "public_event_ids": [
+          "g1e_live_smoke_2_e001"
+        ],
+        "private_event_ids": [
+          "g1e_live_smoke_2_e001"
+        ],
+        "known_roles": {
+          "p1": "werewolf",
+          "p2": "werewolf"
+        }
+      },
+      "allowed_actions": [
+        "werewolf_kill"
+      ],
+      "allowed_targets": [
+        "p1",
+        "p2",
+        "p3",
+        "p4",
+        "p5",
+        "p6"
+      ],
+      "response_format_version": "g1d-action-v1"
+    },
+    {
+      "request_id": "g1e_live_smoke_2_r01_p3",
+      "game_id": "g1e_live_smoke_2",
+      "actor": "p3",
+      "phase": "night",
+      "round": 1,
+      "observation": {
+        "game_id": "g1e_live_smoke_2",
+        "player_id": "p3",
+        "role": "seer",
+        "team": "villager",
+        "phase": "night",
+        "round": 1,
+        "alive_players": [
+          "p1",
+          "p2",
+          "p3",
+          "p4",
+          "p5",
+          "p6"
+        ],
+        "public_event_ids": [
+          "g1e_live_smoke_2_e001"
+        ],
+        "private_event_ids": [],
+        "known_roles": {
+          "p3": "seer"
+        }
+      },
+      "allowed_actions": [
+        "seer_check"
+      ],
+      "allowed_targets": [
+        "p1",
+        "p2",
+        "p3",
+        "p4",
+        "p5",
+        "p6"
+      ],
+      "response_format_version": "g1d-action-v1"
+    },
+    {
+      "request_id": "g1e_live_smoke_2_r01_p4",
+      "game_id": "g1e_live_smoke_2",
+      "actor": "p4",
+      "phase": "night",
+      "round": 1,
+      "observation": {
+        "game_id": "g1e_live_smoke_2",
+        "player_id": "p4",
+        "role": "witch",
+        "team": "villager",
+        "phase": "night",
+        "round": 1,
+        "alive_players": [
+          "p1",
+          "p2",
+          "p3",
+          "p4",
+          "p5",
+          "p6"
+        ],
+        "public_event_ids": [
+          "g1e_live_smoke_2_e001"
+        ],
+        "private_event_ids": [],
+        "known_roles": {
+          "p4": "witch"
+        }
+      },
+      "allowed_actions": [
+        "witch_save",
+        "witch_kill"
+      ],
+      "allowed_targets": [
+        "p1",
+        "p2",
+        "p3",
+        "p4",
+        "p5",
+        "p6"
+      ],
+      "response_format_version": "g1d-action-v1"
+    },
+    {
+      "request_id": "g1e_live_smoke_2_r01_p5",
+      "game_id": "g1e_live_smoke_2",
+      "actor": "p5",
+      "phase": "day",
+      "round": 1,
+      "observation": {
+        "game_id": "g1e_live_smoke_2",
+        "player_id": "p5",
+        "role": "villager",
+        "team": "villager",
+        "phase": "day",
+        "round": 1,
+        "alive_players": [
+          "p1",
+          "p2",
+          "p3",
+          "p4",
+          "p5",
+          "p6"
+        ],
+        "public_event_ids": [
+          "g1e_live_smoke_2_e001",
+          "g1e_live_smoke_2_e005",
+          "g1e_live_smoke_2_e006"
+        ],
+        "private_event_ids": [],
+        "known_roles": {
+          "p5": "villager"
+        }
+      },
+      "allowed_actions": [
+        "player_vote"
+      ],
+      "allowed_targets": [
+        "p1",
+        "p2",
+        "p3",
+        "p4",
+        "p5",
+        "p6"
+      ],
+      "response_format_version": "g1d-action-v1"
+    },
+    {
+      "request_id": "g1e_live_smoke_2_r01_p6",
+      "game_id": "g1e_live_smoke_2",
+      "actor": "p6",
+      "phase": "day",
+      "round": 1,
+      "observation": {
+        "game_id": "g1e_live_smoke_2",
+        "player_id": "p6",
+        "role": "villager",
+        "team": "villager",
+        "phase": "day",
+        "round": 1,
+        "alive_players": [
+          "p1",
+          "p2",
+          "p3",
+          "p4",
+          "p5",
+          "p6"
+        ],
+        "public_event_ids": [
+          "g1e_live_smoke_2_e001",
+          "g1e_live_smoke_2_e005",
+          "g1e_live_smoke_2_e006",
+          "g1e_live_smoke_2_e007"
+        ],
+        "private_event_ids": [],
+        "known_roles": {
+          "p6": "villager"
+        }
+      },
+      "allowed_actions": [
+        "player_vote"
+      ],
+      "allowed_targets": [
+        "p1",
+        "p2",
+        "p3",
+        "p4",
+        "p5",
+        "p6"
+      ],
+      "response_format_version": "g1d-action-v1"
+    },
+    {
+      "request_id": "g1e_live_smoke_2_r02_wolf_team",
+      "game_id": "g1e_live_smoke_2",
+      "actor": "wolf_team",
+      "phase": "night",
+      "round": 2,
+      "observation": {
+        "game_id": "g1e_live_smoke_2",
+        "player_id": "wolf_team",
+        "role": "werewolf",
+        "team": "werewolf",
+        "phase": "night",
+        "round": 2,
+        "alive_players": [
+          "p2",
+          "p3",
+          "p4",
+          "p5",
+          "p6"
+        ],
+        "public_event_ids": [
+          "g1e_live_smoke_2_e001",
+          "g1e_live_smoke_2_e005",
+          "g1e_live_smoke_2_e006",
+          "g1e_live_smoke_2_e007",
+          "g1e_live_smoke_2_e008",
+          "g1e_live_smoke_2_e009",
+          "g1e_live_smoke_2_e010"
+        ],
+        "private_event_ids": [
+          "g1e_live_smoke_2_e001",
+          "g1e_live_smoke_2_e002",
+          "g1e_live_smoke_2_e003",
+          "g1e_live_smoke_2_e004",
+          "g1e_live_smoke_2_e005",
+          "g1e_live_smoke_2_e006",
+          "g1e_live_smoke_2_e007",
+          "g1e_live_smoke_2_e008",
+          "g1e_live_smoke_2_e009",
+          "g1e_live_smoke_2_e010"
+        ],
+        "known_roles": {
+          "p2": "werewolf"
+        }
+      },
+      "allowed_actions": [
+        "werewolf_kill"
+      ],
+      "allowed_targets": [
+        "p2",
+        "p3",
+        "p4",
+        "p5",
+        "p6"
+      ],
+      "response_format_version": "g1d-action-v1"
+    },
+    {
+      "request_id": "g1e_live_smoke_2_r02_p4",
+      "game_id": "g1e_live_smoke_2",
+      "actor": "p4",
+      "phase": "day",
+      "round": 2,
+      "observation": {
+        "game_id": "g1e_live_smoke_2",
+        "player_id": "p4",
+        "role": "witch",
+        "team": "villager",
+        "phase": "day",
+        "round": 2,
+        "alive_players": [
+          "p2",
+          "p4",
+          "p5",
+          "p6"
+        ],
+        "public_event_ids": [
+          "g1e_live_smoke_2_e001",
+          "g1e_live_smoke_2_e005",
+          "g1e_live_smoke_2_e006",
+          "g1e_live_smoke_2_e007",
+          "g1e_live_smoke_2_e008",
+          "g1e_live_smoke_2_e009",
+          "g1e_live_smoke_2_e010",
+          "g1e_live_smoke_2_e012"
+        ],
+        "private_event_ids": [
+          "g1e_live_smoke_2_e004",
+          "g1e_live_smoke_2_e009",
+          "g1e_live_smoke_2_e010",
+          "g1e_live_smoke_2_e012"
+        ],
+        "known_roles": {
+          "p4": "witch"
+        }
+      },
+      "allowed_actions": [
+        "player_vote"
+      ],
+      "allowed_targets": [
+        "p2",
+        "p4",
+        "p5",
+        "p6"
+      ],
+      "response_format_version": "g1d-action-v1"
+    },
+    {
+      "request_id": "g1e_live_smoke_2_r02_p5",
+      "game_id": "g1e_live_smoke_2",
+      "actor": "p5",
+      "phase": "day",
+      "round": 2,
+      "observation": {
+        "game_id": "g1e_live_smoke_2",
+        "player_id": "p5",
+        "role": "villager",
+        "team": "villager",
+        "phase": "day",
+        "round": 2,
+        "alive_players": [
+          "p2",
+          "p4",
+          "p5",
+          "p6"
+        ],
+        "public_event_ids": [
+          "g1e_live_smoke_2_e001",
+          "g1e_live_smoke_2_e005",
+          "g1e_live_smoke_2_e006",
+          "g1e_live_smoke_2_e007",
+          "g1e_live_smoke_2_e008",
+          "g1e_live_smoke_2_e009",
+          "g1e_live_smoke_2_e010",
+          "g1e_live_smoke_2_e012",
+          "g1e_live_smoke_2_e013"
+        ],
+        "private_event_ids": [
+          "g1e_live_smoke_2_e009",
+          "g1e_live_smoke_2_e010",
+          "g1e_live_smoke_2_e012"
+        ],
+        "known_roles": {
+          "p5": "villager"
+        }
+      },
+      "allowed_actions": [
+        "player_vote"
+      ],
+      "allowed_targets": [
+        "p2",
+        "p4",
+        "p5",
+        "p6"
+      ],
+      "response_format_version": "g1d-action-v1"
+    },
+    {
+      "request_id": "g1e_live_smoke_2_r02_p6",
+      "game_id": "g1e_live_smoke_2",
+      "actor": "p6",
+      "phase": "day",
+      "round": 2,
+      "observation": {
+        "game_id": "g1e_live_smoke_2",
+        "player_id": "p6",
+        "role": "villager",
+        "team": "villager",
+        "phase": "day",
+        "round": 2,
+        "alive_players": [
+          "p2",
+          "p4",
+          "p5",
+          "p6"
+        ],
+        "public_event_ids": [
+          "g1e_live_smoke_2_e001",
+          "g1e_live_smoke_2_e005",
+          "g1e_live_smoke_2_e006",
+          "g1e_live_smoke_2_e007",
+          "g1e_live_smoke_2_e008",
+          "g1e_live_smoke_2_e009",
+          "g1e_live_smoke_2_e010",
+          "g1e_live_smoke_2_e012",
+          "g1e_live_smoke_2_e013",
+          "g1e_live_smoke_2_e014"
+        ],
+        "private_event_ids": [
+          "g1e_live_smoke_2_e009",
+          "g1e_live_smoke_2_e010",
+          "g1e_live_smoke_2_e012"
+        ],
+        "known_roles": {
+          "p6": "villager"
+        }
+      },
+      "allowed_actions": [
+        "player_vote"
+      ],
+      "allowed_targets": [
+        "p2",
+        "p4",
+        "p5",
+        "p6"
+      ],
+      "response_format_version": "g1d-action-v1"
+    }
+  ],
+  "responses": [
+    {
+      "request_id": "g1e_live_smoke_2_r01_wolf_team",
+      "provider_name": "deepseek",
+      "source_label": "[DeepSeek API output]",
+      "raw_content": "{\n  \"action\": \"werewolf_kill\",\n  \"target\": \"p3\",\n  \"reason_summary\": \"No information available in round 1, random target.\",\n  \"decision_type\": \"random\",\n  \"confidence\": 0.2\n}",
+      "latency_ms": 0,
+      "token_usage": {
+        "prompt_tokens": 309,
+        "completion_tokens": 55,
+        "total_tokens": 364
+      }
+    },
+    {
+      "request_id": "g1e_live_smoke_2_r01_p3",
+      "provider_name": "deepseek",
+      "source_label": "[DeepSeek API output]",
+      "raw_content": "{\n  \"action\": \"seer_check\",\n  \"target\": \"p1\",\n  \"reason_summary\": \"Random initial seer check since no prior information.\",\n  \"decision_type\": \"random\",\n  \"confidence\": 0.5\n}",
+      "latency_ms": 0,
+      "token_usage": {
+        "prompt_tokens": 284,
+        "completion_tokens": 53,
+        "total_tokens": 337
+      }
+    },
+    {
+      "request_id": "g1e_live_smoke_2_r01_p4",
+      "provider_name": "deepseek",
+      "source_label": "[DeepSeek API output]",
+      "raw_content": "{\"action\":\"witch_save\",\"target\":\"p2\",\"reason_summary\":\"No information yet, but saving a random player to protect the villager team.\",\"decision_type\":\"random\",\"confidence\":0.5}",
+      "latency_ms": 0,
+      "token_usage": {
+        "prompt_tokens": 286,
+        "completion_tokens": 44,
+        "total_tokens": 330
+      }
+    },
+    {
+      "request_id": "g1e_live_smoke_2_r01_p5",
+      "provider_name": "deepseek",
+      "source_label": "[DeepSeek API output]",
+      "raw_content": "{\"action\":\"player_vote\",\"target\":\"p3\",\"reason_summary\":\"No information available; voting randomly to start discussion.\",\"decision_type\":\"random\",\"confidence\":0.5}",
+      "latency_ms": 0,
+      "token_usage": {
+        "prompt_tokens": 312,
+        "completion_tokens": 38,
+        "total_tokens": 350
+      }
+    },
+    {
+      "request_id": "g1e_live_smoke_2_r01_p6",
+      "provider_name": "deepseek",
+      "source_label": "[DeepSeek API output]",
+      "raw_content": "{\"action\":\"player_vote\",\"target\":\"p1\",\"reason_summary\":\"No information yet, randomly selecting a target.\",\"decision_type\":\"random\",\"confidence\":0.2}",
+      "latency_ms": 0,
+      "token_usage": {
+        "prompt_tokens": 326,
+        "completion_tokens": 37,
+        "total_tokens": 363
+      }
+    },
+    {
+      "request_id": "g1e_live_smoke_2_r02_wolf_team",
+      "provider_name": "deepseek",
+      "source_label": "[DeepSeek API output]",
+      "raw_content": "{\n  \"action\": \"werewolf_kill\",\n  \"target\": \"p3\",\n  \"reason_summary\": \"p3 is likely the seer based on early game behavior; eliminating seer reduces threat.\",\n  \"decision_type\": \"inference_based\",\n  \"confidence\": 0.7\n}",
+      "latency_ms": 0,
+      "token_usage": {
+        "prompt_tokens": 504,
+        "completion_tokens": 66,
+        "total_tokens": 570
+      }
+    },
+    {
+      "request_id": "g1e_live_smoke_2_r02_p4",
+      "provider_name": "deepseek",
+      "source_label": "[DeepSeek API output]",
+      "raw_content": "{\n  \"action\": \"player_vote\",\n  \"target\": \"p2\",\n  \"reason_summary\": \"Suspicious voting pattern and potential werewolf based on previous day votes and lack of trust.\",\n  \"decision_type\": \"inference_based\",\n  \"confidence\": 0.7\n}",
+      "latency_ms": 0,
+      "token_usage": {
+        "prompt_tokens": 421,
+        "completion_tokens": 65,
+        "total_tokens": 486
+      }
+    },
+    {
+      "request_id": "g1e_live_smoke_2_r02_p5",
+      "provider_name": "deepseek",
+      "source_label": "[DeepSeek API output]",
+      "raw_content": "{\"action\":\"player_vote\",\"target\":\"p2\",\"reason_summary\":\"p2 did not vote in round 1, which could be strategic wolf behavior. p4 is the only other confirmed villager, so p6 is also suspicious.\",\"decision_type\":\"inference_based\",\"confidence\":0.6}",
+      "latency_ms": 0,
+      "token_usage": {
+        "prompt_tokens": 423,
+        "completion_tokens": 65,
+        "total_tokens": 488
+      }
+    },
+    {
+      "request_id": "g1e_live_smoke_2_r02_p6",
+      "provider_name": "deepseek",
+      "source_label": "[DeepSeek API output]",
+      "raw_content": "{\"action\":\"player_vote\",\"target\":\"p4\",\"reason_summary\":\"Based on the events, p4 was accused by multiple players and no strong evidence clears them, so voting for p4 is a logical inference to eliminate a potential werewolf.\",\"decision_type\":\"inference_based\",\"confidence\":0.7}",
+      "latency_ms": 0,
+      "token_usage": {
+        "prompt_tokens": 437,
+        "completion_tokens": 66,
+        "total_tokens": 503
+      }
+    }
+  ],
+  "failures": []
+}

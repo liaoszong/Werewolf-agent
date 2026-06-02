@@ -67,6 +67,8 @@ class DeepSeekProvider:
             f"You MUST select action from [{allowed_actions_str}] "
             f"and target from [{allowed_targets_str}]. "
             f"No other action or target value is acceptable. "
+            f"decision_type must be exactly one of: inference_based, random, retaliatory. "
+            f"Do not invent other decision_type values. "
             f"Example response format:\n"
             f'{{"action":"{request.allowed_actions[0]}","target":"{request.allowed_targets[0]}",'
             f'"reason_summary":"your reasoning here","decision_type":"inference_based",'
