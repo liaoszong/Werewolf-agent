@@ -35,13 +35,21 @@ def _collect_trace(
     wolf_agent: object,
     failures: list[ProviderFailure],
 ) -> ProviderTrace:
+    seen_req: set[str] = set()
+    seen_resp: set[str] = set()
     all_requests: list[ProviderRequest] = []
     all_responses: list = []
 
     for agent in list(agents.values()) + [wolf_agent]:
         if isinstance(agent, ProviderAgent):
-            all_requests.extend(agent.provider.requests)
-            all_responses.extend(agent.provider.responses)
+            for req in agent.provider.requests:
+                if req.request_id not in seen_req:
+                    seen_req.add(req.request_id)
+                    all_requests.append(req)
+            for resp in agent.provider.responses:
+                if resp.request_id not in seen_resp:
+                    seen_resp.add(resp.request_id)
+                    all_responses.append(resp)
 
     return ProviderTrace(
         game_id=game_id,
@@ -135,10 +143,12 @@ def _build_deepseek_agent(api_key: str, base_url: str, model: str, timeout_secon
         max_tokens=max_tokens,
         max_requests=max_requests,
     )
+    # Share one provider instance across all agents so max_requests is a
+    # true global budget for the entire game run, not a per-instance cap.
+    shared_provider = DeepSeekProvider(config)
 
     def factory(player_id: str) -> ProviderAgent:
-        provider = DeepSeekProvider(config)
-        return ProviderAgent(player_id, provider)
+        return ProviderAgent(player_id, shared_provider)
 
     return factory
 

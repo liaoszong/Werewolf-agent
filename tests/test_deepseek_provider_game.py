@@ -7,6 +7,8 @@ from tempfile import TemporaryDirectory
 from typing import Any
 
 from werewolf_eval.deepseek_provider import DeepSeekProviderConfig
+from werewolf_eval.game_log import load_game_log, validate_game_log
+from werewolf_eval.decision_log import load_decision_log, validate_decision_log
 from werewolf_eval.run_deepseek_provider_game import (
     run_deepseek_game_with_provider_factory,
 )
@@ -121,10 +123,18 @@ class DeepSeekProviderGameCliTests(unittest.TestCase):
             self.assertIn("game_id", game_log)
             self.assertEqual(game_log["game_id"], "g1e_test")
 
+            parsed_game = load_game_log(out_dir / "game-log.json")
+            validate_game_log(parsed_game)
+
             decision_log = json.loads(
                 (out_dir / "decision-log.json").read_text(encoding="utf-8")
             )
             self.assertIn("decisions", decision_log)
+
+            parsed_decision = load_decision_log(
+                out_dir / "decision-log.json", parsed_game
+            )
+            validate_decision_log(parsed_decision, parsed_game)
 
             failure_audit = json.loads(
                 (out_dir / "failure-audit.json").read_text(encoding="utf-8")

@@ -3,7 +3,7 @@
 ## Metadata
 - Base: `main`
 - Branch: `implement/g1e-deepseek-provider-smoke`
-- Generated: 2026-06-02T08:24:17.701454+00:00
+- Generated: 2026-06-02T08:40:30.104994+00:00
 
 ## Changed Files
 - `.oh-my-harness/tree.md`
@@ -19,17 +19,18 @@
 
 ## Diff Stat
 ```
-.oh-my-harness/tree.md                          |   9 +-
- src/werewolf_eval/deepseek_provider.py          | 131 ++++++++++++++++
+.logs/review/latest/review-packet.md            | 384 ++++++++++++------------
+ .oh-my-harness/tree.md                          |   9 +-
+ src/werewolf_eval/deepseek_provider.py          | 138 +++++++++
  src/werewolf_eval/provider_agent.py             |   3 +-
  src/werewolf_eval/provider_contract.py          |   1 +
- src/werewolf_eval/run_deepseek_provider_game.py | 189 ++++++++++++++++++++++++
+ src/werewolf_eval/run_deepseek_provider_game.py | 199 ++++++++++++
  src/werewolf_eval/source_labels.py              |   1 +
- tests/test_deepseek_provider.py                 | 156 +++++++++++++++++++
- tests/test_deepseek_provider_game.py            | 155 +++++++++++++++++++
- tests/test_fake_provider.py                     |  19 ++-
+ tests/test_deepseek_provider.py                 | 156 ++++++++++
+ tests/test_deepseek_provider_game.py            | 165 ++++++++++
+ tests/test_fake_provider.py                     |  19 +-
  tests/test_source_labels.py                     |   5 +
- 10 files changed, 664 insertions(+), 5 deletions(-)
+ 11 files changed, 886 insertions(+), 194 deletions(-)
 ```
 
 ## Diff Check
@@ -64,7 +65,7 @@ FORBIDDEN_PATTERN_SCAN = WARN
 - default: parser.add_argument("--allow-live-api", action="store_true", default=False) [plan-spec: CLI flag or test harness, not new runtime capability]
 - provider: from werewolf_eval.provider_contract import ProviderRequest [plan-spec: CLI flag or test harness, not new runtime capability]
 - provider: class DeepSeekProviderTests(unittest.TestCase): [plan-spec: CLI flag or test harness, not new runtime capability]
-- ... (46) more self-reference hits truncated — all in plan-spec file paths, doc/test strings, or CLI argument definitions
+- ... (47) more self-reference hits truncated — all in plan-spec file paths, doc/test strings, or CLI argument definitions
 
 **Real risk (forbidden term in runtime code):**
 - provider: from werewolf_eval.provider_contract import (
@@ -87,7 +88,7 @@ FORBIDDEN_PATTERN_SCAN = WARN
 - provider: source_label=DEEPSEEK_PROVIDER_SOURCE_LABEL,
 - provider: DEEPSEEK_PROVIDER_SOURCE_LABEL = "[DeepSeek API output]"
 - provider: from werewolf_eval.deepseek_provider import DeepSeekProvider, DeepSeekProviderCo
-- ... (44) more real-risk hits truncated
+- ... (45) more real-risk hits truncated
 
 ## Dependency / Import Diff
 ### Dependency manifest changes
@@ -122,18 +123,19 @@ FORBIDDEN_PATTERN_SCAN = WARN
 - `import sys`
 
 ## Test Summary
-### `PYTHONPATH=src python -m unittest tests.test_source_labels tests.test_fake_provider tests.test_deepseek_provider tests.test_deepseek_provider_game -v`
-Exit: 1 (FAIL)
+### `python -m unittest tests.test_source_labels tests.test_fake_provider tests.test_deepseek_provider tests.test_deepseek_provider_game && python -m unittest discover -s tests`
+Exit: 0 (PASS)
 ```
-'PYTHONPATH' �����ڲ����ⲿ���Ҳ���ǿ����еĳ���
-���������ļ���
-```
+............................
+----------------------------------------------------------------------
+Ran 28 tests in 0.194s
 
-### `PYTHONPATH=src python -m unittest discover -s tests -v`
-Exit: 1 (FAIL)
-```
-'PYTHONPATH' �����ڲ����ⲿ���Ҳ���ǿ����еĳ���
-���������ļ���
+OK
+..................................................................................................................................................................................
+----------------------------------------------------------------------
+Ran 178 tests in 3.657s
+
+OK
 ```
 
 ### `python -m compileall src/werewolf_eval scripts -q`
@@ -145,7 +147,7 @@ Exit: 0 (PASS)
 ### `git diff --check`
 Exit: 0 (PASS)
 ```
-warning: in the working copy of '.oh-my-harness/tree.md', LF will be replaced by CRLF the next time Git touches it
+
 ```
 
 ## Key Hunks
@@ -230,51 +232,54 @@ warning: in the working copy of '.oh-my-harness/tree.md', LF will be replaced by
 Truncation does not block A档 for this PR. Key hunks were omitted because the diff exceeds the packet size limit. Verify hunks by reading the changed files directly or running `git diff` with narrowed paths.
 
 If B档 is needed, Minimal Next Reads (line ranges):
-- `scripts/dev/build_review_packet.py:1-220` (generator core + evidence logic)
-- `tests/test_build_review_packet.py:1-160` (test assertions)
-- `docs/specs/review-packet-gate.md:1-120` (gate contract)
-- `.github/codex-review-comment.md` (A档 guidance block)
+- `src/werewolf_eval/deepseek_provider.py:58-73` (response format with JSON example + _build_request_payload contract)
+- `src/werewolf_eval/run_deepseek_provider_game.py:146-153` (shared_provider = DeepSeekProvider(config) → return ProviderAgent(player_id, shared_provider))
+- `src/werewolf_eval/provider_agent.py:217-230` (source_label=response.source_label preservation)
+- `tests/test_deepseek_provider.py:66-85` (test_builds_openai_compatible_json_request — response_format, stream, thinking, Authorization assertions)
+- `tests/test_deepseek_provider_game.py:108-142` (test_helper_with_fake_provider_factory_writes_valid_artifacts — validate_game_log + load_decision_log + validate_decision_log)
 
 ## Evidence Map
 | Acceptance | Evidence | Status |
 |---|---|---|
-| A-1 [DeepSeek API output] added to VALID_SOURCE_LABELS | src/werewolf_eval/source_labels.py + tests/test_source_labels.py | PASS |
-| A-2 DEEPSEEK_PROVIDER_SOURCE_LABEL constant registered | src/werewolf_eval/provider_contract.py | PASS |
-| A-3 ProviderAgent preserves response.source_label in AgentAction | tests/test_fake_provider.py + src/werewolf_eval/provider_agent.py | PASS |
-| A-4 DeepSeekProvider uses stdlib urllib, no SDK import | src/werewolf_eval/deepseek_provider.py | PASS |
-| A-5 DeepSeekProvider builds OpenAI-compatible JSON request | tests/test_deepseek_provider.py | PASS |
-| A-6 DeepSeekProvider enforces max_requests and refuses empty API key | tests/test_deepseek_provider.py | PASS |
-| A-7 DeepSeek smoke CLI --allow-live-api guard exits nonzero without writing artifacts | tests/test_deepseek_provider_game.py | PASS |
-| A-8 Smoke CLI helper with fake provider writes valid game/decision logs | tests/test_deepseek_provider_game.py | PASS |
-| A-9 Smoke CLI helper failure path writes failure audit but no valid logs | tests/test_deepseek_provider_game.py | PASS |
-| A-10 No real secrets, API keys, captured Authorization values in tracked files | secret scan + test assertions | PASS |
-| A-11 No new dependencies added | git diff package.json et al | PASS |
-| A-12 No network/env/secret/live-AI runtime capability beyond plan scope | forbidden import check | PASS |
+| A-1 [DeepSeek API output] in VALID_SOURCE_LABELS | src/werewolf_eval/source_labels.py + tests | PASS |
+| A-2 DEEPSEEK_PROVIDER_SOURCE_LABEL registered | src/werewolf_eval/provider_contract.py | PASS |
+| A-3 ProviderAgent preserves source_label | tests/test_fake_provider.py + provider_agent.py | PASS |
+| A-4 DeepSeekProvider uses stdlib urllib, no SDK | src/werewolf_eval/deepseek_provider.py | PASS |
+| A-5 OpenAI-compatible JSON request shape | tests/test_deepseek_provider.py | PASS |
+| A-6 max_requests + empty key enforced | tests/test_deepseek_provider.py | PASS |
+| A-7 --allow-live-api guard no artifacts | tests/test_deepseek_provider_game.py | PASS |
+| A-8 Helper writes valid logs through validators | tests/test_deepseek_provider_game.py | PASS |
+| A-9 Failure path audit no valid logs | tests/test_deepseek_provider_game.py | PASS |
+| A-10 No secrets/keys in tracked files | secret scan + tests | PASS |
+| A-11 No new dependencies | git diff manifests | PASS |
+| A-12 No network/env/secret runtime beyond scope | forbidden import check | PASS |
+| A-13 Global request budget shared | run_deepseek_provider_game.py | PASS |
+| A-14 Prompt has JSON example + allowed lists | deepseek_provider.py + tests | PASS |
 
 ## Acceptance Checklist
-- [x] A-1 [DeepSeek API output] added to VALID_SOURCE_LABELS
-- [x] A-2 DEEPSEEK_PROVIDER_SOURCE_LABEL constant registered
-- [x] A-3 ProviderAgent preserves response.source_label in AgentAction
-- [x] A-4 DeepSeekProvider uses stdlib urllib, no SDK import
-- [x] A-5 DeepSeekProvider builds OpenAI-compatible JSON request
-- [x] A-6 DeepSeekProvider enforces max_requests and refuses empty API key
-- [x] A-7 DeepSeek smoke CLI --allow-live-api guard exits nonzero without writing artifacts
-- [x] A-8 Smoke CLI helper with fake provider writes valid game/decision logs
-- [x] A-9 Smoke CLI helper failure path writes failure audit but no valid logs
-- [x] A-10 No real secrets, API keys, captured Authorization values in tracked files
-- [x] A-11 No new dependencies added
-- [x] A-12 No network/env/secret/live-AI runtime capability beyond plan scope
+- [x] A-1 [DeepSeek API output] in VALID_SOURCE_LABELS
+- [x] A-2 DEEPSEEK_PROVIDER_SOURCE_LABEL registered
+- [x] A-3 ProviderAgent preserves source_label
+- [x] A-4 DeepSeekProvider uses stdlib urllib, no SDK
+- [x] A-5 OpenAI-compatible JSON request shape
+- [x] A-6 max_requests + empty key enforced
+- [x] A-7 --allow-live-api guard no artifacts
+- [x] A-8 Helper writes valid logs through validators
+- [x] A-9 Failure path audit no valid logs
+- [x] A-10 No secrets/keys in tracked files
+- [x] A-11 No new dependencies
+- [x] A-12 No network/env/secret runtime beyond scope
+- [x] A-13 Global request budget shared
+- [x] A-14 Prompt has JSON example + allowed lists
 
 ## Implementer Risk Notes
-- deepseek_provider.py uses urllib.request default transport; only used inside --allow-live-api guard which defaults off
+- urllib default transport only used inside --allow-live-api guard; tests inject fake transport
 - run_deepseek_provider_game.py default out-dir is .tmp/ not committed
-- All tests use injected fake transport; no live provider or network calls in tests
-- Authorization header is constructed but never stored in ProviderResponse or exceptions
 
 ## Review Trigger Result
 **RISK_TRIGGERS_FIRED**
 - changed_file_count=10 > 8
-- changed_lines=669 > 500
+- changed_lines=1080 > 500
 - key_hunks_truncated
 - forbidden_pattern_risk=provider
 

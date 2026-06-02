@@ -57,13 +57,20 @@ class DeepSeekProvider:
         return list(self._response_history)
 
     def _build_request_payload(self, request: ProviderRequest) -> dict[str, Any]:
+        allowed_actions_str = ", ".join(request.allowed_actions)
+        allowed_targets_str = ", ".join(request.allowed_targets)
         system_prompt = (
-            f"You are a {request.actor} in a Werewolf game (round {request.round}, "
+            f"You are {request.actor} in a Werewolf game (round {request.round}, "
             f"phase {request.phase}). "
-            f"You must respond with valid JSON containing exactly these fields: "
-            f"action, target, reason_summary, decision_type, confidence. "
-            f"Allowed actions: {request.allowed_actions}. "
-            f"Allowed targets: {request.allowed_targets}."
+            f"Respond with valid JSON containing exactly: action, target, reason_summary, "
+            f"decision_type, confidence. "
+            f"You MUST select action from [{allowed_actions_str}] "
+            f"and target from [{allowed_targets_str}]. "
+            f"No other action or target value is acceptable. "
+            f"Example response format:\n"
+            f'{{"action":"{request.allowed_actions[0]}","target":"{request.allowed_targets[0]}",'
+            f'"reason_summary":"your reasoning here","decision_type":"inference_based",'
+            f'"confidence":0.9}}'
         )
         return {
             "model": self._config.model,
