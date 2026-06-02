@@ -243,6 +243,52 @@ class GameEngineConsensusCliTests(unittest.TestCase):
 
 
 class GameEngineConsensusTests(unittest.TestCase):
+    def test_provider_consensus_mode_calls_each_wolf_agent(self):
+        from werewolf_eval.game_engine import AgentAction, GameEngine, build_default_config, MockAgent
+
+        class RecordingWolfAgent:
+            def __init__(self, player_id: str, target: str) -> None:
+                self.player_id = player_id
+                self.target = target
+                self.observations = []
+
+            def decide(self, observation):
+                self.observations.append(observation)
+                return AgentAction(
+                    actor=self.player_id,
+                    action="werewolf_kill",
+                    target=self.target,
+                    phase=observation.phase,
+                    round=observation.round,
+                    reason_summary=f"{self.player_id} proposes {self.target}",
+                    decision_type="team_coordinated",
+                    confidence=1.0,
+                    source_label="[DeepSeek API output]",
+                    visible_info_refs=list(observation.private_event_ids),
+                )
+
+        p1 = RecordingWolfAgent("p1", "p5")
+        p2 = RecordingWolfAgent("p2", "p5")
+        engine = GameEngine.from_config(
+            build_default_config(game_id="g1f_provider_consensus_unit"),
+            agents={
+                "p1": p1,
+                "p2": p2,
+                "p3": MockAgent("p3"),
+                "p4": MockAgent("p4"),
+                "p5": MockAgent("p5"),
+                "p6": MockAgent("p6"),
+            },
+            source_label="[DeepSeek API output]",
+        )
+        outputs = engine.run(mode="g1f_provider_consensus")
+        self.assertIsNotNone(outputs.consensus_log)
+        first = outputs.consensus_log["consensuses"][0]
+        self.assertEqual(first["participants"], ["p1", "p2"])
+        self.assertEqual(first["final_decision"]["target"], "p5")
+        self.assertEqual([obs.player_id for obs in p1.observations], ["p1"])
+        self.assertEqual([obs.player_id for obs in p2.observations], ["p2"])
+
     def test_g1c_wolf_consensus_log_is_emitted_for_valid_night_kill(self):
         result = run_mock_game_for_test(mode="g1c_consensus")
         consensus_log = result["consensus_log"]

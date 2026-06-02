@@ -292,6 +292,44 @@ class GameEngine:
         failed_participants: list[str] = []
 
         for i, wolf_id in enumerate(wolf_players):
+            if mode == "g1f_provider_consensus":
+                obs = self._mock_agents[wolf_id].observation_for if hasattr(self._mock_agents[wolf_id], "observation_for") else None
+                try:
+                    action = self._mock_agents[wolf_id].decide(self.observation_for(wolf_id))
+                except Exception as exc:
+                    failures.append(build_failure(game_id, round_num, phase, wolf_id, "agent_error", f"{wolf_id} raised {type(exc).__name__}: {exc}"))
+                    failed_participants.append(wolf_id)
+                    continue
+
+                # Validate returned action
+                if not isinstance(action.target, str) or action.target not in alive:
+                    failures.append(build_failure(game_id, round_num, phase, wolf_id, "invalid_action", f"{wolf_id} proposed invalid target {action.target}", target=action.target))
+                    failed_participants.append(wolf_id)
+                    continue
+
+                if action.actor != wolf_id:
+                    failures.append(build_failure(game_id, round_num, phase, wolf_id, "invalid_action", f"{wolf_id} returned actor={action.actor}", target=action.target))
+                    failed_participants.append(wolf_id)
+                    continue
+
+                if action.action != "werewolf_kill":
+                    failures.append(build_failure(game_id, round_num, phase, wolf_id, "invalid_action", f"{wolf_id} returned action={action.action} not werewolf_kill", target=action.target))
+                    failed_participants.append(wolf_id)
+                    continue
+
+                target = action.target
+                valid_targets.append((wolf_id, target))
+                c_proposals.append({
+                    "proposal_id": i + 1,
+                    "proposer": wolf_id,
+                    "proposed_target": target,
+                    "visible_info_refs": list(action.visible_info_refs),
+                    "reason_summary": action.reason_summary,
+                    "confidence": action.confidence,
+                    "action_round": 1,
+                })
+                continue
+
             if mode == "g1c_timeout_parse_failure" and round_num == 1 and i == 0:
                 failures.append(build_failure(game_id, round_num, phase, wolf_id, "timeout", f"{wolf_id} timed out during night consensus"))
                 failed_participants.append(wolf_id)
@@ -399,7 +437,7 @@ class GameEngine:
         decisions: list[dict[str, Any]] = []
         alive: set[str] = {p.player_id for p in self._config.players}
         d_counter = 0
-        is_g1c = mode.startswith("g1c_")
+        is_consensus_mode = mode.startswith("g1c_") or mode == "g1f_provider_consensus"
         consensus_entries: list[dict[str, Any]] = []
         failure_records: list[dict[str, Any]] = []
 
@@ -482,7 +520,7 @@ class GameEngine:
               "Roles assigned to all 6 players.")
 
         # Night 1: wolf kill
-        if is_g1c:
+        if is_consensus_mode:
             n1_wolves = ["p1", "p2"]
             c_entry, c_failures, c_target = self._resolve_wolf_consensus(game_id, 1, "night", n1_wolves, alive, mode, events)
             if c_entry is not None:
@@ -521,7 +559,12 @@ class GameEngine:
         alive.discard("p1")
 
         # Night 2: wolf kill
-        if is_g1c:
+        if mode == "g1f_provider_consensus":
+            n2_wolves = ["p2"]
+            wa3 = self._wolf_agent.decide(_wolf_obs("night", 2, n2_wolves))
+            decisions.append(_decision(wa3.actor, "team", wa3.phase, wa3.action, wa3.target, wa3.decision_type, wa3.reason_summary))
+            _emit("night", 2, wa3.action, wa3.actor, wa3.target, "werewolf_team", f"Wolf team kills {wa3.target}.")
+        elif is_consensus_mode:
             n2_wolves = ["p2"]
             c_entry, c_failures, c_target = self._resolve_wolf_consensus(game_id, 2, "night", n2_wolves, alive, mode, events)
             if c_entry is not None:
@@ -575,7 +618,7 @@ class GameEngine:
 
         consensus_log: dict[str, Any] | None = None
         failure_audit: dict[str, Any] | None = None
-        if is_g1c:
+        if is_consensus_mode:
             consensus_log = {
                 "consensus_log_id": f"{game_id}_consensus_log",
                 "game_id": game_id,
