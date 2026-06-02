@@ -210,15 +210,25 @@ class WolfTeamMockAgent:
 
 
 class GameEngine:
-    def __init__(self, config: GameConfig) -> None:
+    def __init__(
+        self,
+        config: GameConfig,
+        agents: dict[str, Any] | None = None,
+        wolf_agent: Any | None = None,
+        source_label: str | None = None,
+    ) -> None:
         self._config = config
         self._players_by_id: dict[str, EnginePlayer] = {
             p.player_id: p for p in config.players
         }
-        self._mock_agents: dict[str, MockAgent] = {
-            p.player_id: MockAgent(p.player_id) for p in config.players
-        }
-        self._wolf_agent = WolfTeamMockAgent()
+        if agents is not None:
+            self._mock_agents = dict(agents)
+        else:
+            self._mock_agents = {
+                p.player_id: MockAgent(p.player_id) for p in config.players
+            }
+        self._wolf_agent = wolf_agent if wolf_agent is not None else WolfTeamMockAgent()
+        self._source_label = source_label if source_label is not None else MOCK_AGENT_SOURCE_LABEL
         self._events: list[dict[str, Any]] = []
         self._decisions: list[dict[str, Any]] = []
         self._alive: set[str] = set(self._players_by_id.keys())
@@ -226,8 +236,14 @@ class GameEngine:
         self._current_phase: str = "setup"
 
     @classmethod
-    def from_config(cls, config: GameConfig) -> "GameEngine":
-        return cls(config)
+    def from_config(
+        cls,
+        config: GameConfig,
+        agents: dict[str, Any] | None = None,
+        wolf_agent: Any | None = None,
+        source_label: str | None = None,
+    ) -> "GameEngine":
+        return cls(config, agents=agents, wolf_agent=wolf_agent, source_label=source_label)
 
     def observation_for(self, player_id: str) -> AgentObservation:
         player = self._players_by_id[player_id]
@@ -540,7 +556,7 @@ class GameEngine:
 
         game_log: dict[str, Any] = {
             "game_id": game_id,
-            "source_label": MOCK_AGENT_SOURCE_LABEL,
+            "source_label": self._source_label,
             "players": [{"player_id": p.player_id, "role": p.role, "team": p.team} for p in self._config.players],
             "events": events,
             "result": {"winner": "villager", "end_round": 2, "survivors": sorted(alive), "end_condition": "all_werewolves_eliminated"},
@@ -549,7 +565,7 @@ class GameEngine:
         decision_log: dict[str, Any] = {
             "decision_log_id": f"{game_id}_decision_log",
             "game_id": game_id,
-            "source_label": MOCK_AGENT_SOURCE_LABEL,
+            "source_label": self._source_label,
             "decisions": decisions,
         }
 

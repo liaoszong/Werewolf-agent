@@ -1,0 +1,658 @@
+{
+  "game_id": "g1d_fake_provider",
+  "provider_name": "deterministic_fake_provider",
+  "source_label": "[deterministic fake provider output]",
+  "requests": [
+    {
+      "request_id": "g1d_fake_provider_r01_p3",
+      "game_id": "g1d_fake_provider",
+      "actor": "p3",
+      "phase": "night",
+      "round": 1,
+      "observation": {
+        "game_id": "g1d_fake_provider",
+        "player_id": "p3",
+        "role": "seer",
+        "team": "villager",
+        "phase": "night",
+        "round": 1,
+        "alive_players": [
+          "p1",
+          "p2",
+          "p3",
+          "p4",
+          "p5",
+          "p6"
+        ],
+        "public_event_ids": [
+          "g1d_fake_provider_e001"
+        ],
+        "private_event_ids": [],
+        "known_roles": {
+          "p3": "seer"
+        }
+      },
+      "allowed_actions": [
+        "seer_check"
+      ],
+      "allowed_targets": [
+        "p1",
+        "p2",
+        "p3",
+        "p4",
+        "p5",
+        "p6"
+      ],
+      "response_format_version": "g1d-action-v1"
+    },
+    {
+      "request_id": "g1d_fake_provider_r01_p3",
+      "game_id": "g1d_fake_provider",
+      "actor": "p3",
+      "phase": "day",
+      "round": 1,
+      "observation": {
+        "game_id": "g1d_fake_provider",
+        "player_id": "p3",
+        "role": "seer",
+        "team": "villager",
+        "phase": "day",
+        "round": 1,
+        "alive_players": [
+          "p1",
+          "p2",
+          "p3",
+          "p4",
+          "p5",
+          "p6"
+        ],
+        "public_event_ids": [
+          "g1d_fake_provider_e001"
+        ],
+        "private_event_ids": [
+          "g1d_fake_provider_e003"
+        ],
+        "known_roles": {
+          "p3": "seer"
+        }
+      },
+      "allowed_actions": [
+        "player_vote"
+      ],
+      "allowed_targets": [
+        "p1",
+        "p2",
+        "p3",
+        "p4",
+        "p5",
+        "p6"
+      ],
+      "response_format_version": "g1d-action-v1"
+    },
+    {
+      "request_id": "g1d_fake_provider_r01_p4",
+      "game_id": "g1d_fake_provider",
+      "actor": "p4",
+      "phase": "night",
+      "round": 1,
+      "observation": {
+        "game_id": "g1d_fake_provider",
+        "player_id": "p4",
+        "role": "witch",
+        "team": "villager",
+        "phase": "night",
+        "round": 1,
+        "alive_players": [
+          "p1",
+          "p2",
+          "p3",
+          "p4",
+          "p5",
+          "p6"
+        ],
+        "public_event_ids": [
+          "g1d_fake_provider_e001"
+        ],
+        "private_event_ids": [],
+        "known_roles": {
+          "p4": "witch"
+        }
+      },
+      "allowed_actions": [
+        "witch_save",
+        "witch_kill"
+      ],
+      "allowed_targets": [
+        "p1",
+        "p2",
+        "p3",
+        "p4",
+        "p5",
+        "p6"
+      ],
+      "response_format_version": "g1d-action-v1"
+    },
+    {
+      "request_id": "g1d_fake_provider_r01_p4",
+      "game_id": "g1d_fake_provider",
+      "actor": "p4",
+      "phase": "day",
+      "round": 1,
+      "observation": {
+        "game_id": "g1d_fake_provider",
+        "player_id": "p4",
+        "role": "witch",
+        "team": "villager",
+        "phase": "day",
+        "round": 1,
+        "alive_players": [
+          "p1",
+          "p2",
+          "p3",
+          "p4",
+          "p5",
+          "p6"
+        ],
+        "public_event_ids": [
+          "g1d_fake_provider_e001",
+          "g1d_fake_provider_e005"
+        ],
+        "private_event_ids": [
+          "g1d_fake_provider_e004"
+        ],
+        "known_roles": {
+          "p4": "witch"
+        }
+      },
+      "allowed_actions": [
+        "player_vote"
+      ],
+      "allowed_targets": [
+        "p1",
+        "p2",
+        "p3",
+        "p4",
+        "p5",
+        "p6"
+      ],
+      "response_format_version": "g1d-action-v1"
+    },
+    {
+      "request_id": "g1d_fake_provider_r02_p4",
+      "game_id": "g1d_fake_provider",
+      "actor": "p4",
+      "phase": "day",
+      "round": 2,
+      "observation": {
+        "game_id": "g1d_fake_provider",
+        "player_id": "p4",
+        "role": "witch",
+        "team": "villager",
+        "phase": "day",
+        "round": 2,
+        "alive_players": [
+          "p2",
+          "p4",
+          "p5",
+          "p6"
+        ],
+        "public_event_ids": [
+          "g1d_fake_provider_e001",
+          "g1d_fake_provider_e005",
+          "g1d_fake_provider_e006",
+          "g1d_fake_provider_e007",
+          "g1d_fake_provider_e008",
+          "g1d_fake_provider_e009",
+          "g1d_fake_provider_e010",
+          "g1d_fake_provider_e012"
+        ],
+        "private_event_ids": [
+          "g1d_fake_provider_e004",
+          "g1d_fake_provider_e009",
+          "g1d_fake_provider_e010",
+          "g1d_fake_provider_e012"
+        ],
+        "known_roles": {
+          "p4": "witch"
+        }
+      },
+      "allowed_actions": [
+        "player_vote"
+      ],
+      "allowed_targets": [
+        "p2",
+        "p4",
+        "p5",
+        "p6"
+      ],
+      "response_format_version": "g1d-action-v1"
+    },
+    {
+      "request_id": "g1d_fake_provider_r01_p5",
+      "game_id": "g1d_fake_provider",
+      "actor": "p5",
+      "phase": "day",
+      "round": 1,
+      "observation": {
+        "game_id": "g1d_fake_provider",
+        "player_id": "p5",
+        "role": "villager",
+        "team": "villager",
+        "phase": "day",
+        "round": 1,
+        "alive_players": [
+          "p1",
+          "p2",
+          "p3",
+          "p4",
+          "p5",
+          "p6"
+        ],
+        "public_event_ids": [
+          "g1d_fake_provider_e001",
+          "g1d_fake_provider_e005",
+          "g1d_fake_provider_e006"
+        ],
+        "private_event_ids": [],
+        "known_roles": {
+          "p5": "villager"
+        }
+      },
+      "allowed_actions": [
+        "player_vote"
+      ],
+      "allowed_targets": [
+        "p1",
+        "p2",
+        "p3",
+        "p4",
+        "p5",
+        "p6"
+      ],
+      "response_format_version": "g1d-action-v1"
+    },
+    {
+      "request_id": "g1d_fake_provider_r02_p5",
+      "game_id": "g1d_fake_provider",
+      "actor": "p5",
+      "phase": "day",
+      "round": 2,
+      "observation": {
+        "game_id": "g1d_fake_provider",
+        "player_id": "p5",
+        "role": "villager",
+        "team": "villager",
+        "phase": "day",
+        "round": 2,
+        "alive_players": [
+          "p2",
+          "p4",
+          "p5",
+          "p6"
+        ],
+        "public_event_ids": [
+          "g1d_fake_provider_e001",
+          "g1d_fake_provider_e005",
+          "g1d_fake_provider_e006",
+          "g1d_fake_provider_e007",
+          "g1d_fake_provider_e008",
+          "g1d_fake_provider_e009",
+          "g1d_fake_provider_e010",
+          "g1d_fake_provider_e012",
+          "g1d_fake_provider_e013"
+        ],
+        "private_event_ids": [
+          "g1d_fake_provider_e009",
+          "g1d_fake_provider_e010",
+          "g1d_fake_provider_e012"
+        ],
+        "known_roles": {
+          "p5": "villager"
+        }
+      },
+      "allowed_actions": [
+        "player_vote"
+      ],
+      "allowed_targets": [
+        "p2",
+        "p4",
+        "p5",
+        "p6"
+      ],
+      "response_format_version": "g1d-action-v1"
+    },
+    {
+      "request_id": "g1d_fake_provider_r01_p6",
+      "game_id": "g1d_fake_provider",
+      "actor": "p6",
+      "phase": "day",
+      "round": 1,
+      "observation": {
+        "game_id": "g1d_fake_provider",
+        "player_id": "p6",
+        "role": "villager",
+        "team": "villager",
+        "phase": "day",
+        "round": 1,
+        "alive_players": [
+          "p1",
+          "p2",
+          "p3",
+          "p4",
+          "p5",
+          "p6"
+        ],
+        "public_event_ids": [
+          "g1d_fake_provider_e001",
+          "g1d_fake_provider_e005",
+          "g1d_fake_provider_e006",
+          "g1d_fake_provider_e007"
+        ],
+        "private_event_ids": [],
+        "known_roles": {
+          "p6": "villager"
+        }
+      },
+      "allowed_actions": [
+        "player_vote"
+      ],
+      "allowed_targets": [
+        "p1",
+        "p2",
+        "p3",
+        "p4",
+        "p5",
+        "p6"
+      ],
+      "response_format_version": "g1d-action-v1"
+    },
+    {
+      "request_id": "g1d_fake_provider_r02_p6",
+      "game_id": "g1d_fake_provider",
+      "actor": "p6",
+      "phase": "day",
+      "round": 2,
+      "observation": {
+        "game_id": "g1d_fake_provider",
+        "player_id": "p6",
+        "role": "villager",
+        "team": "villager",
+        "phase": "day",
+        "round": 2,
+        "alive_players": [
+          "p2",
+          "p4",
+          "p5",
+          "p6"
+        ],
+        "public_event_ids": [
+          "g1d_fake_provider_e001",
+          "g1d_fake_provider_e005",
+          "g1d_fake_provider_e006",
+          "g1d_fake_provider_e007",
+          "g1d_fake_provider_e008",
+          "g1d_fake_provider_e009",
+          "g1d_fake_provider_e010",
+          "g1d_fake_provider_e012",
+          "g1d_fake_provider_e013",
+          "g1d_fake_provider_e014"
+        ],
+        "private_event_ids": [
+          "g1d_fake_provider_e009",
+          "g1d_fake_provider_e010",
+          "g1d_fake_provider_e012"
+        ],
+        "known_roles": {
+          "p6": "villager"
+        }
+      },
+      "allowed_actions": [
+        "player_vote"
+      ],
+      "allowed_targets": [
+        "p2",
+        "p4",
+        "p5",
+        "p6"
+      ],
+      "response_format_version": "g1d-action-v1"
+    },
+    {
+      "request_id": "g1d_fake_provider_r01_wolf_team",
+      "game_id": "g1d_fake_provider",
+      "actor": "wolf_team",
+      "phase": "night",
+      "round": 1,
+      "observation": {
+        "game_id": "g1d_fake_provider",
+        "player_id": "wolf_team",
+        "role": "werewolf",
+        "team": "werewolf",
+        "phase": "night",
+        "round": 1,
+        "alive_players": [
+          "p1",
+          "p2",
+          "p3",
+          "p4",
+          "p5",
+          "p6"
+        ],
+        "public_event_ids": [
+          "g1d_fake_provider_e001"
+        ],
+        "private_event_ids": [
+          "g1d_fake_provider_e001"
+        ],
+        "known_roles": {
+          "p1": "werewolf",
+          "p2": "werewolf"
+        }
+      },
+      "allowed_actions": [
+        "werewolf_kill"
+      ],
+      "allowed_targets": [
+        "p1",
+        "p2",
+        "p3",
+        "p4",
+        "p5",
+        "p6"
+      ],
+      "response_format_version": "g1d-action-v1"
+    },
+    {
+      "request_id": "g1d_fake_provider_r02_wolf_team",
+      "game_id": "g1d_fake_provider",
+      "actor": "wolf_team",
+      "phase": "night",
+      "round": 2,
+      "observation": {
+        "game_id": "g1d_fake_provider",
+        "player_id": "wolf_team",
+        "role": "werewolf",
+        "team": "werewolf",
+        "phase": "night",
+        "round": 2,
+        "alive_players": [
+          "p2",
+          "p3",
+          "p4",
+          "p5",
+          "p6"
+        ],
+        "public_event_ids": [
+          "g1d_fake_provider_e001",
+          "g1d_fake_provider_e005",
+          "g1d_fake_provider_e006",
+          "g1d_fake_provider_e007",
+          "g1d_fake_provider_e008",
+          "g1d_fake_provider_e009",
+          "g1d_fake_provider_e010"
+        ],
+        "private_event_ids": [
+          "g1d_fake_provider_e001",
+          "g1d_fake_provider_e002",
+          "g1d_fake_provider_e003",
+          "g1d_fake_provider_e004",
+          "g1d_fake_provider_e005",
+          "g1d_fake_provider_e006",
+          "g1d_fake_provider_e007",
+          "g1d_fake_provider_e008",
+          "g1d_fake_provider_e009",
+          "g1d_fake_provider_e010"
+        ],
+        "known_roles": {
+          "p2": "werewolf"
+        }
+      },
+      "allowed_actions": [
+        "werewolf_kill"
+      ],
+      "allowed_targets": [
+        "p2",
+        "p3",
+        "p4",
+        "p5",
+        "p6"
+      ],
+      "response_format_version": "g1d-action-v1"
+    }
+  ],
+  "responses": [
+    {
+      "request_id": "g1d_fake_provider_r01_p3",
+      "provider_name": "deterministic_fake_provider",
+      "source_label": "[deterministic fake provider output]",
+      "raw_content": "{\"action\": \"seer_check\", \"target\": \"p1\", \"reason_summary\": \"p3 seer checks p1\", \"decision_type\": \"inference_based\", \"confidence\": 1.0}",
+      "latency_ms": 0,
+      "token_usage": {
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "total_tokens": 0
+      }
+    },
+    {
+      "request_id": "g1d_fake_provider_r01_p3",
+      "provider_name": "deterministic_fake_provider",
+      "source_label": "[deterministic fake provider output]",
+      "raw_content": "{\"action\": \"player_vote\", \"target\": \"p1\", \"reason_summary\": \"p3 votes p1 based on seer result\", \"decision_type\": \"inference_based\", \"confidence\": 1.0}",
+      "latency_ms": 0,
+      "token_usage": {
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "total_tokens": 0
+      }
+    },
+    {
+      "request_id": "g1d_fake_provider_r01_p4",
+      "provider_name": "deterministic_fake_provider",
+      "source_label": "[deterministic fake provider output]",
+      "raw_content": "{\"action\": \"witch_save\", \"target\": \"p5\", \"reason_summary\": \"p4 witch saves p5\", \"decision_type\": \"inference_based\", \"confidence\": 1.0}",
+      "latency_ms": 0,
+      "token_usage": {
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "total_tokens": 0
+      }
+    },
+    {
+      "request_id": "g1d_fake_provider_r01_p4",
+      "provider_name": "deterministic_fake_provider",
+      "source_label": "[deterministic fake provider output]",
+      "raw_content": "{\"action\": \"player_vote\", \"target\": \"p1\", \"reason_summary\": \"p4 follows vote on p1\", \"decision_type\": \"inference_based\", \"confidence\": 1.0}",
+      "latency_ms": 0,
+      "token_usage": {
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "total_tokens": 0
+      }
+    },
+    {
+      "request_id": "g1d_fake_provider_r02_p4",
+      "provider_name": "deterministic_fake_provider",
+      "source_label": "[deterministic fake provider output]",
+      "raw_content": "{\"action\": \"player_vote\", \"target\": \"p2\", \"reason_summary\": \"p4 votes p2\", \"decision_type\": \"inference_based\", \"confidence\": 1.0}",
+      "latency_ms": 0,
+      "token_usage": {
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "total_tokens": 0
+      }
+    },
+    {
+      "request_id": "g1d_fake_provider_r01_p5",
+      "provider_name": "deterministic_fake_provider",
+      "source_label": "[deterministic fake provider output]",
+      "raw_content": "{\"action\": \"player_vote\", \"target\": \"p1\", \"reason_summary\": \"p5 follows vote on p1\", \"decision_type\": \"inference_based\", \"confidence\": 1.0}",
+      "latency_ms": 0,
+      "token_usage": {
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "total_tokens": 0
+      }
+    },
+    {
+      "request_id": "g1d_fake_provider_r02_p5",
+      "provider_name": "deterministic_fake_provider",
+      "source_label": "[deterministic fake provider output]",
+      "raw_content": "{\"action\": \"player_vote\", \"target\": \"p2\", \"reason_summary\": \"p5 follows vote on p2\", \"decision_type\": \"inference_based\", \"confidence\": 1.0}",
+      "latency_ms": 0,
+      "token_usage": {
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "total_tokens": 0
+      }
+    },
+    {
+      "request_id": "g1d_fake_provider_r01_p6",
+      "provider_name": "deterministic_fake_provider",
+      "source_label": "[deterministic fake provider output]",
+      "raw_content": "{\"action\": \"player_vote\", \"target\": \"p1\", \"reason_summary\": \"p6 follows vote on p1\", \"decision_type\": \"inference_based\", \"confidence\": 1.0}",
+      "latency_ms": 0,
+      "token_usage": {
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "total_tokens": 0
+      }
+    },
+    {
+      "request_id": "g1d_fake_provider_r02_p6",
+      "provider_name": "deterministic_fake_provider",
+      "source_label": "[deterministic fake provider output]",
+      "raw_content": "{\"action\": \"player_vote\", \"target\": \"p2\", \"reason_summary\": \"p6 follows vote on p2\", \"decision_type\": \"inference_based\", \"confidence\": 1.0}",
+      "latency_ms": 0,
+      "token_usage": {
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "total_tokens": 0
+      }
+    },
+    {
+      "request_id": "g1d_fake_provider_r01_wolf_team",
+      "provider_name": "deterministic_fake_provider",
+      "source_label": "[deterministic fake provider output]",
+      "raw_content": "{\"action\": \"werewolf_kill\", \"target\": \"p5\", \"reason_summary\": \"wolf team kills p5\", \"decision_type\": \"team_coordinated\", \"confidence\": 1.0}",
+      "latency_ms": 0,
+      "token_usage": {
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "total_tokens": 0
+      }
+    },
+    {
+      "request_id": "g1d_fake_provider_r02_wolf_team",
+      "provider_name": "deterministic_fake_provider",
+      "source_label": "[deterministic fake provider output]",
+      "raw_content": "{\"action\": \"werewolf_kill\", \"target\": \"p3\", \"reason_summary\": \"wolf team kills seer p3\", \"decision_type\": \"team_coordinated\", \"confidence\": 1.0}",
+      "latency_ms": 0,
+      "token_usage": {
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "total_tokens": 0
+      }
+    }
+  ],
+  "failures": []
+}

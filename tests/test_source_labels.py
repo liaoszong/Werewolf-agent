@@ -12,6 +12,7 @@ class SourceLabelsTests(unittest.TestCase):
             "[AI 生成]",
             "[scripted deterministic output]",
             "[deterministic mock agent output]",
+            "[deterministic fake provider output]",
         }
         self.assertEqual(VALID_SOURCE_LABELS, expected)
 

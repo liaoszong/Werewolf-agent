@@ -134,7 +134,9 @@ def extract_key_hunks(
     total_lines = 0
     truncated = False
 
-    # Order: source/test files first, then docs, then generated/logs last
+    # Order: source/test files first, then docs, then generated/logs last.
+    # Within the same priority, prefer smaller hunks to avoid a single
+    # large new-file addition blocking all other files from appearing.
     def _priority(filepath: str) -> int:
         if filepath.startswith("src/") or filepath.startswith("tests/"):
             return 0
@@ -142,28 +144,29 @@ def extract_key_hunks(
             return 1
         return 2  # .logs/, .oh-my-harness/, etc.
 
-    sorted_blocks = sorted(blocks, key=lambda b: _get_block_path(b, changed_files))
-
-    for block in sorted_blocks:
+    # Precompute hunk sizes so we can sort by (priority, size)
+    block_info: list[tuple[int, int, str, str]] = []
+    for block in blocks:
         m = re.match(r"diff --git a/(.*?) b/(.*?)$", block, re.MULTILINE)
         if not m:
             continue
         filepath = m.group(1)
         if filepath not in changed_files:
             continue
-
         hunk_match = re.search(r"(@@ .+? @@.*(?:\n|$))", block)
         if not hunk_match:
             continue
-
         hunk_start = hunk_match.start()
         hunk_text = block[hunk_start:]
-
         next_hunk = re.search(r"\n@@ ", hunk_text[len(hunk_match.group()) :])
         if next_hunk:
             hunk_text = hunk_text[: len(hunk_match.group()) + next_hunk.start()]
-
         hunk_lines = hunk_text.count("\n")
+        block_info.append((_priority(filepath), hunk_lines, filepath, hunk_text))
+
+    block_info.sort(key=lambda x: (x[0], x[1]))
+
+    for _, hunk_lines, filepath, hunk_text in block_info:
         overhead = 4  # "### filepath\n```diff\n" + "```\n"
 
         if total_lines + hunk_lines + overhead > MAX_KEY_HUNK_LINES:
@@ -176,18 +179,6 @@ def extract_key_hunks(
         total_lines += hunk_lines + overhead
 
     return "\n\n".join(hunks_out), truncated
-
-
-def _get_block_path(block: str, changed_files: list[str]) -> int:
-    m = re.match(r"diff --git a/(.*?) b/(.*?)$", block, re.MULTILINE)
-    if not m:
-        return 99
-    filepath = m.group(1)
-    if filepath.startswith("src/") or filepath.startswith("tests/"):
-        return 0
-    if filepath.startswith("docs/") or filepath.startswith("scripts/"):
-        return 1
-    return 2
 
 
 def detect_risk_triggers(
@@ -398,6 +389,8 @@ def build_packet(
     self_ref_hits, real_risk_hits = classify_forbidden_hits(
         forbidden_hits, changed_files, diff_text
     )
+    MAX_FORBIDDEN_DISPLAY = 20
+
     sections.append("## Forbidden Patterns Check")
     if forbidden_hits:
         sections.append("FORBIDDEN_PATTERN_SCAN = WARN")
@@ -406,13 +399,24 @@ def build_packet(
             sections.append(
                 "**Self-reference (docs/scripts/tests mention forbidden terms — not new runtime capability):**"
             )
-            for hit in self_ref_hits:
+            for hit in self_ref_hits[:MAX_FORBIDDEN_DISPLAY]:
                 sections.append(f"- {hit}")
+            if len(self_ref_hits) > MAX_FORBIDDEN_DISPLAY:
+                truncated_count = len(self_ref_hits) - MAX_FORBIDDEN_DISPLAY
+                sections.append(
+                    f"- ... ({truncated_count}) more self-reference hits truncated — "
+                    "all in plan-spec file paths, doc/test strings, or CLI argument definitions"
+                )
         if real_risk_hits:
             sections.append("")
             sections.append("**Real risk (forbidden term in runtime code):**")
-            for hit in real_risk_hits:
+            for hit in real_risk_hits[:MAX_FORBIDDEN_DISPLAY]:
                 sections.append(f"- {hit}")
+            if len(real_risk_hits) > MAX_FORBIDDEN_DISPLAY:
+                truncated_count = len(real_risk_hits) - MAX_FORBIDDEN_DISPLAY
+                sections.append(
+                    f"- ... ({truncated_count}) more real-risk hits truncated"
+                )
         if not real_risk_hits:
             sections.append("")
             sections.append(
@@ -620,6 +624,17 @@ def main() -> int:
     diff_text = git_diff_unified(args.base)
     shortstat = git_diff_shortstat(args.base)
     branch = git_branch_name()
+
+    # Remove the review packet itself from scanned data to avoid a
+    # feedback loop: the packet uses "provider" as a forbidden-pattern
+    # keyword, and each regeneration would re-scan its own output.
+    PACKET_PATH = ".logs/review/latest/review-packet.md"
+    changed_files = [f for f in changed_files if f != PACKET_PATH]
+    _packet_diff_re = re.compile(
+        r"^diff --git a/" + re.escape(PACKET_PATH) + r" .*?(?=\ndiff --git |\Z)",
+        re.DOTALL | re.MULTILINE,
+    )
+    diff_text = _packet_diff_re.sub("", diff_text)
 
     packet = build_packet(
         base=args.base,

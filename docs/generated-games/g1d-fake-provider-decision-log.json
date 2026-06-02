@@ -1,0 +1,196 @@
+{
+  "decision_log_id": "g1d_fake_provider_decision_log",
+  "game_id": "g1d_fake_provider",
+  "source_label": "[deterministic fake provider output]",
+  "decisions": [
+    {
+      "decision_id": "g1d_fake_provider_d001",
+      "actor": "wolf_team",
+      "decision_scope": "team",
+      "consensus_id": null,
+      "phase": "night",
+      "action": "werewolf_kill",
+      "target": "p5",
+      "visible_info_refs": [],
+      "reason_summary": "wolf team kills p5",
+      "decision_type": "team_coordinated",
+      "confidence": 1.0,
+      "strategy_tag": null
+    },
+    {
+      "decision_id": "g1d_fake_provider_d002",
+      "actor": "p3",
+      "decision_scope": "single",
+      "consensus_id": null,
+      "phase": "night",
+      "action": "seer_check",
+      "target": "p1",
+      "visible_info_refs": [],
+      "reason_summary": "p3 seer checks p1",
+      "decision_type": "inference_based",
+      "confidence": 1.0,
+      "strategy_tag": null
+    },
+    {
+      "decision_id": "g1d_fake_provider_d003",
+      "actor": "p4",
+      "decision_scope": "single",
+      "consensus_id": null,
+      "phase": "night",
+      "action": "witch_save",
+      "target": "p5",
+      "visible_info_refs": [],
+      "reason_summary": "p4 witch saves p5",
+      "decision_type": "inference_based",
+      "confidence": 1.0,
+      "strategy_tag": null
+    },
+    {
+      "decision_id": "g1d_fake_provider_d004",
+      "actor": "p3",
+      "decision_scope": "single",
+      "consensus_id": null,
+      "phase": "day",
+      "action": "player_vote",
+      "target": "p1",
+      "visible_info_refs": [
+        "g1d_fake_provider_e001"
+      ],
+      "reason_summary": "p3 votes p1 based on seer result",
+      "decision_type": "inference_based",
+      "confidence": 1.0,
+      "strategy_tag": null
+    },
+    {
+      "decision_id": "g1d_fake_provider_d005",
+      "actor": "p4",
+      "decision_scope": "single",
+      "consensus_id": null,
+      "phase": "day",
+      "action": "player_vote",
+      "target": "p1",
+      "visible_info_refs": [
+        "g1d_fake_provider_e001"
+      ],
+      "reason_summary": "p4 follows vote on p1",
+      "decision_type": "inference_based",
+      "confidence": 1.0,
+      "strategy_tag": null
+    },
+    {
+      "decision_id": "g1d_fake_provider_d006",
+      "actor": "p5",
+      "decision_scope": "single",
+      "consensus_id": null,
+      "phase": "day",
+      "action": "player_vote",
+      "target": "p1",
+      "visible_info_refs": [
+        "g1d_fake_provider_e001"
+      ],
+      "reason_summary": "p5 follows vote on p1",
+      "decision_type": "inference_based",
+      "confidence": 1.0,
+      "strategy_tag": null
+    },
+    {
+      "decision_id": "g1d_fake_provider_d007",
+      "actor": "p6",
+      "decision_scope": "single",
+      "consensus_id": null,
+      "phase": "day",
+      "action": "player_vote",
+      "target": "p1",
+      "visible_info_refs": [
+        "g1d_fake_provider_e001"
+      ],
+      "reason_summary": "p6 follows vote on p1",
+      "decision_type": "inference_based",
+      "confidence": 1.0,
+      "strategy_tag": null
+    },
+    {
+      "decision_id": "g1d_fake_provider_d008",
+      "actor": "wolf_team",
+      "decision_scope": "team",
+      "consensus_id": null,
+      "phase": "night",
+      "action": "werewolf_kill",
+      "target": "p3",
+      "visible_info_refs": [],
+      "reason_summary": "wolf team kills seer p3",
+      "decision_type": "team_coordinated",
+      "confidence": 1.0,
+      "strategy_tag": null
+    },
+    {
+      "decision_id": "g1d_fake_provider_d009",
+      "actor": "p4",
+      "decision_scope": "single",
+      "consensus_id": null,
+      "phase": "day",
+      "action": "player_vote",
+      "target": "p2",
+      "visible_info_refs": [
+        "g1d_fake_provider_e001",
+        "g1d_fake_provider_e005",
+        "g1d_fake_provider_e006",
+        "g1d_fake_provider_e007",
+        "g1d_fake_provider_e008",
+        "g1d_fake_provider_e009",
+        "g1d_fake_provider_e010",
+        "g1d_fake_provider_e012"
+      ],
+      "reason_summary": "p4 votes p2",
+      "decision_type": "inference_based",
+      "confidence": 1.0,
+      "strategy_tag": null
+    },
+    {
+      "decision_id": "g1d_fake_provider_d010",
+      "actor": "p5",
+      "decision_scope": "single",
+      "consensus_id": null,
+      "phase": "day",
+      "action": "player_vote",
+      "target": "p2",
+      "visible_info_refs": [
+        "g1d_fake_provider_e001",
+        "g1d_fake_provider_e005",
+        "g1d_fake_provider_e006",
+        "g1d_fake_provider_e007",
+        "g1d_fake_provider_e008",
+        "g1d_fake_provider_e009",
+        "g1d_fake_provider_e010",
+        "g1d_fake_provider_e012"
+      ],
+      "reason_summary": "p5 follows vote on p2",
+      "decision_type": "inference_based",
+      "confidence": 1.0,
+      "strategy_tag": null
+    },
+    {
+      "decision_id": "g1d_fake_provider_d011",
+      "actor": "p6",
+      "decision_scope": "single",
+      "consensus_id": null,
+      "phase": "day",
+      "action": "player_vote",
+      "target": "p2",
+      "visible_info_refs": [
+        "g1d_fake_provider_e001",
+        "g1d_fake_provider_e005",
+        "g1d_fake_provider_e006",
+        "g1d_fake_provider_e007",
+        "g1d_fake_provider_e008",
+        "g1d_fake_provider_e009",
+        "g1d_fake_provider_e010",
+        "g1d_fake_provider_e012"
+      ],
+      "reason_summary": "p6 follows vote on p2",
+      "decision_type": "inference_based",
+      "confidence": 1.0,
+      "strategy_tag": null
+    }
+  ]
+}

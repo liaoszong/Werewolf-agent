@@ -384,5 +384,70 @@ class GameEngineConsensusTests(unittest.TestCase):
                              f"{item['kind']} must not be marked repaired_to_valid_action")
 
 
+class GameEngineInjectionTests(unittest.TestCase):
+    def test_injected_fake_provider_emits_fake_provider_source_label(self) -> None:
+        from werewolf_eval.fake_provider import build_default_fake_provider_agent
+        from werewolf_eval.game_engine import GameEngine, build_default_config
+        from werewolf_eval.provider_contract import FAKE_PROVIDER_SOURCE_LABEL
+
+        agents = {pid: build_default_fake_provider_agent(pid) for pid in ["p3", "p4", "p5", "p6"]}
+        wolf_agent = build_default_fake_provider_agent("wolf_team")
+        engine = GameEngine.from_config(
+            build_default_config(game_id="g1d_fake_provider"),
+            agents=agents,
+            wolf_agent=wolf_agent,
+            source_label=FAKE_PROVIDER_SOURCE_LABEL,
+        )
+        outputs = engine.run(mode="g1b_default")
+
+        self.assertEqual(outputs.game_log["source_label"], FAKE_PROVIDER_SOURCE_LABEL)
+        self.assertEqual(outputs.decision_log["source_label"], FAKE_PROVIDER_SOURCE_LABEL)
+
+    def test_injected_fake_provider_game_validates_through_parsers(self) -> None:
+        from werewolf_eval.decision_log import parse_decision_log
+        from werewolf_eval.fake_provider import build_default_fake_provider_agent
+        from werewolf_eval.game_engine import GameEngine, build_default_config
+        from werewolf_eval.game_log import parse_game_log
+        from werewolf_eval.provider_contract import FAKE_PROVIDER_SOURCE_LABEL
+
+        agents = {pid: build_default_fake_provider_agent(pid) for pid in ["p3", "p4", "p5", "p6"]}
+        wolf_agent = build_default_fake_provider_agent("wolf_team")
+        engine = GameEngine.from_config(
+            build_default_config(game_id="g1d_fake_provider"),
+            agents=agents,
+            wolf_agent=wolf_agent,
+            source_label=FAKE_PROVIDER_SOURCE_LABEL,
+        )
+        outputs = engine.run(mode="g1b_default")
+
+        game = parse_game_log(outputs.game_log)
+        decision_log = parse_decision_log(outputs.decision_log, game)
+
+        self.assertEqual(game.game_id, "g1d_fake_provider")
+        self.assertEqual(decision_log.source_label, FAKE_PROVIDER_SOURCE_LABEL)
+        self.assertEqual(len(game.events), 18)
+        self.assertEqual(len(decision_log.decisions), 11)
+        self.assertIsNone(outputs.consensus_log)
+
+    def test_default_run_still_uses_mock_source_label(self) -> None:
+        from werewolf_eval.game_engine import GameEngine, build_default_config
+
+        outputs = GameEngine.from_config(build_default_config()).run()
+        self.assertEqual(outputs.game_log["source_label"], "[deterministic mock agent output]")
+        self.assertEqual(outputs.decision_log["source_label"], "[deterministic mock agent output]")
+
+    def test_g1c_default_run_still_emits_consensus_log_with_mock_label(self) -> None:
+        from werewolf_eval.game_engine import GameEngine, build_default_config
+
+        outputs = GameEngine.from_config(
+            build_default_config(game_id="g1c_wolf_consensus"),
+        ).run(mode="g1c_consensus")
+
+        self.assertIsNotNone(outputs.consensus_log)
+        self.assertEqual(outputs.consensus_log["source_label"], "[deterministic mock agent output]")
+        self.assertIsNotNone(outputs.failure_audit)
+        self.assertEqual(outputs.failure_audit["source_label"], "[deterministic mock agent output]")
+
+
 if __name__ == "__main__":
     unittest.main()

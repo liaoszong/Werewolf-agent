@@ -5,4 +5,5 @@ VALID_SOURCE_LABELS = {
     "[AI 生成]",
     "[scripted deterministic output]",
     "[deterministic mock agent output]",
+    "[deterministic fake provider output]",
 }
