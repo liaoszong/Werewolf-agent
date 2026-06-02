@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 193
+- Entries: 196
 
 ```text
 ./
@@ -80,7 +80,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   ├── phase3-g1-scripted-runtime-demo.html
 │   │   ├── phase3-g1b-mock-agent-runtime-demo.html
 │   │   ├── phase3-g1c-wolf-consensus-runtime-demo.html
-│   │   └── phase3-g1d-fake-provider-runtime-demo.html
+│   │   ├── phase3-g1d-fake-provider-runtime-demo.html
+│   │   └── phase3-g1f-provider-replay.html
 │   ├── game-scripts/
 │   │   └── g1-scripted-game.json
 │   ├── generated-games/
@@ -197,6 +198,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       ├── provider_agent.py
 │       ├── provider_contract.py
 │       ├── render_demo.py
+│       ├── render_provider_replay.py
 │       ├── run_deepseek_consensus_game.py
 │       ├── run_deepseek_provider_game.py
 │       ├── run_fake_provider_game.py
@@ -230,6 +232,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── test_log_bundle.py
 │   ├── test_provider_contract.py
 │   ├── test_render_demo.py
+│   ├── test_render_provider_replay.py
 │   ├── test_scoring.py
 │   ├── test_scripted_game_runner.py
 │   ├── test_semantic_label_research.py
