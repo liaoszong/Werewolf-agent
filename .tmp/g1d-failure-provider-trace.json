@@ -1,0 +1,133 @@
+{
+  "game_id": "g1d_fake_provider_parse_failure",
+  "provider_name": "deterministic_fake_provider",
+  "source_label": "[deterministic fake provider output]",
+  "requests": [
+    {
+      "request_id": "g1d_fake_provider_parse_failure_r01_p3",
+      "game_id": "g1d_fake_provider_parse_failure",
+      "actor": "p3",
+      "phase": "night",
+      "round": 1,
+      "observation": {
+        "game_id": "g1d_fake_provider_parse_failure",
+        "player_id": "p3",
+        "role": "seer",
+        "team": "villager",
+        "phase": "night",
+        "round": 1,
+        "alive_players": [
+          "p1",
+          "p2",
+          "p3",
+          "p4",
+          "p5",
+          "p6"
+        ],
+        "public_event_ids": [
+          "g1d_fake_provider_parse_failure_e001"
+        ],
+        "private_event_ids": [],
+        "known_roles": {
+          "p3": "seer"
+        }
+      },
+      "allowed_actions": [
+        "seer_check"
+      ],
+      "allowed_targets": [
+        "p1",
+        "p2",
+        "p3",
+        "p4",
+        "p5",
+        "p6"
+      ],
+      "response_format_version": "g1d-action-v1"
+    },
+    {
+      "request_id": "g1d_fake_provider_parse_failure_r01_wolf_team",
+      "game_id": "g1d_fake_provider_parse_failure",
+      "actor": "wolf_team",
+      "phase": "night",
+      "round": 1,
+      "observation": {
+        "game_id": "g1d_fake_provider_parse_failure",
+        "player_id": "wolf_team",
+        "role": "werewolf",
+        "team": "werewolf",
+        "phase": "night",
+        "round": 1,
+        "alive_players": [
+          "p1",
+          "p2",
+          "p3",
+          "p4",
+          "p5",
+          "p6"
+        ],
+        "public_event_ids": [
+          "g1d_fake_provider_parse_failure_e001"
+        ],
+        "private_event_ids": [
+          "g1d_fake_provider_parse_failure_e001"
+        ],
+        "known_roles": {
+          "p1": "werewolf",
+          "p2": "werewolf"
+        }
+      },
+      "allowed_actions": [
+        "werewolf_kill"
+      ],
+      "allowed_targets": [
+        "p1",
+        "p2",
+        "p3",
+        "p4",
+        "p5",
+        "p6"
+      ],
+      "response_format_version": "g1d-action-v1"
+    }
+  ],
+  "responses": [
+    {
+      "request_id": "g1d_fake_provider_parse_failure_r01_p3",
+      "provider_name": "deterministic_fake_provider",
+      "source_label": "[deterministic fake provider output]",
+      "raw_content": "{\"action\": \"seer_check\", \"target\": \"p1\", \"reason_summary\": \"p3 seer checks p1\", \"decision_type\": \"inference_based\", \"confidence\": 1.0}",
+      "latency_ms": 0,
+      "token_usage": {
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "total_tokens": 0
+      }
+    },
+    {
+      "request_id": "g1d_fake_provider_parse_failure_r01_wolf_team",
+      "provider_name": "deterministic_fake_provider",
+      "source_label": "[deterministic fake provider output]",
+      "raw_content": "{\"action\": \"werewolf_kill\", \"target\": \"p5\", \"reason_summary\": \"wolf team kills p5\", \"decision_type\": \"team_coordinated\", \"confidence\": 1.0}",
+      "latency_ms": 0,
+      "token_usage": {
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "total_tokens": 0
+      }
+    }
+  ],
+  "failures": [
+    {
+      "request_id": "g1d_fake_provider_parse_failure_r01_p3",
+      "game_id": "g1d_fake_provider_parse_failure",
+      "round": 1,
+      "phase": "night",
+      "actor": "p3",
+      "kind": "parse_failure",
+      "reason": "provider response was not valid JSON: Expecting value: line 1 column 1 (char 0)",
+      "target": null,
+      "repaired_to_valid_action": false
+    }
+  ]
+}

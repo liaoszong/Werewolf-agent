@@ -1,0 +1,17 @@
+{
+  "game_id": "g1d_fake_provider_parse_failure",
+  "source_label": "[deterministic fake provider output]",
+  "failures": [
+    {
+      "request_id": "g1d_fake_provider_parse_failure_r01_p3",
+      "game_id": "g1d_fake_provider_parse_failure",
+      "round": 1,
+      "phase": "night",
+      "actor": "p3",
+      "kind": "parse_failure",
+      "reason": "provider response was not valid JSON: Expecting value: line 1 column 1 (char 0)",
+      "target": null,
+      "repaired_to_valid_action": false
+    }
+  ]
+}
