@@ -4,6 +4,7 @@ from dataclasses import dataclass, asdict
 from typing import Any
 
 FAKE_PROVIDER_SOURCE_LABEL = "[deterministic fake provider output]"
+DEEPSEEK_PROVIDER_SOURCE_LABEL = "[DeepSeek API output]"
 
 
 @dataclass(frozen=True)

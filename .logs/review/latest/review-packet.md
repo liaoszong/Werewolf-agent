@@ -1,26 +1,36 @@
 # Review Packet
 
 ## Metadata
-- Base: `ffcbb0f`
-- Branch: `main`
-- Generated: 2026-06-02T06:56:22.050266+00:00
+- Base: `main`
+- Branch: `implement/g1e-deepseek-provider-smoke`
+- Generated: 2026-06-02T08:40:30.104994+00:00
 
 ## Changed Files
+- `.oh-my-harness/tree.md`
+- `src/werewolf_eval/deepseek_provider.py`
 - `src/werewolf_eval/provider_agent.py`
-- `src/werewolf_eval/run_fake_provider_game.py`
-- `tests/test_build_review_packet.py`
+- `src/werewolf_eval/provider_contract.py`
+- `src/werewolf_eval/run_deepseek_provider_game.py`
+- `src/werewolf_eval/source_labels.py`
+- `tests/test_deepseek_provider.py`
+- `tests/test_deepseek_provider_game.py`
 - `tests/test_fake_provider.py`
-- `tests/test_fake_provider_game.py`
+- `tests/test_source_labels.py`
 
 ## Diff Stat
 ```
-.logs/review/latest/review-packet.md        | 398 ++++++++++++++--------------
- src/werewolf_eval/provider_agent.py         |  38 ++-
- src/werewolf_eval/run_fake_provider_game.py |  16 ++
- tests/test_build_review_packet.py           | 122 +++++++++
- tests/test_fake_provider.py                 |  53 ++++
- tests/test_fake_provider_game.py            |  39 +++
- 6 files changed, 457 insertions(+), 209 deletions(-)
+.logs/review/latest/review-packet.md            | 384 ++++++++++++------------
+ .oh-my-harness/tree.md                          |   9 +-
+ src/werewolf_eval/deepseek_provider.py          | 138 +++++++++
+ src/werewolf_eval/provider_agent.py             |   3 +-
+ src/werewolf_eval/provider_contract.py          |   1 +
+ src/werewolf_eval/run_deepseek_provider_game.py | 199 ++++++++++++
+ src/werewolf_eval/source_labels.py              |   1 +
+ tests/test_deepseek_provider.py                 | 156 ++++++++++
+ tests/test_deepseek_provider_game.py            | 165 ++++++++++
+ tests/test_fake_provider.py                     |  19 +-
+ tests/test_source_labels.py                     |   5 +
+ 11 files changed, 886 insertions(+), 194 deletions(-)
 ```
 
 ## Diff Check
@@ -35,203 +45,186 @@ ALLOWLIST_CHECK = PASS
 FORBIDDEN_PATTERN_SCAN = WARN
 
 **Self-reference (docs/scripts/tests mention forbidden terms — not new runtime capability):**
-- provider: # --- 10. Missing reason_summary → ProviderActionError --- [plan-spec: CLI flag or test harness, not new runtime capability]
-- provider: def test_missing_reason_summary_raises_provider_action_error(self) -> None: [plan-spec: CLI flag or test harness, not new runtime capability]
-- provider: agent = build_default_fake_provider_agent( [plan-spec: CLI flag or test harness, not new runtime capability]
-- default: agent = build_default_fake_provider_agent( [plan-spec: CLI flag or test harness, not new runtime capability]
-- provider: with self.assertRaises(ProviderActionError) as ctx: [plan-spec: CLI flag or test harness, not new runtime capability]
-- provider: # --- 11. Missing decision_type → ProviderActionError --- [plan-spec: CLI flag or test harness, not new runtime capability]
-- provider: def test_missing_decision_type_raises_provider_action_error(self) -> None: [plan-spec: CLI flag or test harness, not new runtime capability]
-- provider: # --- 12. Missing confidence → ProviderActionError --- [plan-spec: CLI flag or test harness, not new runtime capability]
-- provider: def test_missing_confidence_raises_provider_action_error(self) -> None: [plan-spec: CLI flag or test harness, not new runtime capability]
-- provider: # --- 13. Invalid confidence type → ProviderActionError --- [plan-spec: CLI flag or test harness, not new runtime capability]
-- provider: def test_invalid_confidence_type_raises_provider_action_error(self) -> None: [plan-spec: CLI flag or test harness, not new runtime capability]
-- provider: "--provider-trace-out", str(out / "provider-trace.json"), [plan-spec: CLI flag or test harness, not new runtime capability]
-- provider: # Failure audit and provider trace must exist [plan-spec: CLI flag or test harness, not new runtime capability]
-- provider: self.assertTrue((out / "provider-trace.json").exists()) [plan-spec: CLI flag or test harness, not new runtime capability]
+- provider: │   │   │   ├── 2026-06-02--g1d-fake-provider-contract-harness-plan.md [plan-spec: CLI flag or test harness, not new runtime capability]
+- provider: │   │   │   └── 2026-06-02--g1e-deepseek-provider-smoke-plan.md [plan-spec: CLI flag or test harness, not new runtime capability]
+- provider: │       ├── deepseek_provider.py [plan-spec: CLI flag or test harness, not new runtime capability]
+- provider: │       ├── run_deepseek_provider_game.py [plan-spec: CLI flag or test harness, not new runtime capability]
+- provider: │   ├── test_deepseek_provider_game.py [plan-spec: CLI flag or test harness, not new runtime capability]
+- provider: │   ├── test_deepseek_provider.py [plan-spec: CLI flag or test harness, not new runtime capability]
+- default: parser.add_argument("--game-id", default="g1e_deepseek_smoke") [plan-spec: CLI flag or test harness, not new runtime capability]
+- provider: parser.add_argument("--out-dir", default=".tmp/g1e-deepseek-provider-smoke") [plan-spec: CLI flag or test harness, not new runtime capability]
+- default: parser.add_argument("--out-dir", default=".tmp/g1e-deepseek-provider-smoke") [plan-spec: CLI flag or test harness, not new runtime capability]
+- default: parser.add_argument("--model", default="deepseek-v4-flash") [plan-spec: CLI flag or test harness, not new runtime capability]
+- default: parser.add_argument("--base-url", default="https://api.deepseek.com") [plan-spec: CLI flag or test harness, not new runtime capability]
+- env: parser.add_argument("--api-key-env", default="DEEPSEEK_API_KEY") [plan-spec: CLI flag or test harness, not new runtime capability]
+- default: parser.add_argument("--api-key-env", default="DEEPSEEK_API_KEY") [plan-spec: CLI flag or test harness, not new runtime capability]
+- default: parser.add_argument("--timeout-seconds", type=int, default=30) [plan-spec: CLI flag or test harness, not new runtime capability]
+- default: parser.add_argument("--max-tokens-per-request", type=int, default=256) [plan-spec: CLI flag or test harness, not new runtime capability]
+- provider: parser.add_argument("--max-provider-requests", type=int, default=11) [plan-spec: CLI flag or test harness, not new runtime capability]
+- default: parser.add_argument("--max-provider-requests", type=int, default=11) [plan-spec: CLI flag or test harness, not new runtime capability]
+- default: parser.add_argument("--allow-live-api", action="store_true", default=False) [plan-spec: CLI flag or test harness, not new runtime capability]
+- provider: from werewolf_eval.provider_contract import ProviderRequest [plan-spec: CLI flag or test harness, not new runtime capability]
+- provider: class DeepSeekProviderTests(unittest.TestCase): [plan-spec: CLI flag or test harness, not new runtime capability]
+- ... (47) more self-reference hits truncated — all in plan-spec file paths, doc/test strings, or CLI argument definitions
 
 **Real risk (forbidden term in runtime code):**
-- fallback: # All five fields are mandatory — no fallback defaults allowed.
-- default: # All five fields are mandatory — no fallback defaults allowed.
-- provider: # Missing fields must produce a ProviderFailure, not a repaired valid action.
-- provider: failure = ProviderFailure(
-- provider: reason=f"provider response missing required field(s): {', '.join(missing)}",
-- provider: raise ProviderActionError(failure)
-- provider: reason=f"provider response has invalid confidence: {confidence_raw!r} is not a n
-- provider: agents["p3"] = build_default_fake_provider_agent(
-- default: agents["p3"] = build_default_fake_provider_agent(
+- provider: from werewolf_eval.provider_contract import (
+- provider: DEEPSEEK_PROVIDER_SOURCE_LABEL,
+- provider: ProviderRequest,
+- provider: ProviderResponse,
+- provider: class DeepSeekProviderConfig:
+- default: def _default_transport(
+- provider: class DeepSeekProvider:
+- provider: config: DeepSeekProviderConfig,
+- default: self._transport = transport if transport is not None else _default_transport
+- provider: self._request_history: list[ProviderRequest] = []
+- provider: self._response_history: list[ProviderResponse] = []
+- provider: def requests(self) -> list[ProviderRequest]:
+- provider: def responses(self) -> list[ProviderResponse]:
+- provider: def _build_request_payload(self, request: ProviderRequest) -> dict[str, Any]:
+- provider: def respond(self, request: ProviderRequest) -> ProviderResponse:
+- provider: response = ProviderResponse(
+- provider: provider_name="deepseek",
+- provider: source_label=DEEPSEEK_PROVIDER_SOURCE_LABEL,
+- provider: DEEPSEEK_PROVIDER_SOURCE_LABEL = "[DeepSeek API output]"
+- provider: from werewolf_eval.deepseek_provider import DeepSeekProvider, DeepSeekProviderCo
+- ... (45) more real-risk hits truncated
 
 ## Dependency / Import Diff
 ### Dependency manifest changes
 (none)
 
 ### Added imports
+- `from __future__ import annotations`
+- `import json`
+- `import urllib.request`
+- `from dataclasses import dataclass`
+- `from typing import Any, Callable`
+- `from __future__ import annotations`
+- `import argparse`
+- `import json`
+- `import os`
+- `import sys`
+- `from pathlib import Path`
+- `from typing import Any, Callable`
+- `from __future__ import annotations`
+- `import json`
+- `import unittest`
+- `from typing import Any`
+- `from __future__ import annotations`
+- `import json`
+- `import unittest`
+- `from pathlib import Path`
+- `from tempfile import TemporaryDirectory`
+- `from typing import Any`
+- `import subprocess`
+- `import sys`
+- `import subprocess`
 - `import sys`
 
 ## Test Summary
-### `python -c "import subprocess, sys; raise SystemExit(subprocess.run([sys.executable, 'scripts/dev/validate_brief.py']).returncode)"`
+### `python -m unittest tests.test_source_labels tests.test_fake_provider tests.test_deepseek_provider tests.test_deepseek_provider_game && python -m unittest discover -s tests`
 Exit: 0 (PASS)
 ```
-      "command": "PYTHONPATH=src C:\\Users\\jinqi\\AppData\\Local\\Programs\\Python\\Python312\\python.exe -m unittest discover -s tests -p test_*.py",
-      "ok": true,
-      "exit_code": 0,
-      "short_log": ".logs\\validate\\latest\\unit_tests.short.log",
-      "full_log": ".logs\\validate\\latest\\unit_tests.log",
-      "next_read": null
-    }
-  ],
-  "next_read": []
-}
-```
-
-### `python -c "import os, subprocess, sys; env=os.environ.copy(); env['PYTHONPATH']='src'; raise SystemExit(subprocess.run([sys.executable, '-m', 'unittest', 'tests.test_fake_provider', 'tests.test_fake_provider_game', 'tests.test_build_review_packet', '-v'], env=env).returncode)"`
-Exit: 0 (PASS)
-```
-A large hunk that exceeds budget alone is skipped; small hunks still appear. ... ok
-test_small_hunks_prioritized_over_large_hunks (tests.test_build_review_packet.KeyHunkOrderingTests.test_small_hunks_prioritized_over_large_hunks)
-Within the same priority tier, smaller hunks should appear before larger ones. ... ok
-test_truncation_flag_true_when_budget_exceeded (tests.test_build_review_packet.KeyHunkOrderingTests.test_truncation_flag_true_when_budget_exceeded)
-When hunks exceed budget, extract_key_hunks should return truncated=True. ... ok
-
+............................
 ----------------------------------------------------------------------
-Ran 34 tests in 2.490s
+Ran 28 tests in 0.194s
+
+OK
+..................................................................................................................................................................................
+----------------------------------------------------------------------
+Ran 178 tests in 3.657s
 
 OK
 ```
 
-### `python -c "import os, subprocess, sys; env=os.environ.copy(); env['PYTHONPATH']='src'; raise SystemExit(subprocess.run([sys.executable, '-m', 'unittest', 'discover', '-s', 'tests', '-p', 'test_*.py'], env=env).returncode)"`
+### `python -m compileall src/werewolf_eval scripts -q`
 Exit: 0 (PASS)
 ```
-.....................................................................................................................................................................
-----------------------------------------------------------------------
-Ran 165 tests in 3.298s
 
-OK
 ```
 
-### `python -c "import subprocess, sys; raise SystemExit(subprocess.run(['git', 'diff', '--check']).returncode)"`
+### `git diff --check`
 Exit: 0 (PASS)
 ```
 
 ```
 
 ## Key Hunks
-### src/werewolf_eval/run_fake_provider_game.py
+### src/werewolf_eval/source_labels.py
 ```diff
-@@ -2,6 +2,7 @@ from __future__ import annotations
-
- import argparse
- import json
-+import sys
- from pathlib import Path
-
- from werewolf_eval.fake_provider import build_default_fake_provider_agent
-```
-
-### tests/test_build_review_packet.py
-```diff
-@@ -14,6 +14,17 @@ def run(cmd, cwd):
-     return subprocess.run(cmd, cwd=cwd, text=True, capture_output=True, check=True)
-
-
-+def _make_diff_block(filepath: str, lines: list[str]) -> str:
-+    """Build a minimal unified diff block for a single file with added lines."""
-+    header = f"diff --git a/{filepath} b/{filepath}"
-+    index_line = f"index 0000000..1111111 100644"
-+    old_line = "--- a/" + filepath
-+    new_line = "+++ b/" + filepath
-+    hunk_header = "@@ -0,0 +0," + str(len(lines)) + " @@"
-+    body = "\n".join("+" + l for l in lines)
-+    return f"{header}\n{index_line}\n{old_line}\n{new_line}\n{hunk_header}\n{body}\n"
-+
-+
- class BuildReviewPacketTests(unittest.TestCase):
-     def setUp(self):
-         self.tmp = tempfile.TemporaryDirectory()
+@@ -6,4 +6,5 @@ VALID_SOURCE_LABELS = {
+     "[scripted deterministic output]",
+     "[deterministic mock agent output]",
+     "[deterministic fake provider output]",
++    "[DeepSeek API output]",
+ }
 ```
 
 ### src/werewolf_eval/provider_agent.py
 ```diff
-@@ -143,9 +143,26 @@ class ProviderAgent:
+@@ -5,7 +5,6 @@ from typing import Any
 
-         action_name = parsed.get("action")
-         target = parsed.get("target")
--        reason_summary = parsed.get("reason_summary", "")
--        decision_type = parsed.get("decision_type", "inference_based")
--        confidence = float(parsed.get("confidence", 1.0))
-+
-+        # All five fields are mandatory — no fallback defaults allowed.
-+        # Missing fields must produce a ProviderFailure, not a repaired valid action.
-+        _REQUIRED_FIELDS = ("action", "target", "reason_summary", "decision_type", "confidence")
-+        missing = [f for f in _REQUIRED_FIELDS if f not in parsed]
-+        if missing:
-+            failure = ProviderFailure(
-+                request_id=request_id,
-+                game_id=game_id,
-+                round=round_num,
-+                phase=phase,
-+                actor=actor,
-+                kind="parse_failure",
-+                reason=f"provider response missing required field(s): {', '.join(missing)}",
-+            )
-+            raise ProviderActionError(failure)
-+
-+        reason_summary = parsed["reason_summary"]
-+        decision_type = parsed["decision_type"]
-+        confidence_raw = parsed["confidence"]
-
-         if not action_name or not isinstance(action_name, str):
-             failure = ProviderFailure(
+ from werewolf_eval.game_engine import AgentAction, AgentObservation
+ from werewolf_eval.provider_contract import (
+-    FAKE_PROVIDER_SOURCE_LABEL,
+     ProviderFailure,
+     ProviderRequest,
+ )
 ```
 
-### tests/test_fake_provider_game.py
+### src/werewolf_eval/provider_contract.py
 ```diff
-@@ -104,6 +104,45 @@ class FakeProviderGameCliTests(unittest.TestCase):
-             self.assertFalse((out / "game.json").exists())
-             self.assertFalse((out / "decision.json").exists())
+@@ -4,6 +4,7 @@ from dataclasses import dataclass, asdict
+ from typing import Any
 
-+    def test_invalid_target_failure_mode_does_not_write_valid_logs(self) -> None:
-+        """invalid_target must go through failure path: no valid game/decision log written."""
-+        with tempfile.TemporaryDirectory() as tmpdir:
-+            out = Path(tmpdir)
-+            result = self._run_cli(
-+                "--game-id", "g1d_invalid_target",
-+                "--game-log-out", str(out / "game.json"),
-+                "--decision-log-out", str(out / "decision.json"),
-+                "--provider-trace-out", str(out / "provider-trace.json"),
-+                "--failure-audit-out", str(out / "failure-audit.json"),
-+                "--failure-mode", "invalid_target",
-+            )
-+            self.assertNotEqual(result.returncode, 0)
-+            self.assertIn("failure_kind=invalid_action", result.stdout)
-+            self.assertIn("game_log=not_written", result.stdout)
-+            self.assertIn("decision_log=not_written", result.stdout)
-+            # Game log and decision log must NOT exist
-+            self.assertFalse((out / "game.json").exists())
-+            self.assertFalse((out / "decision.json").exists())
-+            # Failure audit and provider trace must exist
-+            self.assertTrue((out / "failure-audit.json").exists())
-+            self.assertTrue((out / "provider-trace.json").exists())
-+
-+    def test_unknown_failure_mode_is_rejected_before_success_path(self) -> None:
-+        """Typo or unknown --failure-mode must exit non-zero with no valid artifacts."""
-+        with tempfile.TemporaryDirectory() as tmpdir:
-+            out = Path(tmpdir)
-+            result = self._run_cli(
-+                "--game-id", "g1d_typo",
-+                "--game-log-out", str(out / "game.json"),
-+                "--decision-log-out", str(out / "decision.json"),
-+                "--provider-trace-out", str(out / "provider-trace.json"),
-+                "--failure-mode", "typo_mode",
-+            )
-+            self.assertNotEqual(result.returncode, 0)
-+            # No valid game/decision log should be written
-+            self.assertFalse((out / "game.json").exists())
-+            self.assertFalse((out / "decision.json").exists())
-+
+ FAKE_PROVIDER_SOURCE_LABEL = "[deterministic fake provider output]"
++DEEPSEEK_PROVIDER_SOURCE_LABEL = "[DeepSeek API output]"
 
- class FakeProviderGameArtifactTests(unittest.TestCase):
-     def test_generated_html_includes_fake_provider_label(self) -> None:
+
+ @dataclass(frozen=True)
+```
+
+### tests/test_source_labels.py
+```diff
+@@ -13,6 +13,7 @@ class SourceLabelsTests(unittest.TestCase):
+             "[scripted deterministic output]",
+             "[deterministic mock agent output]",
+             "[deterministic fake provider output]",
++            "[DeepSeek API output]",
+         }
+         self.assertEqual(VALID_SOURCE_LABELS, expected)
+
+```
+
+### tests/test_fake_provider.py
+```diff
+@@ -162,7 +162,24 @@ class FakeProviderAdapterTests(unittest.TestCase):
+         self.assertEqual(action.source_label, FAKE_PROVIDER_SOURCE_LABEL)
+
+
+-# --- 10. Missing reason_summary → ProviderActionError ---
++# --- 10. ProviderAgent preserves provider response source_label ---
++    def test_provider_agent_preserves_provider_response_source_label(self) -> None:
++        class TestLocalProvider:
++            def respond(self, request: ProviderRequest) -> ProviderResponse:
++                return ProviderResponse(
++                    request_id=request.request_id,
++                    provider_name="test-deepseek",
++                    source_label="[DeepSeek API output]",
++                    raw_content='{"action":"seer_check","target":"p1","reason_summary":"test","decision_type":"inference_based","confidence":1.0}',
++                    latency_ms=100,
++                    token_usage={"prompt": 10, "completion": 20},
++                )
++
++        agent = ProviderAgent("p3", TestLocalProvider())
++        action = agent.decide(self._p3_night_obs())
++        self.assertEqual(action.source_label, "[DeepSeek API output]")
++
++# --- 11. Missing reason_summary → ProviderActionError ---
+     def test_missing_reason_summary_raises_provider_action_error(self) -> None:
+         agent = build_default_fake_provider_agent(
+             "p3",
 ```
 
 **KEY_HUNKS_TRUNCATED = YES**
@@ -239,43 +232,54 @@ Exit: 0 (PASS)
 Truncation does not block A档 for this PR. Key hunks were omitted because the diff exceeds the packet size limit. Verify hunks by reading the changed files directly or running `git diff` with narrowed paths.
 
 If B档 is needed, Minimal Next Reads (line ranges):
-- `scripts/dev/build_review_packet.py:1-220` (generator core + evidence logic)
-- `tests/test_build_review_packet.py:1-160` (test assertions)
-- `docs/specs/review-packet-gate.md:1-120` (gate contract)
-- `.github/codex-review-comment.md` (A档 guidance block)
+- `src/werewolf_eval/deepseek_provider.py:58-73` (response format with JSON example + _build_request_payload contract)
+- `src/werewolf_eval/run_deepseek_provider_game.py:146-153` (shared_provider = DeepSeekProvider(config) → return ProviderAgent(player_id, shared_provider))
+- `src/werewolf_eval/provider_agent.py:217-230` (source_label=response.source_label preservation)
+- `tests/test_deepseek_provider.py:66-85` (test_builds_openai_compatible_json_request — response_format, stream, thinking, Authorization assertions)
+- `tests/test_deepseek_provider_game.py:108-142` (test_helper_with_fake_provider_factory_writes_valid_artifacts — validate_game_log + load_decision_log + validate_decision_log)
 
 ## Evidence Map
 | Acceptance | Evidence | Status |
 |---|---|---|
-| A-1 fake provider source label registered | tests/test_provider_contract.py + tests/test_source_labels.py | PASS |
-| A-2 provider request/response/failure/trace are JSON-safe | tests/test_provider_contract.py | PASS |
-| A-3 fake provider valid response converts to AgentAction | tests/test_fake_provider.py | PASS |
-| A-4 provider invalid/parse/timeout failures are not repaired | tests/test_fake_provider.py + failure audit example | PASS |
-| A-5 GameEngine default mock behavior unchanged | tests/test_game_engine.py | PASS |
-| A-6 injected fake-provider game emits valid Game/Decision logs | tests/test_game_engine.py + validators | PASS |
-| A-7 CLI writes provider trace and refuses forged valid logs on failure | tests/test_fake_provider_game.py | PASS |
-| A-8 generated score/metrics/demo artifacts are reproducible | score/render commands + generated files | PASS |
-| A-9 no live provider/network/secret/dependency capability | packet forbidden/dependency checks | PASS |
-| A-10 packet contains machine evidence and PACKET_TOO_LARGE status | .logs/review/latest/review-packet.md | PASS |
+| A-1 [DeepSeek API output] in VALID_SOURCE_LABELS | src/werewolf_eval/source_labels.py + tests | PASS |
+| A-2 DEEPSEEK_PROVIDER_SOURCE_LABEL registered | src/werewolf_eval/provider_contract.py | PASS |
+| A-3 ProviderAgent preserves source_label | tests/test_fake_provider.py + provider_agent.py | PASS |
+| A-4 DeepSeekProvider uses stdlib urllib, no SDK | src/werewolf_eval/deepseek_provider.py | PASS |
+| A-5 OpenAI-compatible JSON request shape | tests/test_deepseek_provider.py | PASS |
+| A-6 max_requests + empty key enforced | tests/test_deepseek_provider.py | PASS |
+| A-7 --allow-live-api guard no artifacts | tests/test_deepseek_provider_game.py | PASS |
+| A-8 Helper writes valid logs through validators | tests/test_deepseek_provider_game.py | PASS |
+| A-9 Failure path audit no valid logs | tests/test_deepseek_provider_game.py | PASS |
+| A-10 No secrets/keys in tracked files | secret scan + tests | PASS |
+| A-11 No new dependencies | git diff manifests | PASS |
+| A-12 No network/env/secret runtime beyond scope | forbidden import check | PASS |
+| A-13 Global request budget shared | run_deepseek_provider_game.py | PASS |
+| A-14 Prompt has JSON example + allowed lists | deepseek_provider.py + tests | PASS |
 
 ## Acceptance Checklist
-- [x] A-1 fake provider source label registered
-- [x] A-2 provider request/response/failure/trace are JSON-safe
-- [x] A-3 fake provider valid response converts to AgentAction
-- [x] A-4 provider invalid/parse/timeout failures are not repaired
-- [x] A-5 GameEngine default mock behavior unchanged
-- [x] A-6 injected fake-provider game emits valid Game/Decision logs
-- [x] A-7 CLI writes provider trace and refuses forged valid logs on failure
-- [x] A-8 generated score/metrics/demo artifacts are reproducible
-- [x] A-9 no live provider/network/secret/dependency capability
-- [x] A-10 packet contains machine evidence and PACKET_TOO_LARGE status
+- [x] A-1 [DeepSeek API output] in VALID_SOURCE_LABELS
+- [x] A-2 DEEPSEEK_PROVIDER_SOURCE_LABEL registered
+- [x] A-3 ProviderAgent preserves source_label
+- [x] A-4 DeepSeekProvider uses stdlib urllib, no SDK
+- [x] A-5 OpenAI-compatible JSON request shape
+- [x] A-6 max_requests + empty key enforced
+- [x] A-7 --allow-live-api guard no artifacts
+- [x] A-8 Helper writes valid logs through validators
+- [x] A-9 Failure path audit no valid logs
+- [x] A-10 No secrets/keys in tracked files
+- [x] A-11 No new dependencies
+- [x] A-12 No network/env/secret runtime beyond scope
+- [x] A-13 Global request budget shared
+- [x] A-14 Prompt has JSON example + allowed lists
 
 ## Implementer Risk Notes
-(to be filled by implementer)
+- urllib default transport only used inside --allow-live-api guard; tests inject fake transport
+- run_deepseek_provider_game.py default out-dir is .tmp/ not committed
 
 ## Review Trigger Result
 **RISK_TRIGGERS_FIRED**
-- changed_lines=666 > 500
+- changed_file_count=10 > 8
+- changed_lines=1080 > 500
 - key_hunks_truncated
 - forbidden_pattern_risk=provider
 

@@ -5,7 +5,6 @@ from typing import Any
 
 from werewolf_eval.game_engine import AgentAction, AgentObservation
 from werewolf_eval.provider_contract import (
-    FAKE_PROVIDER_SOURCE_LABEL,
     ProviderFailure,
     ProviderRequest,
 )
@@ -226,5 +225,5 @@ class ProviderAgent:
             reason_summary=reason_summary,
             decision_type=decision_type,
             confidence=confidence,
-            source_label=FAKE_PROVIDER_SOURCE_LABEL,
+            source_label=response.source_label,
         )
