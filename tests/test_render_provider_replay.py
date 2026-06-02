@@ -309,3 +309,62 @@ class ProviderReplayHtmlTests(unittest.TestCase):
             self.assertIn("Provider Replay", html)
             self.assertIn("g1g_fixture", html)
             self.assertIn("No live API call is made", html)
+
+    # ------------------------------------------------------------------
+    # CLI tests
+    # ------------------------------------------------------------------
+
+    def test_cli_requires_game_log_and_html_out(self) -> None:
+        """CLI requires --game-log and --html-out."""
+        from werewolf_eval.render_provider_replay import main
+
+        with self.assertRaises(SystemExit):
+            main([])
+
+    def test_cli_writes_expected_output_path(self) -> None:
+        """CLI writes output to the specified path."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            game_path = tmp / "game.json"
+            game_path.write_text(json.dumps(GAME_LOG), encoding="utf-8")
+            html_path = tmp / "output.html"
+
+            from werewolf_eval.render_provider_replay import main
+
+            ret = main([
+                "--game-log", str(game_path),
+                "--html-out", str(html_path),
+            ])
+            self.assertEqual(ret, 0)
+            self.assertTrue(html_path.exists())
+            html = html_path.read_text(encoding="utf-8")
+            self.assertIn("Provider Replay", html)
+
+    def test_cli_accepts_optional_logs(self) -> None:
+        """CLI accepts all optional log paths."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            game_path = tmp / "game.json"
+            game_path.write_text(json.dumps(GAME_LOG), encoding="utf-8")
+            dl_path = tmp / "decision.json"
+            dl_path.write_text(json.dumps(DECISION_LOG), encoding="utf-8")
+            cl_path = tmp / "consensus.json"
+            cl_path.write_text(json.dumps(CONSENSUS_LOG), encoding="utf-8")
+            pt_path = tmp / "provider_trace.json"
+            pt_path.write_text(json.dumps(PROVIDER_TRACE), encoding="utf-8")
+            fa_path = tmp / "failure_audit.json"
+            fa_path.write_text(json.dumps(FAILURE_AUDIT), encoding="utf-8")
+            html_path = tmp / "output.html"
+
+            from werewolf_eval.render_provider_replay import main
+
+            ret = main([
+                "--game-log", str(game_path),
+                "--decision-log", str(dl_path),
+                "--consensus-log", str(cl_path),
+                "--provider-trace", str(pt_path),
+                "--failure-audit", str(fa_path),
+                "--html-out", str(html_path),
+            ])
+            self.assertEqual(ret, 0)
+            self.assertTrue(html_path.exists())

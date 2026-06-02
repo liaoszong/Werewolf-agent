@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import json
 from html import escape
 from pathlib import Path
@@ -346,3 +347,46 @@ def write_provider_replay_html(
     )
     html = render_provider_replay_html(context)
     Path(output_path).write_text(html, encoding="utf-8")
+
+
+def main(argv: list[str] | None = None) -> int:
+    """CLI entry point for provider replay HTML generation.
+
+    No live API call is made during rendering.
+    """
+    parser = argparse.ArgumentParser(description="Generate provider replay HTML report.")
+    parser.add_argument("--game-log", required=True, help="Path to Game Log JSON")
+    parser.add_argument("--decision-log", help="Optional path to Decision Log JSON")
+    parser.add_argument("--consensus-log", help="Optional path to Consensus Log JSON")
+    parser.add_argument("--provider-trace", help="Optional path to Provider Trace JSON")
+    parser.add_argument("--failure-audit", help="Optional path to Failure Audit JSON")
+    parser.add_argument("--html-out", required=True, help="Output HTML file path")
+    args = parser.parse_args(argv)
+
+    write_provider_replay_html(
+        game_log_path=args.game_log,
+        output_path=args.html_out,
+        decision_log_path=args.decision_log,
+        consensus_log_path=args.consensus_log,
+        provider_trace_path=args.provider_trace,
+        failure_audit_path=args.failure_audit,
+    )
+
+    sections = ["game"]
+    if args.decision_log:
+        sections.append("decisions")
+    if args.consensus_log:
+        sections.append("consensus")
+    if args.provider_trace:
+        sections.append("provider_trace")
+    if args.failure_audit:
+        sections.append("failure_audit")
+
+    print(f"wrote {args.html_out}")
+    print(f"replay_sections={','.join(sections)}")
+    print("live_api=not_called")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
