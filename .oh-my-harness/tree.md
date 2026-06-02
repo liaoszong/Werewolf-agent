@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 187
+- Entries: 193
 
 ```text
 ./
@@ -58,6 +58,12 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   ├── game-log.json
 │   │   └── provider-trace.json
 │   ├── g1e-live-smoke-2/
+│   │   ├── decision-log.json
+│   │   ├── failure-audit.json
+│   │   ├── game-log.json
+│   │   └── provider-trace.json
+│   ├── g1f-deepseek-consensus-smoke/
+│   │   ├── consensus-log.json
 │   │   ├── decision-log.json
 │   │   ├── failure-audit.json
 │   │   ├── game-log.json
@@ -150,6 +156,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── prs/
 │   │   ├── 2026-05-30--phase2-next-step-research.md
 │   │   └── 2026-05-30--s5-semantic-label-research.md
+│   ├── secrets/
+│   │   └── README.md
 │   ├── semantic-labeling/
 │   │   ├── s5-label-contract.md
 │   │   └── s5-label-prompts.md
