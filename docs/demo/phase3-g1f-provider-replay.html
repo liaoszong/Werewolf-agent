@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Provider Replay — g1f_deepseek_consensus_smoke</title>
+  <title>Provider 回放 — g1f_deepseek_consensus_smoke</title>
   <style>
     body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 32px; color: #172033; background: #f7f8fb; }
     main { max-width: 1280px; margin: 0 auto; }
@@ -18,90 +18,90 @@
 </head>
 <body>
 <main>
-  <h1>Provider Replay — g1f_deepseek_consensus_smoke</h1>
-  <p><span class="badge">Source: [DeepSeek API output]</span></p>
-  <p><em>No live API call is made during rendering.</em></p>
+  <h1>Provider 回放 — g1f_deepseek_consensus_smoke</h1>
+  <p><span class="badge">来源: [DeepSeek API output]</span></p>
+  <p><em>渲染过程中未发起任何实时 API 调用。</em></p>
 
-  <section class="warning"><h2>Boundary</h2><p>Replay/report only; not a live observer, not a leaderboard, not a scoring mutation.</p></section>
+  <section class="warning"><h2>边界声明</h2><p>仅供回放/报告使用；不是实时观察器，不是排行榜，不是评分变更。</p></section>
 
-  <section><h2>Game Summary</h2>
-  <p>Game: g1f_deepseek_consensus_smoke / Winner: villager / End Round: 2 / Players: 6 / Events: 18 / Source: [DeepSeek API output]</p>
+  <section><h2>对局摘要</h2>
+  <p>对局: g1f_deepseek_consensus_smoke / 胜方: 村民阵营 / 结束轮次: 2 / 玩家数: 6 / 事件数: 18 / 来源: [DeepSeek API output]</p>
   </section>
 
-  <section><h2>Players</h2>
+  <section><h2>玩家列表</h2>
   <div class="scroll"><table>
-  <tr><th>Player ID</th><th>Role</th><th>Team</th></tr>
-  <tr><td>p1</td><td>werewolf</td><td>werewolf</td></tr>
-<tr><td>p2</td><td>werewolf</td><td>werewolf</td></tr>
-<tr><td>p3</td><td>seer</td><td>villager</td></tr>
-<tr><td>p4</td><td>witch</td><td>villager</td></tr>
-<tr><td>p5</td><td>villager</td><td>villager</td></tr>
-<tr><td>p6</td><td>villager</td><td>villager</td></tr>
+  <tr><th>玩家 ID</th><th>角色</th><th>阵营</th></tr>
+  <tr><td>p1</td><td>狼人</td><td>狼人阵营</td></tr>
+<tr><td>p2</td><td>狼人</td><td>狼人阵营</td></tr>
+<tr><td>p3</td><td>预言家</td><td>村民阵营</td></tr>
+<tr><td>p4</td><td>女巫</td><td>村民阵营</td></tr>
+<tr><td>p5</td><td>平民</td><td>村民阵营</td></tr>
+<tr><td>p6</td><td>平民</td><td>村民阵营</td></tr>
   </table></div></section>
 
-  <section><h2>Event Timeline</h2>
+  <section><h2>事件时间线</h2>
   <div class="scroll"><table>
-  <tr><th>Seq</th><th>Round</th><th>Phase</th><th>Type</th><th>Actor</th><th>Target</th><th>Summary</th></tr>
-  <tr><td>1</td><td>0</td><td>setup</td><td>role_assignment</td><td>system</td><td>none</td><td>Roles assigned to all 6 players.</td></tr>
-<tr><td>2</td><td>1</td><td>night</td><td>werewolf_kill</td><td>p1</td><td>p3</td><td>Wolf team kills p3.</td></tr>
-<tr><td>3</td><td>1</td><td>night</td><td>seer_check</td><td>p3</td><td>p1</td><td>Seer p3 checks p1, result: werewolf.</td></tr>
-<tr><td>4</td><td>1</td><td>night</td><td>witch_save</td><td>p4</td><td>p4</td><td>Witch p4 saves p5.</td></tr>
-<tr><td>5</td><td>1</td><td>day</td><td>player_vote</td><td>p3</td><td>p6</td><td>p3 votes p6.</td></tr>
-<tr><td>6</td><td>1</td><td>day</td><td>player_vote</td><td>p4</td><td>p3</td><td>p4 votes p3.</td></tr>
-<tr><td>7</td><td>1</td><td>day</td><td>player_vote</td><td>p5</td><td>p1</td><td>p5 votes p1.</td></tr>
-<tr><td>8</td><td>1</td><td>day</td><td>player_vote</td><td>p6</td><td>p1</td><td>p6 votes p1.</td></tr>
-<tr><td>9</td><td>1</td><td>day</td><td>player_eliminated</td><td>system</td><td>p1</td><td>p1 eliminated by vote.</td></tr>
-<tr><td>10</td><td>1</td><td>day</td><td>role_revealed</td><td>system</td><td>p1</td><td>p1 revealed as werewolf.</td></tr>
-<tr><td>11</td><td>2</td><td>night</td><td>werewolf_kill</td><td>p2</td><td>p4</td><td>Wolf team kills p4.</td></tr>
-<tr><td>12</td><td>2</td><td>night</td><td>player_died</td><td>system</td><td>p3</td><td>p3 died during the night.</td></tr>
-<tr><td>13</td><td>2</td><td>day</td><td>player_vote</td><td>p4</td><td>p2</td><td>p4 votes p2.</td></tr>
-<tr><td>14</td><td>2</td><td>day</td><td>player_vote</td><td>p5</td><td>p2</td><td>p5 votes p2.</td></tr>
-<tr><td>15</td><td>2</td><td>day</td><td>player_vote</td><td>p6</td><td>p2</td><td>p6 votes p2.</td></tr>
-<tr><td>16</td><td>2</td><td>day</td><td>player_eliminated</td><td>system</td><td>p2</td><td>p2 eliminated by vote.</td></tr>
-<tr><td>17</td><td>2</td><td>day</td><td>role_revealed</td><td>system</td><td>p2</td><td>p2 revealed as werewolf.</td></tr>
-<tr><td>18</td><td>2</td><td>game_end</td><td>game_over</td><td>system</td><td>villager_team</td><td>All werewolves eliminated. Villager team wins.</td></tr>
+  <tr><th>序号</th><th>轮次</th><th>阶段</th><th>类型</th><th>行动者</th><th>目标</th><th>摘要</th></tr>
+  <tr><td>1</td><td>0</td><td>开局</td><td>角色分配</td><td>system</td><td>none</td><td>Roles assigned to all 6 players.</td></tr>
+<tr><td>2</td><td>1</td><td>夜晚</td><td>狼人选刀</td><td>p1</td><td>p3</td><td>Wolf team kills p3.</td></tr>
+<tr><td>3</td><td>1</td><td>夜晚</td><td>预言家查验</td><td>p3</td><td>p1</td><td>Seer p3 checks p1, result: werewolf.</td></tr>
+<tr><td>4</td><td>1</td><td>夜晚</td><td>女巫救人</td><td>p4</td><td>p4</td><td>Witch p4 saves p5.</td></tr>
+<tr><td>5</td><td>1</td><td>白天</td><td>投票</td><td>p3</td><td>p6</td><td>p3 votes p6.</td></tr>
+<tr><td>6</td><td>1</td><td>白天</td><td>投票</td><td>p4</td><td>p3</td><td>p4 votes p3.</td></tr>
+<tr><td>7</td><td>1</td><td>白天</td><td>投票</td><td>p5</td><td>p1</td><td>p5 votes p1.</td></tr>
+<tr><td>8</td><td>1</td><td>白天</td><td>投票</td><td>p6</td><td>p1</td><td>p6 votes p1.</td></tr>
+<tr><td>9</td><td>1</td><td>白天</td><td>玩家出局</td><td>system</td><td>p1</td><td>p1 eliminated by vote.</td></tr>
+<tr><td>10</td><td>1</td><td>白天</td><td>身份公开</td><td>system</td><td>p1</td><td>p1 revealed as werewolf.</td></tr>
+<tr><td>11</td><td>2</td><td>夜晚</td><td>狼人选刀</td><td>p2</td><td>p4</td><td>Wolf team kills p4.</td></tr>
+<tr><td>12</td><td>2</td><td>夜晚</td><td>玩家死亡</td><td>system</td><td>p3</td><td>p3 died during the night.</td></tr>
+<tr><td>13</td><td>2</td><td>白天</td><td>投票</td><td>p4</td><td>p2</td><td>p4 votes p2.</td></tr>
+<tr><td>14</td><td>2</td><td>白天</td><td>投票</td><td>p5</td><td>p2</td><td>p5 votes p2.</td></tr>
+<tr><td>15</td><td>2</td><td>白天</td><td>投票</td><td>p6</td><td>p2</td><td>p6 votes p2.</td></tr>
+<tr><td>16</td><td>2</td><td>白天</td><td>玩家出局</td><td>system</td><td>p2</td><td>p2 eliminated by vote.</td></tr>
+<tr><td>17</td><td>2</td><td>白天</td><td>身份公开</td><td>system</td><td>p2</td><td>p2 revealed as werewolf.</td></tr>
+<tr><td>18</td><td>2</td><td>game_end</td><td>游戏结束</td><td>system</td><td>villager_team</td><td>All werewolves eliminated. Villager team wins.</td></tr>
   </table></div></section>
 
-  <section><h2>Decision Replay</h2>
+  <section><h2>决策回放</h2>
 <div class="scroll"><table>
-<tr><th>Decision ID</th><th>Actor</th><th>Phase</th><th>Action</th><th>Target</th><th>Reason Summary</th></tr>
-<tr><td>g1f_deepseek_consensus_smoke_d001</td><td>p1</td><td>night</td><td>werewolf_kill</td><td>p3</td><td>wolf team kills p3</td></tr>
-<tr><td>g1f_deepseek_consensus_smoke_d002</td><td>p3</td><td>night</td><td>seer_check</td><td>p1</td><td>No prior information; random selection among all players.</td></tr>
-<tr><td>g1f_deepseek_consensus_smoke_d003</td><td>p4</td><td>night</td><td>witch_save</td><td>p4</td><td>No information yet; self-preservation to survive and use abilities later.</td></tr>
-<tr><td>g1f_deepseek_consensus_smoke_d004</td><td>p3</td><td>day</td><td>player_vote</td><td>p6</td><td>No concrete information; random vote to apply pressure.</td></tr>
-<tr><td>g1f_deepseek_consensus_smoke_d005</td><td>p4</td><td>day</td><td>player_vote</td><td>p3</td><td>No information available, random vote.</td></tr>
-<tr><td>g1f_deepseek_consensus_smoke_d006</td><td>p5</td><td>day</td><td>player_vote</td><td>p1</td><td>No information yet, voting arbitrarily.</td></tr>
-<tr><td>g1f_deepseek_consensus_smoke_d007</td><td>p6</td><td>day</td><td>player_vote</td><td>p1</td><td>Random vote to start discussion; no information yet.</td></tr>
-<tr><td>g1f_deepseek_consensus_smoke_d008</td><td>p2</td><td>night</td><td>werewolf_kill</td><td>p4</td><td>wolf team kills p4</td></tr>
-<tr><td>g1f_deepseek_consensus_smoke_d009</td><td>p4</td><td>day</td><td>player_vote</td><td>p2</td><td>As witch, no info yet; p2 is as likely as others but random pick.</td></tr>
-<tr><td>g1f_deepseek_consensus_smoke_d010</td><td>p5</td><td>day</td><td>player_vote</td><td>p2</td><td>Based on public events, p2 has been suspicious in voting patterns and I have no clear evidence on others.</td></tr>
-<tr><td>g1f_deepseek_consensus_smoke_d011</td><td>p6</td><td>day</td><td>player_vote</td><td>p2</td><td>Based on public events, p2 has been suspicious in earlier rounds; voting them out reduces risk to villagers.</td></tr>
+<tr><th>决策 ID</th><th>行动者</th><th>阶段</th><th>行动</th><th>目标</th><th>理由摘要</th></tr>
+<tr><td>g1f_deepseek_consensus_smoke_d001</td><td>p1</td><td>夜晚</td><td>werewolf_kill</td><td>p3</td><td>wolf team kills p3</td></tr>
+<tr><td>g1f_deepseek_consensus_smoke_d002</td><td>p3</td><td>夜晚</td><td>seer_check</td><td>p1</td><td>No prior information; random selection among all players.</td></tr>
+<tr><td>g1f_deepseek_consensus_smoke_d003</td><td>p4</td><td>夜晚</td><td>witch_save</td><td>p4</td><td>No information yet; self-preservation to survive and use abilities later.</td></tr>
+<tr><td>g1f_deepseek_consensus_smoke_d004</td><td>p3</td><td>白天</td><td>player_vote</td><td>p6</td><td>No concrete information; random vote to apply pressure.</td></tr>
+<tr><td>g1f_deepseek_consensus_smoke_d005</td><td>p4</td><td>白天</td><td>player_vote</td><td>p3</td><td>No information available, random vote.</td></tr>
+<tr><td>g1f_deepseek_consensus_smoke_d006</td><td>p5</td><td>白天</td><td>player_vote</td><td>p1</td><td>No information yet, voting arbitrarily.</td></tr>
+<tr><td>g1f_deepseek_consensus_smoke_d007</td><td>p6</td><td>白天</td><td>player_vote</td><td>p1</td><td>Random vote to start discussion; no information yet.</td></tr>
+<tr><td>g1f_deepseek_consensus_smoke_d008</td><td>p2</td><td>夜晚</td><td>werewolf_kill</td><td>p4</td><td>wolf team kills p4</td></tr>
+<tr><td>g1f_deepseek_consensus_smoke_d009</td><td>p4</td><td>白天</td><td>player_vote</td><td>p2</td><td>As witch, no info yet; p2 is as likely as others but random pick.</td></tr>
+<tr><td>g1f_deepseek_consensus_smoke_d010</td><td>p5</td><td>白天</td><td>player_vote</td><td>p2</td><td>Based on public events, p2 has been suspicious in voting patterns and I have no clear evidence on others.</td></tr>
+<tr><td>g1f_deepseek_consensus_smoke_d011</td><td>p6</td><td>白天</td><td>player_vote</td><td>p2</td><td>Based on public events, p2 has been suspicious in earlier rounds; voting them out reduces risk to villagers.</td></tr>
 </table></div></section>
 
-  <section><h2>Consensus Replay</h2>
+  <section><h2>共识回放</h2>
 <div class="scroll"><table>
-<tr><th>Consensus ID</th><th>Round</th><th>Participants</th><th>Status</th><th>Final Target</th><th>Supporters</th><th>Dissenters</th></tr>
-<tr><td>g1f_deepseek_consensus_smoke_consensus_r01</td><td>1</td><td>p1, p2</td><td>consensus</td><td>p3</td><td>p1, p2</td><td></td></tr>
-<tr><td>g1f_deepseek_consensus_smoke_consensus_r02</td><td>2</td><td>p2</td><td>consensus</td><td>p4</td><td>p2</td><td></td></tr>
+<tr><th>共识 ID</th><th>轮次</th><th>参与者</th><th>状态</th><th>最终目标</th><th>支持者</th><th>反对者</th></tr>
+<tr><td>g1f_deepseek_consensus_smoke_consensus_r01</td><td>1</td><td>p1, p2</td><td>一致同意</td><td>p3</td><td>p1, p2</td><td></td></tr>
+<tr><td>g1f_deepseek_consensus_smoke_consensus_r02</td><td>2</td><td>p2</td><td>一致同意</td><td>p4</td><td>p2</td><td></td></tr>
 </table></div></section>
 
-  <section><h2>Provider Trace</h2>
-<p><strong>deepseek</strong> — Requests: 10, Responses: 10, Failures: 0, Total tokens: 4157</p>
-<h3>Requests</h3><div class="scroll"><table>
-<tr><th>Request ID</th><th>Actor</th><th>Phase</th><th>Round</th><th>Observation</th></tr>
-<tr><td>g1f_deepseek_consensus_smoke_r01_p1</td><td>p1</td><td>night</td><td>1</td><td>{&quot;game_id&quot;: &quot;g1f_deepseek_consensus_smoke&quot;, &quot;player_id&quot;: &quot;p1&quot;, &quot;role&quot;: &quot;werewolf&quot;, &quot;team&quot;: &quot;werewolf&quot;, &quot;phase&quot;: &quot;night&quot;, &quot;round&quot;: 1, &quot;alive_players&quot;: [&quot;p1&quot;, &quot;p2&quot;, &quot;p3&quot;, &quot;p4&quot;, &quot;p5&quot;, &quot;p6&quot;], &quot;public_event_ids&quot;: [&quot;g1f_deepseek_consensus_smoke_e001&quot;], &quot;private_event_ids&quot;: [], &quot;known_roles&quot;: {&quot;p1&quot;: &quot;werewolf&quot;, &quot;p2&quot;: &quot;werewolf&quot;}}</td></tr>
-<tr><td>g1f_deepseek_consensus_smoke_r01_p2</td><td>p2</td><td>night</td><td>1</td><td>{&quot;game_id&quot;: &quot;g1f_deepseek_consensus_smoke&quot;, &quot;player_id&quot;: &quot;p2&quot;, &quot;role&quot;: &quot;werewolf&quot;, &quot;team&quot;: &quot;werewolf&quot;, &quot;phase&quot;: &quot;night&quot;, &quot;round&quot;: 1, &quot;alive_players&quot;: [&quot;p1&quot;, &quot;p2&quot;, &quot;p3&quot;, &quot;p4&quot;, &quot;p5&quot;, &quot;p6&quot;], &quot;public_event_ids&quot;: [&quot;g1f_deepseek_consensus_smoke_e001&quot;], &quot;private_event_ids&quot;: [], &quot;known_roles&quot;: {&quot;p1&quot;: &quot;werewolf&quot;, &quot;p2&quot;: &quot;werewolf&quot;}}</td></tr>
-<tr><td>g1f_deepseek_consensus_smoke_r01_p3</td><td>p3</td><td>night</td><td>1</td><td>{&quot;game_id&quot;: &quot;g1f_deepseek_consensus_smoke&quot;, &quot;player_id&quot;: &quot;p3&quot;, &quot;role&quot;: &quot;seer&quot;, &quot;team&quot;: &quot;villager&quot;, &quot;phase&quot;: &quot;night&quot;, &quot;round&quot;: 1, &quot;alive_players&quot;: [&quot;p1&quot;, &quot;p2&quot;, &quot;p3&quot;, &quot;p4&quot;, &quot;p5&quot;, &quot;p6&quot;], &quot;public_event_ids&quot;: [&quot;g1f_deepseek_consensus_smoke_e001&quot;], &quot;private_event_ids&quot;: [], &quot;known_roles&quot;: {&quot;p3&quot;: &quot;seer&quot;}}</td></tr>
-<tr><td>g1f_deepseek_consensus_smoke_r01_p4</td><td>p4</td><td>night</td><td>1</td><td>{&quot;game_id&quot;: &quot;g1f_deepseek_consensus_smoke&quot;, &quot;player_id&quot;: &quot;p4&quot;, &quot;role&quot;: &quot;witch&quot;, &quot;team&quot;: &quot;villager&quot;, &quot;phase&quot;: &quot;night&quot;, &quot;round&quot;: 1, &quot;alive_players&quot;: [&quot;p1&quot;, &quot;p2&quot;, &quot;p3&quot;, &quot;p4&quot;, &quot;p5&quot;, &quot;p6&quot;], &quot;public_event_ids&quot;: [&quot;g1f_deepseek_consensus_smoke_e001&quot;], &quot;private_event_ids&quot;: [], &quot;known_roles&quot;: {&quot;p4&quot;: &quot;witch&quot;}}</td></tr>
-<tr><td>g1f_deepseek_consensus_smoke_r01_p5</td><td>p5</td><td>day</td><td>1</td><td>{&quot;game_id&quot;: &quot;g1f_deepseek_consensus_smoke&quot;, &quot;player_id&quot;: &quot;p5&quot;, &quot;role&quot;: &quot;villager&quot;, &quot;team&quot;: &quot;villager&quot;, &quot;phase&quot;: &quot;day&quot;, &quot;round&quot;: 1, &quot;alive_players&quot;: [&quot;p1&quot;, &quot;p2&quot;, &quot;p3&quot;, &quot;p4&quot;, &quot;p5&quot;, &quot;p6&quot;], &quot;public_event_ids&quot;: [&quot;g1f_deepseek_consensus_smoke_e001&quot;, &quot;g1f_deepseek_consensus_smoke_e005&quot;, &quot;g1f_deepseek_consensus_smoke_e006&quot;], &quot;private_event_ids&quot;: [], &quot;known_roles&quot;: {&quot;p5&quot;: &quot;villager&quot;}}</td></tr>
-<tr><td>g1f_deepseek_consensus_smoke_r01_p6</td><td>p6</td><td>day</td><td>1</td><td>{&quot;game_id&quot;: &quot;g1f_deepseek_consensus_smoke&quot;, &quot;player_id&quot;: &quot;p6&quot;, &quot;role&quot;: &quot;villager&quot;, &quot;team&quot;: &quot;villager&quot;, &quot;phase&quot;: &quot;day&quot;, &quot;round&quot;: 1, &quot;alive_players&quot;: [&quot;p1&quot;, &quot;p2&quot;, &quot;p3&quot;, &quot;p4&quot;, &quot;p5&quot;, &quot;p6&quot;], &quot;public_event_ids&quot;: [&quot;g1f_deepseek_consensus_smoke_e001&quot;, &quot;g1f_deepseek_consensus_smoke_e005&quot;, &quot;g1f_deepseek_consensus_smoke_e006&quot;, &quot;g1f_deepseek_consensus_smoke_e007&quot;], &quot;private_event_ids&quot;: [], &quot;known_roles&quot;: {&quot;p6&quot;: &quot;villager&quot;}}</td></tr>
-<tr><td>g1f_deepseek_consensus_smoke_r02_p2</td><td>p2</td><td>night</td><td>2</td><td>{&quot;game_id&quot;: &quot;g1f_deepseek_consensus_smoke&quot;, &quot;player_id&quot;: &quot;p2&quot;, &quot;role&quot;: &quot;werewolf&quot;, &quot;team&quot;: &quot;werewolf&quot;, &quot;phase&quot;: &quot;night&quot;, &quot;round&quot;: 2, &quot;alive_players&quot;: [&quot;p2&quot;, &quot;p3&quot;, &quot;p4&quot;, &quot;p5&quot;, &quot;p6&quot;], &quot;public_event_ids&quot;: [&quot;g1f_deepseek_consensus_smoke_e001&quot;, &quot;g1f_deepseek_consensus_smoke_e005&quot;, &quot;g1f_deepseek_consensus_smoke_e006&quot;, &quot;g1f_deepseek_consensus_smoke_e007&quot;, &quot;g1f_deepseek_consensus_smoke_e008&quot;, &quot;g1f_deepseek_consensus_smoke_e009&quot;, &quot;g1f_deepseek_consensus_smoke_e010&quot;], &quot;private_event_ids&quot;: [&quot;g1f_deepseek_consensus_smoke_e002&quot;, &quot;g1f_deepseek_consensus_smoke_e009&quot;, &quot;g1f_deepseek_consensus_smoke_e010&quot;], &quot;known_roles&quot;: {&quot;p2&quot;: &quot;werewolf&quot;}}</td></tr>
-<tr><td>g1f_deepseek_consensus_smoke_r02_p4</td><td>p4</td><td>day</td><td>2</td><td>{&quot;game_id&quot;: &quot;g1f_deepseek_consensus_smoke&quot;, &quot;player_id&quot;: &quot;p4&quot;, &quot;role&quot;: &quot;witch&quot;, &quot;team&quot;: &quot;villager&quot;, &quot;phase&quot;: &quot;day&quot;, &quot;round&quot;: 2, &quot;alive_players&quot;: [&quot;p2&quot;, &quot;p4&quot;, &quot;p5&quot;, &quot;p6&quot;], &quot;public_event_ids&quot;: [&quot;g1f_deepseek_consensus_smoke_e001&quot;, &quot;g1f_deepseek_consensus_smoke_e005&quot;, &quot;g1f_deepseek_consensus_smoke_e006&quot;, &quot;g1f_deepseek_consensus_smoke_e007&quot;, &quot;g1f_deepseek_consensus_smoke_e008&quot;, &quot;g1f_deepseek_consensus_smoke_e009&quot;, &quot;g1f_deepseek_consensus_smoke_e010&quot;, &quot;g1f_deepseek_consensus_smoke_e012&quot;], &quot;private_event_ids&quot;: [&quot;g1f_deepseek_consensus_smoke_e004&quot;, &quot;g1f_deepseek_consensus_smoke_e009&quot;, &quot;g1f_deepseek_consensus_smoke_e010&quot;, &quot;g1f_deepseek_consensus_smoke_e012&quot;], &quot;known_roles&quot;: {&quot;p4&quot;: &quot;witch&quot;}}</td></tr>
-<tr><td>g1f_deepseek_consensus_smoke_r02_p5</td><td>p5</td><td>day</td><td>2</td><td>{&quot;game_id&quot;: &quot;g1f_deepseek_consensus_smoke&quot;, &quot;player_id&quot;: &quot;p5&quot;, &quot;role&quot;: &quot;villager&quot;, &quot;team&quot;: &quot;villager&quot;, &quot;phase&quot;: &quot;day&quot;, &quot;round&quot;: 2, &quot;alive_players&quot;: [&quot;p2&quot;, &quot;p4&quot;, &quot;p5&quot;, &quot;p6&quot;], &quot;public_event_ids&quot;: [&quot;g1f_deepseek_consensus_smoke_e001&quot;, &quot;g1f_deepseek_consensus_smoke_e005&quot;, &quot;g1f_deepseek_consensus_smoke_e006&quot;, &quot;g1f_deepseek_consensus_smoke_e007&quot;, &quot;g1f_deepseek_consensus_smoke_e008&quot;, &quot;g1f_deepseek_consensus_smoke_e009&quot;, &quot;g1f_deepseek_consensus_smoke_e010&quot;, &quot;g1f_deepseek_consensus_smoke_e012&quot;, &quot;g1f_deepseek_consensus_smoke_e013&quot;], &quot;private_event_ids&quot;: [&quot;g1f_deepseek_consensus_smoke_e009&quot;, &quot;g1f_deepseek_consensus_smoke_e010&quot;, &quot;g1f_deepseek_consensus_smoke_e012&quot;], &quot;known_roles&quot;: {&quot;p5&quot;: &quot;villager&quot;}}</td></tr>
-<tr><td>g1f_deepseek_consensus_smoke_r02_p6</td><td>p6</td><td>day</td><td>2</td><td>{&quot;game_id&quot;: &quot;g1f_deepseek_consensus_smoke&quot;, &quot;player_id&quot;: &quot;p6&quot;, &quot;role&quot;: &quot;villager&quot;, &quot;team&quot;: &quot;villager&quot;, &quot;phase&quot;: &quot;day&quot;, &quot;round&quot;: 2, &quot;alive_players&quot;: [&quot;p2&quot;, &quot;p4&quot;, &quot;p5&quot;, &quot;p6&quot;], &quot;public_event_ids&quot;: [&quot;g1f_deepseek_consensus_smoke_e001&quot;, &quot;g1f_deepseek_consensus_smoke_e005&quot;, &quot;g1f_deepseek_consensus_smoke_e006&quot;, &quot;g1f_deepseek_consensus_smoke_e007&quot;, &quot;g1f_deepseek_consensus_smoke_e008&quot;, &quot;g1f_deepseek_consensus_smoke_e009&quot;, &quot;g1f_deepseek_consensus_smoke_e010&quot;, &quot;g1f_deepseek_consensus_smoke_e012&quot;, &quot;g1f_deepseek_consensus_smoke_e013&quot;, &quot;g1f_deepseek_consensus_smoke_e014&quot;], &quot;private_event_ids&quot;: [&quot;g1f_deepseek_consensus_smoke_e009&quot;, &quot;g1f_deepseek_consensus_smoke_e010&quot;, &quot;g1f_deepseek_consensus_smoke_e012&quot;], &quot;known_roles&quot;: {&quot;p6&quot;: &quot;villager&quot;}}</td></tr>
+  <section><h2>Provider 调用记录</h2>
+<p><strong>deepseek</strong> — 请求: 10, 响应: 10, 失败: 0, 总 Tokens: 4157</p>
+<h3>请求</h3><div class="scroll"><table>
+<tr><th>请求 ID</th><th>行动者</th><th>阶段</th><th>轮次</th><th>观察</th></tr>
+<tr><td>g1f_deepseek_consensus_smoke_r01_p1</td><td>p1</td><td>夜晚</td><td>1</td><td>{&quot;game_id&quot;: &quot;g1f_deepseek_consensus_smoke&quot;, &quot;player_id&quot;: &quot;p1&quot;, &quot;role&quot;: &quot;werewolf&quot;, &quot;team&quot;: &quot;werewolf&quot;, &quot;phase&quot;: &quot;night&quot;, &quot;round&quot;: 1, &quot;alive_players&quot;: [&quot;p1&quot;, &quot;p2&quot;, &quot;p3&quot;, &quot;p4&quot;, &quot;p5&quot;, &quot;p6&quot;], &quot;public_event_ids&quot;: [&quot;g1f_deepseek_consensus_smoke_e001&quot;], &quot;private_event_ids&quot;: [], &quot;known_roles&quot;: {&quot;p1&quot;: &quot;werewolf&quot;, &quot;p2&quot;: &quot;werewolf&quot;}}</td></tr>
+<tr><td>g1f_deepseek_consensus_smoke_r01_p2</td><td>p2</td><td>夜晚</td><td>1</td><td>{&quot;game_id&quot;: &quot;g1f_deepseek_consensus_smoke&quot;, &quot;player_id&quot;: &quot;p2&quot;, &quot;role&quot;: &quot;werewolf&quot;, &quot;team&quot;: &quot;werewolf&quot;, &quot;phase&quot;: &quot;night&quot;, &quot;round&quot;: 1, &quot;alive_players&quot;: [&quot;p1&quot;, &quot;p2&quot;, &quot;p3&quot;, &quot;p4&quot;, &quot;p5&quot;, &quot;p6&quot;], &quot;public_event_ids&quot;: [&quot;g1f_deepseek_consensus_smoke_e001&quot;], &quot;private_event_ids&quot;: [], &quot;known_roles&quot;: {&quot;p1&quot;: &quot;werewolf&quot;, &quot;p2&quot;: &quot;werewolf&quot;}}</td></tr>
+<tr><td>g1f_deepseek_consensus_smoke_r01_p3</td><td>p3</td><td>夜晚</td><td>1</td><td>{&quot;game_id&quot;: &quot;g1f_deepseek_consensus_smoke&quot;, &quot;player_id&quot;: &quot;p3&quot;, &quot;role&quot;: &quot;seer&quot;, &quot;team&quot;: &quot;villager&quot;, &quot;phase&quot;: &quot;night&quot;, &quot;round&quot;: 1, &quot;alive_players&quot;: [&quot;p1&quot;, &quot;p2&quot;, &quot;p3&quot;, &quot;p4&quot;, &quot;p5&quot;, &quot;p6&quot;], &quot;public_event_ids&quot;: [&quot;g1f_deepseek_consensus_smoke_e001&quot;], &quot;private_event_ids&quot;: [], &quot;known_roles&quot;: {&quot;p3&quot;: &quot;seer&quot;}}</td></tr>
+<tr><td>g1f_deepseek_consensus_smoke_r01_p4</td><td>p4</td><td>夜晚</td><td>1</td><td>{&quot;game_id&quot;: &quot;g1f_deepseek_consensus_smoke&quot;, &quot;player_id&quot;: &quot;p4&quot;, &quot;role&quot;: &quot;witch&quot;, &quot;team&quot;: &quot;villager&quot;, &quot;phase&quot;: &quot;night&quot;, &quot;round&quot;: 1, &quot;alive_players&quot;: [&quot;p1&quot;, &quot;p2&quot;, &quot;p3&quot;, &quot;p4&quot;, &quot;p5&quot;, &quot;p6&quot;], &quot;public_event_ids&quot;: [&quot;g1f_deepseek_consensus_smoke_e001&quot;], &quot;private_event_ids&quot;: [], &quot;known_roles&quot;: {&quot;p4&quot;: &quot;witch&quot;}}</td></tr>
+<tr><td>g1f_deepseek_consensus_smoke_r01_p5</td><td>p5</td><td>白天</td><td>1</td><td>{&quot;game_id&quot;: &quot;g1f_deepseek_consensus_smoke&quot;, &quot;player_id&quot;: &quot;p5&quot;, &quot;role&quot;: &quot;villager&quot;, &quot;team&quot;: &quot;villager&quot;, &quot;phase&quot;: &quot;day&quot;, &quot;round&quot;: 1, &quot;alive_players&quot;: [&quot;p1&quot;, &quot;p2&quot;, &quot;p3&quot;, &quot;p4&quot;, &quot;p5&quot;, &quot;p6&quot;], &quot;public_event_ids&quot;: [&quot;g1f_deepseek_consensus_smoke_e001&quot;, &quot;g1f_deepseek_consensus_smoke_e005&quot;, &quot;g1f_deepseek_consensus_smoke_e006&quot;], &quot;private_event_ids&quot;: [], &quot;known_roles&quot;: {&quot;p5&quot;: &quot;villager&quot;}}</td></tr>
+<tr><td>g1f_deepseek_consensus_smoke_r01_p6</td><td>p6</td><td>白天</td><td>1</td><td>{&quot;game_id&quot;: &quot;g1f_deepseek_consensus_smoke&quot;, &quot;player_id&quot;: &quot;p6&quot;, &quot;role&quot;: &quot;villager&quot;, &quot;team&quot;: &quot;villager&quot;, &quot;phase&quot;: &quot;day&quot;, &quot;round&quot;: 1, &quot;alive_players&quot;: [&quot;p1&quot;, &quot;p2&quot;, &quot;p3&quot;, &quot;p4&quot;, &quot;p5&quot;, &quot;p6&quot;], &quot;public_event_ids&quot;: [&quot;g1f_deepseek_consensus_smoke_e001&quot;, &quot;g1f_deepseek_consensus_smoke_e005&quot;, &quot;g1f_deepseek_consensus_smoke_e006&quot;, &quot;g1f_deepseek_consensus_smoke_e007&quot;], &quot;private_event_ids&quot;: [], &quot;known_roles&quot;: {&quot;p6&quot;: &quot;villager&quot;}}</td></tr>
+<tr><td>g1f_deepseek_consensus_smoke_r02_p2</td><td>p2</td><td>夜晚</td><td>2</td><td>{&quot;game_id&quot;: &quot;g1f_deepseek_consensus_smoke&quot;, &quot;player_id&quot;: &quot;p2&quot;, &quot;role&quot;: &quot;werewolf&quot;, &quot;team&quot;: &quot;werewolf&quot;, &quot;phase&quot;: &quot;night&quot;, &quot;round&quot;: 2, &quot;alive_players&quot;: [&quot;p2&quot;, &quot;p3&quot;, &quot;p4&quot;, &quot;p5&quot;, &quot;p6&quot;], &quot;public_event_ids&quot;: [&quot;g1f_deepseek_consensus_smoke_e001&quot;, &quot;g1f_deepseek_consensus_smoke_e005&quot;, &quot;g1f_deepseek_consensus_smoke_e006&quot;, &quot;g1f_deepseek_consensus_smoke_e007&quot;, &quot;g1f_deepseek_consensus_smoke_e008&quot;, &quot;g1f_deepseek_consensus_smoke_e009&quot;, &quot;g1f_deepseek_consensus_smoke_e010&quot;], &quot;private_event_ids&quot;: [&quot;g1f_deepseek_consensus_smoke_e002&quot;, &quot;g1f_deepseek_consensus_smoke_e009&quot;, &quot;g1f_deepseek_consensus_smoke_e010&quot;], &quot;known_roles&quot;: {&quot;p2&quot;: &quot;werewolf&quot;}}</td></tr>
+<tr><td>g1f_deepseek_consensus_smoke_r02_p4</td><td>p4</td><td>白天</td><td>2</td><td>{&quot;game_id&quot;: &quot;g1f_deepseek_consensus_smoke&quot;, &quot;player_id&quot;: &quot;p4&quot;, &quot;role&quot;: &quot;witch&quot;, &quot;team&quot;: &quot;villager&quot;, &quot;phase&quot;: &quot;day&quot;, &quot;round&quot;: 2, &quot;alive_players&quot;: [&quot;p2&quot;, &quot;p4&quot;, &quot;p5&quot;, &quot;p6&quot;], &quot;public_event_ids&quot;: [&quot;g1f_deepseek_consensus_smoke_e001&quot;, &quot;g1f_deepseek_consensus_smoke_e005&quot;, &quot;g1f_deepseek_consensus_smoke_e006&quot;, &quot;g1f_deepseek_consensus_smoke_e007&quot;, &quot;g1f_deepseek_consensus_smoke_e008&quot;, &quot;g1f_deepseek_consensus_smoke_e009&quot;, &quot;g1f_deepseek_consensus_smoke_e010&quot;, &quot;g1f_deepseek_consensus_smoke_e012&quot;], &quot;private_event_ids&quot;: [&quot;g1f_deepseek_consensus_smoke_e004&quot;, &quot;g1f_deepseek_consensus_smoke_e009&quot;, &quot;g1f_deepseek_consensus_smoke_e010&quot;, &quot;g1f_deepseek_consensus_smoke_e012&quot;], &quot;known_roles&quot;: {&quot;p4&quot;: &quot;witch&quot;}}</td></tr>
+<tr><td>g1f_deepseek_consensus_smoke_r02_p5</td><td>p5</td><td>白天</td><td>2</td><td>{&quot;game_id&quot;: &quot;g1f_deepseek_consensus_smoke&quot;, &quot;player_id&quot;: &quot;p5&quot;, &quot;role&quot;: &quot;villager&quot;, &quot;team&quot;: &quot;villager&quot;, &quot;phase&quot;: &quot;day&quot;, &quot;round&quot;: 2, &quot;alive_players&quot;: [&quot;p2&quot;, &quot;p4&quot;, &quot;p5&quot;, &quot;p6&quot;], &quot;public_event_ids&quot;: [&quot;g1f_deepseek_consensus_smoke_e001&quot;, &quot;g1f_deepseek_consensus_smoke_e005&quot;, &quot;g1f_deepseek_consensus_smoke_e006&quot;, &quot;g1f_deepseek_consensus_smoke_e007&quot;, &quot;g1f_deepseek_consensus_smoke_e008&quot;, &quot;g1f_deepseek_consensus_smoke_e009&quot;, &quot;g1f_deepseek_consensus_smoke_e010&quot;, &quot;g1f_deepseek_consensus_smoke_e012&quot;, &quot;g1f_deepseek_consensus_smoke_e013&quot;], &quot;private_event_ids&quot;: [&quot;g1f_deepseek_consensus_smoke_e009&quot;, &quot;g1f_deepseek_consensus_smoke_e010&quot;, &quot;g1f_deepseek_consensus_smoke_e012&quot;], &quot;known_roles&quot;: {&quot;p5&quot;: &quot;villager&quot;}}</td></tr>
+<tr><td>g1f_deepseek_consensus_smoke_r02_p6</td><td>p6</td><td>白天</td><td>2</td><td>{&quot;game_id&quot;: &quot;g1f_deepseek_consensus_smoke&quot;, &quot;player_id&quot;: &quot;p6&quot;, &quot;role&quot;: &quot;villager&quot;, &quot;team&quot;: &quot;villager&quot;, &quot;phase&quot;: &quot;day&quot;, &quot;round&quot;: 2, &quot;alive_players&quot;: [&quot;p2&quot;, &quot;p4&quot;, &quot;p5&quot;, &quot;p6&quot;], &quot;public_event_ids&quot;: [&quot;g1f_deepseek_consensus_smoke_e001&quot;, &quot;g1f_deepseek_consensus_smoke_e005&quot;, &quot;g1f_deepseek_consensus_smoke_e006&quot;, &quot;g1f_deepseek_consensus_smoke_e007&quot;, &quot;g1f_deepseek_consensus_smoke_e008&quot;, &quot;g1f_deepseek_consensus_smoke_e009&quot;, &quot;g1f_deepseek_consensus_smoke_e010&quot;, &quot;g1f_deepseek_consensus_smoke_e012&quot;, &quot;g1f_deepseek_consensus_smoke_e013&quot;, &quot;g1f_deepseek_consensus_smoke_e014&quot;], &quot;private_event_ids&quot;: [&quot;g1f_deepseek_consensus_smoke_e009&quot;, &quot;g1f_deepseek_consensus_smoke_e010&quot;, &quot;g1f_deepseek_consensus_smoke_e012&quot;], &quot;known_roles&quot;: {&quot;p6&quot;: &quot;villager&quot;}}</td></tr>
 </table></div>
-<h3>Responses</h3><div class="scroll"><table>
-<tr><th>Request ID</th><th>Raw Content</th><th>Latency (ms)</th><th>Tokens</th></tr>
+<h3>响应</h3><div class="scroll"><table>
+<tr><th>请求 ID</th><th>原始内容</th><th>延迟(ms)</th><th>Tokens</th></tr>
 <tr><td>g1f_deepseek_consensus_smoke_r01_p1</td><td>{&quot;action&quot;:&quot;werewolf_kill&quot;,&quot;target&quot;:&quot;p3&quot;,&quot;reason_summary&quot;:&quot;Random selection among non-werewolf players since no additional info available in round 1 night.&quot;,&quot;decision_type&quot;:&quot;random&quot;,&quot;confidence&quot;:0.5}</td><td>0</td><td>346</td></tr>
 <tr><td>g1f_deepseek_consensus_smoke_r01_p2</td><td>{&quot;action&quot;:&quot;werewolf_kill&quot;,&quot;target&quot;:&quot;p3&quot;,&quot;reason_summary&quot;:&quot;Random choice among non-werewolf players as no additional info available in round 1 night.&quot;,&quot;decision_type&quot;:&quot;random&quot;,&quot;confidence&quot;:0.5}</td><td>0</td><td>346</td></tr>
 <tr><td>g1f_deepseek_consensus_smoke_r01_p3</td><td>{
@@ -151,8 +151,8 @@
 </table></div>
 </section>
 
-  <section><h2>Failure Audit</h2>
-<p>zero provider failures</p>
+  <section><h2>失败审计</h2>
+<p>零次 Provider 失败</p>
 </section>
 </main>
 </body>

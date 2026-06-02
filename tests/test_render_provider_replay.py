@@ -234,12 +234,12 @@ class ProviderReplayHtmlTests(unittest.TestCase):
 
         html = render_provider_replay_html(self.context)
 
-        self.assertIn("Provider Replay", html)
+        self.assertIn("Provider 回放", html)
         self.assertIn("[DeepSeek API output]", html)
-        self.assertIn("Consensus Replay", html)
-        self.assertIn("Provider Trace", html)
-        self.assertIn("Failure Audit", html)
-        self.assertIn("No live API call is made", html)
+        self.assertIn("共识回放", html)
+        self.assertIn("Provider 调用记录", html)
+        self.assertIn("失败审计", html)
+        self.assertIn("渲染过程中未发起任何实时 API 调用", html)
 
     def test_render_html_escapes_provider_content(self) -> None:
         """render_provider_replay_html escapes unsafe content."""
@@ -306,9 +306,9 @@ class ProviderReplayHtmlTests(unittest.TestCase):
             )
 
             html = html_path.read_text(encoding="utf-8")
-            self.assertIn("Provider Replay", html)
+            self.assertIn("Provider 回放", html)
             self.assertIn("g1g_fixture", html)
-            self.assertIn("No live API call is made", html)
+            self.assertIn("渲染过程中未发起任何实时 API 调用", html)
 
     # ------------------------------------------------------------------
     # CLI tests
@@ -338,7 +338,7 @@ class ProviderReplayHtmlTests(unittest.TestCase):
             self.assertEqual(ret, 0)
             self.assertTrue(html_path.exists())
             html = html_path.read_text(encoding="utf-8")
-            self.assertIn("Provider Replay", html)
+            self.assertIn("Provider 回放", html)
 
     def test_cli_accepts_optional_logs(self) -> None:
         """CLI accepts all optional log paths."""
