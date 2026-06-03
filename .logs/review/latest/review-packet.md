@@ -2,285 +2,158 @@
 
 ## Metadata
 - Base: `main`
-- Branch: `implement/g1e-deepseek-provider-smoke`
-- Generated: 2026-06-02T08:40:30.104994+00:00
+- Branch: `feat/g1g-provider-replay-html`
+- Generated: `2026-06-02T23:05:28+08:00`
+- Packet type: clean manual A档 packet, rebuilt from fresh local verification after `scripts/dev/build_review_packet.py` was restored to `main`.
+- Review scope: `git diff main...HEAD` plus direct safety scan of `docs/demo/phase3-g1f-provider-replay.html`.
 
 ## Changed Files
+Source: `git -c safe.directory=G:/Werewolf-agent diff --name-only main...HEAD`
+
 - `.oh-my-harness/tree.md`
-- `src/werewolf_eval/deepseek_provider.py`
-- `src/werewolf_eval/provider_agent.py`
-- `src/werewolf_eval/provider_contract.py`
-- `src/werewolf_eval/run_deepseek_provider_game.py`
-- `src/werewolf_eval/source_labels.py`
-- `tests/test_deepseek_provider.py`
-- `tests/test_deepseek_provider_game.py`
-- `tests/test_fake_provider.py`
-- `tests/test_source_labels.py`
+- `docs/demo/phase3-g1f-provider-replay.html`
+- `src/werewolf_eval/render_provider_replay.py`
+- `tests/test_render_provider_replay.py`
+
+Worktree hygiene note: local scratch paths `.tmp/g1f-deepseek-consensus-smoke/` and `500` are not in `main...HEAD` and must not be submitted. `docs/TASKS.md` is a separate route/status closeout update, outside the renderer implementation allowlist.
 
 ## Diff Stat
-```
-.logs/review/latest/review-packet.md            | 384 ++++++++++++------------
- .oh-my-harness/tree.md                          |   9 +-
- src/werewolf_eval/deepseek_provider.py          | 138 +++++++++
- src/werewolf_eval/provider_agent.py             |   3 +-
- src/werewolf_eval/provider_contract.py          |   1 +
- src/werewolf_eval/run_deepseek_provider_game.py | 199 ++++++++++++
- src/werewolf_eval/source_labels.py              |   1 +
- tests/test_deepseek_provider.py                 | 156 ++++++++++
- tests/test_deepseek_provider_game.py            | 165 ++++++++++
- tests/test_fake_provider.py                     |  19 +-
- tests/test_source_labels.py                     |   5 +
- 11 files changed, 886 insertions(+), 194 deletions(-)
+Command: `git -c safe.directory=G:/Werewolf-agent diff --stat main...HEAD`
+
+```text
+ .oh-my-harness/tree.md                      |   7 +-
+ docs/demo/phase3-g1f-provider-replay.html   | 159 ++++++++++
+ src/werewolf_eval/render_provider_replay.py | 472 ++++++++++++++++++++++++++++
+ tests/test_render_provider_replay.py        | 370 ++++++++++++++++++++++
+ 4 files changed, 1006 insertions(+), 2 deletions(-)
 ```
 
 ## Diff Check
-```
+Command: `git -c safe.directory=G:/Werewolf-agent diff --check main...HEAD`
+
+```text
 (clean)
 ```
 
 ## Allowed Files Check
 ALLOWLIST_CHECK = PASS
 
+Allowed G1g files:
+- `.oh-my-harness/tree.md`
+- `docs/demo/phase3-g1f-provider-replay.html`
+- `src/werewolf_eval/render_provider_replay.py`
+- `tests/test_render_provider_replay.py`
+
+`scripts/dev/build_review_packet.py` is not in `main...HEAD`.
+
 ## Forbidden Patterns Check
-FORBIDDEN_PATTERN_SCAN = WARN
+FORBIDDEN_PATTERN_CHECK = PASS
+FORBIDDEN_PATTERN_SCAN = PASS
 
-**Self-reference (docs/scripts/tests mention forbidden terms — not new runtime capability):**
-- provider: │   │   │   ├── 2026-06-02--g1d-fake-provider-contract-harness-plan.md [plan-spec: CLI flag or test harness, not new runtime capability]
-- provider: │   │   │   └── 2026-06-02--g1e-deepseek-provider-smoke-plan.md [plan-spec: CLI flag or test harness, not new runtime capability]
-- provider: │       ├── deepseek_provider.py [plan-spec: CLI flag or test harness, not new runtime capability]
-- provider: │       ├── run_deepseek_provider_game.py [plan-spec: CLI flag or test harness, not new runtime capability]
-- provider: │   ├── test_deepseek_provider_game.py [plan-spec: CLI flag or test harness, not new runtime capability]
-- provider: │   ├── test_deepseek_provider.py [plan-spec: CLI flag or test harness, not new runtime capability]
-- default: parser.add_argument("--game-id", default="g1e_deepseek_smoke") [plan-spec: CLI flag or test harness, not new runtime capability]
-- provider: parser.add_argument("--out-dir", default=".tmp/g1e-deepseek-provider-smoke") [plan-spec: CLI flag or test harness, not new runtime capability]
-- default: parser.add_argument("--out-dir", default=".tmp/g1e-deepseek-provider-smoke") [plan-spec: CLI flag or test harness, not new runtime capability]
-- default: parser.add_argument("--model", default="deepseek-v4-flash") [plan-spec: CLI flag or test harness, not new runtime capability]
-- default: parser.add_argument("--base-url", default="https://api.deepseek.com") [plan-spec: CLI flag or test harness, not new runtime capability]
-- env: parser.add_argument("--api-key-env", default="DEEPSEEK_API_KEY") [plan-spec: CLI flag or test harness, not new runtime capability]
-- default: parser.add_argument("--api-key-env", default="DEEPSEEK_API_KEY") [plan-spec: CLI flag or test harness, not new runtime capability]
-- default: parser.add_argument("--timeout-seconds", type=int, default=30) [plan-spec: CLI flag or test harness, not new runtime capability]
-- default: parser.add_argument("--max-tokens-per-request", type=int, default=256) [plan-spec: CLI flag or test harness, not new runtime capability]
-- provider: parser.add_argument("--max-provider-requests", type=int, default=11) [plan-spec: CLI flag or test harness, not new runtime capability]
-- default: parser.add_argument("--max-provider-requests", type=int, default=11) [plan-spec: CLI flag or test harness, not new runtime capability]
-- default: parser.add_argument("--allow-live-api", action="store_true", default=False) [plan-spec: CLI flag or test harness, not new runtime capability]
-- provider: from werewolf_eval.provider_contract import ProviderRequest [plan-spec: CLI flag or test harness, not new runtime capability]
-- provider: class DeepSeekProviderTests(unittest.TestCase): [plan-spec: CLI flag or test harness, not new runtime capability]
-- ... (47) more self-reference hits truncated — all in plan-spec file paths, doc/test strings, or CLI argument definitions
+Fresh strict-risk scan over the four changed files found no runtime or rendered-output risk for:
+- raw API key / `x-api-key` / `sk-...`
+- `Authorization` / `Bearer`
+- secret value exposure
+- network/API client imports such as `requests`, `httpx`, `aiohttp`, `openai`, `anthropic`, `urllib`
+- `socket`, `subprocess`, or `os.environ` usage in the replay renderer
 
-**Real risk (forbidden term in runtime code):**
-- provider: from werewolf_eval.provider_contract import (
-- provider: DEEPSEEK_PROVIDER_SOURCE_LABEL,
-- provider: ProviderRequest,
-- provider: ProviderResponse,
-- provider: class DeepSeekProviderConfig:
-- default: def _default_transport(
-- provider: class DeepSeekProvider:
-- provider: config: DeepSeekProviderConfig,
-- default: self._transport = transport if transport is not None else _default_transport
-- provider: self._request_history: list[ProviderRequest] = []
-- provider: self._response_history: list[ProviderResponse] = []
-- provider: def requests(self) -> list[ProviderRequest]:
-- provider: def responses(self) -> list[ProviderResponse]:
-- provider: def _build_request_payload(self, request: ProviderRequest) -> dict[str, Any]:
-- provider: def respond(self, request: ProviderRequest) -> ProviderResponse:
-- provider: response = ProviderResponse(
-- provider: provider_name="deepseek",
-- provider: source_label=DEEPSEEK_PROVIDER_SOURCE_LABEL,
-- provider: DEEPSEEK_PROVIDER_SOURCE_LABEL = "[DeepSeek API output]"
-- provider: from werewolf_eval.deepseek_provider import DeepSeekProvider, DeepSeekProviderCo
-- ... (45) more real-risk hits truncated
+Benign textual self-references were classified as non-risk:
+- `.oh-my-harness/tree.md:160` contains the existing directory name `secrets/`, not a committed secret value.
+- `tests/test_render_provider_replay.py:258` and `tests/test_render_provider_replay.py:290` assert that `<script` is absent.
+
+## HTML Output Safety Check
+HTML_OUTPUT_SAFETY_CHECK = PASS
+
+Target: `docs/demo/phase3-g1f-provider-replay.html`
+
+Direct scan result:
+- `script=False`
+- `external_http=False`
+- `src_attr=False`
+- `href_attr=False`
+- `css_url=False`
+- `authorization=False`
+- `bearer=False`
+- `api_key=False`
+- `secret=False`
+- `sk_key=False`
+
+The committed HTML contains no `<script>`, no external resource reference, no raw API key, no `Authorization` header, and no external URL.
 
 ## Dependency / Import Diff
-### Dependency manifest changes
-(none)
-
-### Added imports
-- `from __future__ import annotations`
-- `import json`
-- `import urllib.request`
-- `from dataclasses import dataclass`
-- `from typing import Any, Callable`
-- `from __future__ import annotations`
-- `import argparse`
-- `import json`
-- `import os`
-- `import sys`
-- `from pathlib import Path`
-- `from typing import Any, Callable`
-- `from __future__ import annotations`
-- `import json`
-- `import unittest`
-- `from typing import Any`
-- `from __future__ import annotations`
-- `import json`
-- `import unittest`
-- `from pathlib import Path`
-- `from tempfile import TemporaryDirectory`
-- `from typing import Any`
-- `import subprocess`
-- `import sys`
-- `import subprocess`
-- `import sys`
+- Dependency manifest changes: none.
+- Replay renderer imports only `argparse`, `json`, `html.escape`, `pathlib.Path`, and `typing.Any` (`src/werewolf_eval/render_provider_replay.py:3-7`).
+- No `engine/`, provider runtime, scoring runtime, dependency manifest, or `.tmp/` file is in `main...HEAD`.
 
 ## Test Summary
-### `python -m unittest tests.test_source_labels tests.test_fake_provider tests.test_deepseek_provider tests.test_deepseek_provider_game && python -m unittest discover -s tests`
-Exit: 0 (PASS)
-```
-............................
-----------------------------------------------------------------------
-Ran 28 tests in 0.194s
+Environment: PowerShell with `$env:PYTHONPATH='src'`.
 
-OK
-..................................................................................................................................................................................
-----------------------------------------------------------------------
-Ran 178 tests in 3.657s
+### `python -m unittest tests.test_render_provider_replay -v`
+Exit: 0 (PASS)
+
+```text
+Ran 8 tests in 0.030s
 
 OK
 ```
 
-### `python -m compileall src/werewolf_eval scripts -q`
+### `python -m unittest discover -s tests -v`
 Exit: 0 (PASS)
+
+```text
+Ran 193 tests in 4.626s
+
+OK
 ```
 
-```
-
-### `git diff --check`
+### `python -m compileall -q src tests`
 Exit: 0 (PASS)
-```
 
-```
-
-## Key Hunks
-### src/werewolf_eval/source_labels.py
-```diff
-@@ -6,4 +6,5 @@ VALID_SOURCE_LABELS = {
-     "[scripted deterministic output]",
-     "[deterministic mock agent output]",
-     "[deterministic fake provider output]",
-+    "[DeepSeek API output]",
- }
-```
-
-### src/werewolf_eval/provider_agent.py
-```diff
-@@ -5,7 +5,6 @@ from typing import Any
-
- from werewolf_eval.game_engine import AgentAction, AgentObservation
- from werewolf_eval.provider_contract import (
--    FAKE_PROVIDER_SOURCE_LABEL,
-     ProviderFailure,
-     ProviderRequest,
- )
-```
-
-### src/werewolf_eval/provider_contract.py
-```diff
-@@ -4,6 +4,7 @@ from dataclasses import dataclass, asdict
- from typing import Any
-
- FAKE_PROVIDER_SOURCE_LABEL = "[deterministic fake provider output]"
-+DEEPSEEK_PROVIDER_SOURCE_LABEL = "[DeepSeek API output]"
-
-
- @dataclass(frozen=True)
-```
-
-### tests/test_source_labels.py
-```diff
-@@ -13,6 +13,7 @@ class SourceLabelsTests(unittest.TestCase):
-             "[scripted deterministic output]",
-             "[deterministic mock agent output]",
-             "[deterministic fake provider output]",
-+            "[DeepSeek API output]",
-         }
-         self.assertEqual(VALID_SOURCE_LABELS, expected)
-
-```
-
-### tests/test_fake_provider.py
-```diff
-@@ -162,7 +162,24 @@ class FakeProviderAdapterTests(unittest.TestCase):
-         self.assertEqual(action.source_label, FAKE_PROVIDER_SOURCE_LABEL)
-
-
--# --- 10. Missing reason_summary → ProviderActionError ---
-+# --- 10. ProviderAgent preserves provider response source_label ---
-+    def test_provider_agent_preserves_provider_response_source_label(self) -> None:
-+        class TestLocalProvider:
-+            def respond(self, request: ProviderRequest) -> ProviderResponse:
-+                return ProviderResponse(
-+                    request_id=request.request_id,
-+                    provider_name="test-deepseek",
-+                    source_label="[DeepSeek API output]",
-+                    raw_content='{"action":"seer_check","target":"p1","reason_summary":"test","decision_type":"inference_based","confidence":1.0}',
-+                    latency_ms=100,
-+                    token_usage={"prompt": 10, "completion": 20},
-+                )
-+
-+        agent = ProviderAgent("p3", TestLocalProvider())
-+        action = agent.decide(self._p3_night_obs())
-+        self.assertEqual(action.source_label, "[DeepSeek API output]")
-+
-+# --- 11. Missing reason_summary → ProviderActionError ---
-     def test_missing_reason_summary_raises_provider_action_error(self) -> None:
-         agent = build_default_fake_provider_agent(
-             "p3",
-```
-
-**KEY_HUNKS_TRUNCATED = YES**
-
-Truncation does not block A档 for this PR. Key hunks were omitted because the diff exceeds the packet size limit. Verify hunks by reading the changed files directly or running `git diff` with narrowed paths.
-
-If B档 is needed, Minimal Next Reads (line ranges):
-- `src/werewolf_eval/deepseek_provider.py:58-73` (response format with JSON example + _build_request_payload contract)
-- `src/werewolf_eval/run_deepseek_provider_game.py:146-153` (shared_provider = DeepSeekProvider(config) → return ProviderAgent(player_id, shared_provider))
-- `src/werewolf_eval/provider_agent.py:217-230` (source_label=response.source_label preservation)
-- `tests/test_deepseek_provider.py:66-85` (test_builds_openai_compatible_json_request — response_format, stream, thinking, Authorization assertions)
-- `tests/test_deepseek_provider_game.py:108-142` (test_helper_with_fake_provider_factory_writes_valid_artifacts — validate_game_log + load_decision_log + validate_decision_log)
+## Key Evidence Pointers
+- JSON-only input and no live API call: `src/werewolf_eval/render_provider_replay.py:403-419` reads optional logs with `Path(...).read_text(encoding="utf-8")` and `json.loads(...)`; `src/werewolf_eval/render_provider_replay.py:467` prints `live_api=not_called`.
+- Escaping: `src/werewolf_eval/render_provider_replay.py:81-85` routes table cell rendering through `html.escape(..., quote=True)`.
+- UTF-8 output: `src/werewolf_eval/render_provider_replay.py:429` writes HTML with `encoding="utf-8"`.
+- Escaping tests: `tests/test_render_provider_replay.py:244-290` cover unsafe provider content and assert `<script` is absent.
+- HTML artifact scan: `docs/demo/phase3-g1f-provider-replay.html` direct scan shows no script, external resources, secret, raw key, or authorization header.
 
 ## Evidence Map
 | Acceptance | Evidence | Status |
 |---|---|---|
-| A-1 [DeepSeek API output] in VALID_SOURCE_LABELS | src/werewolf_eval/source_labels.py + tests | PASS |
-| A-2 DEEPSEEK_PROVIDER_SOURCE_LABEL registered | src/werewolf_eval/provider_contract.py | PASS |
-| A-3 ProviderAgent preserves source_label | tests/test_fake_provider.py + provider_agent.py | PASS |
-| A-4 DeepSeekProvider uses stdlib urllib, no SDK | src/werewolf_eval/deepseek_provider.py | PASS |
-| A-5 OpenAI-compatible JSON request shape | tests/test_deepseek_provider.py | PASS |
-| A-6 max_requests + empty key enforced | tests/test_deepseek_provider.py | PASS |
-| A-7 --allow-live-api guard no artifacts | tests/test_deepseek_provider_game.py | PASS |
-| A-8 Helper writes valid logs through validators | tests/test_deepseek_provider_game.py | PASS |
-| A-9 Failure path audit no valid logs | tests/test_deepseek_provider_game.py | PASS |
-| A-10 No secrets/keys in tracked files | secret scan + tests | PASS |
-| A-11 No new dependencies | git diff manifests | PASS |
-| A-12 No network/env/secret runtime beyond scope | forbidden import check | PASS |
-| A-13 Global request budget shared | run_deepseek_provider_game.py | PASS |
-| A-14 Prompt has JSON example + allowed lists | deepseek_provider.py + tests | PASS |
+| A1:Only allowlisted files changed | `git diff --name-only main...HEAD` lists exactly the four G1g files above; `ALLOWLIST_CHECK=PASS` | PASS |
+| A2:Renderer consumes existing JSON logs only, no network/API calls | `render_provider_replay.py:403-419` reads JSON from disk; imports at `:3-7` contain no network/API clients; CLI prints `live_api=not_called` at `:467` | PASS |
+| A3:HTML is single-file static output with no JS, no external resources | `HTML_OUTPUT_SAFETY_CHECK=PASS`; direct scan has `script=False`, `external_http=False`, `src_attr=False`, `href_attr=False`, `css_url=False` | PASS |
+| A4:All untrusted JSON values escaped via html.escape | `_html()` uses `html.escape(..., quote=True)` at `render_provider_replay.py:81-82`; `_row()` uses `_html()` at `:85`; unsafe provider tests pass | PASS |
+| A5:Report includes game, player, timeline, decision, consensus, trace, failure sections | `tests.test_render_provider_replay` 8/8 PASS, including required section coverage | PASS |
+| A6:Report labels `[DeepSeek API output]` and boundary statement | Target HTML contains source label and "未发起任何实时 API 调用"; renderer CLI prints `live_api=not_called` | PASS |
+| A7:Tests cover context, HTML content, escaping, and CLI output | Targeted replay test suite ran 8 tests and passed | PASS |
+| A8:Full unittest and compile check pass | Full unittest ran 193 tests and passed; compileall exit 0 | PASS |
+| A9:No dependency/provider/engine/scoring/.tmp changes committed | `main...HEAD` has only the four allowlisted files; no manifest, engine, provider runtime, scoring runtime, or `.tmp/` path | PASS |
+| A10:Review packet contains required machine evidence | Includes changed files, diff stat, diff check, allowlist, forbidden scan, HTML safety scan, imports, tests, evidence map, checklist, and risk notes | PASS |
+| A11:Forbidden scan differentiates test literals from rendered HTML | Strict-risk scan is PASS; benign test/tree self-references classified separately; rendered HTML safety scan is PASS | PASS |
 
 ## Acceptance Checklist
-- [x] A-1 [DeepSeek API output] in VALID_SOURCE_LABELS
-- [x] A-2 DEEPSEEK_PROVIDER_SOURCE_LABEL registered
-- [x] A-3 ProviderAgent preserves source_label
-- [x] A-4 DeepSeekProvider uses stdlib urllib, no SDK
-- [x] A-5 OpenAI-compatible JSON request shape
-- [x] A-6 max_requests + empty key enforced
-- [x] A-7 --allow-live-api guard no artifacts
-- [x] A-8 Helper writes valid logs through validators
-- [x] A-9 Failure path audit no valid logs
-- [x] A-10 No secrets/keys in tracked files
-- [x] A-11 No new dependencies
-- [x] A-12 No network/env/secret runtime beyond scope
-- [x] A-13 Global request budget shared
-- [x] A-14 Prompt has JSON example + allowed lists
+- [x] A1:Only allowlisted files changed
+- [x] A2:Renderer consumes existing JSON logs only, no network/API calls
+- [x] A3:HTML is single-file static output with no JS, no external resources
+- [x] A4:All untrusted JSON values escaped via html.escape
+- [x] A5:Report includes game, player, timeline, decision, consensus, trace, failure sections
+- [x] A6:Report labels `[DeepSeek API output]` and boundary statement
+- [x] A7:Tests cover context, HTML content, escaping, and CLI output
+- [x] A8:Full unittest and compile check pass
+- [x] A9:No dependency/provider/engine/scoring/.tmp changes committed
+- [x] A10:Review packet contains all required machine evidence
+- [x] A11:Forbidden scan differentiates test literals from rendered HTML
 
 ## Implementer Risk Notes
-- urllib default transport only used inside --allow-live-api guard; tests inject fake transport
-- run_deepseek_provider_game.py default out-dir is .tmp/ not committed
+- Committed HTML is a replay artifact for G1f smoke-test output; it does not call live APIs.
+- `.tmp/` exists locally and must remain untracked/out of PR scope.
+- `build_review_packet.py` is not part of `main...HEAD` and should remain unchanged for this PR.
 
 ## Review Trigger Result
-**RISK_TRIGGERS_FIRED**
-- changed_file_count=10 > 8
-- changed_lines=1080 > 500
-- key_hunks_truncated
-- forbidden_pattern_risk=provider
+NO_BLOCKING_TRIGGER
 
-PACKET_TOO_LARGE = NO
+- PACKET_TOO_LARGE = NO
+- ALLOWLIST_CHECK = PASS
+- FORBIDDEN_PATTERN_CHECK = PASS
+- HTML_OUTPUT_SAFETY_CHECK = PASS
+- TESTS = PASS
