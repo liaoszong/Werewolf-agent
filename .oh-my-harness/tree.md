@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 198
+- Entries: 181
 
 ```text
 ./
@@ -51,27 +51,6 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   └── review/
 │       └── latest/
 │           └── review-packet.md
-├── .tmp/
-│   ├── g1e-live-smoke/
-│   │   ├── decision-log.json
-│   │   ├── failure-audit.json
-│   │   ├── game-log.json
-│   │   └── provider-trace.json
-│   ├── g1e-live-smoke-2/
-│   │   ├── decision-log.json
-│   │   ├── failure-audit.json
-│   │   ├── game-log.json
-│   │   └── provider-trace.json
-│   ├── g1f-deepseek-consensus-smoke/
-│   │   ├── consensus-log.json
-│   │   ├── decision-log.json
-│   │   ├── failure-audit.json
-│   │   ├── game-log.json
-│   │   └── provider-trace.json
-│   ├── g1d-failure-audit.json
-│   ├── g1d-failure-provider-trace.json
-│   ├── g1d-metrics-test.json
-│   └── g1d-score-test.json
 ├── docs/
 │   ├── adr/
 │   │   └── 0001-client-agnostic-live-observer-protocol.md
