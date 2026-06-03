@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 192
+- Entries: 197
 
 ```text
 ./
@@ -141,7 +141,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   │   ├── 2026-06-02--g1g-provider-replay-html-plan.md
 │   │   │   ├── 2026-06-02--g1h-decision-round-scoring-disambiguation-plan.md
 │   │   │   ├── 2026-06-03--g1h-contract-closeout-route-docs-alignment-plan.md
-│   │   │   └── 2026-06-03--g1h-live-runtime-event-spine-plan.md
+│   │   │   ├── 2026-06-03--g1h-live-runtime-event-spine-plan.md
+│   │   │   └── 2026-06-03--g2a-local-observer-server-protocol-control-plane-plan.md
 │   │   └── reviews/
 │   │       ├── 2026-06-01--g1c-project-healthcheck-final.md
 │   │       ├── 2026-06-01--g1c-project-healthcheck.md
@@ -187,6 +188,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       ├── game_engine.py
 │       ├── game_log.py
 │       ├── log_bundle.py
+│       ├── observer_protocol.py
+│       ├── observer_server.py
 │       ├── provider_agent.py
 │       ├── provider_contract.py
 │       ├── render_demo.py
@@ -225,6 +228,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── test_game_engine.py
 │   ├── test_game_log.py
 │   ├── test_log_bundle.py
+│   ├── test_observer_protocol.py
+│   ├── test_observer_server.py
 │   ├── test_provider_contract.py
 │   ├── test_render_demo.py
 │   ├── test_render_provider_replay.py
