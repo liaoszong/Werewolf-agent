@@ -34,11 +34,13 @@ class ProviderAgent:
         provider: Any,
         override_raw_content: str | None = None,
         failure_mode: str | None = None,
+        runtime_events: Any | None = None,
     ) -> None:
         self._player_id = player_id
         self._provider = provider
         self._override_raw_content = override_raw_content
         self._failure_mode = failure_mode
+        self._runtime_events = runtime_events
         self._failures: list[ProviderFailure] = []
 
     @property
@@ -48,6 +50,26 @@ class ProviderAgent:
     @property
     def failures(self) -> list[ProviderFailure]:
         return list(self._failures)
+
+    def _emit_provider_event(
+        self,
+        kind: str,
+        *,
+        round: int,
+        phase: str,
+        actor: str,
+        payload: dict[str, object] | None = None,
+    ) -> None:
+        """Emit an event via the optional runtime event writer."""
+        if self._runtime_events is not None:
+            self._runtime_events.emit(
+                kind,
+                round=round,
+                phase=phase,
+                actor=actor,
+                visibility="internal",
+                payload=payload,
+            )
 
     def decide(self, observation: AgentObservation | dict[str, Any]) -> AgentAction:
         if isinstance(observation, dict):
@@ -85,6 +107,13 @@ class ProviderAgent:
                 kind="timeout",
                 reason=f"{actor} timed out",
             )
+            self._emit_provider_event(
+                "provider_timeout",
+                round=round_num,
+                phase=phase,
+                actor=actor,
+                payload={"request_id": request_id, "kind": "timeout"},
+            )
             raise ProviderActionError(failure)
 
         request = ProviderRequest(
@@ -96,6 +125,18 @@ class ProviderAgent:
             observation=observation.to_dict(),
             allowed_actions=allowed_actions,
             allowed_targets=allowed_targets,
+        )
+
+        self._emit_provider_event(
+            "provider_request_prepared",
+            round=round_num,
+            phase=phase,
+            actor=actor,
+            payload={
+                "request_id": request_id,
+                "allowed_actions": allowed_actions,
+                "allowed_targets": allowed_targets,
+            },
         )
 
         try:
@@ -110,7 +151,27 @@ class ProviderAgent:
                 kind="timeout",
                 reason=f"provider error: {exc}",
             )
+            self._emit_provider_event(
+                "provider_failed",
+                round=round_num,
+                phase=phase,
+                actor=actor,
+                payload={"request_id": request_id, "kind": "timeout", "reason": str(exc)},
+            )
             raise ProviderActionError(failure) from exc
+
+        self._emit_provider_event(
+            "provider_response_received",
+            round=round_num,
+            phase=phase,
+            actor=actor,
+            payload={
+                "request_id": request_id,
+                "provider_name": response.provider_name,
+                "latency_ms": response.latency_ms,
+                "token_usage": dict(response.token_usage),
+            },
+        )
 
         raw = self._override_raw_content if self._override_raw_content is not None else response.raw_content
 
@@ -126,6 +187,13 @@ class ProviderAgent:
                 kind="parse_failure",
                 reason=f"provider response was not valid JSON: {exc}",
             )
+            self._emit_provider_event(
+                "provider_parse_failed",
+                round=round_num,
+                phase=phase,
+                actor=actor,
+                payload={"request_id": request_id, "kind": "parse_failure", "reason": str(exc)},
+            )
             raise ProviderActionError(failure) from exc
 
         if not isinstance(parsed, dict):
@@ -137,6 +205,13 @@ class ProviderAgent:
                 actor=actor,
                 kind="parse_failure",
                 reason="provider response is not a JSON object",
+            )
+            self._emit_provider_event(
+                "provider_parse_failed",
+                round=round_num,
+                phase=phase,
+                actor=actor,
+                payload={"request_id": request_id, "kind": "parse_failure", "reason": "not a JSON object"},
             )
             raise ProviderActionError(failure)
 
@@ -157,6 +232,13 @@ class ProviderAgent:
                 kind="parse_failure",
                 reason=f"provider response missing required field(s): {', '.join(missing)}",
             )
+            self._emit_provider_event(
+                "provider_parse_failed",
+                round=round_num,
+                phase=phase,
+                actor=actor,
+                payload={"request_id": request_id, "kind": "parse_failure", "reason": f"missing fields: {', '.join(missing)}"},
+            )
             raise ProviderActionError(failure)
 
         reason_summary = parsed["reason_summary"]
@@ -173,6 +255,13 @@ class ProviderAgent:
                 kind="parse_failure",
                 reason="provider response missing valid 'action' field",
             )
+            self._emit_provider_event(
+                "provider_parse_failed",
+                round=round_num,
+                phase=phase,
+                actor=actor,
+                payload={"request_id": request_id, "kind": "parse_failure", "reason": "missing valid action field"},
+            )
             raise ProviderActionError(failure)
 
         # confidence must be a valid number
@@ -188,6 +277,13 @@ class ProviderAgent:
                 kind="parse_failure",
                 reason=f"provider response has invalid confidence: {confidence_raw!r} is not a number",
             )
+            self._emit_provider_event(
+                "provider_parse_failed",
+                round=round_num,
+                phase=phase,
+                actor=actor,
+                payload={"request_id": request_id, "kind": "parse_failure", "reason": f"invalid confidence: {confidence_raw!r}"},
+            )
             raise ProviderActionError(failure)
 
         if action_name not in allowed_actions:
@@ -200,6 +296,19 @@ class ProviderAgent:
                 kind="invalid_action",
                 reason=f"action '{action_name}' not in allowed_actions {allowed_actions}",
                 target=target,
+            )
+            self._emit_provider_event(
+                "provider_action_invalid",
+                round=round_num,
+                phase=phase,
+                actor=actor,
+                payload={
+                    "request_id": request_id,
+                    "kind": "invalid_action",
+                    "action": action_name,
+                    "target": target,
+                    "reason": f"action '{action_name}' not in allowed_actions",
+                },
             )
             raise ProviderActionError(failure)
 
@@ -214,7 +323,28 @@ class ProviderAgent:
                 reason=f"target '{target}' not in allowed_targets {allowed_targets}",
                 target=target,
             )
+            self._emit_provider_event(
+                "provider_action_invalid",
+                round=round_num,
+                phase=phase,
+                actor=actor,
+                payload={
+                    "request_id": request_id,
+                    "kind": "invalid_action",
+                    "action": action_name,
+                    "target": target,
+                    "reason": f"target '{target}' not in allowed_targets",
+                },
+            )
             raise ProviderActionError(failure)
+
+        self._emit_provider_event(
+            "provider_parse_succeeded",
+            round=round_num,
+            phase=phase,
+            actor=actor,
+            payload={"request_id": request_id},
+        )
 
         return AgentAction(
             actor=actor,

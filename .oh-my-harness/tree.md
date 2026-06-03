@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 181
+- Entries: 185
 
 ```text
 ./
@@ -184,8 +184,10 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       ├── run_deepseek_consensus_game.py
 │       ├── run_deepseek_provider_game.py
 │       ├── run_fake_provider_game.py
+│       ├── run_g1h_fake_runtime.py
 │       ├── run_mock_game.py
 │       ├── run_scripted_game.py
+│       ├── runtime_events.py
 │       ├── score_game.py
 │       ├── scoring.py
 │       ├── scripted_game.py
@@ -209,12 +211,14 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── test_failure_audit.py
 │   ├── test_fake_provider_game.py
 │   ├── test_fake_provider.py
+│   ├── test_g1h_runtime_spine.py
 │   ├── test_game_engine.py
 │   ├── test_game_log.py
 │   ├── test_log_bundle.py
 │   ├── test_provider_contract.py
 │   ├── test_render_demo.py
 │   ├── test_render_provider_replay.py
+│   ├── test_runtime_events.py
 │   ├── test_scoring.py
 │   ├── test_scripted_game_runner.py
 │   ├── test_semantic_label_research.py

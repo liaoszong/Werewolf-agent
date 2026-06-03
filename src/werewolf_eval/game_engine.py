@@ -3,6 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from werewolf_eval.runtime_events import (
+    build_god_snapshot,
+    build_role_projection_snapshot,
+)
+
 MOCK_AGENT_SOURCE_LABEL = "[deterministic mock agent output]"
 CONSENSUS_SOURCE_LABEL = "[deterministic mock agent output]"
 
@@ -216,6 +221,7 @@ class GameEngine:
         agents: dict[str, Any] | None = None,
         wolf_agent: Any | None = None,
         source_label: str | None = None,
+        runtime_events: Any | None = None,
     ) -> None:
         self._config = config
         self._players_by_id: dict[str, EnginePlayer] = {
@@ -229,6 +235,7 @@ class GameEngine:
             }
         self._wolf_agent = wolf_agent if wolf_agent is not None else WolfTeamMockAgent()
         self._source_label = source_label if source_label is not None else MOCK_AGENT_SOURCE_LABEL
+        self._runtime_events = runtime_events
         self._events: list[dict[str, Any]] = []
         self._decisions: list[dict[str, Any]] = []
         self._alive: set[str] = set(self._players_by_id.keys())
@@ -242,8 +249,9 @@ class GameEngine:
         agents: dict[str, Any] | None = None,
         wolf_agent: Any | None = None,
         source_label: str | None = None,
+        runtime_events: Any | None = None,
     ) -> "GameEngine":
-        return cls(config, agents=agents, wolf_agent=wolf_agent, source_label=source_label)
+        return cls(config, agents=agents, wolf_agent=wolf_agent, source_label=source_label, runtime_events=runtime_events)
 
     def observation_for(self, player_id: str) -> AgentObservation:
         player = self._players_by_id[player_id]
@@ -500,6 +508,15 @@ class GameEngine:
             evt = _event(_event_seq, phase, rnd, etype, actor, target, visibility, summary, refs)
             events.append(evt)
             _event_seq += 1
+            if self._runtime_events is not None:
+                self._runtime_events.emit(
+                    "game_event_emitted",
+                    round=rnd,
+                    phase=phase,
+                    actor=actor,
+                    visibility=visibility,
+                    payload={"event_id": evt["event_id"], "type": etype},
+                )
             return evt
 
         def _decision(actor: str, scope: str, phase: str, action: str, target: str, dtype: str, reason: str, refs: list[str] | None = None, consensus_id: str | None = None) -> dict[str, Any]:
@@ -537,32 +554,100 @@ class GameEngine:
             return result
 
         def _wolf_obs(phase: str, rnd: int, wolf_players: list[str]) -> AgentObservation:
-            return AgentObservation(
+            obs = AgentObservation(
                 game_id=game_id, player_id="wolf_team", role="werewolf", team="werewolf",
                 phase=phase, round=rnd, alive_players=sorted(alive),
                 public_event_ids=_public_refs(),
                 private_event_ids=[e["event_id"] for e in events],
                 known_roles={pid: "werewolf" for pid in wolf_players},
             )
+            if self._runtime_events is not None:
+                self._runtime_events.emit(
+                    "observation_built",
+                    round=rnd, phase=phase, actor="wolf_team",
+                    visibility="internal",
+                )
+            return obs
 
         def _player_obs(player_id: str, phase: str, rnd: int) -> AgentObservation:
             p = self._players_by_id[player_id]
-            return AgentObservation(
+            obs = AgentObservation(
                 game_id=game_id, player_id=player_id, role=p.role, team=p.team,
                 phase=phase, round=rnd, alive_players=sorted(alive),
                 public_event_ids=_public_refs(),
                 private_event_ids=_private_refs(player_id),
                 known_roles={player_id: p.role},
             )
+            if self._runtime_events is not None:
+                self._runtime_events.emit(
+                    "observation_built",
+                    round=rnd, phase=phase, actor=player_id,
+                    visibility="internal",
+                )
+            return obs
 
         # Event 1: setup
+        if self._runtime_events is not None:
+            self._runtime_events.emit(
+                "run_started",
+                round=0, phase="setup", actor="system",
+                visibility="internal",
+                payload={"game_id": game_id},
+            )
+            self._runtime_events.emit(
+                "phase_started",
+                round=0, phase="setup", actor="system",
+                visibility="internal",
+                payload={"phase": "setup"},
+            )
         _emit("setup", 0, "role_assignment", "system", "none", "public",
               "Roles assigned to all 6 players.")
+        # God snapshot after setup
+        if self._runtime_events is not None:
+            players_list = [
+                {"player_id": p.player_id, "role": p.role, "team": p.team}
+                for p in self._config.players
+            ]
+            snap = build_god_snapshot(
+                run_id=game_id,
+                game_id=game_id,
+                round=0,
+                phase="setup",
+                players=players_list,
+                alive_players=sorted(self._players_by_id.keys()),
+                public_event_ids=[],
+                private_event_ids=[],
+            )
+            self._runtime_events.write_snapshot(
+                "setup_god_view", snap,
+                visibility="internal", round=0, phase="setup", actor="system",
+            )
 
         # Night 1: wolf kill
+        if self._runtime_events is not None:
+            self._runtime_events.emit(
+                "phase_started",
+                round=1, phase="night", actor="system",
+                visibility="internal",
+                payload={"phase": "night"},
+            )
         if is_consensus_mode:
             n1_wolves = ["p1", "p2"]
+            if self._runtime_events is not None:
+                self._runtime_events.emit(
+                    "consensus_started",
+                    round=1, phase="night", actor="system",
+                    visibility="internal",
+                    payload={"mode": mode, "participants": n1_wolves},
+                )
             c_entry, c_failures, c_target = self._resolve_wolf_consensus(game_id, 1, "night", n1_wolves, alive, mode, events)
+            if self._runtime_events is not None:
+                self._runtime_events.emit(
+                    "consensus_resolved",
+                    round=1, phase="night", actor="system",
+                    visibility="internal",
+                    payload={"resolved": c_target is not None, "target": c_target},
+                )
             if c_entry is not None:
                 consensus_entries.append(c_entry)
             failure_records.extend(c_failures)
@@ -572,25 +657,88 @@ class GameEngine:
                 decisions.append(_decision(d_actor, "team", "night", "werewolf_kill", c_target, "team_coordinated", f"wolf team kills {c_target}", consensus_id=cid))
                 _emit("night", 1, "werewolf_kill", d_actor, c_target, "werewolf_team", f"Wolf team kills {c_target}.")
         else:
-            wa1 = self._wolf_agent.decide(_wolf_obs("night", 1, ["p1", "p2"]))
+            obs_wolf_n1 = _wolf_obs("night", 1, ["p1", "p2"])
+            if self._runtime_events is not None:
+                snap = build_role_projection_snapshot(run_id=game_id, observation=obs_wolf_n1)
+                self._runtime_events.write_snapshot(
+                    "obs_wolf_n1", snap,
+                    visibility="internal", round=1, phase="night", actor="wolf_team",
+                )
+            wa1 = self._wolf_agent.decide(obs_wolf_n1)
+            if self._runtime_events is not None:
+                self._runtime_events.emit(
+                    "agent_action_selected",
+                    round=1, phase="night", actor=wa1.actor,
+                    visibility="internal",
+                    payload={"action": wa1.action, "target": wa1.target},
+                )
             decisions.append(_decision(wa1.actor, "team", wa1.phase, wa1.action, wa1.target, wa1.decision_type, wa1.reason_summary))
             _emit("night", 1, wa1.action, wa1.actor, wa1.target, "werewolf_team", f"Wolf team kills {wa1.target}.")
 
         # Night 1: seer check
-        sa1 = self._mock_agents["p3"].decide(_player_obs("p3", "night", 1))
+        obs_p3_n1 = _player_obs("p3", "night", 1)
+        if self._runtime_events is not None:
+            snap = build_role_projection_snapshot(run_id=game_id, observation=obs_p3_n1)
+            self._runtime_events.write_snapshot(
+                "obs_p3_n1", snap,
+                visibility="internal", round=1, phase="night", actor="p3",
+            )
+        sa1 = self._mock_agents["p3"].decide(obs_p3_n1)
+        if self._runtime_events is not None:
+            self._runtime_events.emit(
+                "agent_action_selected",
+                round=1, phase="night", actor=sa1.actor,
+                visibility="internal",
+                payload={"action": sa1.action, "target": sa1.target},
+            )
         decisions.append(_decision(sa1.actor, "single", sa1.phase, sa1.action, sa1.target, sa1.decision_type, sa1.reason_summary))
         _emit("night", 1, sa1.action, sa1.actor, sa1.target, "seer", f"Seer p3 checks p1, result: werewolf.")
 
         # Night 1: witch save
-        wa2 = self._mock_agents["p4"].decide(_player_obs("p4", "night", 1))
+        obs_p4_n1 = _player_obs("p4", "night", 1)
+        if self._runtime_events is not None:
+            snap = build_role_projection_snapshot(run_id=game_id, observation=obs_p4_n1)
+            self._runtime_events.write_snapshot(
+                "obs_p4_n1", snap,
+                visibility="internal", round=1, phase="night", actor="p4",
+            )
+        wa2 = self._mock_agents["p4"].decide(obs_p4_n1)
+        if self._runtime_events is not None:
+            self._runtime_events.emit(
+                "agent_action_selected",
+                round=1, phase="night", actor=wa2.actor,
+                visibility="internal",
+                payload={"action": wa2.action, "target": wa2.target},
+            )
         decisions.append(_decision(wa2.actor, "single", wa2.phase, wa2.action, wa2.target, wa2.decision_type, wa2.reason_summary))
         _emit("night", 1, wa2.action, wa2.actor, wa2.target, "witch", f"Witch p4 saves p5.")
 
         # Day 1: votes (p3, p4, p5, p6 → p1)
+        if self._runtime_events is not None:
+            self._runtime_events.emit(
+                "phase_started",
+                round=1, phase="day", actor="system",
+                visibility="internal",
+                payload={"phase": "day"},
+            )
         day1_voters = ["p3", "p4", "p5", "p6"]
         day1_refs = _public_refs()
         for vid in day1_voters:
-            va = self._mock_agents[vid].decide(_player_obs(vid, "day", 1))
+            obs_vid = _player_obs(vid, "day", 1)
+            if self._runtime_events is not None:
+                snap = build_role_projection_snapshot(run_id=game_id, observation=obs_vid)
+                self._runtime_events.write_snapshot(
+                    f"obs_{vid}_d1", snap,
+                    visibility="internal", round=1, phase="day", actor=vid,
+                )
+            va = self._mock_agents[vid].decide(obs_vid)
+            if self._runtime_events is not None:
+                self._runtime_events.emit(
+                    "agent_action_selected",
+                    round=1, phase="day", actor=va.actor,
+                    visibility="internal",
+                    payload={"action": va.action, "target": va.target},
+                )
             decisions.append(_decision(va.actor, "single", va.phase, va.action, va.target, va.decision_type, va.reason_summary, refs=day1_refs))
             _emit("day", 1, va.action, va.actor, va.target, "public", f"{vid} votes {va.target}.")
 
@@ -600,9 +748,30 @@ class GameEngine:
         alive.discard("p1")
 
         # Night 2: wolf kill
+        if self._runtime_events is not None:
+            self._runtime_events.emit(
+                "phase_started",
+                round=2, phase="night", actor="system",
+                visibility="internal",
+                payload={"phase": "night"},
+            )
         if is_consensus_mode:
             n2_wolves = ["p2"]
+            if self._runtime_events is not None:
+                self._runtime_events.emit(
+                    "consensus_started",
+                    round=2, phase="night", actor="system",
+                    visibility="internal",
+                    payload={"mode": mode, "participants": n2_wolves},
+                )
             c_entry, c_failures, c_target = self._resolve_wolf_consensus(game_id, 2, "night", n2_wolves, alive, mode, events)
+            if self._runtime_events is not None:
+                self._runtime_events.emit(
+                    "consensus_resolved",
+                    round=2, phase="night", actor="system",
+                    visibility="internal",
+                    payload={"resolved": c_target is not None, "target": c_target},
+                )
             if c_entry is not None:
                 consensus_entries.append(c_entry)
             failure_records.extend(c_failures)
@@ -612,17 +781,52 @@ class GameEngine:
                 decisions.append(_decision(d_actor, "team", "night", "werewolf_kill", c_target, "team_coordinated", f"wolf team kills {c_target}", consensus_id=cid))
                 _emit("night", 2, "werewolf_kill", d_actor, c_target, "werewolf_team", f"Wolf team kills {c_target}.")
         else:
-            wa3 = self._wolf_agent.decide(_wolf_obs("night", 2, ["p2"]))
+            obs_wolf_n2 = _wolf_obs("night", 2, ["p2"])
+            if self._runtime_events is not None:
+                snap = build_role_projection_snapshot(run_id=game_id, observation=obs_wolf_n2)
+                self._runtime_events.write_snapshot(
+                    "obs_wolf_n2", snap,
+                    visibility="internal", round=2, phase="night", actor="wolf_team",
+                )
+            wa3 = self._wolf_agent.decide(obs_wolf_n2)
+            if self._runtime_events is not None:
+                self._runtime_events.emit(
+                    "agent_action_selected",
+                    round=2, phase="night", actor=wa3.actor,
+                    visibility="internal",
+                    payload={"action": wa3.action, "target": wa3.target},
+                )
             decisions.append(_decision(wa3.actor, "team", wa3.phase, wa3.action, wa3.target, wa3.decision_type, wa3.reason_summary))
             _emit("night", 2, wa3.action, wa3.actor, wa3.target, "werewolf_team", f"Wolf team kills {wa3.target}.")
         _emit("night", 2, "player_died", "system", "p3", "all", "p3 died during the night.")
         alive.discard("p3")
 
         # Day 2: votes (p4, p5, p6 → p2)
+        if self._runtime_events is not None:
+            self._runtime_events.emit(
+                "phase_started",
+                round=2, phase="day", actor="system",
+                visibility="internal",
+                payload={"phase": "day"},
+            )
         day2_voters = ["p4", "p5", "p6"]
         day2_refs = _public_refs()
         for vid in day2_voters:
-            va = self._mock_agents[vid].decide(_player_obs(vid, "day", 2))
+            obs_vid = _player_obs(vid, "day", 2)
+            if self._runtime_events is not None:
+                snap = build_role_projection_snapshot(run_id=game_id, observation=obs_vid)
+                self._runtime_events.write_snapshot(
+                    f"obs_{vid}_d2", snap,
+                    visibility="internal", round=2, phase="day", actor=vid,
+                )
+            va = self._mock_agents[vid].decide(obs_vid)
+            if self._runtime_events is not None:
+                self._runtime_events.emit(
+                    "agent_action_selected",
+                    round=2, phase="day", actor=va.actor,
+                    visibility="internal",
+                    payload={"action": va.action, "target": va.target},
+                )
             decisions.append(_decision(va.actor, "single", va.phase, va.action, va.target, va.decision_type, va.reason_summary, refs=day2_refs))
             _emit("day", 2, va.action, va.actor, va.target, "public", f"{vid} votes {va.target}.")
 
@@ -632,7 +836,34 @@ class GameEngine:
         alive.discard("p2")
 
         # Game end
+        if self._runtime_events is not None:
+            self._runtime_events.emit(
+                "phase_started",
+                round=2, phase="game_end", actor="system",
+                visibility="internal",
+                payload={"phase": "game_end"},
+            )
         _emit("game_end", 2, "game_over", "system", "villager_team", "all", "All werewolves eliminated. Villager team wins.")
+        # Final god snapshot
+        if self._runtime_events is not None:
+            players_list = [
+                {"player_id": p.player_id, "role": p.role, "team": p.team}
+                for p in self._config.players
+            ]
+            snap = build_god_snapshot(
+                run_id=game_id,
+                game_id=game_id,
+                round=2,
+                phase="game_end",
+                players=players_list,
+                alive_players=sorted(alive),
+                public_event_ids=_public_refs(),
+                private_event_ids=[],
+            )
+            self._runtime_events.write_snapshot(
+                "final_god_view", snap,
+                visibility="internal", round=2, phase="game_end", actor="system",
+            )
 
         game_log: dict[str, Any] = {
             "game_id": game_id,

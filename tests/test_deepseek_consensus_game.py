@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
+import sys
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -11,6 +14,7 @@ from werewolf_eval.decision_log import load_decision_log, validate_decision_log
 from werewolf_eval.run_deepseek_consensus_game import (
     run_deepseek_consensus_game_with_provider_factory,
 )
+from werewolf_eval.runtime_events import read_events_jsonl
 
 
 class _FakeDeepSeekProvider:
@@ -182,6 +186,59 @@ class DeepSeekConsensusGameCliTests(unittest.TestCase):
                 (out_dir / "failure-audit.json").read_text(encoding="utf-8")
             )
             self.assertGreater(len(failure_audit["failures"]), 0)
+
+    def test_helper_with_runtime_spine_writes_events_and_manifest(self) -> None:
+        with TemporaryDirectory() as tmp:
+            out_dir = Path(tmp)
+            exit_code = run_deepseek_consensus_game_with_provider_factory(
+                game_id="g1h_test_spine",
+                out_dir=out_dir,
+                provider_factory=_fake_provider_factory,
+                write_runtime_spine=True,
+            )
+            self.assertEqual(exit_code, 0)
+
+            self.assertTrue((out_dir / "events.jsonl").exists())
+            self.assertTrue((out_dir / "prompt-manifest.json").exists())
+            self.assertTrue((out_dir / "snapshots").is_dir())
+            snapshot_files = list((out_dir / "snapshots").glob("*.json"))
+            self.assertGreater(len(snapshot_files), 0)
+
+            events = read_events_jsonl(out_dir / "events.jsonl")
+            self.assertGreater(len(events), 0)
+            seqs = [int(e["seq"]) for e in events]
+            self.assertEqual(seqs, sorted(seqs))
+
+            manifest = json.loads(
+                (out_dir / "prompt-manifest.json").read_text(encoding="utf-8")
+            )
+            self.assertTrue(manifest.get("secrets_redacted"))
+
+            self.assertTrue((out_dir / "game-log.json").exists())
+            self.assertTrue((out_dir / "decision-log.json").exists())
+            self.assertTrue((out_dir / "consensus-log.json").exists())
+            self.assertTrue((out_dir / "provider-trace.json").exists())
+            self.assertTrue((out_dir / "failure-audit.json").exists())
+
+            parsed_game = load_game_log(out_dir / "game-log.json")
+            validate_game_log(parsed_game)
+
+    def test_cli_write_runtime_spine_without_allow_live_api_exits_nonzero(self) -> None:
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "werewolf_eval.run_deepseek_consensus_game",
+                "--write-runtime-spine",
+            ],
+            capture_output=True,
+            text=True,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("live_api=disabled", result.stdout)
+        self.assertIn("game_log=not_written", result.stdout)
+        self.assertIn("decision_log=not_written", result.stdout)
+        self.assertIn("consensus_log=not_written", result.stdout)
 
 
 if __name__ == "__main__":
