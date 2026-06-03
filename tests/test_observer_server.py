@@ -744,3 +744,99 @@ class ObserverServerProjectionEndpointTests(TestCase):
                      "players", "events", "hidden_event_count", "snapshots",
                      "hidden_snapshot_count", "proof"):
             self.assertIn(key, result)
+
+
+# ---------------------------------------------------------------------------
+# ObserverServerVisibilityNonLeakTests (G2c Task 5)
+# ---------------------------------------------------------------------------
+
+
+class ObserverServerVisibilityNonLeakTests(TestCase):
+    """Test that projection endpoints do not leak role information."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls._tmp = TemporaryDirectory()
+        cls._tmp_path = Path(cls._tmp.name)
+        cls._server, cls._base_url = _start_server(cls._tmp_path)
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls._server.shutdown()
+        cls._tmp.cleanup()
+
+    def _make_nonleak_fixture(self, run_id: str) -> None:
+        """Create a run with werewolf (p3, p4) and seer (p1) players."""
+        run_dir = self._tmp_path / run_id
+        run_dir.mkdir()
+        (run_dir / "events.jsonl").write_text(
+            json.dumps(_event("game_started", "public", 0)) + "\n",
+            encoding="utf-8",
+        )
+        snap_dir = run_dir / "snapshots"
+        snap_dir.mkdir()
+        (snap_dir / "role-p1-r1.json").write_text(json.dumps({
+            "snapshot_type": "role_projection",
+            "player_id": "p1", "role": "seer", "team": "villager",
+            "round": 1, "phase": "night",
+            "alive_players": ["p1", "p2", "p3", "p4", "p5", "p6"],
+            "projected_known_roles": {"p1": "seer", "p3": "unknown", "p4": "unknown"},
+        }), encoding="utf-8")
+        (snap_dir / "role-p3-r1.json").write_text(json.dumps({
+            "snapshot_type": "role_projection",
+            "player_id": "p3", "role": "werewolf", "team": "werewolf",
+            "round": 1, "phase": "night",
+            "alive_players": ["p1", "p2", "p3", "p4", "p5", "p6"],
+            "projected_known_roles": {"p1": "unknown", "p3": "werewolf", "p4": "werewolf"},
+        }), encoding="utf-8")
+        (snap_dir / "role-p4-r1.json").write_text(json.dumps({
+            "snapshot_type": "role_projection",
+            "player_id": "p4", "role": "werewolf", "team": "werewolf",
+            "round": 1, "phase": "night",
+            "alive_players": ["p1", "p2", "p3", "p4", "p5", "p6"],
+            "projected_known_roles": {"p1": "unknown", "p3": "werewolf", "p4": "werewolf"},
+        }), encoding="utf-8")
+
+    def test_public_projection_response_does_not_contain_werewolf_role_labels(self) -> None:
+        self._make_nonleak_fixture("leak_public")
+        text = _request_text(
+            self._base_url, "/api/runs/leak_public/projection?perspective=public"
+        )
+        self.assertNotIn('"display_role":"werewolf"', text)
+        self.assertNotIn('"display_team":"werewolf"', text)
+
+    def test_role_projection_response_does_not_contain_other_hidden_roles(self) -> None:
+        self._make_nonleak_fixture("leak_role")
+        result = _request_json(
+            self._base_url, "/api/runs/leak_role/projection?perspective=role:p1"
+        )
+        self.assertIsInstance(result, dict)
+        players = result.get("players", [])  # type: ignore[union-attr]
+        # p1 is seer, should NOT expose werewolf roles for p3/p4
+        for p in players:
+            if p.get("player_id") != "p1":
+                self.assertNotEqual(p.get("display_role"), "werewolf",
+                                    f"Leaked werewolf role for {p.get('player_id')}")
+
+    def test_team_werewolf_projection_response_does_not_contain_non_wolf_roles(self) -> None:
+        self._make_nonleak_fixture("leak_team")
+        result = _request_json(
+            self._base_url, "/api/runs/leak_team/projection?perspective=team:werewolf"
+        )
+        self.assertIsInstance(result, dict)
+        players = result.get("players", [])  # type: ignore[union-attr]
+        for p in players:
+            if p.get("display_role") != "unknown":
+                # If role is exposed, it must be werewolf team
+                self.assertIn(p.get("display_role"), ("werewolf",), 
+                              f"Non-wolf role exposed in team view: {p.get('display_role')}")
+
+    def test_projection_response_contains_no_absolute_paths(self) -> None:
+        self._make_nonleak_fixture("leak_paths")
+        text = _request_text(
+            self._base_url, "/api/runs/leak_paths/projection"
+        )
+        # Should not contain the temp directory absolute path
+        self.assertNotIn(self._tmp_path.as_posix(), text)
+        # Should not contain Windows-style absolute paths
+        self.assertNotIn(":\\", text)
