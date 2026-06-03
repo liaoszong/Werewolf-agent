@@ -9,13 +9,13 @@ ComboBox {
     property var perspectiveLabels: ({
         "god": "God View",
         "public": "Public",
-        "role:p1": "Role: p1 (Werewolf)",
-        "role:p2": "Role: p2 (Werewolf)",
-        "role:p3": "Role: p3 (Seer)",
-        "role:p4": "Role: p4 (Witch)",
-        "role:p5": "Role: p5 (Villager)",
-        "role:p6": "Role: p6 (Villager)",
-        "team:werewolf": "Team: Werewolf",
+        "role:p1": "Seat p1",
+        "role:p2": "Seat p2",
+        "role:p3": "Seat p3",
+        "role:p4": "Seat p4",
+        "role:p5": "Seat p5",
+        "role:p6": "Seat p6",
+        "team:werewolf": "Werewolf Team",
     })
 
     model: ["god", "public", "role:p1", "role:p2", "role:p3", "role:p4", "role:p5", "role:p6", "team:werewolf"]

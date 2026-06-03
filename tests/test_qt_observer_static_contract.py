@@ -302,5 +302,26 @@ class QtObserverVisibilityUiTests(unittest.TestCase):
         self.assertNotIn('role: "Seer"', content)
 
 
+class QtObserverPerspectiveSwitcherTrustTests(unittest.TestCase):
+    """G2c B档 gap fix: PerspectiveSwitcher must not leak role information in labels."""
+
+    def test_perspective_switcher_does_not_expose_role_names_in_labels(self) -> None:
+        content = (QT / "qml/components/PerspectiveSwitcher.qml").read_text(encoding="utf-8")
+        # Role labels must not contain role names that reveal hidden information
+        for role_name in ["Werewolf", "Seer", "Witch", "Villager"]:
+            # Check for patterns like "Role: p1 (Werewolf)" or "(Seer)" in label values
+            self.assertNotRegex(
+                content,
+                rf'"role:p\d+":\s*"[^"]*\({role_name}\)"',
+                f"PerspectiveSwitcher leaks role '{role_name}' in seat label",
+            )
+
+    def test_perspective_switcher_uses_generic_seat_labels(self) -> None:
+        content = (QT / "qml/components/PerspectiveSwitcher.qml").read_text(encoding="utf-8")
+        # Should use generic seat labels like "Seat p1" not "Role: p1 (Werewolf)"
+        self.assertIn("Seat p1", content)
+        self.assertIn("Seat p6", content)
+
+
 if __name__ == "__main__":
     unittest.main()

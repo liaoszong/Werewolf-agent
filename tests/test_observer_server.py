@@ -840,3 +840,80 @@ class ObserverServerVisibilityNonLeakTests(TestCase):
         self.assertNotIn(self._tmp_path.as_posix(), text)
         # Should not contain Windows-style absolute paths
         self.assertNotIn(":\\", text)
+
+
+# ---------------------------------------------------------------------------
+# ObserverServerProjectionDegradationTests (G2c B档 gap fix)
+# ---------------------------------------------------------------------------
+
+
+class ObserverServerProjectionDegradationTests(TestCase):
+    """Test projection endpoint degrades safely when artifacts are missing."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls._tmp = TemporaryDirectory()
+        cls._tmp_path = Path(cls._tmp.name)
+        cls._server, cls._base_url = _start_server(cls._tmp_path)
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls._server.shutdown()
+        cls._tmp.cleanup()
+
+    def test_projection_degrades_when_no_snapshots_exist(self) -> None:
+        """Run dir exists with events but no snapshots dir → insufficient_artifacts."""
+        run_dir = self._tmp_path / "degrade_no_snaps"
+        run_dir.mkdir()
+        (run_dir / "events.jsonl").write_text(
+            json.dumps(_event("game_started", "public", 0)) + "\n",
+            encoding="utf-8",
+        )
+        result = _request_json(
+            self._base_url, "/api/runs/degrade_no_snaps/projection?perspective=god"
+        )
+        self.assertIsInstance(result, dict)
+        proof = result.get("proof")  # type: ignore[union-attr]
+        self.assertIsInstance(proof, dict)
+        self.assertEqual(proof.get("source"), "insufficient_artifacts")
+
+    def test_projection_degrades_all_roles_unknown_without_snapshots(self) -> None:
+        """Without snapshots, non-god perspectives must show all roles as unknown."""
+        run_dir = self._tmp_path / "degrade_roles"
+        run_dir.mkdir()
+        (run_dir / "events.jsonl").write_text(
+            json.dumps(_event("game_started", "public", 0)) + "\n",
+            encoding="utf-8",
+        )
+        result = _request_json(
+            self._base_url, "/api/runs/degrade_roles/projection?perspective=public"
+        )
+        self.assertIsInstance(result, dict)
+        players = result.get("players", [])  # type: ignore[union-attr]
+        for p in players:
+            self.assertEqual(p["display_role"], "unknown")
+            self.assertEqual(p["display_team"], "unknown")
+
+    def test_projection_degrades_empty_events_jsonl(self) -> None:
+        """Run dir with empty events.jsonl and no snapshots → valid envelope with empty events."""
+        run_dir = self._tmp_path / "degrade_empty_events"
+        run_dir.mkdir()
+        (run_dir / "events.jsonl").write_text("", encoding="utf-8")
+        result = _request_json(
+            self._base_url, "/api/runs/degrade_empty_events/projection"
+        )
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result.get("contract_version"), "g2c.visibility.v1")  # type: ignore[union-attr]
+        self.assertEqual(result.get("events"), [])  # type: ignore[union-attr]
+        self.assertEqual(result.get("hidden_event_count"), 0)  # type: ignore[union-attr]
+
+    def test_projection_degrades_no_events_file(self) -> None:
+        """Run dir without events.jsonl at all → valid envelope with empty events."""
+        run_dir = self._tmp_path / "degrade_no_events"
+        run_dir.mkdir()
+        result = _request_json(
+            self._base_url, "/api/runs/degrade_no_events/projection?perspective=role:p1"
+        )
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result.get("contract_version"), "g2c.visibility.v1")  # type: ignore[union-attr]
+        self.assertEqual(result.get("events"), [])  # type: ignore[union-attr]

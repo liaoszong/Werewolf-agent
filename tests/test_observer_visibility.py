@@ -620,6 +620,151 @@ class VisibilityEnvelopeTests(unittest.TestCase):
             )
             self.assertEqual(envelope["proof"].get("team"), "werewolf")
 
+    def test_proof_rules_contain_expected_strings(self) -> None:
+        """proof.rules must include specific trust-chain rule descriptions."""
+        with tempfile.TemporaryDirectory() as td:
+            run_dir = _make_run_dir(Path(td), "run-1", [
+                _make_role_snapshot("role-p1-r1.json", "p1", "seer", "villager"),
+            ])
+            envelope = build_projection_envelope(
+                run_dir=run_dir,
+                run_id="run-1",
+                perspective="god",
+                events=[],
+            )
+            rules = envelope["proof"]["rules"]
+            self.assertIsInstance(rules, list)
+            self.assertGreaterEqual(len(rules), 3)
+            # Must mention role_projection trust
+            rules_text = " ".join(rules)
+            self.assertIn("role_projection", rules_text)
+            # Must mention non-god trust constraint
+            self.assertIn("non-god", rules_text)
+            # Must mention team:werewolf constraint
+            self.assertIn("team:werewolf", rules_text)
+
+    def test_proof_rules_are_consistent_across_perspectives(self) -> None:
+        """Base proof rules should be the same regardless of perspective."""
+        with tempfile.TemporaryDirectory() as td:
+            run_dir = _make_run_dir(Path(td), "run-1", [
+                _make_role_snapshot("role-p1-r1.json", "p1", "seer", "villager"),
+                _make_role_snapshot("role-p3-r1.json", "p3", "werewolf", "werewolf"),
+            ])
+            god_envelope = build_projection_envelope(
+                run_dir=run_dir, run_id="run-1", perspective="god", events=[],
+            )
+            public_envelope = build_projection_envelope(
+                run_dir=run_dir, run_id="run-1", perspective="public", events=[],
+            )
+            # Base rules list should be identical
+            self.assertEqual(god_envelope["proof"]["rules"], public_envelope["proof"]["rules"])
+
+
+# ---------------------------------------------------------------------------
+# B档 gap fix: seer-vs-witch cross-visibility test
+# ---------------------------------------------------------------------------
+
+
+class VisibilityCrossRoleEventTests(unittest.TestCase):
+    """Test that role-specific events are only visible to the correct role."""
+
+    def _make_seat_index_with_seer_and_witch(self) -> dict:
+        return {
+            "p1": {
+                "player_id": "p1", "role": "seer", "team": "villager",
+                "role_source": "role_projection_snapshot",
+                "team_source": "role_projection_snapshot",
+                "alive_source": "role_projection_snapshot",
+                "projected_known_roles": {},
+            },
+            "p2": {
+                "player_id": "p2", "role": "witch", "team": "villager",
+                "role_source": "role_projection_snapshot",
+                "team_source": "role_projection_snapshot",
+                "alive_source": "role_projection_snapshot",
+                "projected_known_roles": {},
+            },
+            "p3": {
+                "player_id": "p3", "role": "werewolf", "team": "werewolf",
+                "role_source": "role_projection_snapshot",
+                "team_source": "role_projection_snapshot",
+                "alive_source": "role_projection_snapshot",
+                "projected_known_roles": {},
+            },
+        }
+
+    def test_seer_sees_seer_events_but_witch_does_not(self) -> None:
+        """Seer (p1) can see seer-visibility events; witch (p2) cannot."""
+        index = self._make_seat_index_with_seer_and_witch()
+        seer_event = _make_event(visibility="seer")
+        # Seer sees it
+        visible, reason = event_visible_in_projection(seer_event, "role:p1", index)
+        self.assertTrue(visible)
+        self.assertEqual(reason, "seer_event")
+        # Witch does NOT see seer events
+        visible, reason = event_visible_in_projection(seer_event, "role:p2", index)
+        self.assertFalse(visible)
+        self.assertEqual(reason, "hidden")
+
+    def test_witch_sees_witch_events_but_seer_does_not(self) -> None:
+        """Witch (p2) can see witch-visibility events; seer (p1) cannot."""
+        index = self._make_seat_index_with_seer_and_witch()
+        witch_event = _make_event(visibility="witch")
+        # Witch sees it
+        visible, reason = event_visible_in_projection(witch_event, "role:p2", index)
+        self.assertTrue(visible)
+        self.assertEqual(reason, "witch_event")
+        # Seer does NOT see witch events
+        visible, reason = event_visible_in_projection(witch_event, "role:p1", index)
+        self.assertFalse(visible)
+        self.assertEqual(reason, "hidden")
+
+    def test_werewolf_cannot_see_seer_or_witch_events(self) -> None:
+        """Werewolf (p3) cannot see seer or witch role-specific events."""
+        index = self._make_seat_index_with_seer_and_witch()
+        seer_event = _make_event(visibility="seer")
+        witch_event = _make_event(visibility="witch")
+        visible, _ = event_visible_in_projection(seer_event, "role:p3", index)
+        self.assertFalse(visible)
+        visible, _ = event_visible_in_projection(witch_event, "role:p3", index)
+        self.assertFalse(visible)
+
+    def test_seer_cannot_see_werewolf_team_events(self) -> None:
+        """Seer (p1, villager team) cannot see werewolf_team events."""
+        index = self._make_seat_index_with_seer_and_witch()
+        wolf_event = _make_event(visibility="werewolf_team")
+        visible, _ = event_visible_in_projection(wolf_event, "role:p1", index)
+        self.assertFalse(visible)
+
+    def test_full_cross_role_event_matrix(self) -> None:
+        """Comprehensive matrix: each role perspective sees only its own events."""
+        index = self._make_seat_index_with_seer_and_witch()
+        events = [
+            _make_event(event_id="pub", visibility="public"),
+            _make_event(event_id="seer_ev", visibility="seer"),
+            _make_event(event_id="witch_ev", visibility="witch"),
+            _make_event(event_id="wolf_ev", visibility="werewolf_team"),
+            _make_event(event_id="internal_ev", visibility="internal"),
+        ]
+
+        # Seer (p1): public + seer
+        result = project_events(events, "role:p1", index)
+        visible_ids = {e["event_id"] for e in result["events"]}
+        self.assertEqual(visible_ids, {"pub", "seer_ev"})
+        self.assertEqual(result["hidden_event_count"], 3)
+
+        # Witch (p2): public + witch
+        result = project_events(events, "role:p2", index)
+        visible_ids = {e["event_id"] for e in result["events"]}
+        self.assertEqual(visible_ids, {"pub", "witch_ev"})
+        self.assertEqual(result["hidden_event_count"], 3)
+
+        # Werewolf (p3): public + werewolf_team
+        result = project_events(events, "role:p3", index)
+        visible_ids = {e["event_id"] for e in result["events"]}
+        self.assertEqual(visible_ids, {"pub", "wolf_ev"})
+        self.assertEqual(result["hidden_event_count"], 3)
+
 
 if __name__ == "__main__":
     unittest.main()
