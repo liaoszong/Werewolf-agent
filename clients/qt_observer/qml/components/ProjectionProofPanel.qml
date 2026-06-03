@@ -39,7 +39,7 @@ Rectangle {
         }
 
         Text {
-            text: "Self: " + (root.proof && root.proof.self_role ? root.proof.self_role : "N/A") + 
+            text: "Self: " + (root.proof && root.proof.self_role ? root.proof.self_role : "N/A") +
                   (root.proof && root.proof.self_team ? " (" + root.proof.self_team + ")" : "")
             font.pixelSize: 12
             color: "#555"

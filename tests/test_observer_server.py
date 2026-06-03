@@ -828,7 +828,7 @@ class ObserverServerVisibilityNonLeakTests(TestCase):
         for p in players:
             if p.get("display_role") != "unknown":
                 # If role is exposed, it must be werewolf team
-                self.assertIn(p.get("display_role"), ("werewolf",), 
+                self.assertIn(p.get("display_role"), ("werewolf",),
                               f"Non-wolf role exposed in team view: {p.get('display_role')}")
 
     def test_projection_response_contains_no_absolute_paths(self) -> None:
