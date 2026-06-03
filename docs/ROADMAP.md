@@ -48,7 +48,6 @@ The current main branch has completed:
 
 The current main branch has not completed:
 
-- Local observer server.
 - Qt/QML observer client.
 - Web observer client.
 - Prompt editor UI.
@@ -161,7 +160,8 @@ Goal: expose the G1h runtime event spine through local observer surfaces without
 
 #### G2a: Local Observer Server
 
-- Role: provide local REST/WebSocket access to run control, live events, snapshots, and historical run artifacts.
+- Status: `completed`.
+- Role: provide local REST access to run control, live events, snapshots, and historical run artifacts through a stdlib HTTP server with SSE live tailing.
 - Boundary: server protocol only; no rich client implementation.
 
 #### G2b: Qt Observer MVP
@@ -250,7 +250,7 @@ G1h event spine
 
 ## Current Priority
 
-G1h Live Runtime Event Spine is now `completed`. The next implementation candidate is G2a Local Observer Server / Protocol Control Plane.
+G1h Live Runtime Event Spine and G2a Local Observer Server / Protocol Control Plane are now `completed`. The next implementation candidate is G2b Qt Observer MVP.
 
 G1 series retrospective:
 - G1a proved fresh generated logs can feed validators, scoring, metrics, and replay demo.
