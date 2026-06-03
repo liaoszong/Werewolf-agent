@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 185
+- Entries: 192
 
 ```text
 ./
@@ -51,6 +51,12 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   └── review/
 │       └── latest/
 │           └── review-packet.md
+├── clients/
+│   └── qt_observer/
+│       ├── CMakeLists.txt
+│       ├── main.cpp
+│       ├── Main.qml
+│       └── README.md
 ├── docs/
 │   ├── adr/
 │   │   └── 0001-client-agnostic-live-observer-protocol.md
@@ -103,6 +109,9 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   ├── s5-semantic-label-eval-set.json
 │   │   └── s5-semantic-label-output.example.json
 │   ├── harness/
+│   │   ├── designs/
+│   │   │   ├── 2026-06-03--live-ai-werewolf-experiment-platform-charter.md
+│   │   │   └── 2026-06-03--live-ai-werewolf-experiment-platform-charter.zh.md
 │   │   ├── plans/
 │   │   │   ├── 2026-05-29--e1-game-log-parser-validation-plan.md
 │   │   │   ├── 2026-05-29--phase1-closure-phase2-boundary-alignment-plan.md
@@ -131,6 +140,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   │   ├── 2026-06-02--g1f-deepseek-consensus-smoke-plan.md
 │   │   │   ├── 2026-06-02--g1g-provider-replay-html-plan.md
 │   │   │   ├── 2026-06-02--g1h-decision-round-scoring-disambiguation-plan.md
+│   │   │   ├── 2026-06-03--g1h-contract-closeout-route-docs-alignment-plan.md
 │   │   │   └── 2026-06-03--g1h-live-runtime-event-spine-plan.md
 │   │   └── reviews/
 │   │       ├── 2026-06-01--g1c-project-healthcheck-final.md

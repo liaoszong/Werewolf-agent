@@ -22,3 +22,9 @@ docs/generated-context/current-task.ctx.md
 
 # API keys — never commit
 docs/secrets/api-keys.md
+
+# Qt observer local files
+clients/qt_observer/.qtcreator/
+clients/qt_observer/*.user
+clients/qt_observer/*.user.*
+clients/qt_observer/build/

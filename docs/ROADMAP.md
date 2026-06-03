@@ -44,10 +44,10 @@ The current main branch has completed:
 - G1e provider-backed single-game smoke.
 - G1f DeepSeek consensus smoke.
 - G1g provider replay HTML report.
+- G1h Live Runtime Event Spine.
 
 The current main branch has not completed:
 
-- G1h Live Runtime Event Spine.
 - Local observer server.
 - Qt/QML observer client.
 - Web observer client.
@@ -149,11 +149,11 @@ G-track route:
 
 #### G1h: Live Runtime Event Spine
 
-- Status: `next_candidate`.
+- Status: `completed`.
 - Role: turn real/fake provider single-game runtime into a client-agnostic event spine by emitting `events.jsonl`, runtime snapshots, prompt manifest, provider lifecycle events, and final standard log bundle compatibility.
 - Boundary: no Qt/QML client, no Web observer/server, no prompt editor UI, no multi-provider arena, no leaderboard, no scoring formula changes, no provider adapter behavior changes beyond event emission needed by the bound plan.
 
-G1a-G1g are retained as audit foundation, replay foundation, and log bundle / provider trace / failure audit foundation. Full live experiment platform work starts at G1h because a client cannot safely observe what the runtime does not first expose as a stable event stream.
+G1a-G1h are retained as audit foundation, replay foundation, runtime event spine foundation, and log bundle / provider trace / failure audit foundation. Full observer platform work proceeds through G2a because clients must consume a stable event stream through a protocol boundary.
 
 ### Phase 3+ / G2: observer route
 
@@ -167,6 +167,7 @@ Goal: expose the G1h runtime event spine through local observer surfaces without
 #### G2b: Qt Observer MVP
 
 - Role: first rich client direction. Qt/QML consumes the client-agnostic REST/WebSocket/event protocol and shows run status, player panels, event stream, provider trace summary, and audit links.
+- Scaffold: `clients/qt_observer` exists as a Qt6 Quick auto-generated starter project only. It is the intended G2b client workspace, not a completed observer client.
 - Boundary: Qt must not bind directly to Python runtime objects or private Python APIs.
 
 #### G2c: God View / Role View
@@ -249,7 +250,7 @@ G1h event spine
 
 ## Current Priority
 
-G1g provider replay HTML is now `completed`. The next implementation candidate is G1h Live Runtime Event Spine.
+G1h Live Runtime Event Spine is now `completed`. The next implementation candidate is G2a Local Observer Server / Protocol Control Plane.
 
 G1 series retrospective:
 - G1a proved fresh generated logs can feed validators, scoring, metrics, and replay demo.
@@ -262,9 +263,9 @@ G1 series retrospective:
 
 Immediate pivot:
 
-- Keep G1a-G1g as audit/replay/log-bundle foundation.
+- Keep G1a-G1h as audit/replay/log-bundle/event-spine foundation.
 - Do not extend the project by generating more HTML reports as the main user experience.
-- Build G1h as the event spine that later Qt/Web clients can consume.
+- Build on the completed G1h event spine through G2a Local Observer Server / Protocol Control Plane before rich Qt/Web clients.
 
 ## Explicit Non-goals
 
@@ -305,4 +306,5 @@ Qt/QML is the recommended first rich client direction for G2b, but the protocol 
 - `docs/EVALUATION_RUBRIC.md`: scoring dimensions, formulas, log schemas, and AI judge boundary.
 - `docs/adr/`: stable architecture decisions such as client-agnostic observer protocol.
 - `docs/prs/`: research records and route decisions that may later be promoted into stable docs.
+- `docs/harness/designs/2026-06-03--live-ai-werewolf-experiment-platform-charter.md`: Phase A product-route and system-architecture charter for game-like experience architecture, minimum match/profile contract seed, visibility trust gates, exit demos, and anti-shrinkage gates.
 - `docs/harness/plans/`: executable implementation protocols.

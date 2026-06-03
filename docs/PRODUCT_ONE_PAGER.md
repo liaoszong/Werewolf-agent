@@ -24,7 +24,7 @@ Werewolf-agent 是一个 **client-agnostic live AI Werewolf experiment platform*
 
 ## 输出是什么
 
-**G1h-G3 运行平台层（当前阶段）：**
+**G1h-G3 运行平台层（分阶段能力）：**
 1. Runtime event spine：`events.jsonl` 事件流 + runtime snapshots + prompt manifest + provider lifecycle events
 2. 标准结构化日志包：Game Log / Decision Log / Consensus Log / Score Log
 3. Provider trace + failure audit（可审计的 provider 调用链和故障记录）
@@ -50,20 +50,22 @@ Werewolf-agent 是一个 **client-agnostic live AI Werewolf experiment platform*
 - 评测和 Leaderboard 建立在真实运行数据之上，不是人工 gold sample。
 - Client-agnostic protocol 确保 observer client 不与 Python runtime 内部实现绑定。
 
-## G1h：Live Runtime Event Spine（当前）
+## G1h：Live Runtime Event Spine（已完成基础设施）
 
-G1h 是平台的 runtime 基础设施层：
+G1h 是已完成的平台 runtime 基础设施层：
 - 把 real/fake provider 单局运行升级为可订阅、可回放、可审计的 runtime event stream。
 - 产出 `events.jsonl`、runtime snapshots、prompt manifest、provider lifecycle events、标准 log bundle compatibility。
 - G1h 不做 Qt/QML client、Web observer、prompt editor UI、multi-provider arena、leaderboard 或 scoring formula 变更。
 
-G1a-G1g 已完成，当前价值是 audit/replay/log bundle/provider trace/failure audit foundation。G1g 的 HTML replay/report 是 offline audit artifact，不是 primary UX。
+G1a-G1h 已完成，当前价值是 audit/replay/log bundle/provider trace/failure audit/event spine foundation。G1g 的 HTML replay/report 是 offline audit artifact，不是 primary UX。G2 Observer Route 是下一阶段，observer server、Qt/Web client、prompt/profile editor、experiment orchestration 和 leaderboard 尚未完成。
 
 ## G2：Observer Route（下一阶段）
 
 - G2a：Local Observer Server（REST/WebSocket protocol）
 - G2b：Qt Observer MVP（God View + Role View）
 - G2c：Prompt Configuration MVP
+
+G2b 的本地 Qt/QML 起点目录是 `clients/qt_observer`。当前它只是 Qt Creator 自动生成的 Qt6 Quick scaffold；observer protocol integration、match cockpit、God/Role View、run control、history/replay UI 仍未完成。
 
 ## G3：Experiment Route
 
@@ -82,7 +84,7 @@ G1a-G1g 已完成，当前价值是 audit/replay/log bundle/provider trace/failu
 
 项目从 Phase 1 deterministic MVP（单局人工 gold sample → 确定性评分 → 规则归因 → UI demo）出发，经由 Phase 2 evaluator runtime closure 和 G1a-G1g gameplay foundation，已 pivot 到 client-agnostic live experiment platform。
 
-详细路线以 `docs/ROADMAP.md` 为准。Phase 1 和 Phase 2 的具体实现记录见 `docs/GOLD_DEMO.md`（Phase 1 legacy）和 `docs/TASKS.md`（任务状态）。
+详细路线以 `docs/ROADMAP.md` 为准。Phase A 产品路线与系统架构宪章见 `docs/harness/designs/2026-06-03--live-ai-werewolf-experiment-platform-charter.md`。Phase 1 和 Phase 2 的具体实现记录见 `docs/GOLD_DEMO.md`（Phase 1 legacy）和 `docs/TASKS.md`（任务状态）。
 
 ## 数据标注规范
 
