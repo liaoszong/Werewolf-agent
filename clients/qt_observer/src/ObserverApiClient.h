@@ -4,6 +4,7 @@
 #include <QString>
 #include <QStringList>
 #include <QVariantList>
+#include <QVariantMap>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 
@@ -20,6 +21,12 @@ class ObserverApiClient : public QObject {
     Q_PROPERTY(QVariantList eventItems READ eventItems NOTIFY eventItemsChanged)
     Q_PROPERTY(QVariantList auditItems READ auditItems NOTIFY auditItemsChanged)
     Q_PROPERTY(QString lastError READ lastError NOTIFY lastErrorChanged)
+    // G2c projection properties
+    Q_PROPERTY(QVariantList playerItems READ playerItems NOTIFY playerItemsChanged)
+    Q_PROPERTY(QVariantMap projectionProof READ projectionProof NOTIFY projectionProofChanged)
+    Q_PROPERTY(int hiddenEventCount READ hiddenEventCount NOTIFY projectionChanged)
+    Q_PROPERTY(int hiddenSnapshotCount READ hiddenSnapshotCount NOTIFY projectionChanged)
+    Q_PROPERTY(QString visibilityContractVersion READ visibilityContractVersion NOTIFY projectionChanged)
 
 public:
     explicit ObserverApiClient(QObject *parent = nullptr);
@@ -38,6 +45,12 @@ public:
     QVariantList eventItems() const;
     QVariantList auditItems() const;
     QString lastError() const;
+    // G2c projection accessors
+    QVariantList playerItems() const;
+    QVariantMap projectionProof() const;
+    int hiddenEventCount() const;
+    int hiddenSnapshotCount() const;
+    QString visibilityContractVersion() const;
 
 public slots:
     Q_INVOKABLE void checkHealth();
@@ -47,6 +60,7 @@ public slots:
     Q_INVOKABLE void connectStream();
     Q_INVOKABLE void disconnectStream();
     Q_INVOKABLE void refreshAuditLinks();
+    Q_INVOKABLE void refreshProjection();
 
 signals:
     void baseUrlChanged();
@@ -58,6 +72,10 @@ signals:
     void eventItemsChanged();
     void auditItemsChanged();
     void lastErrorChanged();
+    // G2c projection signals
+    void playerItemsChanged();
+    void projectionProofChanged();
+    void projectionChanged();
 
 private slots:
     void onStreamReadyRead();
@@ -80,6 +98,13 @@ private:
     QVariantList m_eventItems;
     QVariantList m_auditItems;
     QString m_lastError;
+    // G2c projection state
+    QVariantList m_playerItems;
+    QVariantMap m_projectionProof;
+    int m_hiddenEventCount = 0;
+    int m_hiddenSnapshotCount = 0;
+    QString m_visibilityContractVersion;
+    quint64 m_projectionRequestSerial = 0;
 
     QNetworkAccessManager *m_network;
     QNetworkReply *m_streamReply;

@@ -39,6 +39,8 @@ qt_add_qml_module(appqt_observer
         qml/components/PerspectiveSwitcher.qml
         qml/components/AuditLinksPanel.qml
         qml/components/StatusBadge.qml
+        qml/components/ViewBoundaryBadge.qml
+        qml/components/ProjectionProofPanel.qml
 )
 
 set_target_properties(appqt_observer PROPERTIES

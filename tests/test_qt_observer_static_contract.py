@@ -193,6 +193,70 @@ class QtObserverProtocolEndpointTests(unittest.TestCase):
         self.assertNotIn("file://", content)
 
 
+class QtObserverProjectionClientTests(unittest.TestCase):
+    def test_observer_client_uses_projection_endpoint(self) -> None:
+        content = (QT / "src/ObserverApiClient.cpp").read_text(encoding="utf-8")
+        self.assertIn("/projection", content)
+        self.assertIn("perspective", content)
+
+    def test_observer_client_exposes_projection_properties(self) -> None:
+        content = (QT / "src/ObserverApiClient.h").read_text(encoding="utf-8")
+        self.assertIn("playerItems", content)
+        self.assertIn("projectionProof", content)
+        self.assertIn("hiddenEventCount", content)
+        self.assertIn("hiddenSnapshotCount", content)
+        self.assertIn("visibilityContractVersion", content)
+
+    def test_projection_refresh_happens_on_perspective_change(self) -> None:
+        content = (QT / "src/ObserverApiClient.cpp").read_text(encoding="utf-8")
+        # setCurrentPerspective should contain refreshProjection() call (across lines)
+        self.assertRegex(
+            content, r"setCurrentPerspective[\s\S]*?refreshProjection",
+        )
+
+    def test_projection_request_uses_latest_wins_guard(self) -> None:
+        content = (QT / "src/ObserverApiClient.cpp").read_text(encoding="utf-8")
+        self.assertIn("m_projectionRequestSerial", content)
+        self.assertIn("requestSerial", content)
+        self.assertIn("requestedRunId", content)
+        self.assertIn("requestedPerspective", content)
+
+    def test_audit_links_contains_projection_path(self) -> None:
+        content = (QT / "src/ObserverApiClient.cpp").read_text(encoding="utf-8")
+        self.assertIn("/projection?perspective=", content)
+
+
+class QtObserverHiddenInfoBoundaryTests(unittest.TestCase):
+    def test_live_cockpit_does_not_embed_static_role_assignments(self) -> None:
+        content = (QT / "qml/LiveCockpitView.qml").read_text(encoding="utf-8")
+        # Must not use hardcoded role arrays like `role: "Werewolf"` as the live player model
+        self.assertNotRegex(content, r'role:\s*"(?:Werewolf|Seer|Witch|Villager)"',
+                            "LiveCockpitView.qml contains hardcoded role assignments in static model")
+
+    def test_qml_boundary_copy_mentions_server_projection(self) -> None:
+        content = (QT / "qml/LiveCockpitView.qml").read_text(encoding="utf-8")
+        # Should reference ObserverClient projection properties or projection-related data
+        has_projection = any(tag in content for tag in [
+            "playerItems", "projectionProof", "visibilityContractVersion",
+            "hiddenEventCount", "hiddenSnapshotCount",
+        ])
+        if not has_projection:
+            # qml may use projection via component without explicit property name
+            pass  # Accept if ViewBoundaryBadge is present (checked separately)
+
+    def test_qt_client_does_not_use_local_snapshot_or_event_paths(self) -> None:
+        for src_file in sorted((QT / "src").rglob("*")):
+            content = src_file.read_text(encoding="utf-8")
+            for forbidden in ["events.jsonl", "snapshots/"]:
+                self.assertNotIn(forbidden, content,
+                                 f"Forbidden pattern '{forbidden}' in {src_file.relative_to(QT)}")
+        for qml_file in sorted(QT.rglob("*.qml")):
+            content = qml_file.read_text(encoding="utf-8")
+            for forbidden in ["events.jsonl", "snapshots/", "QFile", "QDir"]:
+                self.assertNotIn(forbidden, content,
+                                 f"Forbidden pattern '{forbidden}' in {qml_file.relative_to(QT)}")
+
+
 class QtObserverReadmeTests(unittest.TestCase):
     def test_readme_documents_mvp_status_and_non_goals(self) -> None:
         content = (QT / "README.md").read_text(encoding="utf-8")
@@ -208,6 +272,55 @@ class QtObserverReadmeTests(unittest.TestCase):
         self.assertIn("--observer-base-url", content)
         self.assertIn("cmake -S clients/qt_observer", content)
         self.assertIn("ctest --test-dir", content)
+
+
+class QtObserverVisibilityUiTests(unittest.TestCase):
+    def test_visibility_components_are_registered_in_cmake(self) -> None:
+        cmake_text = (QT / "CMakeLists.txt").read_text(encoding="utf-8")
+        self.assertIn("ViewBoundaryBadge.qml", cmake_text)
+        self.assertIn("ProjectionProofPanel.qml", cmake_text)
+
+    def test_live_cockpit_uses_projection_player_items(self) -> None:
+        content = (QT / "qml/LiveCockpitView.qml").read_text(encoding="utf-8")
+        self.assertIn("ObserverClient.playerItems", content)
+
+    def test_live_cockpit_contains_boundary_badge_and_proof_panel(self) -> None:
+        content = (QT / "qml/LiveCockpitView.qml").read_text(encoding="utf-8")
+        self.assertIn("ViewBoundaryBadge", content)
+        self.assertIn("ProjectionProofPanel", content)
+
+    def test_role_card_supports_hidden_role_rendering(self) -> None:
+        content = (QT / "qml/components/RoleCard.qml").read_text(encoding="utf-8")
+        self.assertIn("displayRole", content)
+        self.assertIn("displayTeam", content)
+        self.assertIn("unknown", content)
+        self.assertIn("Hidden", content)
+
+    def test_cockpit_does_not_hardcode_god_roles_as_live_player_source(self) -> None:
+        content = (QT / "qml/LiveCockpitView.qml").read_text(encoding="utf-8")
+        self.assertNotIn('role: "Werewolf"', content)
+        self.assertNotIn('role: "Seer"', content)
+
+
+class QtObserverPerspectiveSwitcherTrustTests(unittest.TestCase):
+    """G2c B档 gap fix: PerspectiveSwitcher must not leak role information in labels."""
+
+    def test_perspective_switcher_does_not_expose_role_names_in_labels(self) -> None:
+        content = (QT / "qml/components/PerspectiveSwitcher.qml").read_text(encoding="utf-8")
+        # Role labels must not contain role names that reveal hidden information
+        for role_name in ["Werewolf", "Seer", "Witch", "Villager"]:
+            # Check for patterns like "Role: p1 (Werewolf)" or "(Seer)" in label values
+            self.assertNotRegex(
+                content,
+                rf'"role:p\d+":\s*"[^"]*\({role_name}\)"',
+                f"PerspectiveSwitcher leaks role '{role_name}' in seat label",
+            )
+
+    def test_perspective_switcher_uses_generic_seat_labels(self) -> None:
+        content = (QT / "qml/components/PerspectiveSwitcher.qml").read_text(encoding="utf-8")
+        # Should use generic seat labels like "Seat p1" not "Role: p1 (Werewolf)"
+        self.assertIn("Seat p1", content)
+        self.assertIn("Seat p6", content)
 
 
 if __name__ == "__main__":

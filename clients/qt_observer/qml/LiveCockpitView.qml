@@ -11,6 +11,7 @@ Item {
     Component.onCompleted: {
         if (ObserverClient.currentRunId !== "") {
             ObserverClient.connectStream()
+            ObserverClient.refreshProjection()
         }
     }
 
@@ -44,6 +45,21 @@ Item {
             }
         }
 
+        ViewBoundaryBadge {
+            id: viewBoundaryBadge
+            perspective: ObserverClient.currentPerspective
+            contractVersion: ObserverClient.visibilityContractVersion
+            hiddenEventCount: ObserverClient.hiddenEventCount
+            hiddenSnapshotCount: ObserverClient.hiddenSnapshotCount
+        }
+
+        ProjectionProofPanel {
+            id: projectionProofPanel
+            proof: ObserverClient.projectionProof
+            hiddenEventCount: ObserverClient.hiddenEventCount
+            hiddenSnapshotCount: ObserverClient.hiddenSnapshotCount
+        }
+
         Grid {
             id: playerPanelGrid
             objectName: "playerPanelGrid"
@@ -51,17 +67,14 @@ Item {
             spacing: 4
 
             Repeater {
-                model: [
-                    { seatId: "p1", role: "Werewolf" },
-                    { seatId: "p2", role: "Werewolf" },
-                    { seatId: "p3", role: "Seer" },
-                    { seatId: "p4", role: "Witch" },
-                    { seatId: "p5", role: "Villager" },
-                    { seatId: "p6", role: "Villager" },
-                ]
+                model: ObserverClient.playerItems
                 delegate: RoleCard {
-                    seatId: modelData.seatId
-                    roleName: modelData.role
+                    seatId: modelData.player_id
+                    roleName: modelData.display_role
+                    displayRole: modelData.display_role
+                    displayTeam: modelData.display_team
+                    visibilityLabel: modelData.visibility
+                    statusText: modelData.alive ? "Alive" : "Dead"
                     width: 120
                     height: 140
                 }

@@ -12,6 +12,7 @@ Column {
         "/failure-audit": "Failure Audit",
         "/snapshots": "Snapshots",
         "/artifacts": "Artifacts",
+        "/projection": "Projection",
     })
 
     Repeater {
@@ -21,6 +22,7 @@ Column {
             { label: "Failure Audit", tag: "failure-audit" },
             { label: "Snapshots", tag: "snapshots" },
             { label: "Artifacts", tag: "artifacts" },
+            { label: "Projection", tag: "projection" },
         ]
 
         delegate: Text {
@@ -34,6 +36,9 @@ Column {
                 cursorShape: Qt.PointingHandCursor
                 onClicked: {
                     var path = "/api/runs/" + ObserverClient.currentRunId + "/" + modelData.tag
+                    if (modelData.tag === "projection") {
+                        path += "?perspective=" + ObserverClient.currentPerspective
+                    }
                     console.log("Audit link:", ObserverClient.baseUrl + path)
                 }
             }

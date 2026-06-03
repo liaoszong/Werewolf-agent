@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 216
+- Entries: 221
 
 ```text
 ./
@@ -58,8 +58,10 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       │   │   ├── AuditLinksPanel.qml
 │       │   │   ├── EventTimeline.qml
 │       │   │   ├── PerspectiveSwitcher.qml
+│       │   │   ├── ProjectionProofPanel.qml
 │       │   │   ├── RoleCard.qml
-│       │   │   └── StatusBadge.qml
+│       │   │   ├── StatusBadge.qml
+│       │   │   └── ViewBoundaryBadge.qml
 │       │   ├── AppShell.qml
 │       │   ├── HistoryView.qml
 │       │   ├── HomeView.qml
@@ -163,7 +165,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   │   ├── 2026-06-03--g1h-contract-closeout-route-docs-alignment-plan.md
 │   │   │   ├── 2026-06-03--g1h-live-runtime-event-spine-plan.md
 │   │   │   ├── 2026-06-03--g2a-local-observer-server-protocol-control-plane-plan.md
-│   │   │   └── 2026-06-03--g2b-qt-observer-cockpit-mvp-plan.md
+│   │   │   ├── 2026-06-03--g2b-qt-observer-cockpit-mvp-plan.md
+│   │   │   └── 2026-06-03--g2c-god-role-view-visibility-trust-plan.md
 │   │   └── reviews/
 │   │       ├── 2026-06-01--g1c-project-healthcheck-final.md
 │   │       ├── 2026-06-01--g1c-project-healthcheck.md
@@ -211,6 +214,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       ├── log_bundle.py
 │       ├── observer_protocol.py
 │       ├── observer_server.py
+│       ├── observer_visibility.py
 │       ├── provider_agent.py
 │       ├── provider_contract.py
 │       ├── render_demo.py
@@ -252,6 +256,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── test_log_bundle.py
 │   ├── test_observer_protocol.py
 │   ├── test_observer_server.py
+│   ├── test_observer_visibility.py
 │   ├── test_provider_contract.py
 │   ├── test_qt_observer_static_contract.py
 │   ├── test_render_demo.py
