@@ -2,25 +2,26 @@
 
 ## Purpose
 
-`ROADMAP.md` is the canonical route alignment document for Phase 2 / Phase 3 planning. It explains what the project is ultimately trying to become, where the current main branch stands, and how the G-track proceeds after G1a.
+`ROADMAP.md` is the canonical route alignment document for Phase 2 / Phase 3+ planning. It explains what the project is ultimately trying to become, where the current main branch stands, and how the route proceeds from offline replay foundation toward a client-agnostic live AI Werewolf experiment platform.
 
 This document does not replace `docs/TASKS.md`. `TASKS.md` tracks task status and implementation candidates. Implementation details still live in bound plans under `docs/harness/plans/`.
 
 ## Final Product Vision
 
-Werewolf-agent aims to become an AI Werewolf Agent evaluation, review, and leaderboard system.
+Werewolf-agent aims to become a client-agnostic live AI Werewolf experiment platform.
 
 The final product route is:
 
 ```text
-real or replayed Werewolf games
--> structured Game Log / Decision Log / Consensus Log
--> reproducible Score Log / Metrics Summary
--> deterministic attribution + AI-assisted semantic labels
--> role-separated scorecards and real multi-game Leaderboard
+configurable AI Werewolf run profile
+-> Python runtime game engine + agent/provider loop
+-> live runtime event spine + snapshots + prompt manifest
+-> client-agnostic observer protocol
+-> Qt/QML or Web observer clients
+-> replay/audit/export + evaluation and leaderboard layers
 ```
 
-The project is not trying to become only a static HTML demo. The static demos exist to prove that the evaluation loop is visible and understandable before real Agent gameplay is introduced.
+The project is not trying to become only a static HTML demo or offline replay generator. Static HTML replay/report output remains valuable as an offline audit artifact, but it is not the primary user experience. The primary product direction is a live, configurable, observable experiment platform whose logs can still feed replay, audit, export, scoring, and later leaderboard workflows.
 
 ## Current Main Facts
 
@@ -40,13 +41,20 @@ The current main branch has completed:
 - G1b deterministic game engine + mock agent contract.
 - G1c wolf consensus + failure recovery.
 - G1d provider adapter research / fake-provider contract.
+- G1e provider-backed single-game smoke.
+- G1f DeepSeek consensus smoke.
+- G1g provider replay HTML report.
 
 The current main branch has not completed:
 
-- G1 real AI Agent gameplay engine.
-- live provider integration.
+- G1h Live Runtime Event Spine.
+- Local observer server.
+- Qt/QML observer client.
+- Web observer client.
+- Prompt editor UI.
+- Multi-provider arena.
 - human-vs-AI UI.
-- L1 real multi-game Leaderboard.
+- G4 evaluation platform / real multi-game Leaderboard.
 
 ## Phase Boundaries
 
@@ -127,21 +135,76 @@ G-track route:
 - Role: run one local, budget-controlled provider-backed game after G1d establishes the boundary.
 - Boundary: no CI live calls, no multi-game Leaderboard, no human-vs-AI UI.
 
-Full G1 real AI Agent gameplay is not complete until the G1b-G1e gates establish a real engine, real action loop, provider boundary, failure recovery, and a provider-backed single-game smoke. G1a alone proves fresh-log generation and evaluator compatibility, not live Agent gameplay.
+#### G1f: DeepSeek consensus smoke
 
-### Phase 3+ / L-track: real multi-game Leaderboard
+- Status: `completed`.
+- Role: run a local, opt-in DeepSeek consensus smoke where separate werewolf roles call provider-backed agents and emit Game Log / Decision Log / Consensus Log / Provider Trace / Failure Audit.
+- Boundary: no CI live calls, no multi-game Leaderboard, no observer UI.
 
-Goal: aggregate many real games across models, versions, and roles.
+#### G1g: provider replay HTML
 
-L1 requires:
+- Status: `completed`.
+- Role: render provider-backed game bundles into a standalone static HTML replay/report for audit and review.
+- Boundary: offline audit artifact only. It reads existing logs and does not call providers, mutate game state, change scoring, or act as live observer UI.
 
-- enough games to make role-separated ranking meaningful
-- `games_played` and `role_distribution`
+#### G1h: Live Runtime Event Spine
+
+- Status: `next_candidate`.
+- Role: turn real/fake provider single-game runtime into a client-agnostic event spine by emitting `events.jsonl`, runtime snapshots, prompt manifest, provider lifecycle events, and final standard log bundle compatibility.
+- Boundary: no Qt/QML client, no Web observer/server, no prompt editor UI, no multi-provider arena, no leaderboard, no scoring formula changes, no provider adapter behavior changes beyond event emission needed by the bound plan.
+
+G1a-G1g are retained as audit foundation, replay foundation, and log bundle / provider trace / failure audit foundation. Full live experiment platform work starts at G1h because a client cannot safely observe what the runtime does not first expose as a stable event stream.
+
+### Phase 3+ / G2: observer route
+
+Goal: expose the G1h runtime event spine through local observer surfaces without binding clients to Python internals.
+
+#### G2a: Local Observer Server
+
+- Role: provide local REST/WebSocket access to run control, live events, snapshots, and historical run artifacts.
+- Boundary: server protocol only; no rich client implementation.
+
+#### G2b: Qt Observer MVP
+
+- Role: first rich client direction. Qt/QML consumes the client-agnostic REST/WebSocket/event protocol and shows run status, player panels, event stream, provider trace summary, and audit links.
+- Boundary: Qt must not bind directly to Python runtime objects or private Python APIs.
+
+#### G2c: God View / Role View
+
+- Role: separate god-view state from role-view projections so hidden information remains auditable.
+- Boundary: no prompt editor or multi-run experiment system.
+
+#### G2d: Prompt Configuration MVP
+
+- Role: configure local prompt/profile/model/temperature/strategy parameters through a controlled profile surface.
+- Boundary: no hosted account system, no multi-provider arena, no leaderboard.
+
+### Phase 3+ / G3: experiment route
+
+Goal: support repeatable experiment profiles and unify replay/live operation.
+
+G3 candidates:
+
+- Experiment profiles.
+- Replay + live dual mode over the same observer protocol.
+- Multi-provider arena.
+- Batch run metadata and comparison-ready exports.
+
+Boundary: G3 depends on G1h event spine and G2 observer contracts.
+
+### Phase 4 / G4: evaluation platform
+
+Goal: convert live/replay experiment output into robust evaluation products.
+
+G4 candidates:
+
+- real multi-game Leaderboard
+- role-separated scorecards
 - sample-size warnings
-- role tabs
-- stable aggregation for `avg_outcome_score`, `avg_decision_quality_score`, and `avg_rule_integrity_score`
+- provider/model/version comparison
+- exportable evaluation reports
 
-Boundary: L1 depends on G1 producing enough multi-game data.
+Boundary: real Leaderboard is a later evaluation-platform capability. It is not the next candidate immediately after G1g because it depends on stable live run capture and enough multi-game data.
 
 ## Dependency Graph
 
@@ -171,14 +234,22 @@ E1 + D1 + D2 + S4 contracts
   -> G1c wolf consensus + failure recovery
   -> G1d provider adapter research / fake-provider contract
   -> G1e provider-backed single-game smoke
+  -> G1f DeepSeek consensus smoke
+  -> G1g provider replay HTML audit artifact
+  -> G1h Live Runtime Event Spine
 
-G1 multi-game outputs
-  -> L1 real multi-game Leaderboard
+G1h event spine
+  -> G2a Local Observer Server
+  -> G2b Qt Observer MVP
+  -> G2c God View / Role View
+  -> G2d Prompt Configuration MVP
+  -> G3 Experiment Profiles / Replay + Live Dual Mode / Multi-provider Arena
+  -> G4 Evaluation Platform / real multi-game Leaderboard
 ```
 
 ## Current Priority
 
-G1e provider-backed single-game smoke is now `completed`. The next implementation candidate is L1 real multi-game Leaderboard (see Phase 3+ section above).
+G1g provider replay HTML is now `completed`. The next implementation candidate is G1h Live Runtime Event Spine.
 
 G1 series retrospective:
 - G1a proved fresh generated logs can feed validators, scoring, metrics, and replay demo.
@@ -186,6 +257,14 @@ G1 series retrospective:
 - G1c added failure recovery, wolf consensus, and audit trail.
 - G1d researched provider boundary and established the fake-provider contract.
 - G1e delivered a budget-controlled, provider-backed single-game smoke CLI with a DeepSeek adapter and offline guard.
+- G1f proved provider-backed wolf consensus smoke can emit standard logs, provider trace, and failure audit.
+- G1g made provider-backed game bundles inspectable as offline HTML replay/report artifacts.
+
+Immediate pivot:
+
+- Keep G1a-G1g as audit/replay/log-bundle foundation.
+- Do not extend the project by generating more HTML reports as the main user experience.
+- Build G1h as the event spine that later Qt/Web clients can consume.
 
 ## Explicit Non-goals
 
@@ -199,9 +278,23 @@ Current Phase 2A does not do:
 - full natural-language review reports
 - human-vs-AI UI
 
+G1h specifically does not do:
+
+- Qt/QML client
+- Web observer/server
+- prompt editor UI
+- multi-provider arena
+- leaderboard
+- scoring formula changes
+- provider adapter behavior changes outside event-spine instrumentation
+
 `decision_quality_score` quality beyond deterministic visibility checks comes only from saved S5 semantic-label JSON. Live AI semantic labeling remains outside the completed runtime.
 
 G1a specifically must not be described as live AI Agent gameplay, provider-backed gameplay, Web live observer, human-vs-AI UI, or real multi-game Leaderboard. It is scripted deterministic fresh-log generation plus evaluator/replay compatibility only.
+
+G1g specifically must not be described as primary UX, live observer, Qt/Web client, live API behavior, or leaderboard. It is an offline audit artifact that reads existing log bundles.
+
+Qt/QML is the recommended first rich client direction for G2b, but the protocol must remain client-agnostic. Python owns game engine, agent runtime, provider adapter, prompt registry, event bus, and log writer. Qt/QML consumes REST/WebSocket/event protocol and must not bind to Python runtime internals.
 
 ## Document Responsibility Map
 
@@ -210,5 +303,6 @@ G1a specifically must not be described as live AI Agent gameplay, provider-backe
 - `docs/ROADMAP.md`: phase route, dependency graph, and route conflict resolution.
 - `docs/TASKS.md`: task status, candidate tasks, and UX/demo acceptance.
 - `docs/EVALUATION_RUBRIC.md`: scoring dimensions, formulas, log schemas, and AI judge boundary.
+- `docs/adr/`: stable architecture decisions such as client-agnostic observer protocol.
 - `docs/prs/`: research records and route decisions that may later be promoted into stable docs.
 - `docs/harness/plans/`: executable implementation protocols.

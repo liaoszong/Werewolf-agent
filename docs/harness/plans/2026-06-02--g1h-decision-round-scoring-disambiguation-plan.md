@@ -1,5 +1,7 @@
 # G1h Decision Round Scoring Disambiguation Implementation Plan
 
+> Superseded stage-name note: This plan remains a valid prerequisite / fix candidate, but the G1h stage name has been superseded by Live Runtime Event Spine. Do not treat this file as the active G1h route owner.
+
 > **For agentic workers:** 步骤使用复选框（`- [ ]`）语法进行跟踪。
 
 **Goal:** Add an explicit `round` field to Decision Log entries and use it in scoring matches so repeated same actor/action/phase/target decisions across rounds no longer trigger ambiguous scorer matches.
