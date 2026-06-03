@@ -583,3 +583,164 @@ class ObserverServerArtifactTests(TestCase):
             self._base_url, "/api/runs/fa_run/failure-audit"
         )
         self.assertIn("audit", text)
+
+
+# ---------------------------------------------------------------------------
+# ObserverServerProjectionEndpointTests (G2c)
+# ---------------------------------------------------------------------------
+
+
+class ObserverServerProjectionEndpointTests(TestCase):
+    """Test the /api/runs/{run_id}/projection endpoint."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls._tmp = TemporaryDirectory()
+        cls._tmp_path = Path(cls._tmp.name)
+        cls._server, cls._base_url = _start_server(cls._tmp_path)
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls._server.shutdown()
+        cls._tmp.cleanup()
+
+    def _make_fixture_run(self, run_id: str) -> Path:
+        """Create a run directory with events.jsonl and role-projection snapshots."""
+        run_dir = self._tmp_path / run_id
+        run_dir.mkdir()
+        # Write events.jsonl with various visibilities
+        events = [
+            _event("game_started", "public", 0),
+            _event("provider_request", "private", 1),
+            _event("observation_delivered", "all", 2),
+            _event("action_executed", "seer", 3),
+            _event("consensus_started", "werewolf_team", 4),
+            _event("vote_cast", "witch", 5),
+            _event("internal_event", "internal", 6),
+        ]
+        lines = "\n".join(json.dumps(e) for e in events) + "\n"
+        (run_dir / "events.jsonl").write_text(lines, encoding="utf-8")
+
+        # Write role_projection snapshots
+        snap_dir = run_dir / "snapshots"
+        snap_dir.mkdir()
+        (snap_dir / "role-p1-r1.json").write_text(json.dumps({
+            "snapshot_type": "role_projection",
+            "player_id": "p1",
+            "role": "seer",
+            "team": "villager",
+            "round": 1,
+            "phase": "night",
+            "alive_players": ["p1", "p2", "p3", "p4", "p5", "p6"],
+            "projected_known_roles": {"p1": "seer", "p2": "villager", "p3": "unknown"},
+        }), encoding="utf-8")
+        (snap_dir / "role-p3-r1.json").write_text(json.dumps({
+            "snapshot_type": "role_projection",
+            "player_id": "p3",
+            "role": "werewolf",
+            "team": "werewolf",
+            "round": 1,
+            "phase": "night",
+            "alive_players": ["p1", "p2", "p3", "p4", "p5", "p6"],
+            "projected_known_roles": {"p1": "unknown", "p3": "werewolf"},
+        }), encoding="utf-8")
+        (snap_dir / "role-p5-r1.json").write_text(json.dumps({
+            "snapshot_type": "role_projection",
+            "player_id": "p5",
+            "role": "villager",
+            "team": "villager",
+            "round": 1,
+            "phase": "night",
+            "alive_players": ["p1", "p2", "p3", "p4", "p5", "p6"],
+            "projected_known_roles": {},
+        }), encoding="utf-8")
+        return run_dir
+
+    def test_projection_endpoint_returns_contract_version(self) -> None:
+        self._make_fixture_run("proj_contract")
+        result = _request_json(
+            self._base_url, "/api/runs/proj_contract/projection"
+        )
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result.get("contract_version"), "g2c.visibility.v1")  # type: ignore[union-attr]
+
+    def test_god_projection_exposes_roles(self) -> None:
+        self._make_fixture_run("proj_god")
+        result = _request_json(
+            self._base_url, "/api/runs/proj_god/projection?perspective=god"
+        )
+        self.assertIsInstance(result, dict)
+        players = result.get("players", [])  # type: ignore[union-attr]
+        # Fixture provides 3 role-projection snapshots → 3 players in index
+        self.assertGreaterEqual(len(players), 3)
+        roles = {p["player_id"]: p["display_role"] for p in players}
+        self.assertEqual(roles.get("p1"), "seer")
+        self.assertEqual(roles.get("p3"), "werewolf")
+
+    def test_public_projection_hides_roles(self) -> None:
+        self._make_fixture_run("proj_public")
+        result = _request_json(
+            self._base_url, "/api/runs/proj_public/projection?perspective=public"
+        )
+        self.assertIsInstance(result, dict)
+        players = result.get("players", [])  # type: ignore[union-attr]
+        for p in players:
+            self.assertEqual(p["display_role"], "unknown")
+            self.assertEqual(p["display_team"], "unknown")
+
+    def test_role_projection_exposes_self_role_only(self) -> None:
+        self._make_fixture_run("proj_role")
+        result = _request_json(
+            self._base_url, "/api/runs/proj_role/projection?perspective=role:p1"
+        )
+        self.assertIsInstance(result, dict)
+        players = result.get("players", [])  # type: ignore[union-attr]
+        # p1 should see its own role
+        p1 = [p for p in players if p["player_id"] == "p1"][0]
+        self.assertEqual(p1["display_role"], "seer")
+        # p3 (werewolf) should be hidden
+        p3 = [p for p in players if p["player_id"] == "p3"][0]
+        self.assertEqual(p3["display_role"], "unknown")
+
+    def test_werewolf_team_projection_hides_non_wolf_roles(self) -> None:
+        self._make_fixture_run("proj_team")
+        result = _request_json(
+            self._base_url, "/api/runs/proj_team/projection?perspective=team:werewolf"
+        )
+        self.assertIsInstance(result, dict)
+        players = result.get("players", [])  # type: ignore[union-attr]
+        wolf_visible = [p for p in players if p["display_role"] != "unknown"]
+        self.assertGreater(len(wolf_visible), 0)
+        # Non-wolf players should be hidden
+        for p in players:
+            if p["display_role"] != "unknown":
+                self.assertEqual(p["display_team"], "werewolf")
+
+    def test_projection_rejects_unknown_perspective(self) -> None:
+        self._make_fixture_run("proj_bad")
+        result = _request_json(
+            self._base_url, "/api/runs/proj_bad/projection?perspective=invalid"
+        )
+        self.assertIsInstance(result, dict)
+        self.assertIn(result.get("code"), ("invalid_request", "invalid_perspective"))  # type: ignore[union-attr]
+
+    def test_projection_contains_proof(self) -> None:
+        self._make_fixture_run("proj_proof")
+        result = _request_json(
+            self._base_url, "/api/runs/proj_proof/projection"
+        )
+        self.assertIsInstance(result, dict)
+        proof = result.get("proof")  # type: ignore[union-attr]
+        self.assertIsInstance(proof, dict)
+        self.assertIn("source", proof)
+
+    def test_projection_all_keys_present(self) -> None:
+        self._make_fixture_run("proj_keys")
+        result = _request_json(
+            self._base_url, "/api/runs/proj_keys/projection"
+        )
+        self.assertIsInstance(result, dict)
+        for key in ("contract_version", "run_id", "perspective", "view_kind",
+                     "players", "events", "hidden_event_count", "snapshots",
+                     "hidden_snapshot_count", "proof"):
+            self.assertIn(key, result)

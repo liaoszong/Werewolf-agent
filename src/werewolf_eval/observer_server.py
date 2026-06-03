@@ -35,6 +35,10 @@ from werewolf_eval.observer_protocol import (
     safe_child_path,
     validate_run_id,
 )
+from werewolf_eval.observer_visibility import (
+    VisibilityProjectionError,
+    build_projection_envelope,
+)
 from werewolf_eval.run_g1h_fake_runtime import run_fake_runtime
 from werewolf_eval.runtime_events import RuntimeEventError, read_events_jsonl
 
@@ -202,6 +206,22 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
                             self._send_error_json(404, "not_found", str(exc))
                         return
                     self._send_json(200, detail)
+                    return
+
+                # /api/runs/{run_id}/projection (G2c God View / Role View)
+                if sub_path == ["projection"]:
+                    try:
+                        events_path = run_dir / "events.jsonl"
+                        events = _read_events_jsonl_safe(events_path)
+                        envelope = build_projection_envelope(
+                            run_dir=run_dir,
+                            run_id=run_id,
+                            perspective=perspective,
+                            events=events,
+                        )
+                        self._send_json(200, envelope)
+                    except VisibilityProjectionError as exc:
+                        self._send_error_json(400, "invalid_perspective", str(exc))
                     return
 
                 # /api/runs/{run_id} with no sub-path -> run detail
