@@ -12,6 +12,7 @@
 
 __pycache__/
 *.pyc
+.tmp/
 
 # Generated context-budget artifacts
 docs/generated-context/*.index.json
