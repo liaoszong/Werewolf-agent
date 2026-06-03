@@ -46,8 +46,10 @@ void ObserverApiClient::setCurrentPerspective(const QString &perspective)
     if (m_currentPerspective != perspective) {
         m_currentPerspective = perspective;
         emit currentPerspectiveChanged();
-        if (m_connected && !m_currentRunId.isEmpty())
+        if (m_connected && !m_currentRunId.isEmpty()) {
             startStreamRequest();
+            refreshProjection();
+        }
     }
 }
 
@@ -55,6 +57,13 @@ QVariantList ObserverApiClient::runItems() const { return m_runItems; }
 QVariantList ObserverApiClient::eventItems() const { return m_eventItems; }
 QVariantList ObserverApiClient::auditItems() const { return m_auditItems; }
 QString ObserverApiClient::lastError() const { return m_lastError; }
+
+// G2c projection getters
+QVariantList ObserverApiClient::playerItems() const { return m_playerItems; }
+QVariantMap ObserverApiClient::projectionProof() const { return m_projectionProof; }
+int ObserverApiClient::hiddenEventCount() const { return m_hiddenEventCount; }
+int ObserverApiClient::hiddenSnapshotCount() const { return m_hiddenSnapshotCount; }
+QString ObserverApiClient::visibilityContractVersion() const { return m_visibilityContractVersion; }
 
 QNetworkReply *ObserverApiClient::get(const QString &path)
 {
@@ -156,6 +165,7 @@ void ObserverApiClient::startDefaultMatch()
         emit currentRunChanged();
         emit currentStatusChanged();
         refreshAuditLinks();
+        refreshProjection();
         connectStream();
     });
 }
@@ -179,6 +189,8 @@ void ObserverApiClient::openRun(const QString &runId)
         m_currentStatus = obj.value(QStringLiteral("status")).toString();
         emit currentRunChanged();
         emit currentStatusChanged();
+        refreshAuditLinks();
+        refreshProjection();
 
         QNetworkReply *eventsReply = get(
             QStringLiteral("/api/runs/") + runId + QStringLiteral("/events?perspective=") + m_currentPerspective);
@@ -313,6 +325,7 @@ void ObserverApiClient::refreshAuditLinks()
         QStringLiteral("/provider-trace"),
         QStringLiteral("/failure-audit"),
         QStringLiteral("/snapshots?perspective=") + m_currentPerspective,
+        QStringLiteral("/projection?perspective=") + m_currentPerspective,
         QStringLiteral("/artifacts"),
     };
 
@@ -329,4 +342,51 @@ void ObserverApiClient::refreshAuditLinks()
 
     m_auditItems = auditList;
     emit auditItemsChanged();
+}
+
+void ObserverApiClient::refreshProjection()
+{
+    if (m_currentRunId.isEmpty())
+        return;
+
+    const quint64 requestSerial = ++m_projectionRequestSerial;
+    const QString requestedRunId = m_currentRunId;
+    const QString requestedPerspective = m_currentPerspective;
+
+    QUrl url(m_baseUrl + QStringLiteral("/api/runs/") + requestedRunId + QStringLiteral("/projection"));
+    QUrlQuery query;
+    query.addQueryItem(QStringLiteral("perspective"), requestedPerspective);
+    url.setQuery(query);
+
+    QNetworkRequest req(url);
+    req.setRawHeader("Accept", "application/json");
+    QNetworkReply *reply = m_network->get(req);
+    connect(reply, &QNetworkReply::finished, this, [this, reply, requestSerial, requestedRunId, requestedPerspective]() {
+        reply->deleteLater();
+        if (requestSerial != m_projectionRequestSerial || requestedRunId != m_currentRunId || requestedPerspective != m_currentPerspective)
+            return;
+        if (reply->error() != QNetworkReply::NoError) {
+            setError(reply->errorString());
+            return;
+        }
+        QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+        if (!doc.isObject()) {
+            setError(QStringLiteral("Invalid projection response"));
+            return;
+        }
+        QJsonObject obj = doc.object();
+        m_visibilityContractVersion = obj.value(QStringLiteral("contract_version")).toString();
+        m_hiddenEventCount = obj.value(QStringLiteral("hidden_event_count")).toInt();
+        m_hiddenSnapshotCount = obj.value(QStringLiteral("hidden_snapshot_count")).toInt();
+
+        QVariantList players;
+        for (const QJsonValue &v : obj.value(QStringLiteral("players")).toArray())
+            players.append(v.toObject().toVariantMap());
+        m_playerItems = players;
+        m_projectionProof = obj.value(QStringLiteral("proof")).toObject().toVariantMap();
+
+        emit playerItemsChanged();
+        emit projectionProofChanged();
+        emit projectionChanged();
+    });
 }

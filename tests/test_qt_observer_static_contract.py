@@ -193,6 +193,39 @@ class QtObserverProtocolEndpointTests(unittest.TestCase):
         self.assertNotIn("file://", content)
 
 
+class QtObserverProjectionClientTests(unittest.TestCase):
+    def test_observer_client_uses_projection_endpoint(self) -> None:
+        content = (QT / "src/ObserverApiClient.cpp").read_text(encoding="utf-8")
+        self.assertIn("/projection", content)
+        self.assertIn("perspective", content)
+
+    def test_observer_client_exposes_projection_properties(self) -> None:
+        content = (QT / "src/ObserverApiClient.h").read_text(encoding="utf-8")
+        self.assertIn("playerItems", content)
+        self.assertIn("projectionProof", content)
+        self.assertIn("hiddenEventCount", content)
+        self.assertIn("hiddenSnapshotCount", content)
+        self.assertIn("visibilityContractVersion", content)
+
+    def test_projection_refresh_happens_on_perspective_change(self) -> None:
+        content = (QT / "src/ObserverApiClient.cpp").read_text(encoding="utf-8")
+        # setCurrentPerspective should contain refreshProjection() call (across lines)
+        self.assertRegex(
+            content, r"setCurrentPerspective[\s\S]*?refreshProjection",
+        )
+
+    def test_projection_request_uses_latest_wins_guard(self) -> None:
+        content = (QT / "src/ObserverApiClient.cpp").read_text(encoding="utf-8")
+        self.assertIn("m_projectionRequestSerial", content)
+        self.assertIn("requestSerial", content)
+        self.assertIn("requestedRunId", content)
+        self.assertIn("requestedPerspective", content)
+
+    def test_audit_links_contains_projection_path(self) -> None:
+        content = (QT / "src/ObserverApiClient.cpp").read_text(encoding="utf-8")
+        self.assertIn("/projection?perspective=", content)
+
+
 class QtObserverReadmeTests(unittest.TestCase):
     def test_readme_documents_mvp_status_and_non_goals(self) -> None:
         content = (QT / "README.md").read_text(encoding="utf-8")
