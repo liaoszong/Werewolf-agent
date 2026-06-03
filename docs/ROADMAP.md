@@ -45,10 +45,11 @@ The current main branch has completed:
 - G1f DeepSeek consensus smoke.
 - G1g provider replay HTML report.
 - G1h Live Runtime Event Spine.
+- G2a Local Observer Server / Protocol Control Plane.
+- G2b Qt Observer Cockpit MVP.
 
 The current main branch has not completed:
 
-- Qt/QML observer client.
 - Web observer client.
 - Prompt editor UI.
 - Multi-provider arena.
@@ -166,9 +167,10 @@ Goal: expose the G1h runtime event spine through local observer surfaces without
 
 #### G2b: Qt Observer MVP
 
-- Role: first rich client direction. Qt/QML consumes the client-agnostic REST/WebSocket/event protocol and shows run status, player panels, event stream, provider trace summary, and audit links.
-- Scaffold: `clients/qt_observer` exists as a Qt6 Quick auto-generated starter project only. It is the intended G2b client workspace, not a completed observer client.
-- Boundary: Qt must not bind directly to Python runtime objects or private Python APIs.
+- Status: `completed`.
+- Role: first rich client direction. Qt/QML consumes the G2a client-agnostic REST/SSE protocol and provides Home/Lobby, default match setup, preflight, live cockpit (run status, player panels, event timeline, perspective switcher, audit links), and history/replay views.
+- Boundary: Qt uses Qt Network / G2a protocol only; no direct Python runtime binding.
+- Core artifacts: `ObserverApiClient` (Qt Network protocol adapter), `ObserverSseParser` (SSE frame parser), `AppShell.qml` / `HomeView.qml` / `MatchSetupView.qml` / `PreflightView.qml` / `LiveCockpitView.qml` / `HistoryView.qml` + 5 QML components, QtTest + Python static contract tests.
 
 #### G2c: God View / Role View
 
@@ -250,7 +252,7 @@ G1h event spine
 
 ## Current Priority
 
-G1h Live Runtime Event Spine and G2a Local Observer Server / Protocol Control Plane are now `completed`. The next implementation candidate is G2b Qt Observer MVP.
+G1h Live Runtime Event Spine, G2a Local Observer Server / Protocol Control Plane, and G2b Qt Observer Cockpit MVP are now `completed`. The next implementation candidate is G2c God View / Role View.
 
 G1 series retrospective:
 - G1a proved fresh generated logs can feed validators, scoring, metrics, and replay demo.

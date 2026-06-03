@@ -1,8 +1,19 @@
 import QtQuick
+import QtQuick.Controls
+import qt_observer
 
-Window {
-    width: 640
-    height: 480
+ApplicationWindow {
+    id: root
+    objectName: "werewolfObserverMainWindow"
+    width: 1280
+    height: 800
     visible: true
-    title: qsTr("Hello World")
+    title: qsTr("Werewolf Observer")
+
+    Loader {
+        id: shellLoader
+        objectName: "appShellLoader"
+        anchors.fill: parent
+        source: "qml/AppShell.qml"
+    }
 }

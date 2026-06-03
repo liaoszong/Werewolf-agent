@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 198
+- Entries: 216
 
 ```text
 ./
@@ -53,6 +53,26 @@ Use this file for navigation only. Verify implementation details by reading sour
 │           └── review-packet.md
 ├── clients/
 │   └── qt_observer/
+│       ├── qml/
+│       │   ├── components/
+│       │   │   ├── AuditLinksPanel.qml
+│       │   │   ├── EventTimeline.qml
+│       │   │   ├── PerspectiveSwitcher.qml
+│       │   │   ├── RoleCard.qml
+│       │   │   └── StatusBadge.qml
+│       │   ├── AppShell.qml
+│       │   ├── HistoryView.qml
+│       │   ├── HomeView.qml
+│       │   ├── LiveCockpitView.qml
+│       │   ├── MatchSetupView.qml
+│       │   └── PreflightView.qml
+│       ├── src/
+│       │   ├── ObserverApiClient.cpp
+│       │   ├── ObserverApiClient.h
+│       │   ├── ObserverSseParser.cpp
+│       │   └── ObserverSseParser.h
+│       ├── tests/
+│       │   └── tst_observer_sse_parser.cpp
 │       ├── CMakeLists.txt
 │       ├── main.cpp
 │       ├── Main.qml
@@ -142,7 +162,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   │   ├── 2026-06-02--g1h-decision-round-scoring-disambiguation-plan.md
 │   │   │   ├── 2026-06-03--g1h-contract-closeout-route-docs-alignment-plan.md
 │   │   │   ├── 2026-06-03--g1h-live-runtime-event-spine-plan.md
-│   │   │   └── 2026-06-03--g2a-local-observer-server-protocol-control-plane-plan.md
+│   │   │   ├── 2026-06-03--g2a-local-observer-server-protocol-control-plane-plan.md
+│   │   │   └── 2026-06-03--g2b-qt-observer-cockpit-mvp-plan.md
 │   │   └── reviews/
 │   │       ├── 2026-06-01--g1c-project-healthcheck-final.md
 │   │       ├── 2026-06-01--g1c-project-healthcheck.md
@@ -232,6 +253,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── test_observer_protocol.py
 │   ├── test_observer_server.py
 │   ├── test_provider_contract.py
+│   ├── test_qt_observer_static_contract.py
 │   ├── test_render_demo.py
 │   ├── test_render_provider_replay.py
 │   ├── test_runtime_events.py

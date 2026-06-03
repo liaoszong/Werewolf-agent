@@ -2,35 +2,50 @@ cmake_minimum_required(VERSION 3.16)
 
 project(qt_observer VERSION 0.1 LANGUAGES CXX)
 
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Quick)
+find_package(Qt6 REQUIRED COMPONENTS Quick QuickControls2 Network Test)
 
 qt_standard_project_setup(REQUIRES 6.8)
 
 qt_add_executable(appqt_observer
     main.cpp
+    src/ObserverApiClient.cpp
+    src/ObserverApiClient.h
+    src/ObserverSseParser.cpp
+    src/ObserverSseParser.h
+)
+
+target_include_directories(appqt_observer PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+
+target_link_libraries(appqt_observer
+    PRIVATE Qt6::Quick Qt6::QuickControls2 Qt6::Network
 )
 
 qt_add_qml_module(appqt_observer
     URI qt_observer
+    VERSION 1.0
     QML_FILES
         Main.qml
+        qml/AppShell.qml
+        qml/HomeView.qml
+        qml/MatchSetupView.qml
+        qml/PreflightView.qml
+        qml/LiveCockpitView.qml
+        qml/HistoryView.qml
+        qml/components/RoleCard.qml
+        qml/components/EventTimeline.qml
+        qml/components/PerspectiveSwitcher.qml
+        qml/components/AuditLinksPanel.qml
+        qml/components/StatusBadge.qml
 )
 
-# Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
-# If you are developing for iOS or macOS you should consider setting an
-# explicit, fixed bundle identifier manually though.
 set_target_properties(appqt_observer PROPERTIES
-#    MACOSX_BUNDLE_GUI_IDENTIFIER com.example.appqt_observer
     MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
     MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
     MACOSX_BUNDLE TRUE
     WIN32_EXECUTABLE TRUE
-)
-
-target_link_libraries(appqt_observer
-    PRIVATE Qt6::Quick
 )
 
 include(GNUInstallDirs)
@@ -39,3 +54,13 @@ install(TARGETS appqt_observer
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
+
+enable_testing()
+qt_add_executable(tst_observer_sse_parser
+    tests/tst_observer_sse_parser.cpp
+    src/ObserverSseParser.cpp
+    src/ObserverSseParser.h
+)
+target_include_directories(tst_observer_sse_parser PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(tst_observer_sse_parser PRIVATE Qt6::Test Qt6::Core)
+add_test(NAME observer_sse_parser COMMAND tst_observer_sse_parser)
