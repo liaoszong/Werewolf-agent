@@ -21,6 +21,10 @@ from werewolf_eval.provider_contract import (
     provider_trace_to_dict,
     ProviderTrace,
 )
+from werewolf_eval.runtime_events import (
+    RuntimeEventWriter,
+    build_prompt_manifest,
+)
 
 
 def _write_json(path: str, payload: dict) -> None:
@@ -71,13 +75,32 @@ def run_deepseek_consensus_game_with_provider_factory(
     game_id: str,
     out_dir: Path,
     provider_factory: ProviderFactory,
+    write_runtime_spine: bool = False,
+    runtime_source_label: str | None = None,
 ) -> int:
-    agents = {pid: provider_factory(pid) for pid in ["p1", "p2", "p3", "p4", "p5", "p6"]}
+    writer: RuntimeEventWriter | None = None
+    if write_runtime_spine:
+        writer = RuntimeEventWriter(run_id=game_id, out_dir=out_dir)
+
+    source_label = runtime_source_label or DEEPSEEK_PROVIDER_SOURCE_LABEL
+
+    def _wrap_factory(pid: str) -> ProviderAgent:
+        agent = provider_factory(pid)
+        if writer is not None and not hasattr(agent, "_runtime_events"):
+            agent = ProviderAgent(
+                pid, agent.provider, runtime_events=writer
+            )
+        elif writer is not None:
+            agent._runtime_events = writer
+        return agent
+
+    agents = {pid: _wrap_factory(pid) for pid in ["p1", "p2", "p3", "p4", "p5", "p6"]}
 
     engine = GameEngine.from_config(
         build_default_config(game_id=game_id),
         agents=agents,
-        source_label=DEEPSEEK_PROVIDER_SOURCE_LABEL,
+        source_label=source_label,
+        runtime_events=writer,
     )
 
     failures: list[ProviderFailure] = []
@@ -92,13 +115,49 @@ def run_deepseek_consensus_game_with_provider_factory(
 
         failure_audit = {
             "game_id": game_id,
-            "source_label": DEEPSEEK_PROVIDER_SOURCE_LABEL,
+            "source_label": source_label,
             "failures": [provider_failure_to_dict(f) for f in failures],
         }
         _write_json(str(out_dir / "failure-audit.json"), failure_audit)
 
+        if writer is not None:
+            writer.emit(
+                "artifact_written",
+                round=0, phase="final", actor="system",
+                visibility="internal",
+                payload={"artifact": "provider-trace.json"},
+            )
+            writer.emit(
+                "artifact_written",
+                round=0, phase="final", actor="system",
+                visibility="internal",
+                payload={"artifact": "failure-audit.json"},
+            )
+            manifest = build_prompt_manifest(
+                run_id=game_id,
+                source_label=source_label,
+                agents=[
+                    {"player_id": pid, "provider": "deepseek", "model": "unknown"}
+                    for pid in ["p1", "p2", "p3", "p4", "p5", "p6"]
+                ],
+            )
+            manifest["secrets_redacted"] = True
+            writer.write_prompt_manifest(manifest)
+            writer.emit(
+                "artifact_written",
+                round=0, phase="final", actor="system",
+                visibility="internal",
+                payload={"artifact": "prompt-manifest.json"},
+            )
+            writer.emit(
+                "run_finalized",
+                round=0, phase="final", actor="system",
+                visibility="internal",
+                payload={"status": "failure"},
+            )
+
         print(f"deepseek_consensus_game_id={game_id}")
-        print(f"source_label={DEEPSEEK_PROVIDER_SOURCE_LABEL}")
+        print(f"source_label={source_label}")
         print(f"provider_requests={len(trace.requests)}")
         print(f"provider_responses={len(trace.responses)}")
         print(f"provider_failures={len(failures)}")
@@ -121,13 +180,51 @@ def run_deepseek_consensus_game_with_provider_factory(
 
     failure_audit = {
         "game_id": game_id,
-        "source_label": DEEPSEEK_PROVIDER_SOURCE_LABEL,
+        "source_label": source_label,
         "failures": [],
     }
     _write_json(str(out_dir / "failure-audit.json"), failure_audit)
 
+    if writer is not None:
+        for artifact in ["game-log.json", "decision-log.json", "provider-trace.json", "failure-audit.json"]:
+            writer.emit(
+                "artifact_written",
+                round=0, phase="final", actor="system",
+                visibility="internal",
+                payload={"artifact": artifact},
+            )
+        if outputs.consensus_log is not None:
+            writer.emit(
+                "artifact_written",
+                round=0, phase="final", actor="system",
+                visibility="internal",
+                payload={"artifact": "consensus-log.json"},
+            )
+        manifest = build_prompt_manifest(
+            run_id=game_id,
+            source_label=source_label,
+            agents=[
+                {"player_id": pid, "provider": "deepseek", "model": "unknown"}
+                for pid in ["p1", "p2", "p3", "p4", "p5", "p6"]
+            ],
+        )
+        manifest["secrets_redacted"] = True
+        writer.write_prompt_manifest(manifest)
+        writer.emit(
+            "artifact_written",
+            round=0, phase="final", actor="system",
+            visibility="internal",
+            payload={"artifact": "prompt-manifest.json"},
+        )
+        writer.emit(
+            "run_finalized",
+            round=0, phase="final", actor="system",
+            visibility="internal",
+            payload={"status": "success"},
+        )
+
     print(f"deepseek_consensus_game_id={game_id}")
-    print(f"source_label={DEEPSEEK_PROVIDER_SOURCE_LABEL}")
+    print(f"source_label={source_label}")
     print(f"provider_failures=0")
     print(f"game_log=written")
     print(f"decision_log=written")
@@ -165,6 +262,7 @@ def main() -> int:
     parser.add_argument("--max-tokens-per-request", type=int, default=256)
     parser.add_argument("--max-provider-requests", type=int, default=12)
     parser.add_argument("--allow-live-api", action="store_true", default=False)
+    parser.add_argument("--write-runtime-spine", action="store_true", default=False)
     args = parser.parse_args()
 
     if not args.allow_live_api:
@@ -195,6 +293,7 @@ def main() -> int:
         game_id=args.game_id,
         out_dir=Path(args.out_dir),
         provider_factory=factory,
+        write_runtime_spine=args.write_runtime_spine,
     )
 
 
