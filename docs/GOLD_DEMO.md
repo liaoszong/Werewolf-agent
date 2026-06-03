@@ -1,4 +1,6 @@
-# GOLD_DEMO — Werewolf-agent Phase 1
+# GOLD_DEMO — Werewolf-agent
+
+> **Phase 1 legacy.** This document describes the completed Phase 1 deterministic MVP / gold demo proof-of-concept. Current product direction is `docs/ROADMAP.md` and `docs/PRODUCT_ONE_PAGER.md`. The HTML gold demo at `docs/demo/phase1-gold-demo.html` is an offline audit artifact, not primary UX.
 
 ## 固定输入
 

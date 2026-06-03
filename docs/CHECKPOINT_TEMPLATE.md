@@ -1,5 +1,7 @@
 # CHECKPOINT_TEMPLATE — Werewolf-agent
 
+> **ON-DEMAND template.** Not default context. Use this template when writing a checkpoint report. Process artifact only — does not define product direction or implementation scope.
+
 每个 checkpoint 必须填写以下报告。目的是让非代码审查者也能判断项目是否真的前进。
 
 ---

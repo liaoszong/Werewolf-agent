@@ -26,6 +26,9 @@ Default reads should be small and current:
 
 Do not default-read historical material:
 
+- `docs/GOLD_DEMO.md` and `docs/SPIKES.md`: Phase 1 legacy/archived. Skip unless tracing Phase 1 spike or gold-demo history.
+- `docs/EVALUATION_RUBRIC.md`: G4 later-stage reference. Read-on-demand for G1h-G3; default-read for G4 evaluation platform work.
+- `docs/CHECKPOINT_TEMPLATE.md`: process template, not default context.
 - `docs/harness/plans/**` except the active bound plan.
 - `docs/harness/reviews/**`.
 - `docs/demo/**`.

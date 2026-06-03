@@ -1,4 +1,6 @@
-# SPIKES — Werewolf-agent Phase 1
+# SPIKES — Werewolf-agent
+
+> **Archived.** All 7 Phase 1 spikes completed (S0-S6). Current new spikes are not tracked here. This document is retained as a historical record of Phase 1 uncertainty validation.
 
 不确定性验证清单。每个 spike 必须在 engineering task 之前完成并通过验收。
 

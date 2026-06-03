@@ -1,5 +1,7 @@
 # EVALUATION_RUBRIC — Werewolf-agent
 
+> **G4 later-stage reference.** Scoring dimensions, formulas, role rubrics, and AI judge boundaries defined here are canonical — but they apply to G4 evaluation platform. Read-on-demand for G1h-G3 work. Current product direction is `docs/ROADMAP.md` and `docs/PRODUCT_ONE_PAGER.md`.
+
 评分体系唯一事实来源。本文档定义所有评分维度、计算公式、角色 Rubric、AI 裁判边界和 Leaderboard 结构。其他文档引用本文件，不复制评分规则。
 
 **Phase 1 重要限定：**
