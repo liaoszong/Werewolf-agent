@@ -6,6 +6,9 @@ Item {
 
     property string seatId: ""
     property string roleName: ""
+    property string displayRole: ""
+    property string displayTeam: ""
+    property string visibilityLabel: ""
     property string aiLabel: ""
     property string statusText: ""
     property string accentText: ""
@@ -44,7 +47,11 @@ Item {
 
             Text {
                 anchors.centerIn: parent
-                text: root.roleName.substring(0, 2)
+                text: {
+                    var r = root.displayRole !== "" ? root.displayRole : root.roleName;
+                    if (r === "unknown") return "?";
+                    return r.substring(0, 2);
+                }
                 font.pixelSize: 14
                 font.bold: true
                 color: "#555"
@@ -52,10 +59,30 @@ Item {
         }
 
         Text {
-            text: root.roleName
+            text: {
+                var r = root.displayRole !== "" ? root.displayRole : root.roleName;
+                if (r === "unknown") return "Hidden";
+                return r;
+            }
             font.pixelSize: 13
             font.bold: true
             anchors.horizontalCenter: parent.horizontalCenter
+        }
+
+        Text {
+            text: root.displayTeam !== "" ? root.displayTeam : ""
+            font.pixelSize: 11
+            color: "#666"
+            anchors.horizontalCenter: parent.horizontalCenter
+            visible: text !== ""
+        }
+
+        Text {
+            text: root.visibilityLabel !== "" ? root.visibilityLabel : ""
+            font.pixelSize: 10
+            color: "#1976d2"
+            anchors.horizontalCenter: parent.horizontalCenter
+            visible: text !== ""
         }
 
         Text {
@@ -63,6 +90,7 @@ Item {
             font.pixelSize: 11
             color: "#666"
             anchors.horizontalCenter: parent.horizontalCenter
+            visible: text !== ""
         }
 
         Text {
@@ -70,6 +98,7 @@ Item {
             font.pixelSize: 11
             color: "#888"
             anchors.horizontalCenter: parent.horizontalCenter
+            visible: text !== ""
         }
     }
 }

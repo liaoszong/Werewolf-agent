@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 219
+- Entries: 221
 
 ```text
 ./
@@ -58,8 +58,10 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       │   │   ├── AuditLinksPanel.qml
 │       │   │   ├── EventTimeline.qml
 │       │   │   ├── PerspectiveSwitcher.qml
+│       │   │   ├── ProjectionProofPanel.qml
 │       │   │   ├── RoleCard.qml
-│       │   │   └── StatusBadge.qml
+│       │   │   ├── StatusBadge.qml
+│       │   │   └── ViewBoundaryBadge.qml
 │       │   ├── AppShell.qml
 │       │   ├── HistoryView.qml
 │       │   ├── HomeView.qml
