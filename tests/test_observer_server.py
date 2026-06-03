@@ -23,6 +23,19 @@ from werewolf_eval.observer_server import (
 from werewolf_eval.runtime_events import RuntimeEventWriter
 
 
+def _event(kind: str = "test", visibility: str = "public", seq: int = 0) -> dict[str, object]:
+    return {
+        "event_id": f"evt_{seq}_{kind}",
+        "seq": seq,
+        "kind": kind,
+        "round": 0,
+        "phase": "lobby",
+        "actor": "system",
+        "visibility": visibility,
+        "ts": "2026-01-01T00:00:00Z",
+    }
+
+
 # ---------------------------------------------------------------------------
 # Test helpers
 # ---------------------------------------------------------------------------
@@ -130,7 +143,7 @@ class ObserverServerEndpointTests(TestCase):
         run_dir = self._tmp_path / "my_run"
         run_dir.mkdir()
         (run_dir / "events.jsonl").write_text(
-            json.dumps({"kind": "game_started", "visibility": "public"}) + "\n",
+            json.dumps(_event("game_started", "public", 0)) + "\n",
             encoding="utf-8",
         )
 
@@ -149,8 +162,8 @@ class ObserverServerEndpointTests(TestCase):
         run_dir = self._tmp_path / "events_run"
         run_dir.mkdir()
         (run_dir / "events.jsonl").write_text(
-            json.dumps({"kind": "test", "visibility": "public"}) + "\n"
-            + json.dumps({"kind": "test", "visibility": "private"}) + "\n",
+            json.dumps(_event("game_started", "public", 0)) + "\n"
+            + json.dumps(_event("provider_request", "private", 1)) + "\n",
             encoding="utf-8",
         )
 
@@ -158,7 +171,7 @@ class ObserverServerEndpointTests(TestCase):
             self._base_url, "/api/runs/events_run/events?perspective=public"
         )
         self.assertIsInstance(result, dict)
-        self.assertEqual(result.get("count"), 1)  # type: ignore[union-attr]
+        self.assertEqual(result.get("hidden_count"), 1)  # type: ignore[union-attr]
         events = result.get("events", [])  # type: ignore[union-attr]
         self.assertEqual(len(events), 1)
 
@@ -166,7 +179,7 @@ class ObserverServerEndpointTests(TestCase):
         run_dir = self._tmp_path / "stream_run"
         run_dir.mkdir()
         (run_dir / "events.jsonl").write_text(
-            json.dumps({"kind": "game_started", "visibility": "public"}) + "\n",
+            json.dumps(_event("game_started", "public", 0)) + "\n",
             encoding="utf-8",
         )
         # Mark as completed
@@ -187,13 +200,13 @@ class ObserverServerEndpointTests(TestCase):
     def test_artifact_endpoint_rejects_unknown_artifact(self) -> None:
         run_dir = self._tmp_path / "art_run"
         run_dir.mkdir()
-        run_dir.mkdir(parents=True, exist_ok=True)
 
         result = _request_json(
-            self._base_url, "/api/runs/art_run/events"
+            self._base_url, "/api/runs/art_run/artifacts/bad.txt"
         )
         self.assertIsInstance(result, dict)
-        self.assertIn("events", result)  # type: ignore[operator]
+        code = result.get("code")  # type: ignore[union-attr]
+        self.assertIn(code, ("invalid_request", "not_found"))
 
     def test_snapshot_detail_rejects_god_snapshot_for_public(self) -> None:
         run_dir = self._tmp_path / "snap_run"
@@ -411,11 +424,10 @@ class ObserverServerSecretScanTests(TestCase):
                 )
 
     def test_public_endpoints_do_not_expose_secret_markers(self) -> None:
-        # Pre-create a run with data
         run_dir = self._tmp_path / "sec_run"
         run_dir.mkdir()
         (run_dir / "events.jsonl").write_text(
-            json.dumps({"kind": "test", "visibility": "public"}) + "\n",
+            json.dumps(_event("game_started", "public", 0)) + "\n",
             encoding="utf-8",
         )
 
@@ -425,9 +437,9 @@ class ObserverServerSecretScanTests(TestCase):
             "/api/runs/sec_run/events?perspective=god",
             "/api/runs/sec_run/snapshots?perspective=god",
             "/api/runs/sec_run/snapshots/s1.json?perspective=god",
-            "/manifest?run_id=sec_run",
-            "/provider-trace?run_id=sec_run",
-            "/failure-audit?run_id=sec_run",
+            "/api/runs/sec_run/manifest",
+            "/api/runs/sec_run/provider-trace",
+            "/api/runs/sec_run/failure-audit",
         ]
 
         for ep in endpoints:
@@ -442,8 +454,6 @@ class ObserverServerSecretScanTests(TestCase):
 
 class ObserverServerLiveObservationTests(TestCase):
     def _slow_launcher(self, run_id: str, run_dir: Path) -> int:
-        from werewolf_eval.runtime_events import RuntimeEventWriter
-
         writer = RuntimeEventWriter(run_id=run_id, out_dir=run_dir)
         writer.emit(
             "game_started", round=0, phase="lobby",
@@ -473,10 +483,8 @@ class ObserverServerLiveObservationTests(TestCase):
                 )
                 run_id = launch.get("run_id")  # type: ignore[union-attr]
 
-                # POST must return before completion (status is queued)
                 self.assertEqual(launch.get("status"), "queued")  # type: ignore[union-attr]
 
-                # Status query observes "queued" or "running" before "completed"
                 status_seen: set[str] = set()
                 deadline = time.time() + 5.0
                 while time.time() < deadline:
@@ -493,7 +501,6 @@ class ObserverServerLiveObservationTests(TestCase):
                     f"Must observe queued/running before completed, saw: {status_seen}",
                 )
 
-                # Re-launch a new run and test stream receives runtime events
                 launch2 = _request_json(
                     base_url, "/api/runs", method="POST", payload={}
                 )
@@ -508,3 +515,71 @@ class ObserverServerLiveObservationTests(TestCase):
                 self.assertIn("game_started", sse_text)
             finally:
                 server.shutdown()
+# ---------------------------------------------------------------------------
+
+
+class ObserverServerArtifactTests(TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls._tmp = TemporaryDirectory()
+        cls._tmp_path = Path(cls._tmp.name)
+        cls._server, cls._base_url = _start_server(cls._tmp_path)
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls._server.shutdown()
+        cls._tmp.cleanup()
+
+    def test_artifacts_endpoint_lists_allowed_artifacts(self) -> None:
+        run_dir = self._tmp_path / "art_test"
+        run_dir.mkdir()
+        (run_dir / "events.jsonl").write_text(
+            json.dumps(_event("game_started", "public", 0)) + "\n",
+            encoding="utf-8",
+        )
+        result = _request_json(
+            self._base_url, "/api/runs/art_test/artifacts"
+        )
+        self.assertIsInstance(result, dict)
+        artifacts = result.get("artifacts")  # type: ignore[union-attr]
+        self.assertIsInstance(artifacts, dict)
+        self.assertIn("events.jsonl", artifacts)
+
+    def test_artifacts_name_endpoint_serves_file(self) -> None:
+        run_dir = self._tmp_path / "art_file"
+        run_dir.mkdir()
+        (run_dir / "events.jsonl").write_text(
+            json.dumps(_event("game_started", "public", 0)) + "\n",
+            encoding="utf-8",
+        )
+        text = _request_text(
+            self._base_url, "/api/runs/art_file/artifacts/events.jsonl"
+        )
+        self.assertIn("evt_0_game_started", text)
+
+    def test_manifest_endpoint_serves_prompt_manifest(self) -> None:
+        run_dir = self._tmp_path / "mani_run"
+        run_dir.mkdir()
+        (run_dir / "prompt-manifest.json").write_text('{"hello":"world"}', encoding="utf-8")
+        text = _request_text(
+            self._base_url, "/api/runs/mani_run/manifest"
+        )
+        self.assertIn("hello", text)
+
+    def test_provider_trace_endpoint_serves_file(self) -> None:
+        run_dir = self._tmp_path / "trace_run"
+        run_dir.mkdir()
+        (run_dir / "provider-trace.json").write_text('{"trace":"yes"}', encoding="utf-8")
+        text = _request_text(
+            self._base_url, "/api/runs/trace_run/provider-trace"
+        )
+        self.assertIn("trace", text)
+
+    def test_failure_audit_endpoint_serves_file(self) -> None:
+        run_dir = self._tmp_path / "fa_run"
+        run_dir.mkdir()
+        (run_dir / "failure-audit.json").write_text('{"audit":"yes"}', encoding="utf-8")
+        text = _request_text(
+            self._base_url, "/api/runs/fa_run/failure-audit"
+        )
+        self.assertIn("audit", text)

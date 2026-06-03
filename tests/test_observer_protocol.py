@@ -242,8 +242,11 @@ class ObserverVisibilityTests(TestCase):
         result = filter_events_for_perspective(events, "public")
         self.assertIsInstance(result, dict)
         self.assertIn("events", result)
-        self.assertIn("count", result)
-        self.assertEqual(result["count"], 2)
+        self.assertIn("perspective", result)
+        self.assertIn("hidden_count", result)
+        self.assertEqual(result["perspective"], "public")
+        self.assertEqual(len(result["events"]), 2)  # type: ignore[arg-type]
+        self.assertEqual(result["hidden_count"], 1)
 
 
 # ---------------------------------------------------------------------------

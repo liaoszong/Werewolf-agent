@@ -277,12 +277,15 @@ def build_run_summary(
     snapshot_files = _list_snapshot_files(run_dir)
     snapshot_count = len(snapshot_files)
     snapshot_names = [f.name for f in snapshot_files]
+    failure_audit_path = run_dir / "failure-audit.json"
+    has_failure_audit = failure_audit_path.exists()
     return {
         "run_id": run_id,
         "status": current_status,
         "event_count": event_count,
         "snapshot_count": snapshot_count,
         "snapshot_names": snapshot_names,
+        "has_failure_audit": has_failure_audit,
     }
 
 
@@ -422,10 +425,14 @@ def snapshot_visible_to_perspective(
 def filter_events_for_perspective(
     events: list[dict[str, object]], perspective: str
 ) -> dict[str, object]:
-    """Return a dict with filtered ``events`` list and a ``count`` key."""
+    """Return a dict with ``perspective``, ``events``, and ``hidden_count``."""
     perspective = normalize_perspective(perspective)
     filtered = [e for e in events if event_visible_to_perspective(e, perspective)]
-    return {"events": filtered, "count": len(filtered)}
+    return {
+        "perspective": perspective,
+        "events": filtered,
+        "hidden_count": len(events) - len(filtered),
+    }
 
 
 def format_sse_event(event: dict[str, object]) -> bytes:

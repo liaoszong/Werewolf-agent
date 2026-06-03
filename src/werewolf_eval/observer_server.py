@@ -18,6 +18,8 @@ from urllib.parse import parse_qs, unquote, urlparse
 from werewolf_eval.observer_protocol import (
     ALLOWED_ARTIFACTS,
     ObserverProtocolError,
+    artifact_path,
+    build_artifact_registry,
     build_run_detail,
     build_run_summary,
     build_snapshot_registry,
@@ -34,6 +36,7 @@ from werewolf_eval.observer_protocol import (
     validate_run_id,
 )
 from werewolf_eval.run_g1h_fake_runtime import run_fake_runtime
+from werewolf_eval.runtime_events import RuntimeEventError, read_events_jsonl
 
 RunLauncher = Callable[[str, Path], int]
 
@@ -170,7 +173,7 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
 
                 if sub_path == ["events"]:
                     events_path = run_dir / "events.jsonl"
-                    events = _read_events(events_path)
+                    events = _read_events_jsonl_safe(events_path)
                     result = filter_events_for_perspective(events, perspective)
                     self._send_json(200, result)
                     return
@@ -208,35 +211,44 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
                     self._send_json(200, detail)
                     return
 
-            # artifact aliases
-            artifact_aliases: dict[str, str] = {
-                "manifest": "prompt-manifest.json",
-                "provider-trace": "provider-trace.json",
-                "failure-audit": "failure-audit.json",
-            }
-            if len(segments) == 1 and segments[0] in artifact_aliases:
-                artifact_name = artifact_aliases[segments[0]]
-                # artifact aliases need a run context; require query param
-                parsed = urlparse(self.path)
-                qs = parse_qs(parsed.query)
-                run_id = qs.get("run_id", [None])[0]
-                if not run_id:
-                    self._send_error_json(
-                        400, "missing_run_id", "run_id query parameter is required"
-                    )
+                # /api/runs/{run_id}/artifacts
+                if sub_path == ["artifacts"]:
+                    registry = build_artifact_registry(run_dir)
+                    self._send_json(200, {"artifacts": registry})
                     return
-                run_dir = self._run_dir(run_id)
-                if not run_dir.is_dir():
-                    self._send_error_json(404, "not_found", f"Run not found: {run_id}")
+
+                # /api/runs/{run_id}/artifacts/{name}
+                if len(sub_path) >= 2 and sub_path[0] == "artifacts":
+                    art_name = sub_path[1]
+                    try:
+                        art_path = artifact_path(run_dir, art_name)
+                    except ObserverProtocolError as exc:
+                        self._send_error_json(400, "invalid_request", str(exc))
+                        return
+                    if not art_path.exists():
+                        self._send_error_json(
+                            404, "not_found", f"Artifact not found: {art_name}"
+                        )
+                        return
+                    self._send_artifact_file(art_path)
                     return
-                art_path = safe_child_path(run_dir, artifact_name)
-                if not art_path.exists():
-                    self._send_error_json(
-                        404, "not_found", f"Artifact not found: {artifact_name}"
-                    )
+
+                # artifact aliases under run path
+                artifact_aliases: dict[str, str] = {
+                    "manifest": "prompt-manifest.json",
+                    "provider-trace": "provider-trace.json",
+                    "failure-audit": "failure-audit.json",
+                }
+                if len(sub_path) == 1 and sub_path[0] in artifact_aliases:
+                    art_name = artifact_aliases[sub_path[0]]
+                    art_path = safe_child_path(run_dir, art_name)
+                    if not art_path.exists():
+                        self._send_error_json(
+                            404, "not_found", f"Artifact not found: {art_name}"
+                        )
+                        return
+                    self._send_artifact_file(art_path)
                     return
-                self._send_artifact_file(art_path)
-                return
 
             self._send_error_json(404, "not_found", "Not found")
 
@@ -329,7 +341,7 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
 
         def _read_new_events() -> list[dict[str, object]]:
             nonlocal sent_count
-            all_events = _read_events(events_path)
+            all_events = _read_events_jsonl_safe(events_path)
             new_events = all_events[sent_count:]
             return new_events
 
@@ -398,24 +410,17 @@ def create_observer_server(
 # ---------------------------------------------------------------------------
 
 
-def _read_events(path: Path) -> list[dict[str, object]]:
-    """Read all events from a JSONL file with retry for concurrent access."""
+def _read_events_jsonl_safe(path: Path) -> list[dict[str, object]]:
+    """Read events via ``read_events_jsonl`` with retry for concurrent access.
+
+    Returns an empty list when the file does not exist or contains
+    invalid/incomplete JSONL (e.g. while a launcher is writing).
+    """
     if not path.exists():
         return []
     for _attempt in range(3):
         try:
-            text = path.read_text(encoding="utf-8")
-            break
-        except OSError:
+            return read_events_jsonl(path)  # type: ignore[return-value]
+        except (OSError, RuntimeEventError):
             time.sleep(0.05)
-    else:
-        return []
-    events: list[dict[str, object]] = []
-    for line in text.splitlines():
-        stripped = line.strip()
-        if stripped:
-            try:
-                events.append(json.loads(stripped))
-            except json.JSONDecodeError:
-                pass
-    return events
+    return []
