@@ -2,13 +2,25 @@
 
 > **For agentic workers:** 步骤使用复选框（`- [ ]`）语法进行跟踪。
 
-**Goal:** Build the G2a local observer server that exposes G1h runtime event-spine runs through a client-agnostic REST + streaming protocol, with a minimum default-match launch contract and visibility-trust slices from day one.
+**Goal:** Build the G2a local observer server that exposes G1h runtime event-spine runs through a client-agnostic REST + streaming protocol, with live-run observation, controlled snapshot access, a minimum default-match launch contract, and visibility-trust slices from day one.
 
-**Architecture:** Add a narrow Python-standard-library observer layer around completed G1h artifacts. The observer server reads and serves run bundles from a local runs directory, can launch the deterministic fake-provider default 6-player match through the existing G1h fake runtime, streams runtime events through Server-Sent Events, and never exposes Python runtime objects directly to clients. It is a protocol/control-plane milestone, not a Qt/Web UI or profile editor milestone.
+**Architecture:** Add a narrow Python-standard-library observer layer around completed G1h artifacts. The observer server reads completed run bundles, launches the deterministic fake-provider default 6-player match asynchronously, tracks run status changes, tails `events.jsonl` while a run is active, serves visibility-filtered events and controlled snapshot details, and never exposes Python runtime objects directly to clients. It is a protocol/control-plane milestone, not a Qt/Web UI or profile editor milestone.
 
-**Tech Stack:** Python standard library only: `http.server`, `socketserver`/`ThreadingHTTPServer`, `threading`, `json`, `pathlib`, `urllib.request` in tests, `unittest`, existing `werewolf_eval.runtime_events.read_events_jsonl`, existing `werewolf_eval.run_g1h_fake_runtime.run_fake_runtime`. No FastAPI, Flask, websockets, requests, PySide, Qt, or dependency manifest changes.
+**Tech Stack:** Python standard library only: `http.server`, `ThreadingHTTPServer`, `threading`, `time`, `json`, `pathlib`, `urllib.request` in tests, `unittest`, existing `werewolf_eval.runtime_events.read_events_jsonl`, existing `werewolf_eval.run_g1h_fake_runtime.run_fake_runtime`. No FastAPI, Flask, websockets, requests, PySide, Qt, or dependency manifest changes.
 
 ---
+
+## Block Review Fixes Incorporated
+
+This plan was revised after plan-only review found two blocking shrinkage risks:
+
+1. **Live-run observation gap fixed.** `POST /api/runs` must launch the default fake run asynchronously, expose status transitions, and `/stream` must tail events while the run is still active. Completed-run replay alone is not enough for G2a acceptance.
+2. **Snapshot content access gap fixed.** G2a must include a controlled snapshot detail endpoint with perspective-aware visibility checks. Snapshot metadata alone is not enough for G2a acceptance.
+
+The plan also resolves two internal inconsistencies:
+
+- `/events` returns an object with `perspective`, `events`, and `hidden_count`, not a bare JSON array.
+- The fake-run launch path is consistently asynchronous for server behavior and tests. Manual CLI smoke may still observe a run that completes quickly.
 
 ## Context Basis
 
@@ -36,11 +48,12 @@ G1h exposes a stable event spine and run bundle, but clients still have no proto
 
 G2a includes:
 
-- Local observer protocol helpers for run discovery, run metadata, artifact registry, safe path resolution, visibility filtering, and SSE event formatting.
-- Local HTTP server with REST endpoints for health, run listing, run status, events, snapshots, artifacts, prompt manifest, provider trace, failure audit, and default fake-match launch.
+- Local observer protocol helpers for run discovery, run metadata, artifact registry, safe path resolution, snapshot registry, snapshot visibility checks, event visibility filtering, and SSE event formatting.
+- Local HTTP server with REST endpoints for health, run listing, run status, events, stream, snapshots, snapshot details, artifacts, prompt manifest, provider trace, failure audit, and default fake-match launch.
 - A deterministic, CI-safe minimum match/profile contract seed for launching a default 6-player fake-provider match.
-- Streaming endpoint that emits event-spine events from `events.jsonl` using SSE over local HTTP.
-- Tests that use only temporary directories, fake G1h runtime output, localhost HTTP, and Python standard library clients.
+- Asynchronous run-control path for `POST /api/runs` with observable `queued` / `running` / `completed` / `failed` status.
+- Streaming endpoint that replays existing visible events and tails new `events.jsonl` events until the run reaches a terminal status.
+- Tests that use only temporary directories, fake G1h runtime output, injected slow local runner, localhost HTTP, and Python standard library clients.
 - A compact review packet for Codex省余额审查.
 
 G2a does not include:
@@ -65,14 +78,14 @@ G2a does not include:
 
 - `src/werewolf_eval/observer_protocol.py`
   - Pure helper module for observer contracts.
-  - Defines protocol constants, allowed artifact names, match/profile seed shape, run metadata builder, artifact registry, visibility filtering, SSE formatting, and safe path validation.
+  - Defines protocol constants, allowed artifact names, match/profile seed shape, run metadata builder, artifact registry, snapshot registry, snapshot detail loading, visibility filtering, SSE formatting, and safe path validation.
   - No sockets, no background threads, no CLI parsing.
 
 - `src/werewolf_eval/observer_server.py`
   - Local HTTP server implementation.
   - Uses `ThreadingHTTPServer` and `BaseHTTPRequestHandler`.
-  - Serves REST JSON endpoints, artifact JSON, and SSE stream.
-  - Launches default fake-provider run through existing `run_fake_runtime()` in a background thread.
+  - Serves REST JSON endpoints, artifact JSON, controlled snapshot details, and SSE stream.
+  - Launches default fake-provider run through an injectable launcher. Production default uses existing `run_fake_runtime()` in a background thread.
 
 - `src/werewolf_eval/run_observer_server.py`
   - CLI entry point.
@@ -80,10 +93,10 @@ G2a does not include:
   - Does not auto-launch live provider runs.
 
 - `tests/test_observer_protocol.py`
-  - Unit tests for safe path handling, run discovery, metadata, artifact registry, visibility filters, SSE format, and minimum match/profile seed validation.
+  - Unit tests for safe path handling, run discovery, metadata, artifact registry, snapshot registry/detail visibility, event visibility filters, SSE format, and minimum match/profile seed validation.
 
 - `tests/test_observer_server.py`
-  - Integration tests for local HTTP endpoints and default fake-run launch using temporary directories and localhost port `0`.
+  - Integration tests for local HTTP endpoints, asynchronous default fake-run launch, live stream tailing, controlled snapshot detail access, and security boundaries using temporary directories and localhost port `0`.
 
 ### Modify
 
@@ -149,8 +162,9 @@ The implementation must not:
 - Add dependency manifests or edit dependency manifests such as `pyproject.toml`, `requirements.txt`, `poetry.lock`, `uv.lock`, `package.json`, `package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, or Qt/CMake dependency files outside the allowlist.
 - Import `requests`, `httpx`, `aiohttp`, `websockets`, `fastapi`, `flask`, `starlette`, `uvicorn`, `openai`, `anthropic`, `PySide6`, `PyQt6`, `streamlit`, or `gradio`.
 - Call live provider APIs in tests or server defaults.
-- Expose raw secrets or local credential values in JSON responses, SSE events, or review evidence.
+- Expose raw secrets or local credential values in JSON responses, SSE events, snapshot responses, or review evidence.
 - Serve arbitrary local filesystem paths outside the configured runs directory.
+- Serve god-view snapshots to non-god perspectives.
 - Treat `clients/qt_observer` scaffold as completed G2b.
 
 ---
@@ -179,6 +193,27 @@ consensus-log.json
 provider-trace.json
 failure-audit.json
 ```
+
+### Run Status Contract
+
+Run status values:
+
+```text
+queued
+running
+completed
+failed
+unknown
+```
+
+Rules:
+
+- `POST /api/runs` must set status to `queued` before starting a background thread.
+- The background thread must set status to `running` before invoking the runner.
+- It must set status to `completed` only when the runner returns `0`.
+- It must set status to `failed` when the runner returns nonzero or raises.
+- Completed run directories discovered from disk without in-memory state are reported as `completed` when `events.jsonl` and final artifacts exist.
+- Discovered incomplete run directories are reported as `unknown` unless there is in-memory state.
 
 ### Minimum Match/Profile Contract Seed
 
@@ -215,7 +250,8 @@ POST /api/runs
 GET  /api/runs/{run_id}
 GET  /api/runs/{run_id}/events?perspective=god|public|role:p1|role:p2|role:p3|role:p4|role:p5|role:p6|team:werewolf
 GET  /api/runs/{run_id}/stream?perspective=god|public|role:p1|role:p2|role:p3|role:p4|role:p5|role:p6|team:werewolf
-GET  /api/runs/{run_id}/snapshots
+GET  /api/runs/{run_id}/snapshots?perspective=god|public|role:p1|role:p2|role:p3|role:p4|role:p5|role:p6|team:werewolf
+GET  /api/runs/{run_id}/snapshots/{snapshot_name}?perspective=god|public|role:p1|role:p2|role:p3|role:p4|role:p5|role:p6|team:werewolf
 GET  /api/runs/{run_id}/artifacts
 GET  /api/runs/{run_id}/artifacts/{artifact_name}
 GET  /api/runs/{run_id}/manifest
@@ -239,13 +275,34 @@ Endpoint behavior:
 
 - `GET /health` returns `200` and `{"status":"ok","service":"werewolf-observer"}`.
 - `GET /api/runs` returns an ordered list of run summaries discovered under the runs directory.
-- `POST /api/runs` launches a default fake run and returns `201` if it completes synchronously or `202` if still running. Either result is acceptable if the response includes `run_id`, `status`, and `template`.
+- `POST /api/runs` launches a default fake run asynchronously and returns `202` with `run_id`, `status`, `template`, and `mode`. It must not block until the whole run completes.
 - `GET /api/runs/{run_id}` returns status, artifact availability, event count, snapshot count, source labels if available, and paths relative to the run directory only.
-- `GET /events` returns visibility-filtered events as a JSON array.
-- `GET /stream` returns `text/event-stream` with one SSE event per runtime event. For completed runs it may replay the current event file and close.
-- `GET /snapshots` returns snapshot file metadata only, not arbitrary file paths.
+- `GET /events` returns an object with `perspective`, `events`, and `hidden_count`.
+- `GET /stream` returns `text/event-stream; charset=utf-8`, first replays visible events already present, then tails new visible events while the run status is `queued` or `running`, and closes only after a terminal status plus final poll. Completed-run streams replay current visible events and close.
+- `GET /snapshots` returns perspective-filtered snapshot metadata. Metadata includes `snapshot_name`, relative `path`, `snapshot_type`, `player_id` when safe, and `visible`.
+- `GET /snapshots/{snapshot_name}` returns controlled snapshot content only if the requested perspective is allowed to see it.
 - `GET /artifacts` returns allowed artifact names and availability.
 - Artifact endpoints must return `404` for missing artifacts and `400` or `404` for unknown artifact names.
+
+### Snapshot Visibility Rules
+
+Snapshot names:
+
+- Must be simple filenames under `snapshots/`.
+- Must end with `.json`.
+- Must not contain `/`, `\\`, `..`, URL-decoded traversal, or absolute-path syntax.
+
+Snapshot content is loaded only from `run_dir / "snapshots" / snapshot_name`.
+
+Visibility rules:
+
+- `god` may read every snapshot.
+- `public` may read only snapshots whose JSON has `snapshot_type == "public"`. Current G1h snapshots normally do not provide public snapshots, so `public` usually sees metadata with hidden snapshots and receives `403` for details.
+- `role:pN` may read only `snapshot_type == "role_projection"` snapshots whose `player_id == "pN"`.
+- `team:werewolf` may read `snapshot_type == "role_projection"` snapshots whose `team == "werewolf"`.
+- No non-god perspective may read `snapshot_type == "god"`.
+- If a snapshot lacks `snapshot_type`, hide it from all non-god perspectives.
+- Hidden snapshot detail requests return `403` with `code = "snapshot_hidden"` and must not include snapshot content.
 
 ### Visibility Trust Slices
 
@@ -293,7 +350,6 @@ Implement these public names:
 ```python
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -320,6 +376,13 @@ ALLOWED_PERSPECTIVES: tuple[str, ...] = (
     "role:p6",
     "team:werewolf",
 )
+RUN_STATUS_VALUES: tuple[str, ...] = (
+    "queued",
+    "running",
+    "completed",
+    "failed",
+    "unknown",
+)
 
 class ObserverProtocolError(ValueError):
     """Raised when observer protocol input is invalid."""
@@ -331,43 +394,51 @@ Constraints:
 - Do not import networking libraries here.
 - Do not import Qt or client code.
 
-- [ ] **Step 2: Add safe ID and path helpers**
+- [ ] **Step 2: Add safe ID, artifact, and snapshot path helpers**
 
 Implement:
 
 ```python
 def validate_run_id(run_id: str) -> str: ...
+def validate_snapshot_name(snapshot_name: str) -> str: ...
 def safe_child_path(root: Path, child_name: str) -> Path: ...
 def artifact_path(run_dir: Path, artifact_name: str) -> Path: ...
+def snapshot_path(run_dir: Path, snapshot_name: str) -> Path: ...
 ```
 
 Required behavior:
 
 - `validate_run_id()` accepts only non-empty IDs matching ASCII letters, digits, `_`, `-`, and `.`.
 - Reject `..`, `/`, `\\`, empty values, and path-like input.
+- `validate_snapshot_name()` accepts only simple filenames ending in `.json`; rejects traversal and nested paths.
 - `safe_child_path()` returns a resolved child path under `root` and rejects traversal.
 - `artifact_path()` accepts only `ALLOWED_ARTIFACTS` and returns a path under the run directory.
+- `snapshot_path()` accepts only safe snapshot names and returns a path under `run_dir / "snapshots"`.
 
-- [ ] **Step 3: Add run metadata and artifact registry helpers**
+- [ ] **Step 3: Add run metadata, artifact registry, and snapshot registry helpers**
 
 Implement:
 
 ```python
 def list_run_dirs(runs_dir: Path) -> list[Path]: ...
 def build_artifact_registry(run_dir: Path) -> dict[str, dict[str, object]]: ...
-def build_run_summary(run_dir: Path) -> dict[str, object]: ...
-def build_run_detail(run_dir: Path) -> dict[str, object]: ...
+def build_snapshot_registry(run_dir: Path, perspective: str = "god") -> list[dict[str, object]]: ...
+def load_snapshot_detail(run_dir: Path, snapshot_name: str, perspective: str = "god") -> dict[str, object]: ...
+def build_run_summary(run_dir: Path, status: str | None = None) -> dict[str, object]: ...
+def build_run_detail(run_dir: Path, status: str | None = None) -> dict[str, object]: ...
 ```
 
 Required behavior:
 
 - `list_run_dirs()` returns sorted child directories only.
 - `build_artifact_registry()` reports only allowed artifacts with `exists`, `name`, and relative `path` fields.
+- `build_snapshot_registry()` lists snapshot metadata without leaking hidden content to unauthorized perspectives.
+- `load_snapshot_detail()` enforces snapshot visibility rules and raises `ObserverProtocolError` for hidden or invalid snapshot access.
 - `build_run_summary()` includes `run_id`, `status`, `event_count`, `snapshot_count`, `artifacts`, and `has_failure_audit`.
-- `build_run_detail()` includes all summary fields plus `snapshots` list with relative names under `snapshots/`.
+- `build_run_detail()` includes all summary fields plus perspective-neutral snapshot metadata for `god` only when called internally for local audit. Endpoint handlers must pass request perspectives explicitly when serving snapshots.
 - Missing artifacts are represented as unavailable, not as errors.
 
-- [ ] **Step 4: Add launch contract parser**
+- [ ] **Step 4: Add launch contract parser and run ID generator**
 
 Implement:
 
@@ -386,25 +457,27 @@ Required behavior:
 - Validate provided `run_id` through `validate_run_id()`.
 - Generated run IDs must pass `validate_run_id()`.
 
-- [ ] **Step 5: Add visibility filtering and SSE formatting**
+- [ ] **Step 5: Add visibility filtering, snapshot visibility, and SSE formatting**
 
 Implement:
 
 ```python
 def normalize_perspective(perspective: str | None) -> str: ...
 def event_visible_to_perspective(event: dict[str, object], perspective: str) -> bool: ...
+def snapshot_visible_to_perspective(snapshot: dict[str, object], perspective: str) -> bool: ...
 def filter_events_for_perspective(events: list[dict[str, object]], perspective: str) -> dict[str, object]: ...
 def format_sse_event(event: dict[str, object]) -> bytes: ...
+def format_sse_status(run_id: str, status: str) -> bytes: ...
 ```
 
 Required behavior:
 
 - Missing perspective defaults to `god` for local audit tools.
 - Unknown perspectives raise `ObserverProtocolError`.
-- `god` sees all events.
-- `public` sees only `visibility == "public"`.
-- `team:werewolf` sees `public` and `werewolf_team`.
-- `role:pN` sees `public` plus role-specific visibility if current G1h event data safely supports it. In this milestone, role views must not receive `private`, `internal`, or `all` events.
+- `god` sees all events and snapshots.
+- `public` sees only event `visibility == "public"` and only public snapshots.
+- `team:werewolf` sees `public` / `werewolf_team` events and werewolf role-projection snapshots.
+- `role:pN` sees public events and only role-projection snapshots for `pN`. In this milestone, role views must not receive `private`, `internal`, or `all` events.
 - `filter_events_for_perspective()` returns:
 
 ```python
@@ -420,6 +493,13 @@ Required behavior:
 ```text
 event: runtime_event
 data: {JSON object}\n\n
+```
+
+- `format_sse_status()` emits bytes in this shape:
+
+```text
+event: run_status
+data: {"run_id":"...","status":"..."}\n\n
 ```
 
 Use `json.dumps(..., ensure_ascii=False, sort_keys=True)`.
@@ -440,19 +520,26 @@ from werewolf_eval.observer_protocol import (
     build_artifact_registry,
     build_run_detail,
     build_run_summary,
+    build_snapshot_registry,
     event_visible_to_perspective,
     filter_events_for_perspective,
     format_sse_event,
+    format_sse_status,
     list_run_dirs,
+    load_snapshot_detail,
     parse_launch_request,
     safe_child_path,
+    snapshot_path,
+    snapshot_visible_to_perspective,
     validate_run_id,
+    validate_snapshot_name,
 )
 
 class ObserverPathSafetyTests(unittest.TestCase):
     def test_validate_run_id_rejects_path_traversal(self) -> None: ...
     def test_artifact_path_rejects_unknown_artifact(self) -> None: ...
     def test_safe_child_path_stays_under_root(self) -> None: ...
+    def test_validate_snapshot_name_rejects_nested_paths(self) -> None: ...
 
 class ObserverRunSummaryTests(unittest.TestCase):
     def test_build_run_summary_counts_events_and_snapshots(self) -> None: ...
@@ -469,9 +556,17 @@ class ObserverVisibilityTests(unittest.TestCase):
     def test_werewolf_team_sees_public_and_werewolf_team_events(self) -> None: ...
     def test_unknown_perspective_is_rejected(self) -> None: ...
     def test_sse_format_contains_event_and_data_lines(self) -> None: ...
+    def test_sse_status_contains_run_status_event(self) -> None: ...
+
+class ObserverSnapshotVisibilityTests(unittest.TestCase):
+    def test_god_can_read_god_snapshot_detail(self) -> None: ...
+    def test_public_cannot_read_god_snapshot_detail(self) -> None: ...
+    def test_role_can_read_only_own_projection_snapshot(self) -> None: ...
+    def test_werewolf_team_can_read_werewolf_projection_snapshot(self) -> None: ...
+    def test_snapshot_registry_marks_hidden_snapshots_for_public(self) -> None: ...
 ```
 
-Test fixture events should be minimal dictionaries with `visibility` values `public`, `private`, `internal`, `all`, and `werewolf_team`. Do not read repository artifacts.
+Test fixture events should be minimal dictionaries with `visibility` values `public`, `private`, `internal`, `all`, and `werewolf_team`. Snapshot fixtures should include `snapshot_type = "god"`, `snapshot_type = "role_projection"`, `player_id`, and `team` fields. Do not read repository artifacts.
 
 - [ ] **Step 7: Run protocol focused tests**
 
@@ -491,7 +586,7 @@ The exact test count must be recorded in the review packet.
 
 ---
 
-## Task 2: Add local observer HTTP server
+## Task 2: Add local observer HTTP server with live run state
 
 **Files:**
 
@@ -509,24 +604,32 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any
+from threading import Lock, Thread
+from typing import Callable
+
+RunLauncher = Callable[[str, Path], int]
 
 @dataclass
 class ObserverServerState:
     runs_dir: Path
+    launcher: RunLauncher
     run_status: dict[str, str] = field(default_factory=dict)
+    run_errors: dict[str, str] = field(default_factory=dict)
+    lock: Lock = field(default_factory=Lock)
 
 class ObserverRequestHandler(BaseHTTPRequestHandler): ...
 
-def create_observer_server(host: str, port: int, runs_dir: Path) -> ThreadingHTTPServer: ...
+def create_observer_server(host: str, port: int, runs_dir: Path, launcher: RunLauncher | None = None) -> ThreadingHTTPServer: ...
 ```
 
 Implementation requirements:
 
+- Production default `launcher` calls existing `run_fake_runtime(game_id=run_id, out_dir=run_dir)`.
 - Store `ObserverServerState` on the `ThreadingHTTPServer` instance as `server.observer_state`.
+- All access to `run_status` and `run_errors` must be under `state.lock`.
 - All JSON responses must include `Content-Type: application/json; charset=utf-8`.
 - Disable noisy request logging by overriding `log_message()` to no-op unless a local debug flag is added later. Do not add a debug flag in this milestone.
-- Use `urllib.parse.urlparse` and `parse_qs` for routes.
+- Use `urllib.parse.urlparse`, `unquote`, and `parse_qs` for routes.
 
 - [ ] **Step 2: Implement error responses and request body parsing**
 
@@ -536,13 +639,17 @@ Add helper methods on `ObserverRequestHandler`:
 def _send_json(self, status: int, payload: dict[str, object] | list[object]) -> None: ...
 def _send_error_json(self, status: int, code: str, message: str) -> None: ...
 def _read_json_body(self) -> dict[str, object]: ...
+def _get_state(self) -> ObserverServerState: ...
+def _get_status(self, run_id: str, run_dir: Path) -> str: ...
+def _set_status(self, run_id: str, status: str) -> None: ...
 ```
 
 Required behavior:
 
 - Invalid JSON body returns `400` with `code = "invalid_json"`.
 - Protocol validation errors return `400` with `code = "invalid_request"`.
-- Missing runs/artifacts return `404` with stable JSON error shape.
+- Hidden snapshot detail returns `403` with `code = "snapshot_hidden"`.
+- Missing runs/artifacts/snapshots return `404` with stable JSON error shape.
 - Error response shape:
 
 ```json
@@ -565,6 +672,7 @@ Implement `do_GET()` dispatch for:
 /api/runs/{run_id}/events
 /api/runs/{run_id}/stream
 /api/runs/{run_id}/snapshots
+/api/runs/{run_id}/snapshots/{snapshot_name}
 /api/runs/{run_id}/artifacts
 /api/runs/{run_id}/artifacts/{artifact_name}
 /api/runs/{run_id}/manifest
@@ -575,19 +683,39 @@ Implement `do_GET()` dispatch for:
 Required behavior:
 
 - `/health` returns status `ok` and service name.
-- `/api/runs` lists run summaries from the configured runs directory.
-- `/api/runs/{run_id}` returns run detail.
-- `/events` reads `events.jsonl` through `read_events_jsonl()` and applies `filter_events_for_perspective()`.
-- `/stream` returns `text/event-stream; charset=utf-8` and writes formatted SSE bytes for visible events. For completed runs, replay current events and close.
-- `/snapshots` returns snapshot metadata from `build_run_detail()`.
+- `/api/runs` lists run summaries from the configured runs directory with current in-memory status when present.
+- `/api/runs/{run_id}` returns run detail plus current status.
+- `/events` reads `events.jsonl` through `read_events_jsonl()` and returns `filter_events_for_perspective()` object.
+- `/stream` returns `text/event-stream; charset=utf-8` and uses live tailing behavior described in Step 4.
+- `/snapshots` returns snapshot metadata from `build_snapshot_registry(run_dir, perspective)`.
+- `/snapshots/{snapshot_name}` returns `load_snapshot_detail(run_dir, snapshot_name, perspective)` result.
 - `/artifacts` returns `build_artifact_registry()`.
 - Artifact aliases:
   - `/manifest` serves `prompt-manifest.json`.
   - `/provider-trace` serves `provider-trace.json`.
   - `/failure-audit` serves `failure-audit.json`.
-- Do not serve files outside allowed artifacts.
+- Do not serve files outside allowed artifacts or controlled snapshot paths.
 
-- [ ] **Step 4: Implement POST default fake run launch**
+- [ ] **Step 4: Implement live SSE tailing**
+
+Implement a helper on `ObserverRequestHandler`:
+
+```python
+def _send_event_stream(self, run_id: str, run_dir: Path, perspective: str) -> None: ...
+```
+
+Required behavior:
+
+- Sends `Content-Type: text/event-stream; charset=utf-8`.
+- Sends an initial `run_status` SSE event with current status.
+- Polls `events.jsonl` at a short interval such as `0.05` seconds.
+- Replays visible events not yet sent.
+- While status is `queued` or `running`, continues polling for new events.
+- When status becomes `completed` or `failed`, performs one final read, sends any newly visible events, sends a final `run_status` SSE event, then closes.
+- For completed runs with no in-memory active status, replays existing visible events and closes.
+- Uses only standard-library file polling. Do not introduce WebSocket or async server dependencies.
+
+- [ ] **Step 5: Implement asynchronous POST default fake run launch**
 
 Implement `do_POST()` for:
 
@@ -599,35 +727,38 @@ Required behavior:
 
 - Parse body through `parse_launch_request()`.
 - Create run directory under `runs_dir / run_id`.
-- Call existing:
-
-```python
-from werewolf_eval.run_g1h_fake_runtime import run_fake_runtime
-```
-
-- The first implementation may run the fake runtime synchronously inside the request because it is deterministic, local, and fast. If the implementer uses a background thread instead, tests must wait for completion by polling `/api/runs/{run_id}`.
-- Response must include:
+- Set run status to `queued`.
+- Start a daemon background `Thread`.
+- Thread behavior:
+  - set status `running`,
+  - call `state.launcher(run_id, run_dir)`,
+  - set status `completed` on return code `0`,
+  - set status `failed` and store error text on nonzero return or exception.
+- Response must return `202` immediately and include:
 
 ```json
 {
   "run_id": "...",
   "template": "default_6p_fake",
   "mode": "fake",
-  "status": "completed",
-  "artifacts": {...}
+  "status": "queued"
 }
 ```
 
-- If `run_fake_runtime()` returns nonzero, return `500` with `code = "run_failed"`, keep failure artifacts if written, and do not forge success.
 - Do not call DeepSeek or any live provider path.
+- Do not block until fake runtime finishes.
 
-- [ ] **Step 5: Implement server integration tests**
+- [ ] **Step 6: Implement server integration tests**
 
 Create `tests/test_observer_server.py` with helper functions:
 
 ```python
 import json
+import os
+import subprocess
+import sys
 import threading
+import time
 import unittest
 import urllib.error
 import urllib.request
@@ -636,11 +767,13 @@ from tempfile import TemporaryDirectory
 
 from werewolf_eval.observer_server import create_observer_server
 from werewolf_eval.run_g1h_fake_runtime import run_fake_runtime
+from werewolf_eval.runtime_events import RuntimeEventWriter
 
 
-def _start_server(runs_dir: Path): ...
+def _start_server(runs_dir: Path, launcher=None): ...
 def _request_json(base_url: str, path: str, *, method: str = "GET", payload: dict[str, object] | None = None) -> object: ...
 def _request_text(base_url: str, path: str) -> str: ...
+def _wait_for_status(base_url: str, run_id: str, expected: str, timeout_s: float = 5.0) -> dict[str, object]: ...
 ```
 
 Required helper behavior:
@@ -656,9 +789,12 @@ class ObserverServerEndpointTests(unittest.TestCase):
     def test_health_endpoint_returns_ok(self) -> None: ...
     def test_list_runs_and_run_detail_for_existing_fake_runtime(self) -> None: ...
     def test_events_endpoint_filters_public_perspective(self) -> None: ...
-    def test_stream_endpoint_replays_sse_events(self) -> None: ...
+    def test_stream_endpoint_replays_sse_events_for_completed_run(self) -> None: ...
     def test_artifact_endpoint_rejects_unknown_artifact(self) -> None: ...
-    def test_post_runs_launches_default_fake_match(self) -> None: ...
+    def test_snapshot_detail_rejects_god_snapshot_for_public(self) -> None: ...
+    def test_snapshot_detail_allows_role_projection_for_matching_role(self) -> None: ...
+    def test_post_runs_launches_default_fake_match_asynchronously(self) -> None: ...
+    def test_stream_endpoint_tails_events_while_run_is_active(self) -> None: ...
     def test_post_runs_rejects_unknown_template(self) -> None: ...
 ```
 
@@ -667,12 +803,14 @@ Test details:
 - For existing-run tests, create a temp run directory and call `run_fake_runtime(game_id="server_existing", out_dir=run_dir)`, asserting return code `0`.
 - `/api/runs` must include `server_existing`.
 - `/api/runs/server_existing` must report `event_count > 0`, `snapshot_count > 0`, and available artifacts.
-- `/api/runs/server_existing/events?perspective=public` must return `perspective = "public"` and must not include events with `visibility` `private`, `internal`, or `all`.
-- `/stream?perspective=god` response text must contain `event: runtime_event` and `data: `.
+- `/api/runs/server_existing/events?perspective=public` must return an object with `perspective = "public"`, `events`, and `hidden_count`, and must not include events with `visibility` `private`, `internal`, or `all`.
+- `/stream?perspective=god` response text for a completed run must contain `event: runtime_event` and `data: `.
 - Unknown artifact should raise `urllib.error.HTTPError` with code `400` or `404`.
-- `POST /api/runs` with `{"template":"default_6p_fake","run_id":"launch_test","mode":"fake"}` must return status `completed` and write `events.jsonl`, `prompt-manifest.json`, `game-log.json`, `decision-log.json`, `provider-trace.json`, and `failure-audit.json` under the temp runs directory.
+- For snapshot tests, use generated G1h snapshots and/or controlled snapshot fixtures written under a temp run. Public perspective must receive `403` for a god snapshot detail. Matching role perspective must receive a role-projection snapshot for its player.
+- `POST /api/runs` with `{"template":"default_6p_fake","run_id":"launch_test","mode":"fake"}` must return `202` with status `queued` or `running`, then `_wait_for_status()` must observe `completed`, and artifacts must exist under the temp runs directory.
+- Live tailing test must inject a slow local `launcher` that uses `RuntimeEventWriter` to write at least two events with a delay, writes minimal final artifacts, and returns `0`. The test must start `/stream?perspective=god` while status is `running` and assert the SSE text includes at least one `runtime_event` before final `run_status` completion. This proves live observation rather than completed-run-only replay.
 
-- [ ] **Step 6: Run server tests**
+- [ ] **Step 7: Run server tests**
 
 Run:
 
@@ -720,7 +858,7 @@ def main() -> int:
 
     server = create_observer_server(args.host, args.port, Path(args.runs_dir))
     host, port = server.server_address[:2]
-    print(f"observer_server=started")
+    print("observer_server=started")
     print(f"host={host}")
     print(f"port={port}")
     print(f"runs_dir={Path(args.runs_dir)}")
@@ -790,7 +928,7 @@ OK
 
 ---
 
-## Task 4: Add security, provenance, and no-secret tests
+## Task 4: Add security, provenance, snapshot, and no-secret tests
 
 **Files:**
 
@@ -806,6 +944,7 @@ Extend `tests/test_observer_protocol.py`:
 class ObserverTraversalDefenseTests(unittest.TestCase):
     def test_run_id_rejects_parent_directory_segments(self) -> None: ...
     def test_artifact_path_rejects_nested_paths(self) -> None: ...
+    def test_snapshot_path_rejects_nested_paths(self) -> None: ...
 ```
 
 Inputs to reject:
@@ -815,22 +954,23 @@ Inputs to reject:
 ..\\x
 x/y
 x\\y
-
 ```
 
-- [ ] **Step 2: Add server traversal endpoint test**
+- [ ] **Step 2: Add server traversal endpoint tests**
 
 Extend `tests/test_observer_server.py`:
 
 ```python
 class ObserverServerSecurityTests(unittest.TestCase):
     def test_server_does_not_serve_path_traversal_artifact(self) -> None: ...
+    def test_server_does_not_serve_path_traversal_snapshot(self) -> None: ...
 ```
 
-Request path example:
+Request path examples:
 
 ```text
 /api/runs/security_run/artifacts/..%2F..%2FREADME.md
+/api/runs/security_run/snapshots/..%2F..%2FREADME.md
 ```
 
 Expected:
@@ -850,7 +990,7 @@ class ObserverServerSecretScanTests(unittest.TestCase):
 Procedure:
 
 - Generate a temp fake run with `run_fake_runtime()`.
-- Call `/api/runs`, `/api/runs/{run_id}`, `/events?perspective=god`, `/artifacts`, `/manifest`, `/provider-trace`, and `/failure-audit`.
+- Call `/api/runs`, `/api/runs/{run_id}`, `/events?perspective=god`, `/snapshots?perspective=god`, `/artifacts`, `/manifest`, `/provider-trace`, and `/failure-audit`.
 - Concatenate response text.
 - Fail if unsafe secret markers appear:
 
@@ -863,7 +1003,24 @@ sk-
 
 Safe literal references inside tests must be described in the review packet as test-only forbidden-pattern markers.
 
-- [ ] **Step 4: Run security tests**
+- [ ] **Step 4: Add live-observation non-shrinkage test**
+
+Extend `tests/test_observer_server.py`:
+
+```python
+class ObserverServerLiveObservationTests(unittest.TestCase):
+    def test_status_changes_and_stream_events_are_visible_before_completion(self) -> None: ...
+```
+
+Required proof:
+
+- Inject a slow launcher.
+- `POST /api/runs` returns before launcher completion.
+- A status query observes `queued` or `running` before `completed`.
+- `/stream?perspective=god` receives at least one runtime event from the active run before final completion status.
+- The test fails if the implementation only runs synchronously and only replays completed runs.
+
+- [ ] **Step 5: Run security and live-observation tests**
 
 Run:
 
@@ -939,6 +1096,7 @@ Invoke-RestMethod http://127.0.0.1:8765/health
 Invoke-RestMethod http://127.0.0.1:8765/api/runs
 Invoke-RestMethod http://127.0.0.1:8765/api/runs/g2a_smoke_run
 Invoke-RestMethod 'http://127.0.0.1:8765/api/runs/g2a_smoke_run/events?perspective=public'
+Invoke-RestMethod 'http://127.0.0.1:8765/api/runs/g2a_smoke_run/snapshots?perspective=god'
 ```
 
 Expected:
@@ -947,6 +1105,7 @@ Expected:
 - Runs response includes `g2a_smoke_run`.
 - Run detail has `event_count > 0` and `snapshot_count > 0`.
 - Public events response includes `perspective = public` and does not include private/internal events.
+- God snapshot metadata response lists snapshots without absolute local paths.
 
 - [ ] **Step 4: Record manual smoke status**
 
@@ -1164,29 +1323,33 @@ A3. Existing completed G1h run bundles can be listed through `GET /api/runs`.
 
 A4. Existing run details expose event count, snapshot count, and allowed artifact availability without leaking absolute local file paths.
 
-A5. `GET /api/runs/{run_id}/events` reads and validates `events.jsonl` through `read_events_jsonl()`.
+A5. `GET /api/runs/{run_id}/events` reads and validates `events.jsonl` through `read_events_jsonl()` and returns `perspective`, `events`, and `hidden_count`.
 
-A6. `GET /api/runs/{run_id}/stream` emits SSE-formatted runtime events and uses `Content-Type: text/event-stream; charset=utf-8`.
+A6. `GET /api/runs/{run_id}/stream` emits SSE-formatted runtime events, emits run-status SSE events, and tails new events while a run is active.
 
-A7. `POST /api/runs` accepts the minimum default launch contract and starts only the deterministic fake-provider 6-player runtime.
+A7. `POST /api/runs` accepts the minimum default launch contract, returns before run completion, and starts only the deterministic fake-provider 6-player runtime in a background thread.
 
 A8. The launch contract rejects unknown templates, unknown modes, unsafe run IDs, and extra keys.
 
 A9. G2a implements conservative visibility filtering for `god`, `public`, `role:p1`-`role:p6`, and `team:werewolf` perspectives.
 
-A10. Non-god perspectives do not receive `private`, `internal`, or unsafe unmapped event visibilities by default.
+A10. Non-god event perspectives do not receive `private`, `internal`, or unsafe unmapped event visibilities by default.
 
-A11. Artifact serving is restricted to the allowlisted G1h artifact names and rejects path traversal.
+A11. Snapshot metadata and snapshot detail endpoints exist; non-god perspectives cannot read god snapshots, and role perspectives can read only their own role-projection snapshots.
 
-A12. No API keys, bearer tokens, authorization headers, secret values, or local credential values are exposed in protocol responses.
+A12. Artifact serving is restricted to the allowlisted G1h artifact names and rejects path traversal.
 
-A13. G2a does not modify Qt scaffold, Web client, prompt/profile editor, scoring, providers, validators, generated fixtures, demo HTML, ROADMAP, TASKS, README, or PRODUCT_ONE_PAGER.
+A13. Snapshot serving is restricted to safe `snapshots/*.json` names under the run directory and rejects path traversal.
 
-A14. G2a uses no new third-party dependencies and does not modify dependency manifests.
+A14. No API keys, bearer tokens, authorization headers, secret values, or local credential values are exposed in protocol responses, SSE events, or snapshot responses.
 
-A15. Focused observer tests, G1h regression tests, full unit suite, compileall, allowlist check, forbidden-scope check, forbidden-pattern check, dependency/import check, and runtime-artifact staging check pass or are documented with exact pre-existing failure evidence.
+A15. G2a does not modify Qt scaffold, Web client, prompt/profile editor, scoring, providers, validators, generated fixtures, demo HTML, ROADMAP, TASKS, README, or PRODUCT_ONE_PAGER.
 
-A16. `.logs/review/latest/review-packet.md` exists and contains the machine-generated evidence required below.
+A16. G2a uses no new third-party dependencies and does not modify dependency manifests.
+
+A17. Focused observer tests, G1h regression tests, full unit suite, compileall, allowlist check, forbidden-scope check, forbidden-pattern check, dependency/import check, and runtime-artifact staging check pass or are documented with exact pre-existing failure evidence.
+
+A18. `.logs/review/latest/review-packet.md` exists and contains the machine-generated evidence required below.
 
 ---
 
@@ -1308,17 +1471,21 @@ or the exact failure summary.
 Include concise excerpts, not full diffs, for:
 
 - endpoint dispatch in `observer_server.py`,
+- asynchronous `POST /api/runs` launcher and status transitions in `observer_server.py`,
+- live SSE tailing loop in `observer_server.py`,
 - path traversal defense in `observer_protocol.py`,
 - visibility filter logic in `observer_protocol.py`,
-- `POST /api/runs` fake-launch path in `observer_server.py`,
+- snapshot visibility and detail loading in `observer_protocol.py`,
 - tests proving public perspective hides private/internal events,
+- tests proving snapshot detail rejects god snapshot for public perspective,
+- tests proving live stream receives active-run events before completion,
 - tests proving traversal rejection.
 
 Each excerpt must include file path and line range after implementation.
 
 ### 9. Acceptance checklist with evidence pointer
 
-Include A1-A16 checklist. Each item must point to a test name, command result, or file hunk excerpt.
+Include A1-A18 checklist. Each item must point to a test name, command result, or file hunk excerpt.
 
 Example format:
 
@@ -1334,8 +1501,9 @@ Include a short section:
 ## Implementer Risk Notes
 
 - Server uses Python stdlib HTTP only; no FastAPI/Flask/WebSocket dependency.
-- SSE stream replays completed run events and closes; full long-lived live tailing is intentionally limited in G2a.
+- SSE stream replays existing visible events and tails active-run `events.jsonl` until terminal status; it is local file polling, not a full hosted event bus.
 - Minimum match/profile contract supports only `default_6p_fake`; full profile editor is G2d.
+- Snapshot detail access is conservative: god can read all, role views read only matching role projections, and public normally cannot read G1h god snapshots.
 - Visibility filtering is conservative and protocol-level; full Phase E trust proof remains later hardening.
 - Qt scaffold is untouched; G2b remains not completed.
 ```
@@ -1347,12 +1515,13 @@ Include a short section:
 The implementation may trigger B档 deeper review if any of these happen:
 
 - `git diff --stat main...HEAD` exceeds 8 changed files or 500 changed lines.
-- `observer_server.py` grows beyond 350 lines.
+- `observer_server.py` grows beyond 400 lines.
 - Any source file combines protocol helpers, HTTP routing, CLI, and tests in one file instead of the planned separation.
 - Any change touches forbidden scope such as Qt scaffold, ROADMAP/TASKS, runtime engine, provider adapter, scoring, validators, generated fixtures, demo HTML, or dependency manifests.
 - Any import introduces third-party server/client dependencies.
 - Any endpoint serves arbitrary paths or absolute paths.
-- Any non-god perspective returns private/internal/unmapped event data.
+- Any snapshot endpoint serves god-view snapshot content to non-god perspectives.
+- Any non-god event perspective returns private/internal/unmapped event data.
 - Any test starts a long-running server process without guaranteed shutdown.
 - Full suite fails without proof that the failure is pre-existing and unrelated.
 - Review packet lacks key hunk excerpts or acceptance checklist evidence pointers.
@@ -1375,8 +1544,9 @@ Body:
 ## Summary
 
 - Adds a Python-stdlib local observer server for G2a.
-- Exposes G1h run bundles through client-agnostic REST endpoints and SSE event replay.
-- Adds a minimum default fake-match launch contract for `default_6p_fake`.
+- Exposes G1h run bundles through client-agnostic REST endpoints and SSE event replay/tailing.
+- Adds asynchronous default fake-match launch for `default_6p_fake` with observable run status transitions.
+- Adds controlled snapshot metadata/detail endpoints with conservative perspective checks.
 - Adds conservative visibility filtering for God/Public/Role/Team perspectives from day one.
 
 ## Scope
@@ -1403,13 +1573,13 @@ Body:
 
 ## Execution Handoff
 
-After saving this plan, implementation should proceed task-by-task in order:
+Implementation should proceed task-by-task in order:
 
 1. Observer protocol helpers and unit tests.
-2. Local HTTP observer server and endpoint tests.
+2. Local HTTP observer server with live run state, endpoint tests, live stream tests, and snapshot tests.
 3. CLI and CLI help test.
-4. Security/provenance/no-secret tests.
+4. Security/provenance/snapshot/no-secret tests.
 5. Manual observer smoke evidence.
 6. Full validation and review packet.
 
-Do not jump directly into Qt/QML. Do not build a Web UI. Do not broaden the launch contract beyond `default_6p_fake` in this milestone.
+Do not jump directly into Qt/QML. Do not build a Web UI. Do not broaden the launch contract beyond `default_6p_fake` in this milestone. Do not accept completed-run replay alone as proof of G2a success.
