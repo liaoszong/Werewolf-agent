@@ -10,6 +10,17 @@
 
 ---
 
+## Plan Review Fixes Incorporated
+
+This revision fixes the G2b plan-review findings before implementation:
+
+- **QML module registration fixed:** Task 2 now provides the complete target-state `qt_add_qml_module()` call with every QML file listed under `QML_FILES`.
+- **QML injection compatibility fixed:** `setContextProperty()` is no longer the planned API. `ObserverApiClient` must be exposed with `qmlRegisterSingletonInstance("qt_observer", 1, 0, "ObserverClient", &observerClient)` before `engine.loadFromModule("qt_observer", "Main")`.
+- **CMake target state fixed:** Task 2 contains the full target-state `CMakeLists.txt`. Later UI tasks must not add more QML files to CMake; they only fill files already registered in Task 2.
+- **Start-run state handoff fixed:** `startDefaultMatch()` must parse the `run_id` from the G2a `202` response, set `currentRunId`, set `currentStatus`, emit `currentRunChanged` / `currentStatusChanged`, and connect the stream.
+- **SSE data scope clarified:** `ObserverSseParser` supports single-line `data: {json}` frames only in G2b MVP because current G2a emits single-line JSON. Multi-line `data:` concatenation is explicitly out of scope.
+- **Artifact alias semantics clarified:** Audit links must prefer G2a alias endpoints `/manifest`, `/provider-trace`, and `/failure-audit`, not local filenames or direct file paths.
+
 ## Context Basis
 
 Current route facts:
@@ -32,12 +43,15 @@ Reason:
 G2a has supplied the protocol/control plane. The product now needs its first rich observer surface so users can start a default AI-vs-AI match, watch it live, reopen historical runs, and understand the match without reading JSON.
 ```
 
+---
+
 ## Scope Summary
 
 G2b includes:
 
 - Qt/QML app shell with Home/Lobby, Start New Match, Preflight, Live Match Cockpit, and Match History views.
 - A small C++ `ObserverApiClient` that uses Qt Network to call G2a REST endpoints and consume SSE stream events.
+- A small C++ `ObserverSseParser` that parses G2a single-line JSON SSE frames.
 - A game-like visual surface for default 6-player AI-vs-AI matches, including role/player cards, run status, event timeline, perspective switcher, and audit links.
 - Minimal default match launch flow through G2a `POST /api/runs` with `template = default_6p_fake`.
 - History/replay flow through G2a `GET /api/runs`, `/events`, and `/stream`.
@@ -99,7 +113,7 @@ Required visible UI concepts:
   - event timeline,
   - perspective switcher for `god`, `public`, `role:p1`-`role:p6`, `team:werewolf`,
   - provider/failure status summary,
-  - audit links panel for manifest/provider-trace/failure-audit/snapshots/final logs.
+  - audit links panel for manifest, provider trace, failure audit, snapshots, and final logs.
 - Match History:
   - completed and recent runs from G2a `/api/runs`,
   - open/replay action using the same cockpit surface,
@@ -131,6 +145,16 @@ GET  /api/runs/{run_id}/provider-trace
 GET  /api/runs/{run_id}/failure-audit
 ```
 
+Audit link URL construction must use these alias endpoints for direct artifact summaries:
+
+```text
+/api/runs/{run_id}/manifest
+/api/runs/{run_id}/provider-trace
+/api/runs/{run_id}/failure-audit
+/api/runs/{run_id}/snapshots?perspective={perspective}
+/api/runs/{run_id}/artifacts
+```
+
 The Qt client must not:
 
 - read `events.jsonl` or `snapshots/*.json` from disk,
@@ -146,85 +170,31 @@ The Qt client must not:
 ### Create
 
 - `clients/qt_observer/src/ObserverApiClient.h`
-  - QObject protocol adapter exposed to QML.
-  - Owns `baseUrl`, `connected`, `currentRunId`, `currentStatus`, `currentPerspective`, `eventItems`, `runItems`, `auditItems`, `lastError`, and invokable methods.
-
 - `clients/qt_observer/src/ObserverApiClient.cpp`
-  - Uses `QNetworkAccessManager` for REST.
-  - Uses long-lived `QNetworkReply` for SSE stream.
-  - Parses G2a JSON and SSE frames.
-  - Emits QML-friendly signals.
-
 - `clients/qt_observer/src/ObserverSseParser.h`
-  - Small pure C++/Qt helper for SSE frame parsing.
-
 - `clients/qt_observer/src/ObserverSseParser.cpp`
-  - Parses `event: runtime_event` and `event: run_status` frames into value objects.
-
 - `clients/qt_observer/qml/AppShell.qml`
-  - Root navigation shell and shared layout.
-
 - `clients/qt_observer/qml/HomeView.qml`
-  - Lobby page.
-
 - `clients/qt_observer/qml/MatchSetupView.qml`
-  - Default 6-player setup page with role cards.
-
 - `clients/qt_observer/qml/PreflightView.qml`
-  - Preflight summary page.
-
 - `clients/qt_observer/qml/LiveCockpitView.qml`
-  - Main cockpit page.
-
 - `clients/qt_observer/qml/HistoryView.qml`
-  - Run history/replay page.
-
 - `clients/qt_observer/qml/components/RoleCard.qml`
-  - Visual role/player card.
-
 - `clients/qt_observer/qml/components/EventTimeline.qml`
-  - Event stream list.
-
 - `clients/qt_observer/qml/components/PerspectiveSwitcher.qml`
-  - God/Public/Role/Team selector.
-
 - `clients/qt_observer/qml/components/AuditLinksPanel.qml`
-  - Artifact/action links panel.
-
 - `clients/qt_observer/qml/components/StatusBadge.qml`
-  - Status badge component.
-
 - `clients/qt_observer/tests/tst_observer_sse_parser.cpp`
-  - QtTest for SSE parsing and conservative parser behavior.
-
 - `tests/test_qt_observer_static_contract.py`
-  - Python static tests for CMake/QML contract, no direct Python runtime binding, expected screen/component files, and no secret markers.
 
 ### Modify
 
 - `clients/qt_observer/CMakeLists.txt`
-  - Add Qt components `Network`, `QuickControls2`, and `Test`.
-  - Add source files and QML files.
-  - Add QtTest executable and `enable_testing()`.
-
 - `clients/qt_observer/main.cpp`
-  - Register `ObserverApiClient` as a QML singleton/context property.
-  - Parse optional `--observer-base-url` argument with default `http://127.0.0.1:8765`.
-  - Load `AppShell` or keep module entry as `Main` delegating to `AppShell`.
-
 - `clients/qt_observer/Main.qml`
-  - Replace default Hello World window with root shell that loads `AppShell`.
-
 - `clients/qt_observer/README.md`
-  - Update status from scaffold-only to G2b MVP.
-  - Preserve explicit non-goals.
-  - Document how to configure/build/run against local G2a server.
-
 - `.logs/review/latest/review-packet.md`
-  - Implementation evidence only.
-
 - `.oh-my-harness/tree.md`
-  - Refresh only via `node .codex/hooks/tree.mjs --force` because new files are created.
 
 ### Do Not Modify
 
@@ -232,14 +202,9 @@ The Qt client must not:
 - `tests/test_observer_protocol.py`
 - `tests/test_observer_server.py`
 - Any G2a observer server/protocol implementation.
-- `docs/ROADMAP.md`
-- `docs/TASKS.md`
-- `docs/PRODUCT_ONE_PAGER.md`
-- `README.md` outside `clients/qt_observer/README.md`.
-- `docs/adr/**`
-- `docs/demo/**`
-- `docs/generated-games/**`
-- `docs/gold-game/**`
+- `README.md` at repository root.
+- `docs/ROADMAP.md`, `docs/TASKS.md`, `docs/PRODUCT_ONE_PAGER.md`, `docs/adr/**`.
+- `docs/demo/**`, `docs/generated-games/**`, `docs/gold-game/**`.
 - Dependency manifests outside `clients/qt_observer/CMakeLists.txt`.
 - GitHub workflow files.
 
@@ -289,7 +254,7 @@ Implementation must not:
 
 - Modify `src/werewolf_eval/**` or any Python runtime/server/provider/scoring/validator code.
 - Modify `tests/test_observer_protocol.py` or `tests/test_observer_server.py`.
-- Modify route docs such as `README.md`, `docs/ROADMAP.md`, `docs/TASKS.md`, `docs/PRODUCT_ONE_PAGER.md`, or `docs/adr/**`.
+- Modify route docs such as root `README.md`, `docs/ROADMAP.md`, `docs/TASKS.md`, `docs/PRODUCT_ONE_PAGER.md`, or `docs/adr/**`.
 - Modify historical plans/reviews, demo HTML, generated games, gold-game fixtures, semantic-labeling docs, or `.github/**`.
 - Add provider API calls, live API flags, secrets, API keys, or credential handling.
 - Add Web UI, Electron, React/Vue, Python GUI bindings, PySide/PyQt, QML WebEngine, or browser automation.
@@ -309,19 +274,20 @@ Implementation must not:
 - Create: `clients/qt_observer/src/ObserverSseParser.cpp`
 - Create: `clients/qt_observer/src/ObserverApiClient.h`
 - Create: `clients/qt_observer/src/ObserverApiClient.cpp`
-- Modify: `clients/qt_observer/CMakeLists.txt`
+- Modify: `clients/qt_observer/CMakeLists.txt` only for C++ sources and QtTest at this stage
 - Test: `clients/qt_observer/tests/tst_observer_sse_parser.cpp`
 
 - [ ] **Step 1: Add `ObserverSseParser` API**
 
-Implement a small parser with this public shape:
+Implement:
 
 ```cpp
 #pragma once
 
-#include <QString>
+#include <QByteArray>
 #include <QJsonObject>
 #include <QList>
+#include <QString>
 
 struct ObserverSseMessage {
     QString eventName;
@@ -343,7 +309,8 @@ Required behavior:
 - Accept chunks from a long-lived G2a SSE reply.
 - Split frames by blank line.
 - Parse `event: runtime_event` and `event: run_status`.
-- Parse `data: {json}` into `QJsonObject`.
+- Parse exactly one single-line `data: {json}` field per frame.
+- Multi-line `data:` concatenation is not supported in G2b MVP because current G2a emits single-line JSON.
 - Ignore unknown lines.
 - Keep incomplete frames buffered until the next chunk.
 - Never throw exceptions.
@@ -382,16 +349,19 @@ Required behavior:
 - `checkHealth()` calls `GET /health`.
 - `refreshRuns()` calls `GET /api/runs`.
 - `startDefaultMatch()` calls `POST /api/runs` with body `{"template":"default_6p_fake","mode":"fake"}`.
+- `startDefaultMatch()` must parse the `202` response, extract `run_id`, set `currentRunId`, set `currentStatus`, emit `currentRunChanged` and `currentStatusChanged`, refresh audit links, and call `connectStream()`.
 - `openRun(runId)` calls `GET /api/runs/{run_id}` and then `/events?perspective=currentPerspective`.
 - `connectStream()` calls `/api/runs/{run_id}/stream?perspective=currentPerspective`.
 - Perspective changes reconnect the stream for the current run.
-- `refreshAuditLinks()` calls `/artifacts` and builds QML-displayable artifact items.
+- `refreshAuditLinks()` uses alias endpoints `/manifest`, `/provider-trace`, `/failure-audit`, `/snapshots?perspective=...`, and `/artifacts`.
 - All network failures set `lastError` and must not crash the app.
 - The client must not read local files.
 
-- [ ] **Step 3: Wire CMake for Qt Network, Quick Controls, and Qt Test**
+- [ ] **Step 3: Add intermediate CMake wiring for C++ and QtTest only**
 
-Modify `clients/qt_observer/CMakeLists.txt`:
+Modify `clients/qt_observer/CMakeLists.txt` so it can build the new C++ sources and parser test while the existing QML module still contains at least `Main.qml`. The full QML module target state is applied in Task 2 after all QML files exist.
+
+Minimum Task 1 CMake requirements:
 
 ```cmake
 find_package(Qt6 REQUIRED COMPONENTS Quick QuickControls2 Network Test)
@@ -404,9 +374,8 @@ qt_add_executable(appqt_observer
     src/ObserverSseParser.h
 )
 
-target_link_libraries(appqt_observer
-    PRIVATE Qt6::Quick Qt6::QuickControls2 Qt6::Network
-)
+target_include_directories(appqt_observer PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(appqt_observer PRIVATE Qt6::Quick Qt6::QuickControls2 Qt6::Network)
 
 enable_testing()
 qt_add_executable(tst_observer_sse_parser
@@ -414,11 +383,10 @@ qt_add_executable(tst_observer_sse_parser
     src/ObserverSseParser.cpp
     src/ObserverSseParser.h
 )
+target_include_directories(tst_observer_sse_parser PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(tst_observer_sse_parser PRIVATE Qt6::Test Qt6::Core)
 add_test(NAME observer_sse_parser COMMAND tst_observer_sse_parser)
 ```
-
-Do not add non-Qt third-party dependencies.
 
 - [ ] **Step 4: Add QtTest for SSE parser**
 
@@ -432,6 +400,7 @@ private slots:
     void parsesRunStatusFrame();
     void buffersIncompleteFrameAcrossChunks();
     void ignoresUnknownLinesWithoutCrashing();
+    void ignoresMultilineDataFramesInMvp();
 };
 ```
 
@@ -441,10 +410,11 @@ Expected assertions:
 - `eventName == "run_status"` for status frames.
 - JSON data contains `run_id`, `status`, or `kind` when present.
 - Incomplete chunk returns zero messages until completed.
+- Multi-line data frames are ignored or produce no valid message rather than producing wrong JSON.
 
 - [ ] **Step 5: Run parser tests**
 
-Run from repository root in an environment where Qt 6.8+ CMake packages are available:
+Run:
 
 ```powershell
 Remove-Item -Recurse -Force .tmp/qt-observer-build -ErrorAction SilentlyContinue
@@ -463,7 +433,7 @@ Record exact CMake, build, and CTest summaries in the review packet.
 
 ---
 
-## Task 2: Add QML application shell and navigation
+## Task 2: Add QML application shell, singleton registration, and full CMake target state
 
 **Files:**
 
@@ -476,26 +446,137 @@ Record exact CMake, build, and CTest summaries in the review packet.
 - Create: `clients/qt_observer/qml/PreflightView.qml`
 - Create: `clients/qt_observer/qml/LiveCockpitView.qml`
 - Create: `clients/qt_observer/qml/HistoryView.qml`
+- Create: `clients/qt_observer/qml/components/RoleCard.qml`
+- Create: `clients/qt_observer/qml/components/EventTimeline.qml`
+- Create: `clients/qt_observer/qml/components/PerspectiveSwitcher.qml`
+- Create: `clients/qt_observer/qml/components/AuditLinksPanel.qml`
+- Create: `clients/qt_observer/qml/components/StatusBadge.qml`
 - Test: `tests/test_qt_observer_static_contract.py`
 
-- [ ] **Step 1: Expose `ObserverApiClient` to QML**
+- [ ] **Step 1: Expose `ObserverApiClient` with QML singleton registration**
 
-Modify `main.cpp` so the QML context has an `observerClient` object:
+Modify `main.cpp` to register the object before loading the module:
 
 ```cpp
-ObserverApiClient observerClient;
-observerClient.setBaseUrl(observerBaseUrlFromArgs(argc, argv));
-engine.rootContext()->setContextProperty("observerClient", &observerClient);
-engine.loadFromModule("qt_observer", "Main");
+#include <QGuiApplication>
+#include <QQmlApplicationEngine>
+#include <QQmlEngine>
+#include "ObserverApiClient.h"
+
+static QString observerBaseUrlFromArgs(const QStringList &args)
+{
+    const int index = args.indexOf("--observer-base-url");
+    if (index >= 0 && index + 1 < args.size()) {
+        return args.at(index + 1);
+    }
+    return QStringLiteral("http://127.0.0.1:8765");
+}
+
+int main(int argc, char *argv[])
+{
+    QGuiApplication app(argc, argv);
+
+    ObserverApiClient observerClient;
+    observerClient.setBaseUrl(observerBaseUrlFromArgs(app.arguments()));
+    qmlRegisterSingletonInstance("qt_observer", 1, 0, "ObserverClient", &observerClient);
+
+    QQmlApplicationEngine engine;
+    QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed,
+                     &app, []() { QCoreApplication::exit(-1); }, Qt::QueuedConnection);
+    engine.loadFromModule("qt_observer", "Main");
+
+    return app.exec();
+}
 ```
 
 Required behavior:
 
-- Parse optional CLI argument `--observer-base-url <url>`.
-- Default to `http://127.0.0.1:8765`.
+- Do not use `engine.rootContext()->setContextProperty()`.
 - Do not start the Python observer server from Qt.
+- QML references the singleton as `ObserverClient`.
 
-- [ ] **Step 2: Replace default `Main.qml`**
+- [ ] **Step 2: Create minimal registered QML files before full CMake update**
+
+Create all QML files listed in the File Plan with minimal valid content and required `objectName` values. Component files may be simple at this checkpoint. Use relative imports for subdirectory QML files:
+
+- `Main.qml` loads `qml/AppShell.qml` via `Loader { source: "qml/AppShell.qml" }`.
+- `qml/AppShell.qml` may instantiate `HomeView`, `MatchSetupView`, `PreflightView`, `LiveCockpitView`, and `HistoryView` because they are in the same directory.
+- QML files under `qml/` that need components under `qml/components/` must include `import "components"`.
+
+- [ ] **Step 3: Apply full target-state `CMakeLists.txt`**
+
+Replace `clients/qt_observer/CMakeLists.txt` with the complete target state below. Later tasks must not add more QML files to CMake; they must only edit these already-registered files.
+
+```cmake
+cmake_minimum_required(VERSION 3.16)
+
+project(qt_observer VERSION 0.1 LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+find_package(Qt6 REQUIRED COMPONENTS Quick QuickControls2 Network Test)
+
+qt_standard_project_setup(REQUIRES 6.8)
+
+qt_add_executable(appqt_observer
+    main.cpp
+    src/ObserverApiClient.cpp
+    src/ObserverApiClient.h
+    src/ObserverSseParser.cpp
+    src/ObserverSseParser.h
+)
+
+target_include_directories(appqt_observer PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+
+target_link_libraries(appqt_observer
+    PRIVATE Qt6::Quick Qt6::QuickControls2 Qt6::Network
+)
+
+qt_add_qml_module(appqt_observer
+    URI qt_observer
+    VERSION 1.0
+    QML_FILES
+        Main.qml
+        qml/AppShell.qml
+        qml/HomeView.qml
+        qml/MatchSetupView.qml
+        qml/PreflightView.qml
+        qml/LiveCockpitView.qml
+        qml/HistoryView.qml
+        qml/components/RoleCard.qml
+        qml/components/EventTimeline.qml
+        qml/components/PerspectiveSwitcher.qml
+        qml/components/AuditLinksPanel.qml
+        qml/components/StatusBadge.qml
+)
+
+set_target_properties(appqt_observer PROPERTIES
+    MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
+    MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
+    MACOSX_BUNDLE TRUE
+    WIN32_EXECUTABLE TRUE
+)
+
+include(GNUInstallDirs)
+install(TARGETS appqt_observer
+    BUNDLE DESTINATION .
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
+
+enable_testing()
+qt_add_executable(tst_observer_sse_parser
+    tests/tst_observer_sse_parser.cpp
+    src/ObserverSseParser.cpp
+    src/ObserverSseParser.h
+)
+target_include_directories(tst_observer_sse_parser PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(tst_observer_sse_parser PRIVATE Qt6::Test Qt6::Core)
+add_test(NAME observer_sse_parser COMMAND tst_observer_sse_parser)
+```
+
+- [ ] **Step 4: Replace default `Main.qml`**
 
 `Main.qml` must be a real application window, not Hello World:
 
@@ -512,15 +593,16 @@ ApplicationWindow {
     visible: true
     title: qsTr("Werewolf Observer")
 
-    AppShell {
-        id: appShell
-        objectName: "appShell"
+    Loader {
+        id: shellLoader
+        objectName: "appShellLoader"
         anchors.fill: parent
+        source: "qml/AppShell.qml"
     }
 }
 ```
 
-- [ ] **Step 3: Add `AppShell.qml` navigation**
+- [ ] **Step 5: Add `AppShell.qml` navigation**
 
 Required object names:
 
@@ -553,13 +635,12 @@ Home -> History
 History -> Open Run -> Cockpit
 ```
 
-- [ ] **Step 4: Add static contract test for shell files**
+- [ ] **Step 6: Add static contract test for shell files**
 
 Create `tests/test_qt_observer_static_contract.py` with:
 
 ```python
 import pathlib
-import re
 import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -569,6 +650,8 @@ class QtObserverStaticContractTests(unittest.TestCase):
     def test_required_qml_views_exist(self) -> None: ...
     def test_main_window_is_not_hello_world(self) -> None: ...
     def test_navigation_object_names_exist(self) -> None: ...
+    def test_cmake_registers_all_qml_files(self) -> None: ...
+    def test_qml_uses_observer_client_singleton_name(self) -> None: ...
 ```
 
 Expected assertions:
@@ -576,20 +659,26 @@ Expected assertions:
 - Each required QML file exists.
 - `Main.qml` does not contain `Hello World`.
 - QML contains object names listed above.
+- `CMakeLists.txt` contains every QML file listed in Task 2 Step 3.
+- QML uses `ObserverClient`, not `observerClient`.
 
-- [ ] **Step 5: Run static tests**
+- [ ] **Step 7: Run static tests and build**
 
 Run:
 
 ```powershell
 python -m unittest tests.test_qt_observer_static_contract -v
+cmake -S clients/qt_observer -B .tmp/qt-observer-build -DCMAKE_BUILD_TYPE=Debug
+cmake --build .tmp/qt-observer-build --config Debug
+ctest --test-dir .tmp/qt-observer-build --output-on-failure
 ```
 
-Expected result:
+Expected:
 
-```text
-OK
-```
+- Python static tests: `OK`.
+- CMake configure exits `0`.
+- Build exits `0`.
+- CTest: `100% tests passed`.
 
 ---
 
@@ -600,9 +689,8 @@ OK
 - Modify: `clients/qt_observer/qml/HomeView.qml`
 - Modify: `clients/qt_observer/qml/MatchSetupView.qml`
 - Modify: `clients/qt_observer/qml/PreflightView.qml`
-- Create: `clients/qt_observer/qml/components/RoleCard.qml`
-- Create: `clients/qt_observer/qml/components/StatusBadge.qml`
-- Modify: `clients/qt_observer/CMakeLists.txt`
+- Modify: `clients/qt_observer/qml/components/RoleCard.qml`
+- Modify: `clients/qt_observer/qml/components/StatusBadge.qml`
 - Test: `tests/test_qt_observer_static_contract.py`
 
 - [ ] **Step 1: Implement `RoleCard.qml`**
@@ -618,7 +706,7 @@ property string accentText
 property bool selected
 ```
 
-Required visual behavior:
+Required behavior:
 
 - Card-like rectangle with rounded corners.
 - Role glyph or silhouette using text/shape only; do not add binary image assets in this milestone.
@@ -640,8 +728,8 @@ recentRunsList
 Required actions:
 
 - `startNewMatchButton` navigates to setup.
-- `historyButton` navigates to history and calls `observerClient.refreshRuns()`.
-- Home calls `observerClient.checkHealth()` on completion.
+- `historyButton` navigates to history and calls `ObserverClient.refreshRuns()`.
+- Home calls `ObserverClient.checkHealth()` on completion.
 
 - [ ] **Step 3: Implement `MatchSetupView.qml`**
 
@@ -686,9 +774,9 @@ startMatchButton
 Required behavior:
 
 - Displays selected template `default_6p_fake`.
-- Displays server status from `observerClient.connected`.
+- Displays server status from `ObserverClient.connected`.
 - Displays visibility boundary note.
-- `startMatchButton` calls `observerClient.startDefaultMatch()` and navigates to cockpit when a run id is available.
+- `startMatchButton` calls `ObserverClient.startDefaultMatch()` and navigates to cockpit after `ObserverClient.currentRunId` becomes non-empty.
 
 - [ ] **Step 5: Extend static tests**
 
@@ -706,7 +794,7 @@ Assertions:
 - QML contains `p1`-`p6` and role labels.
 - QML contains `default_6p_fake`.
 - QML contains visibility boundary text.
-- No QML file contains `promptEditor`, `PromptEditor`, or `textarea` intended for prompt editing.
+- No QML file contains `promptEditor`, `PromptEditor`, or `TextArea` intended for prompt editing.
 
 - [ ] **Step 6: Run tests and build**
 
@@ -732,11 +820,10 @@ Expected:
 
 - Modify: `clients/qt_observer/qml/LiveCockpitView.qml`
 - Modify: `clients/qt_observer/qml/HistoryView.qml`
-- Create: `clients/qt_observer/qml/components/EventTimeline.qml`
-- Create: `clients/qt_observer/qml/components/PerspectiveSwitcher.qml`
-- Create: `clients/qt_observer/qml/components/AuditLinksPanel.qml`
+- Modify: `clients/qt_observer/qml/components/EventTimeline.qml`
+- Modify: `clients/qt_observer/qml/components/PerspectiveSwitcher.qml`
+- Modify: `clients/qt_observer/qml/components/AuditLinksPanel.qml`
 - Modify: `clients/qt_observer/qml/components/RoleCard.qml`
-- Modify: `clients/qt_observer/CMakeLists.txt`
 - Test: `tests/test_qt_observer_static_contract.py`
 
 - [ ] **Step 1: Implement `PerspectiveSwitcher.qml`**
@@ -758,9 +845,9 @@ team:werewolf
 Required behavior:
 
 - Exposes selected perspective string.
-- Calls `observerClient.currentPerspective = selectedPerspective`.
+- Calls `ObserverClient.currentPerspective = selectedPerspective`.
 - Has `objectName: "perspectiveSwitcher"`.
-- UI labels must distinguish God/Public/Role/Team views.
+- UI labels distinguish God/Public/Role/Team views.
 
 - [ ] **Step 2: Implement `EventTimeline.qml`**
 
@@ -800,9 +887,14 @@ artifactsLink
 
 Required behavior:
 
-- Shows artifact availability from `observerClient.auditItems`.
+- Shows artifact availability from `ObserverClient.auditItems`.
 - Does not open local file paths.
-- Uses G2a URLs or copyable endpoint paths only.
+- Uses G2a alias URLs or copyable endpoint paths only:
+  - `/manifest`,
+  - `/provider-trace`,
+  - `/failure-audit`,
+  - `/snapshots?perspective=...`,
+  - `/artifacts`.
 
 - [ ] **Step 4: Implement `LiveCockpitView.qml`**
 
@@ -820,10 +912,10 @@ providerFailureSummary
 
 Required behavior:
 
-- Calls `observerClient.connectStream()` when entering cockpit with a run id.
+- Calls `ObserverClient.connectStream()` when entering cockpit with a run id.
 - Shows current run id and status.
 - Shows six player cards.
-- Shows event timeline backed by `observerClient.eventItems`.
+- Shows event timeline backed by `ObserverClient.eventItems`.
 - Shows perspective switcher.
 - Shows provider/failure summary from available event/audit data.
 - No raw JSON dump as the primary UI.
@@ -841,9 +933,9 @@ openReplayButton
 
 Required behavior:
 
-- Calls `observerClient.refreshRuns()`.
-- Lists `observerClient.runItems`.
-- Opens selected run by calling `observerClient.openRun(runId)` and then navigates to cockpit.
+- Calls `ObserverClient.refreshRuns()`.
+- Lists `ObserverClient.runItems`.
+- Opens selected run by calling `ObserverClient.openRun(runId)` and then navigates to cockpit.
 
 - [ ] **Step 6: Extend static tests**
 
@@ -891,7 +983,7 @@ class QtObserverBoundaryTests(unittest.TestCase):
     def test_client_does_not_reference_python_runtime_modules(self) -> None: ...
 ```
 
-Scan files under `clients/qt_observer` excluding README. Fail if any source/QML file contains:
+Scan files under `clients/qt_observer` excluding README and test files. Fail if any source/QML file contains:
 
 ```text
 werewolf_eval
@@ -907,7 +999,7 @@ QProcess
 Allowed exceptions:
 
 - README may mention G2a protocol and non-goals.
-- QML may display user-facing text `snapshots` only as an audit concept, not a local path. The test should scan for `snapshots/` with slash as local path indicator, not the word `snapshots` alone.
+- QML may display the word `snapshots` as an audit concept, but must not contain `snapshots/` with a slash as a local path indicator.
 
 - [ ] **Step 2: Add no secret marker test**
 
@@ -946,6 +1038,7 @@ Assertions:
 - Contains `/api/runs`.
 - Contains `/stream?perspective=`.
 - Contains `/events?perspective=`.
+- Contains `/manifest`, `/provider-trace`, and `/failure-audit`.
 - Contains `/artifacts`.
 - Does not contain `file://`.
 
@@ -1116,13 +1209,7 @@ Run:
 python -m unittest tests.test_qt_observer_static_contract -v
 ```
 
-Expected result:
-
-```text
-OK
-```
-
-Record exact test count.
+Expected result: `OK`. Record exact test count.
 
 - [ ] **Step 2: Configure and build Qt client**
 
@@ -1161,17 +1248,7 @@ Run:
 $env:PYTHONPATH='src'; python -m unittest tests.test_observer_protocol tests.test_observer_server -v
 ```
 
-Expected result:
-
-```text
-OK
-```
-
-Reason:
-
-```text
-G2b depends on G2a protocol. This proves the client work did not modify or break the server protocol contract.
-```
+Expected result: `OK`.
 
 - [ ] **Step 5: Compile Python tests**
 
@@ -1181,11 +1258,7 @@ Run:
 python -m compileall tests
 ```
 
-Expected result:
-
-```text
-0 failures
-```
+Expected result: `0 failures` and exit code `0`.
 
 - [ ] **Step 6: Run diff whitespace check**
 
@@ -1195,11 +1268,7 @@ Run:
 git diff --check main...HEAD
 ```
 
-Expected result:
-
-```text
-(no output)
-```
+Expected result: no output.
 
 - [ ] **Step 7: Run changed files allowlist check**
 
@@ -1231,10 +1300,7 @@ tests/test_qt_observer_static_contract.py
 .oh-my-harness/tree.md'''.splitlines()); changed=[line.strip() for line in sys.stdin if line.strip()]; bad=[p for p in changed if p not in allowed]; print('\n'.join(changed)); assert not bad, 'outside allowlist: '+repr(bad)"
 ```
 
-Expected result:
-
-- Prints only allowed files.
-- Exits `0`.
+Expected result: prints only allowed files and exits `0`.
 
 - [ ] **Step 8: Run forbidden-scope check**
 
@@ -1244,11 +1310,7 @@ Run:
 git diff --name-only main...HEAD | python -c "import sys; forbidden_prefixes=('src/werewolf_eval/','docs/demo/','docs/generated-games/','docs/gold-game/','docs/adr/','.github/','.agents/skills/'); forbidden_exact={'README.md','docs/ROADMAP.md','docs/TASKS.md','docs/PRODUCT_ONE_PAGER.md','tests/test_observer_protocol.py','tests/test_observer_server.py'}; changed=[line.strip() for line in sys.stdin if line.strip()]; bad=[p for p in changed if p in forbidden_exact or p.startswith(forbidden_prefixes)]; print('\n'.join(bad)); assert not bad, 'forbidden scope changed: '+repr(bad)"
 ```
 
-Expected result:
-
-```text
-(no output)
-```
+Expected result: no output.
 
 - [ ] **Step 9: Run forbidden pattern scan on added Qt/test lines**
 
@@ -1271,11 +1333,7 @@ Run:
 git diff --name-only main...HEAD -- package.json package-lock.json pyproject.toml requirements.txt poetry.lock pnpm-lock.yaml yarn.lock uv.lock CMakeLists.txt src/werewolf_eval
 ```
 
-Expected result:
-
-```text
-(no output)
-```
+Expected result: no output.
 
 Also run:
 
@@ -1283,11 +1341,7 @@ Also run:
 git diff main...HEAD -- clients/qt_observer tests/test_qt_observer_static_contract.py | python -c "import sys,re; data=sys.stdin.read(); risky=[line for line in data.splitlines() if line.startswith('+') and re.search(r'(QProcess|werewolf_eval|src/werewolf_eval|run_g1h_fake_runtime|observer_server\.py|observer_protocol\.py|file://|requests|httpx|fastapi|flask|openai|anthropic|PySide6|PyQt6)', line)]; print('\n'.join(risky)); unsafe=[line for line in risky if 'README.md' not in line and 'non-goal' not in line.lower() and 'forbidden' not in line.lower() and 'scan' not in line.lower()]; assert not unsafe, 'unexpected runtime binding or dependency reference: '+repr(unsafe)"
 ```
 
-Expected result:
-
-```text
-(no output)
-```
+Expected result: no output.
 
 - [ ] **Step 11: Verify no build/runtime artifacts are staged**
 
@@ -1297,11 +1351,7 @@ Run:
 git diff --name-only --cached | python -c "import sys; bad=[p.strip() for p in sys.stdin if p.strip().startswith('.tmp/') or p.strip().startswith('.runs/') or '/build/' in p.strip() or p.strip().endswith('.user')]; assert not bad, 'staged build/runtime artifacts: '+repr(bad); print('NO_STAGED_BUILD_OR_RUNTIME_ARTIFACTS')"
 ```
 
-Expected result:
-
-```text
-NO_STAGED_BUILD_OR_RUNTIME_ARTIFACTS
-```
+Expected result: `NO_STAGED_BUILD_OR_RUNTIME_ARTIFACTS`.
 
 - [ ] **Step 12: Refresh tree for new files**
 
@@ -1324,35 +1374,39 @@ A1. Qt app builds successfully with Qt 6.8+ and CMake.
 
 A2. Qt app no longer displays the default Hello World window.
 
-A3. Home/Lobby screen exists with server status, Start New Match, History, and recent-runs affordance.
+A3. `CMakeLists.txt` registers every QML view/component through `qt_add_qml_module(... QML_FILES ...)`.
 
-A4. Start New Match flow shows default 6-player AI-vs-AI setup with six visual role/player cards.
+A4. `ObserverApiClient` is exposed to QML through `qmlRegisterSingletonInstance` as `ObserverClient`, not through `setContextProperty`.
 
-A5. Preflight screen exists and displays server health, default template, visibility boundary, and Start Match action.
+A5. Home/Lobby screen exists with server status, Start New Match, History, and recent-runs affordance.
 
-A6. Start Match uses G2a `POST /api/runs` with `template = default_6p_fake`; it does not start Python runtime directly.
+A6. Start New Match flow shows default 6-player AI-vs-AI setup with six visual role/player cards.
 
-A7. Live Cockpit screen exists with run status, player cards, event timeline, perspective switcher, provider/failure summary, and audit links panel.
+A7. Preflight screen exists and displays server health, default template, visibility boundary, and Start Match action.
 
-A8. History screen lists runs from G2a and can open a run into the same cockpit/replay surface.
+A8. Start Match uses G2a `POST /api/runs` with `template = default_6p_fake`, parses `run_id`, sets `currentRunId`, and does not start Python runtime directly.
 
-A9. `ObserverApiClient` uses Qt Network and G2a REST/SSE endpoints only.
+A9. Live Cockpit screen exists with run status, player cards, event timeline, perspective switcher, provider/failure summary, and audit links panel.
 
-A10. SSE parser handles runtime event frames, run status frames, chunk boundaries, and unknown lines without crashing.
+A10. History screen lists runs from G2a and can open a run into the same cockpit/replay surface.
 
-A11. Perspective switcher includes `god`, `public`, `role:p1`-`role:p6`, and `team:werewolf`, and the client passes perspective to G2a endpoints rather than filtering raw files.
+A11. `ObserverApiClient` uses Qt Network and G2a REST/SSE endpoints only.
 
-A12. Qt client does not reference `werewolf_eval`, Python runtime modules, local `events.jsonl`, local `snapshots/` paths, or `QProcess`.
+A12. SSE parser handles runtime event frames, run status frames, chunk boundaries, unknown lines, and unsupported multi-line data safely.
 
-A13. Qt client does not contain API keys, bearer tokens, authorization headers, or secret markers.
+A13. Perspective switcher includes `god`, `public`, `role:p1`-`role:p6`, and `team:werewolf`, and the client passes perspective to G2a endpoints rather than filtering raw files.
 
-A14. Qt client README documents G2b MVP status, build/run instructions, G2a dependency, and non-goals.
+A14. Qt client does not reference `werewolf_eval`, Python runtime modules, local `events.jsonl`, local `snapshots/` paths, or `QProcess`.
 
-A15. G2b does not modify G2a server/protocol, runtime, provider, scoring, validators, generated fixtures, demo HTML, route docs, or dependency manifests outside the Qt client CMake file.
+A15. Qt client does not contain API keys, bearer tokens, authorization headers, or secret markers.
 
-A16. Static tests, Qt build, Qt CTest, G2a regression tests, compileall tests, diff check, allowlist check, forbidden-scope check, forbidden-pattern check, dependency/import check, and build-artifact staging check pass or are documented with exact environment failure evidence.
+A16. Qt client README documents G2b MVP status, build/run instructions, G2a dependency, and non-goals.
 
-A17. `.logs/review/latest/review-packet.md` exists, is compact, and contains the machine-generated evidence required below.
+A17. G2b does not modify G2a server/protocol, runtime, provider, scoring, validators, generated fixtures, demo HTML, route docs, or dependency manifests outside the Qt client CMake file.
+
+A18. Static tests, Qt build, Qt CTest, G2a regression tests, compileall tests, diff check, allowlist check, forbidden-scope check, forbidden-pattern check, dependency/import check, and build-artifact staging check pass or are documented with exact environment failure evidence.
+
+A19. `.logs/review/latest/review-packet.md` exists, is compact, and contains the machine-generated evidence required below.
 
 ---
 
@@ -1444,9 +1498,10 @@ For each, include `exit_code` and exact pass/fail summary. If Qt GUI manual smok
 
 Include concise excerpts, not full diffs, for:
 
+- complete `qt_add_qml_module(... QML_FILES ...)` target state,
 - `ObserverApiClient` endpoint construction and no-file protocol usage,
-- `ObserverSseParser` frame parsing,
-- `main.cpp` `--observer-base-url` handling and QML context wiring,
+- `ObserverSseParser` frame parsing and single-line data constraint,
+- `main.cpp` `--observer-base-url` handling and `qmlRegisterSingletonInstance` registration,
 - `Main.qml` replacing Hello World with application shell,
 - Home/Setup/Preflight navigation QML,
 - Live Cockpit QML with event timeline, perspective switcher, audit links,
@@ -1466,17 +1521,11 @@ Include a Markdown table with exactly these columns:
 | A1 | `cmake --build` result; `ctest` result | PASS |
 ```
 
-Every A1-A17 item must have one row. Evidence must point to a test name, command result, manual smoke result, or key hunk line range.
+Every A1-A19 item must have one row. Evidence must point to a test name, command result, manual smoke result, or key hunk line range.
 
 ### 11. Acceptance Checklist
 
-Include checklist form for A1-A17. Each item must include an evidence pointer.
-
-Example:
-
-```markdown
-- [x] A6 Start Match uses G2a POST only — `ObserverApiClient.cpp:Lx-Ly`; `QtObserverProtocolEndpointTests.test_client_uses_g2a_protocol_endpoint_names`
-```
+Include checklist form for A1-A19. Each item must include an evidence pointer.
 
 ### 12. Implementer Risk Notes
 
@@ -1487,8 +1536,11 @@ Include:
 
 - G2b consumes G2a REST/SSE only; it does not import or shell out to Python runtime internals.
 - Qt client uses Qt Network, Quick, Quick Controls, and Qt Test only.
+- `ObserverClient` is registered through `qmlRegisterSingletonInstance`, not context properties.
+- All QML files are listed in `qt_add_qml_module(... QML_FILES ...)`.
 - Role cards are visual/default-template presentation only; full seat/prompt editing remains G2d.
 - Perspective selection is passed to G2a endpoints; G2b does not implement independent hidden-information filtering.
+- SSE parser supports current G2a single-line `data:` JSON frames; multi-line data frames remain out of MVP scope.
 - Manual GUI smoke may depend on local Qt desktop availability; build and CTest are still required.
 - No Web client, human-vs-AI UI, arena, leaderboard, scoring, provider, validator, or G2a server changes are included.
 ```
@@ -1542,6 +1594,7 @@ Body:
 
 - Turns `clients/qt_observer` from Qt6 Quick scaffold into a first observer cockpit MVP.
 - Adds a Qt Network protocol adapter for G2a REST/SSE endpoints.
+- Registers QML views/components through `qt_add_qml_module` and exposes the client as `ObserverClient` via `qmlRegisterSingletonInstance`.
 - Adds Home, default match setup, preflight, live cockpit, history/replay, role cards, event timeline, perspective switcher, and audit links panel.
 - Adds QtTest coverage for SSE parsing and Python static contract tests for UI/protocol boundaries.
 
@@ -1574,7 +1627,7 @@ Body:
 Implementation should proceed task-by-task in order:
 
 1. C++ protocol adapter and SSE parser.
-2. QML shell and navigation.
+2. QML shell, singleton registration, and full CMake target state.
 3. Game-like Home / Setup / Preflight UI.
 4. Live Cockpit and History / Replay UI.
 5. Boundary/static tests for no runtime binding and no secret markers.
