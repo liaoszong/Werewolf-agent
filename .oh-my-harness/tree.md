@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 197
+- Entries: 198
 
 ```text
 ./
@@ -199,6 +199,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       ├── run_fake_provider_game.py
 │       ├── run_g1h_fake_runtime.py
 │       ├── run_mock_game.py
+│       ├── run_observer_server.py
 │       ├── run_scripted_game.py
 │       ├── runtime_events.py
 │       ├── score_game.py
