@@ -1,8 +1,16 @@
+import json
+import tempfile
 import unittest
+from pathlib import Path
 
 from werewolf_eval.profile_config import (
     PROFILE_SCHEMA_VERSION,
     ProfileValidationError,
+    build_resolved_profile_artifact,
+    list_profiles,
+    load_profile,
+    resolve_profile,
+    save_profile,
     validate_profile,
 )
 
@@ -100,6 +108,74 @@ class ProfileValidationTests(unittest.TestCase):
         p = _valid_profile()
         p["role_defaults"]["seer"]["prompt"] = "keep your seer role secret"
         validate_profile(p)
+
+
+class ProfileResolutionTests(unittest.TestCase):
+    def test_resolve_applies_role_defaults_in_seat_order(self):
+        seats = resolve_profile(_valid_profile())
+        self.assertEqual([s["player_id"] for s in seats], ["p1", "p2", "p3", "p4", "p5", "p6"])
+        self.assertEqual(seats[0]["role"], "werewolf")
+        self.assertEqual(seats[0]["team"], "werewolf")
+        self.assertEqual(seats[2]["role"], "seer")
+        self.assertEqual(seats[2]["team"], "villager")
+
+    def test_resolve_applies_seat_override(self):
+        seats = resolve_profile(_valid_profile(seat_overrides={
+            "p3": {"provider": "deepseek", "model": "deepseek-chat", "prompt": "x", "strategy": "cautious"},
+        }))
+        p3 = next(s for s in seats if s["player_id"] == "p3")
+        self.assertEqual(p3["provider"], "deepseek")
+        self.assertEqual(p3["model"], "deepseek-chat")
+        self.assertEqual(p3["strategy"], "cautious")
+
+
+class ProfileArtifactTests(unittest.TestCase):
+    def test_artifact_shape_and_hashing(self):
+        art = build_resolved_profile_artifact(
+            _valid_profile(seat_overrides={
+                "p3": {"provider": "deepseek", "model": "deepseek-chat", "prompt": "custom-strategy-text", "strategy": "cautious"},
+            }),
+            run_id="run123",
+        )
+        self.assertEqual(art["schema_version"], PROFILE_SCHEMA_VERSION)
+        self.assertEqual(art["run_id"], "run123")
+        self.assertEqual(art["execution_mode"], "fake")
+        self.assertEqual(art["live_api"], "not_used")
+        self.assertTrue(art["secrets_redacted"])
+        self.assertEqual(len(art["seats"]), 6)
+        p3 = next(s for s in art["seats"] if s["player_id"] == "p3")
+        self.assertEqual(len(p3["prompt_hash"]), 64)
+        # raw prompt text never stored (only its hash)
+        self.assertNotIn("custom-strategy-text", json.dumps(art))
+
+    def test_artifact_has_no_absolute_paths(self):
+        art = build_resolved_profile_artifact(_valid_profile(), run_id="run123")
+        blob = json.dumps(art)
+        self.assertNotIn(":\\", blob)
+        self.assertNotIn("/home/", blob)
+
+
+class ProfilePersistenceTests(unittest.TestCase):
+    def test_save_and_load_round_trip(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = save_profile(_valid_profile(name="rt"), Path(tmp))
+            self.assertTrue(path.exists())
+            loaded = load_profile(path)
+            self.assertEqual(loaded["name"], "rt")
+
+    def test_save_rejects_unsafe_name(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(ProfileValidationError):
+                save_profile(_valid_profile(name="../x"), Path(tmp))
+
+    def test_list_profiles_reports_malformed_as_invalid(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "good.json").write_text(json.dumps(_valid_profile(name="good")), encoding="utf-8")
+            (Path(tmp) / "bad.json").write_text("{ not json", encoding="utf-8")
+            listed = {e["name"]: e for e in list_profiles(Path(tmp))}
+            self.assertTrue(listed["good"]["valid"])
+            self.assertFalse(listed["bad"]["valid"])
+            self.assertIsNotNone(listed["bad"]["error"])
 
 
 if __name__ == "__main__":

@@ -214,3 +214,101 @@ def validate_profile(profile: object) -> None:
         raise ProfileValidationError("role multiset must match canonical default_6p")
     for seat in DEFAULT_SEAT_IDS:
         _check_resolved_seat(_resolve_seat(profile, seat, seat_roles[seat]), seat)
+
+
+def resolve_profile(profile: dict) -> list[dict]:
+    """Return resolved per-seat configs in template seat order.  Assumes a
+    validated profile."""
+    seat_roles = _template_seat_roles(profile["template"])
+    return [
+        _resolve_seat(profile, seat, seat_roles[seat])
+        for seat in DEFAULT_SEAT_IDS
+    ]
+
+
+def build_resolved_profile_artifact(profile: dict, run_id: str) -> dict:
+    """Build the ``resolved-profile.json`` content: declared per-seat config
+    with hashed prompts and explicit fake-execution markers."""
+    seats: list[dict[str, Any]] = []
+    for seat_cfg in resolve_profile(profile):
+        prompt = seat_cfg.get("prompt") or ""
+        seats.append(
+            {
+                "player_id": seat_cfg["player_id"],
+                "role": seat_cfg["role"],
+                "team": seat_cfg["team"],
+                "provider": seat_cfg["provider"],
+                "model": seat_cfg["model"],
+                "strategy": seat_cfg["strategy"],
+                "prompt_hash": _hash_text(prompt) if prompt else "",
+            }
+        )
+    return {
+        "schema_version": PROFILE_SCHEMA_VERSION,
+        "run_id": run_id,
+        "profile_name": profile["name"],
+        "template": profile["template"],
+        "execution_mode": "fake",
+        "live_api": "not_used",
+        "secrets_redacted": True,
+        "seats": seats,
+    }
+
+
+def load_profile(path: Path) -> dict:
+    """Read and parse a profile JSON file; raise ProfileValidationError on
+    malformed JSON or non-object content.  Error messages use the basename
+    only — never the absolute path — so server responses cannot leak local
+    paths."""
+    p = Path(path)
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ProfileValidationError(f"invalid JSON in {p.name}: {exc}") from exc
+    except OSError:
+        raise ProfileValidationError(f"cannot read profile {p.name}")
+    if not isinstance(data, dict):
+        raise ProfileValidationError("profile file must contain a JSON object")
+    return data
+
+
+def save_profile(profile: dict, profiles_dir: Path) -> Path:
+    """Validate then write ``<profiles_dir>/<name>.json``.  Pure helper — not a
+    server endpoint this slice."""
+    validate_profile(profile)
+    name = profile["name"]
+    if not _SAFE_NAME_RE.match(name):
+        raise ProfileValidationError(f"unsafe profile name: {name!r}")
+    target_dir = Path(profiles_dir)
+    target_dir.mkdir(parents=True, exist_ok=True)
+    target = target_dir / f"{name}.json"
+    target.write_text(
+        json.dumps(profile, ensure_ascii=False, indent=2, sort_keys=True),
+        encoding="utf-8",
+    )
+    return target
+
+
+def list_profiles(profiles_dir: Path) -> list[dict]:
+    """Return per-file metadata; malformed files are reported valid=False and
+    never raise."""
+    target_dir = Path(profiles_dir)
+    entries: list[dict] = []
+    if not target_dir.is_dir():
+        return entries
+    for path in sorted(target_dir.glob("*.json")):
+        entry: dict[str, Any] = {
+            "name": path.stem,
+            "template": None,
+            "valid": False,
+            "error": None,
+        }
+        try:
+            data = load_profile(path)
+            validate_profile(data)
+            entry["template"] = data.get("template")
+            entry["valid"] = True
+        except ProfileValidationError as exc:
+            entry["error"] = str(exc)
+        entries.append(entry)
+    return entries
