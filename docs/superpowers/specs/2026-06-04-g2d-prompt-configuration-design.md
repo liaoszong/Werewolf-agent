@@ -24,6 +24,22 @@ This mirrors the established platform pattern: G2a added a protocol/control-plan
 | D4 | Persistence / API surface | **Read `profiles/` dir + inline launch** | Server only *reads* profiles (list/get/validate) and launches from inline-or-named profiles. No client-driven server file writes → no write-path security surface. "Save" is a pure Python helper. |
 | D5 | Launch integration | **Approach A — companion `resolved-profile.json` artifact** | A profile-bound launcher closure runs the existing fake runtime untouched (execution truth = fake), then writes a separate `resolved-profile.json` (declared config). Zero changes to `game_engine.py` / `run_g1h_fake_runtime.py`; explicit declared-vs-executed separation; reuses the `ObserverServerState.launcher` seam. |
 
+## 2A. Route alignment (resolve before writing-plans)
+
+**Known misalignment.** The canonical route docs still point at G2c as the *next* candidate, even though G2c is fully implemented and merged (git: `8b81fe6`…`2a3f08a`, plus follow-on `d765955`). This staleness is pre-existing: the G2c plan deliberately listed route docs under "Do Not Modify," so the post-merge route update was never made. Evidence at time of writing:
+
+- `README.md` (zh): "G2b … 已完成，下一候选开发点是 **G2c** God View / Role View."
+- `docs/ROADMAP.md` → *Current Priority*: "… are now `completed`. The next implementation candidate is **G2c** God View / Role View."
+- `docs/TASKS.md`: lists through G2b then Backlog; G2c is not marked completed and G2d is not surfaced as active.
+
+**Resolution (binds the implementation plan).**
+
+1. **This committed spec is the authoritative route source for the G2d-1 slice.** The implementation plan must open with a note citing `docs/superpowers/specs/2026-06-04-g2d-prompt-configuration-design.md` as the route override authorizing G2d-1 work, so the plan does not contradict the stale docs.
+2. **The plan's first task is a minimal, self-contained Route Alignment task** that updates exactly three route docs to reflect reality — `README.md`, `docs/ROADMAP.md`, `docs/TASKS.md` — to mark **G2c `completed`** and **G2d the active candidate**. This is the *only* route-doc change in scope; wording stays minimal (status flip + next-candidate line), no roadmap restructuring.
+3. All other route/product docs (`docs/PRODUCT_ONE_PAGER.md`, `docs/adr/**`, charter/designs) remain **out of scope** and unchanged.
+
+These three route-doc paths are added to a clearly-marked *route-alignment* portion of the allowlist (§11) and are exempt from the otherwise-strict "no route-doc changes" boundary in §10, which continues to apply to every other doc.
+
 ## 3. Context anchors (current code)
 
 - `build_default_config()` (`src/werewolf_eval/game_engine.py:91`) fixes the canonical 6-player layout: `p1,p2 = werewolf`, `p3 = seer`, `p4 = witch`, `p5,p6 = villager`. Role multiset = `2 werewolf / 1 seer / 1 witch / 2 villager`; teams: `werewolf→werewolf`, `seer/witch/villager→villager`.
@@ -87,13 +103,14 @@ The profile layer is a pure module. The server owns endpoints and the launcher c
     "villager":  {"provider": "fake_deterministic", "model": "none", "prompt": "...", "strategy": "default"}
   },
   "seat_overrides": {
-    "p3": {"model": "deepseek-chat", "prompt": "...seat-specific...", "strategy": "cautious"}
+    "p3": {"provider": "deepseek", "model": "deepseek-chat", "prompt": "...seat-specific...", "strategy": "cautious"}
   }
 }
 ```
 - `role_defaults` keys must cover every role present in the template's layout.
 - `seat_overrides` is optional; each key is a seat ID; each value is a partial config that overrides that seat's role default.
 - A seat-override value may not change a seat's **role** (role layout is fixed by the template); it may only override `provider` / `model` / `prompt` / `strategy`.
+- **Provider/model coherence is enforced on the *resolved* (post-merge) seat, not on the raw fragments.** If an override changes `provider` it must also supply a `model` valid for that provider (and vice versa). In the example, p3 overrides `provider: "deepseek"` and `model: "deepseek-chat"` together — overriding `model` alone while inheriting `provider: "fake_deterministic"` would be **rejected**, since `deepseek-chat ∉ ALLOWED_MODELS["fake_deterministic"]`.
 
 **Public functions**
 - `validate_profile(profile: dict) -> None` — raises `ProfileValidationError` on the first failure (message lists the problem). Rules in §6.
@@ -125,6 +142,12 @@ The profile layer is a pure module. The server owns endpoints and the launcher c
   - `{"profile": { ...inline profile... }, "run_id"?: "...", "mode"?: "fake"}`, or
   - `{"profile_name": "my_profile", "run_id"?: "...", "mode"?: "fake"}`.
   It validates `mode` against `ALLOWED_MODES`, validates/normalizes `run_id` (reusing `validate_run_id` / `generate_run_id`), and path-checks `profile_name`. It does **not** itself read the file (the server resolves the directory); it returns a normalized `{kind: "inline"|"named", profile|profile_name, run_id, mode}`.
+- **Exactly one launch source.** The parser enforces mutual exclusion and rejects (`ObserverProtocolError` → `400`):
+  - both `profile` and `profile_name` present;
+  - `profile` or `profile_name` combined with `template` (template launches go through the separate `parse_launch_request` path);
+  - neither a profile source nor a template present;
+  - any unexpected keys (allowed key set is `{profile, profile_name, run_id, mode}`).
+- **Routing in `POST /api/runs`:** the handler treats a request as a *profile launch* iff `profile` or `profile_name` is present, and otherwise falls back to the existing `parse_launch_request` template path. The two payload shapes never overlap.
 - The existing `parse_launch_request` template path is unchanged.
 
 ### 5.3 `src/werewolf_eval/observer_server.py` (MODIFY)
@@ -163,8 +186,9 @@ A profile is rejected (`ProfileValidationError`) unless **all** hold:
 5. `role_defaults` covers exactly the roles in the template layout (`werewolf, seer, witch, villager`); each value has keys ⊆ `{provider, model, prompt, strategy}` with `provider`, `model`, `strategy` required.
 6. For each role default: `provider ∈ ALLOWED_PROVIDERS`; `model ∈ ALLOWED_MODELS[provider]`; `strategy ∈ ALLOWED_STRATEGIES`; `prompt` is a string with `len ≤ PROMPT_MAX_LEN`.
 7. The resolved role multiset equals `CANONICAL_DEFAULT_6P_ROLES` (the template's fixed layout). Seat roles come from the template, not the profile, so this is enforced by construction; the validator additionally rejects any attempt to set a seat `role`.
-8. `seat_overrides` (if present) keys ⊆ `DEFAULT_SEAT_IDS`; each value has keys ⊆ `{provider, model, prompt, strategy}` (no `role`); overridden provider/model/strategy/prompt obey the same allowlists/limits as rule 6.
-9. No secret-like fields anywhere: reject keys matching the existing secret patterns (`api_key`, `api-key`, `authorization`, `token`, `bearer`, etc.) and reject string values that look like credentials (reuse the `redact_secret_values` / secret-marker detection already in the codebase).
+8. `seat_overrides` (if present) keys ⊆ `DEFAULT_SEAT_IDS`; each value has keys ⊆ `{provider, model, prompt, strategy}` (no `role`).
+9. **Resolved-seat coherence (post-merge):** the validator resolves each seat (role default ← seat override) and checks the *resolved* config, so a partial override cannot desync provider/model. For every resolved seat: `provider ∈ ALLOWED_PROVIDERS`; `model ∈ ALLOWED_MODELS[provider]`; `strategy ∈ ALLOWED_STRATEGIES`; `prompt` is a string with `len ≤ PROMPT_MAX_LEN`. (Rule 6 checks the raw role defaults; this rule re-checks after overrides are applied.)
+10. **No secret-like fields anywhere — keys *and* values.** This needs a **dedicated profile check**, not just the existing `redact_secret_values` helper, which recurses on values only and *preserves* dict keys (`runtime_events.py:96`). `profile_config` adds `_reject_secret_like_keys(obj)` that walks the whole profile and raises if any key contains a secret fragment (case-insensitive: `api_key`, `api-key`, `apikey`, `authorization`, `secret`, `token`, `bearer`, `password`, `credential`, `access_key`). String values are additionally screened with the codebase's existing secret-marker detection. `redact_secret_values` is still applied to the *output* artifact as defense-in-depth, but it is not the gate.
 
 `POST /api/profiles/validate` returns the full error list (collect-all mode) for UX, while module-internal `validate_profile` may raise on first failure; the endpoint wraps it to gather messages.
 
@@ -197,15 +221,21 @@ The G2c projection endpoints continue to work against the run's events/snapshots
 
 **Pure module — `tests/test_profile_config.py`** (handcrafted profiles under `TemporaryDirectory()`):
 - valid profile passes; resolution applies role defaults then seat overrides in seat order;
-- rejects: wrong `schema_version`, extra top-level keys, bad `template`, missing role default, seat override setting `role`, seat ID outside p1–p6, provider/model/strategy outside allowlist, oversized prompt, secret-like key/value;
+- rejects: wrong `schema_version`, extra top-level keys, bad `template`, missing role default, seat override setting `role`, seat ID outside p1–p6, provider/model/strategy outside allowlist, oversized prompt;
+- **resolved-seat coherence:** a seat override that sets `model` alone while inheriting an incompatible `provider` (e.g. `{"model":"deepseek-chat"}` over a `fake_deterministic` default) is **rejected** (rule 9), and the symmetric provider-only desync is rejected; an override that sets a coherent `{provider, model}` pair passes;
+- **secret rejection (keys *and* values):** a profile with a secret-like **key** (e.g. `"api_key"`, `"authorization"`) at any depth is rejected even when its value is innocuous (guards against the value-only `redact_secret_values` gap); a secret-like **value** is also rejected;
 - role multiset enforcement matches `CANONICAL_DEFAULT_6P_ROLES`;
 - `build_resolved_profile_artifact` shape: has `execution_mode="fake"`, `live_api="not_used"`, `secrets_redacted=true`, prompt **hashed not stored**, no absolute paths;
 - `save_profile`/`load_profile` round-trip; `save_profile` rejects unsafe names; `list_profiles` reports malformed files as `valid:false`.
 
+**Protocol — `tests/test_observer_protocol.py`** (extends existing suite):
+- `parse_profile_launch_request` accepts a lone `profile` and a lone `profile_name`; **rejects** `profile`+`profile_name` together, `profile`/`profile_name`+`template` together, neither-source payloads, and unexpected keys;
+- `"resolved-profile.json"` is present in `ALLOWED_ARTIFACTS`.
+
 **Server — `tests/test_observer_server.py`** (extends existing suite):
 - `GET /api/profiles` lists dropped profiles; `GET /api/profiles/{name}` returns redacted content; `POST /api/profiles/validate` returns verdict + resolved seats;
 - launch-from-profile (inline and named) yields a `completed` run whose `resolved-profile.json` records declared provider/model/prompt/strategy + `execution_mode=fake`;
-- `400` on invalid profile launch; `404` on unknown name; `400` on unsafe name;
+- `400` on invalid profile launch; `404` on unknown name; `400` on unsafe name; `400` on a payload mixing `profile`/`profile_name`/`template`;
 - response text contains no temp-dir absolute path and no secret markers; `live_api` never indicates a live call.
 
 > **Environmental note:** the local HTTP-server test suite (`tests/test_observer_server.py`) cannot complete in the current sandbox — a minimal 5-line `http.server` round-trip fails with `RemoteDisconnected` here, affecting every server test on any branch (confirmed against the pre-existing G2a `/health` test). Server tests are still authored and pass in a normal environment; results are documented the same way G2c's plan handles it (Task 7 Step 5: record exact failing names + proof of environmental cause + passing pure-module evidence).
@@ -215,20 +245,27 @@ The G2c projection endpoints continue to work against the run's events/snapshots
 - No Qt/Web UI, no setup wizard (→ G2d-2).
 - No live provider calls, API keys, credentials, or secret handling.
 - No changes to `game_engine.py`, `run_g1h_fake_runtime.py`, `provider_agent.py`, scoring, attribution, validators unrelated to the observer protocol.
-- No changes to route docs (`README.md`, `docs/ROADMAP.md`, `docs/TASKS.md`, `docs/PRODUCT_ONE_PAGER.md`).
+- Route docs: **only** the minimal G2c-completed / G2d-active alignment in `README.md`, `docs/ROADMAP.md`, `docs/TASKS.md` per §2A. **No** changes to `docs/PRODUCT_ONE_PAGER.md`, `docs/adr/**`, or the charter/designs.
 - No client-driven server-side profile **writes** (save is a pure helper / file-drop).
 - No new third-party dependencies; Python standard library only.
 
 ## 11. Allowlist (files this slice may touch)
 
 ```
+# implementation
 src/werewolf_eval/profile_config.py          (new)
 src/werewolf_eval/observer_protocol.py        (ALLOWED_ARTIFACTS + parse_profile_launch_request)
 src/werewolf_eval/observer_server.py          (profile endpoints + profile-bound launcher)
 tests/test_profile_config.py                  (new)
+tests/test_observer_protocol.py               (launch-payload + ALLOWED_ARTIFACTS tests)
 tests/test_observer_server.py                 (profile endpoint + launch tests)
 docs/superpowers/specs/2026-06-04-g2d-prompt-configuration-design.md  (this spec)
 .oh-my-harness/tree.md                         (refresh via tree hook only)
+
+# route alignment (§2A — minimal status flip only)
+README.md                                      (G2c completed, G2d active)
+docs/ROADMAP.md                                (G2c completed, G2d active)
+docs/TASKS.md                                  (G2c completed, G2d active)
 ```
 
 ## 12. Acceptance criteria (high level — to be expanded in the implementation plan)
@@ -237,10 +274,12 @@ docs/superpowers/specs/2026-06-04-g2d-prompt-configuration-design.md  (this spec
 - A2. `GET /api/profiles`, `GET /api/profiles/{name}`, `POST /api/profiles/validate` exist and behave per §5.3.
 - A3. `POST /api/runs` launches a fake run from an inline or named profile and writes `resolved-profile.json`.
 - A4. `resolved-profile.json` records declared per-seat provider/model/prompt(hash)/strategy + `execution_mode="fake"` / `live_api="not_used"`; contains no secrets or absolute paths.
-- A5. Validation rejects bad schema, bad role layout, disallowed provider/model/strategy, unsafe names, secret-like fields, and extra keys.
+- A5. Validation rejects bad schema, bad role layout, disallowed provider/model/strategy, unsafe names, extra keys, secret-like **keys *and* values** (via the dedicated `_reject_secret_like_keys` check, not value-only redaction), and **post-merge** provider/model incoherence from partial seat overrides.
 - A6. The template launch path and all G2a/G2c endpoints are unchanged.
-- A7. No live providers, no new dependencies, no changes to the game engine / fake runtime / route docs.
+- A7. No live providers, no new dependencies, no changes to the game engine / fake runtime / out-of-scope docs (route-doc changes limited to the §2A alignment).
 - A8. Pure-module tests pass; server tests pass in a normal environment or are documented with the exact environmental limitation.
+- A9. `parse_profile_launch_request` enforces exactly one launch source (rejects `profile`+`profile_name`, `profile`/`profile_name`+`template`, neither, and unexpected keys).
+- A10. Route docs (`README.md`, `docs/ROADMAP.md`, `docs/TASKS.md`) mark G2c `completed` and G2d the active candidate; no other route/product docs change.
 
 ## 13. Future (out of scope, noted for continuity)
 
