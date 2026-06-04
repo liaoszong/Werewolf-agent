@@ -30,6 +30,7 @@ from werewolf_eval.observer_protocol import (
     load_snapshot_detail,
     normalize_perspective,
     parse_launch_request,
+    parse_profile_launch_request,
     safe_child_path,
     snapshot_path,
     snapshot_visible_to_perspective,
@@ -447,3 +448,44 @@ class ObserverProtocolTraversalTests(TestCase):
             run_dir.mkdir()
             with self.assertRaises(ObserverProtocolError):
                 artifact_path(run_dir, "../events.jsonl")
+
+
+class ProfileLaunchRequestTests(TestCase):
+    def test_resolved_profile_in_allowed_artifacts(self) -> None:
+        self.assertIn("resolved-profile.json", ALLOWED_ARTIFACTS)
+
+    def test_accepts_inline_profile(self) -> None:
+        out = parse_profile_launch_request({"profile": {"name": "x"}})
+        self.assertEqual(out["kind"], "inline")
+        self.assertEqual(out["mode"], "fake")
+        self.assertTrue(out["run_id"])
+
+    def test_accepts_named_profile(self) -> None:
+        out = parse_profile_launch_request({"profile_name": "demo"})
+        self.assertEqual(out["kind"], "named")
+        self.assertEqual(out["profile_name"], "demo")
+
+    def test_rejects_both_sources(self) -> None:
+        with self.assertRaises(ObserverProtocolError):
+            parse_profile_launch_request({"profile": {}, "profile_name": "demo"})
+
+    def test_rejects_profile_with_template(self) -> None:
+        with self.assertRaises(ObserverProtocolError):
+            parse_profile_launch_request({"profile_name": "demo", "template": "default_6p_fake"})
+
+    def test_rejects_neither_source(self) -> None:
+        with self.assertRaises(ObserverProtocolError):
+            parse_profile_launch_request({"mode": "fake"})
+
+    def test_rejects_unsafe_profile_name(self) -> None:
+        with self.assertRaises(ObserverProtocolError):
+            parse_profile_launch_request({"profile_name": "../escape"})
+
+    def test_rejects_non_string_profile_name(self) -> None:
+        for bad in (None, 123, ["x"]):
+            with self.assertRaises(ObserverProtocolError):
+                parse_profile_launch_request({"profile_name": bad})
+
+    def test_rejects_non_string_run_id(self) -> None:
+        with self.assertRaises(ObserverProtocolError):
+            parse_profile_launch_request({"profile_name": "demo", "run_id": 123})

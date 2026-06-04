@@ -252,7 +252,7 @@ G1h event spine
 
 ## Current Priority
 
-G1h Live Runtime Event Spine, G2a Local Observer Server / Protocol Control Plane, and G2b Qt Observer Cockpit MVP are now `completed`. The next implementation candidate is G2c God View / Role View.
+G1h Live Runtime Event Spine, G2a Local Observer Server / Protocol Control Plane, G2b Qt Observer Cockpit MVP, and G2c God View / Role View are now `completed`. The next implementation candidate is G2d Prompt Configuration MVP.
 
 G1 series retrospective:
 - G1a proved fresh generated logs can feed validators, scoring, metrics, and replay demo.

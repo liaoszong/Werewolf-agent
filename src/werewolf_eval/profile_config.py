@@ -1,0 +1,314 @@
+"""G2d profile configuration helpers.
+
+Pure profile schema, validation, resolution, and resolved-profile artifact
+helpers for the prompt-configuration MVP.  No networking, no game engine,
+no Qt.  Standard library only.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import re
+from pathlib import Path
+from typing import Any
+
+PROFILE_SCHEMA_VERSION = "g2d.profile.v1"
+
+ALLOWED_TEMPLATES: frozenset[str] = frozenset({"default_6p_fake"})
+ALLOWED_PROVIDERS: frozenset[str] = frozenset({"fake_deterministic", "deepseek"})
+ALLOWED_MODELS: dict[str, frozenset[str]] = {
+    "fake_deterministic": frozenset({"none"}),
+    "deepseek": frozenset({"deepseek-chat", "deepseek-reasoner"}),
+}
+ALLOWED_STRATEGIES: frozenset[str] = frozenset({"default", "aggressive", "cautious"})
+ALLOWED_ROLES: frozenset[str] = frozenset({"werewolf", "seer", "witch", "villager"})
+CANONICAL_DEFAULT_6P_ROLES: dict[str, int] = {
+    "werewolf": 2,
+    "seer": 1,
+    "witch": 1,
+    "villager": 2,
+}
+ROLE_TEAMS: dict[str, str] = {
+    "werewolf": "werewolf",
+    "seer": "villager",
+    "witch": "villager",
+    "villager": "villager",
+}
+DEFAULT_6P_SEAT_ROLES: dict[str, str] = {
+    "p1": "werewolf",
+    "p2": "werewolf",
+    "p3": "seer",
+    "p4": "witch",
+    "p5": "villager",
+    "p6": "villager",
+}
+DEFAULT_SEAT_IDS: tuple[str, ...] = tuple(DEFAULT_6P_SEAT_ROLES)
+PROMPT_MAX_LEN = 8000
+
+_SAFE_NAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,255}$")
+_CONFIG_KEYS = frozenset({"provider", "model", "prompt", "strategy"})
+_SECRET_KEY_FRAGMENTS = (
+    "api_key",
+    "api-key",
+    "apikey",
+    "authorization",
+    "secret",
+    "token",
+    "bearer",
+    "password",
+    "credential",
+    "access_key",
+)
+# Value markers are intentionally NARROWER than key fragments: they target
+# high-confidence credential shapes so free-text prompts (e.g. "keep your role
+# secret") are NOT rejected, while real credentials (api keys, bearer tokens)
+# are.  No bare "secret"/"token"/"password" here.
+_VALUE_SECRET_MARKERS = (
+    "sk-",
+    "bearer ",
+    "api_key",
+    "api-key",
+    "apikey",
+    "authorization",
+    "access_key",
+    "deepseek_api_key",
+)
+
+
+class ProfileValidationError(ValueError):
+    """Raised when a profile cannot be validated safely."""
+
+
+def _hash_text(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _reject_secret_like_keys(obj: Any, path: str = "") -> None:
+    if isinstance(obj, dict):
+        for key, value in obj.items():
+            if any(frag in str(key).lower() for frag in _SECRET_KEY_FRAGMENTS):
+                raise ProfileValidationError(
+                    f"secret-like key not allowed: {path}{key}"
+                )
+            _reject_secret_like_keys(value, f"{path}{key}.")
+    elif isinstance(obj, list):
+        for index, item in enumerate(obj):
+            _reject_secret_like_keys(item, f"{path}{index}.")
+
+
+def _reject_secret_like_values(obj: Any, path: str = "") -> None:
+    if isinstance(obj, dict):
+        for key, value in obj.items():
+            _reject_secret_like_values(value, f"{path}{key}.")
+    elif isinstance(obj, list):
+        for index, item in enumerate(obj):
+            _reject_secret_like_values(item, f"{path}{index}.")
+    elif isinstance(obj, str):
+        lowered = obj.lower()
+        if any(marker in lowered for marker in _VALUE_SECRET_MARKERS):
+            raise ProfileValidationError(
+                f"secret-like value not allowed at {path.rstrip('.')}"
+            )
+
+
+def _template_seat_roles(template: str) -> dict[str, str]:
+    if template == "default_6p_fake":
+        return dict(DEFAULT_6P_SEAT_ROLES)
+    raise ProfileValidationError(f"unknown template: {template!r}")
+
+
+def _check_fragment(fragment: object, *, where: str, required: bool) -> None:
+    if not isinstance(fragment, dict):
+        raise ProfileValidationError(f"{where} must be an object")
+    if "role" in fragment:
+        raise ProfileValidationError(f"{where} may not set 'role'")
+    extra = set(fragment) - _CONFIG_KEYS
+    if extra:
+        raise ProfileValidationError(f"{where} has unexpected keys: {sorted(extra)}")
+    if required:
+        for field_name in ("provider", "model", "strategy"):
+            if field_name not in fragment:
+                raise ProfileValidationError(f"{where} missing {field_name!r}")
+    for field_name, value in fragment.items():
+        if not isinstance(value, str):
+            raise ProfileValidationError(f"{where}.{field_name} must be a string")
+    prompt = fragment.get("prompt")
+    if isinstance(prompt, str) and len(prompt) > PROMPT_MAX_LEN:
+        raise ProfileValidationError(f"{where}.prompt exceeds {PROMPT_MAX_LEN} chars")
+
+
+def _resolve_seat(profile: dict, seat: str, role: str) -> dict[str, Any]:
+    base = dict(profile["role_defaults"][role])
+    override = dict(profile.get("seat_overrides", {}).get(seat, {}))
+    merged = {**base, **override}
+    return {
+        "player_id": seat,
+        "role": role,
+        "team": ROLE_TEAMS[role],
+        "provider": merged.get("provider"),
+        "model": merged.get("model"),
+        "prompt": merged.get("prompt", ""),
+        "strategy": merged.get("strategy"),
+    }
+
+
+def _check_resolved_seat(seat_cfg: dict, seat: str) -> None:
+    provider = seat_cfg["provider"]
+    model = seat_cfg["model"]
+    strategy = seat_cfg["strategy"]
+    prompt = seat_cfg["prompt"]
+    if provider not in ALLOWED_PROVIDERS:
+        raise ProfileValidationError(f"{seat}: provider {provider!r} not allowed")
+    if model not in ALLOWED_MODELS.get(provider, frozenset()):
+        raise ProfileValidationError(
+            f"{seat}: model {model!r} not valid for provider {provider!r}"
+        )
+    if strategy not in ALLOWED_STRATEGIES:
+        raise ProfileValidationError(f"{seat}: strategy {strategy!r} not allowed")
+    if not isinstance(prompt, str) or len(prompt) > PROMPT_MAX_LEN:
+        raise ProfileValidationError(f"{seat}: prompt invalid or too long")
+
+
+def validate_profile(profile: object) -> None:
+    """Raise ``ProfileValidationError`` on the first failed rule; else return."""
+    if not isinstance(profile, dict):
+        raise ProfileValidationError("profile must be a JSON object")
+    # Secret-like keys and values first, so the failure reason is explicit.
+    _reject_secret_like_keys(profile)
+    _reject_secret_like_values(profile)
+    allowed_top = {"schema_version", "name", "template", "role_defaults", "seat_overrides"}
+    extra = set(profile) - allowed_top
+    if extra:
+        raise ProfileValidationError(f"unexpected top-level keys: {sorted(extra)}")
+    if profile.get("schema_version") != PROFILE_SCHEMA_VERSION:
+        raise ProfileValidationError(
+            f"schema_version must be {PROFILE_SCHEMA_VERSION!r}"
+        )
+    name = profile.get("name")
+    if not isinstance(name, str) or not _SAFE_NAME_RE.match(name):
+        raise ProfileValidationError(f"invalid profile name: {name!r}")
+    template = profile.get("template")
+    if template not in ALLOWED_TEMPLATES:
+        raise ProfileValidationError(f"unknown template: {template!r}")
+    seat_roles = _template_seat_roles(template)
+    needed_roles = set(seat_roles.values())
+    role_defaults = profile.get("role_defaults")
+    if not isinstance(role_defaults, dict) or set(role_defaults) != needed_roles:
+        raise ProfileValidationError(
+            f"role_defaults must cover exactly {sorted(needed_roles)}"
+        )
+    for role, fragment in role_defaults.items():
+        _check_fragment(fragment, where=f"role_defaults.{role}", required=True)
+    seat_overrides = profile.get("seat_overrides", {})
+    if not isinstance(seat_overrides, dict):
+        raise ProfileValidationError("seat_overrides must be an object")
+    for seat, fragment in seat_overrides.items():
+        if seat not in DEFAULT_SEAT_IDS:
+            raise ProfileValidationError(f"unknown seat id: {seat!r}")
+        _check_fragment(fragment, where=f"seat_overrides.{seat}", required=False)
+    counts: dict[str, int] = {}
+    for role in seat_roles.values():
+        counts[role] = counts.get(role, 0) + 1
+    if counts != CANONICAL_DEFAULT_6P_ROLES:
+        raise ProfileValidationError("role multiset must match canonical default_6p")
+    for seat in DEFAULT_SEAT_IDS:
+        _check_resolved_seat(_resolve_seat(profile, seat, seat_roles[seat]), seat)
+
+
+def resolve_profile(profile: dict) -> list[dict]:
+    """Return resolved per-seat configs in template seat order.  Assumes a
+    validated profile."""
+    seat_roles = _template_seat_roles(profile["template"])
+    return [
+        _resolve_seat(profile, seat, seat_roles[seat])
+        for seat in DEFAULT_SEAT_IDS
+    ]
+
+
+def build_resolved_profile_artifact(profile: dict, run_id: str) -> dict:
+    """Build the ``resolved-profile.json`` content: declared per-seat config
+    with hashed prompts and explicit fake-execution markers."""
+    seats: list[dict[str, Any]] = []
+    for seat_cfg in resolve_profile(profile):
+        prompt = seat_cfg.get("prompt") or ""
+        seats.append(
+            {
+                "player_id": seat_cfg["player_id"],
+                "role": seat_cfg["role"],
+                "team": seat_cfg["team"],
+                "provider": seat_cfg["provider"],
+                "model": seat_cfg["model"],
+                "strategy": seat_cfg["strategy"],
+                "prompt_hash": _hash_text(prompt) if prompt else "",
+            }
+        )
+    return {
+        "schema_version": PROFILE_SCHEMA_VERSION,
+        "run_id": run_id,
+        "profile_name": profile["name"],
+        "template": profile["template"],
+        "execution_mode": "fake",
+        "live_api": "not_used",
+        "secrets_redacted": True,
+        "seats": seats,
+    }
+
+
+def load_profile(path: Path) -> dict:
+    """Read and parse a profile JSON file; raise ProfileValidationError on
+    malformed JSON or non-object content.  Error messages use the basename
+    only — never the absolute path — so server responses cannot leak local
+    paths."""
+    p = Path(path)
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ProfileValidationError(f"invalid JSON in {p.name}: {exc}") from exc
+    except OSError:
+        raise ProfileValidationError(f"cannot read profile {p.name}")
+    if not isinstance(data, dict):
+        raise ProfileValidationError("profile file must contain a JSON object")
+    return data
+
+
+def save_profile(profile: dict, profiles_dir: Path) -> Path:
+    """Validate then write ``<profiles_dir>/<name>.json``.  Pure helper — not a
+    server endpoint this slice."""
+    validate_profile(profile)
+    name = profile["name"]
+    if not _SAFE_NAME_RE.match(name):
+        raise ProfileValidationError(f"unsafe profile name: {name!r}")
+    target_dir = Path(profiles_dir)
+    target_dir.mkdir(parents=True, exist_ok=True)
+    target = target_dir / f"{name}.json"
+    target.write_text(
+        json.dumps(profile, ensure_ascii=False, indent=2, sort_keys=True),
+        encoding="utf-8",
+    )
+    return target
+
+
+def list_profiles(profiles_dir: Path) -> list[dict]:
+    """Return per-file metadata; malformed files are reported valid=False and
+    never raise."""
+    target_dir = Path(profiles_dir)
+    entries: list[dict] = []
+    if not target_dir.is_dir():
+        return entries
+    for path in sorted(target_dir.glob("*.json")):
+        entry: dict[str, Any] = {
+            "name": path.stem,
+            "template": None,
+            "valid": False,
+            "error": None,
+        }
+        try:
+            data = load_profile(path)
+            validate_profile(data)
+            entry["template"] = data.get("template")
+            entry["valid"] = True
+        except ProfileValidationError as exc:
+            entry["error"] = str(exc)
+        entries.append(entry)
+    return entries

@@ -32,6 +32,7 @@ ALLOWED_ARTIFACTS: tuple[str, ...] = (
     "consensus-log.json",
     "provider-trace.json",
     "failure-audit.json",
+    "resolved-profile.json",
 )
 
 ALLOWED_PERSPECTIVES: tuple[str, ...] = (
@@ -335,6 +336,56 @@ def parse_launch_request(payload: dict[str, object]) -> dict[str, object]:
             run_id = f"{template}_{uuid.uuid4().hex[:8]}"
 
     return {"template": template, "run_id": run_id, "mode": mode}
+
+
+def parse_profile_launch_request(payload: dict[str, object]) -> dict[str, object]:
+    """Validate and normalize a profile-launch payload.
+
+    Exactly one launch source is required: ``profile`` (inline object) or
+    ``profile_name`` (saved profile).  Allowed keys: ``profile``,
+    ``profile_name``, ``run_id``, ``mode``.  ``template`` is not allowed here
+    (template launches use ``parse_launch_request``).
+    """
+    if not isinstance(payload, dict):
+        raise ObserverProtocolError("Launch request payload must be a JSON object")
+    allowed_keys = {"profile", "profile_name", "run_id", "mode"}
+    extra = set(payload.keys()) - allowed_keys
+    if extra:
+        raise ObserverProtocolError(
+            f"Unexpected keys in profile launch: {sorted(extra)}.  Allowed: {sorted(allowed_keys)}"
+        )
+    has_inline = "profile" in payload
+    has_named = "profile_name" in payload
+    if has_inline and has_named:
+        raise ObserverProtocolError("Provide either 'profile' or 'profile_name', not both")
+    if not has_inline and not has_named:
+        raise ObserverProtocolError("Profile launch requires 'profile' or 'profile_name'")
+
+    mode = str(payload.get("mode", DEFAULT_FAKE_MODE))
+    if mode not in ALLOWED_MODES:
+        raise ObserverProtocolError(f"Unknown mode: {mode!r}.  Allowed: {ALLOWED_MODES}")
+
+    run_id_raw = payload.get("run_id", "")
+    if not isinstance(run_id_raw, str):
+        raise ObserverProtocolError("run_id must be a string")
+    run_id = run_id_raw
+    if run_id:
+        validate_run_id(run_id)
+    else:
+        run_id = generate_run_id(prefix="g2d_profile")
+        if not run_id.startswith("g2d_profile"):
+            run_id = f"g2d_profile_{uuid.uuid4().hex[:8]}"
+
+    if has_inline:
+        profile = payload["profile"]
+        if not isinstance(profile, dict):
+            raise ObserverProtocolError("'profile' must be a JSON object")
+        return {"kind": "inline", "profile": profile, "run_id": run_id, "mode": mode}
+
+    profile_name = payload["profile_name"]
+    if not isinstance(profile_name, str) or not _SAFE_NAME_RE.match(profile_name):
+        raise ObserverProtocolError(f"Unsafe profile_name: {profile_name!r}")
+    return {"kind": "named", "profile_name": profile_name, "run_id": run_id, "mode": mode}
 
 
 def generate_run_id(prefix: str = "g2a_default_6p_fake") -> str:

@@ -7,6 +7,7 @@ SSE streaming, and asynchronous run launch.  All I/O is local-filesystem only.
 from __future__ import annotations
 
 import json
+import re
 import time
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -32,6 +33,7 @@ from werewolf_eval.observer_protocol import (
     load_snapshot_detail,
     normalize_perspective,
     parse_launch_request,
+    parse_profile_launch_request,
     safe_child_path,
     validate_run_id,
 )
@@ -39,10 +41,24 @@ from werewolf_eval.observer_visibility import (
     VisibilityProjectionError,
     build_projection_envelope,
 )
+from werewolf_eval.profile_config import (
+    ProfileValidationError,
+    build_resolved_profile_artifact,
+    list_profiles,
+    load_profile,
+    resolve_profile,
+    validate_profile,
+)
 from werewolf_eval.run_g1h_fake_runtime import run_fake_runtime
-from werewolf_eval.runtime_events import RuntimeEventError, read_events_jsonl
+from werewolf_eval.runtime_events import (
+    RuntimeEventError,
+    read_events_jsonl,
+    redact_secret_values,
+)
 
 RunLauncher = Callable[[str, Path], int]
+
+_PROFILE_NAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,255}$")
 
 
 def default_fake_launcher(run_id: str, run_dir: Path) -> int:
@@ -53,6 +69,7 @@ def default_fake_launcher(run_id: str, run_dir: Path) -> int:
 class ObserverServerState:
     runs_dir: Path
     launcher: RunLauncher
+    profiles_dir: Path = field(default_factory=lambda: Path("profiles"))
     run_status: dict[str, str] = field(default_factory=dict)
     run_errors: dict[str, str] = field(default_factory=dict)
     lock: Lock = field(default_factory=Lock)
@@ -163,6 +180,29 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
                     mem_status = self._get_status(d.name, d)
                     runs.append(build_run_summary(d, status=mem_status))
                 self._send_json(200, {"runs": runs})
+                return
+
+            if segments == ["api", "profiles"]:
+                profiles = list_profiles(self._get_state().profiles_dir)
+                self._send_json(200, {"profiles": profiles})
+                return
+
+            if len(segments) == 3 and segments[:2] == ["api", "profiles"]:
+                name = segments[2]
+                if not _PROFILE_NAME_RE.match(name):
+                    self._send_error_json(400, "invalid_request", "unsafe profile name")
+                    return
+                path = self._get_state().profiles_dir / f"{name}.json"
+                if not path.exists():
+                    self._send_error_json(404, "not_found", "profile not found")
+                    return
+                try:
+                    data = load_profile(path)
+                    validate_profile(data)
+                except ProfileValidationError as exc:
+                    self._send_error_json(400, "invalid_profile", str(exc))
+                    return
+                self._send_json(200, redact_secret_values(data))
                 return
 
             if len(segments) >= 3 and segments[0] == "api" and segments[1] == "runs":
@@ -277,11 +317,87 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
         except Exception:
             self._send_error_json(500, "internal_error", "Internal server error")
 
+    def _launch_run_async(
+        self, run_id: str, run_dir: Path, launcher: RunLauncher
+    ) -> None:
+        self._set_status(run_id, "queued")
+
+        def _run_thread() -> None:
+            self._set_status(run_id, "running")
+            try:
+                ret = launcher(run_id, run_dir)
+            except Exception as exc:  # noqa: BLE001
+                self._set_error(run_id, str(exc))
+                self._set_status(run_id, "failed")
+                return
+            if ret == 0:
+                self._set_status(run_id, "completed")
+            else:
+                self._set_error(run_id, f"Launcher returned code {ret}")
+                self._set_status(run_id, "failed")
+
+        Thread(target=_run_thread, daemon=True).start()
+
+    def _handle_profile_launch(self, body: dict[str, object]) -> None:
+        plr = parse_profile_launch_request(body)
+        state = self._get_state()
+        if plr["kind"] == "named":
+            ppath = state.profiles_dir / f"{plr['profile_name']}.json"
+            if not ppath.exists():
+                self._send_error_json(404, "not_found", "profile not found")
+                return
+            try:
+                profile = load_profile(ppath)
+            except ProfileValidationError as exc:
+                self._send_error_json(400, "invalid_profile", str(exc))
+                return
+        else:
+            profile = plr["profile"]  # type: ignore[assignment]
+        try:
+            validate_profile(profile)
+        except ProfileValidationError as exc:
+            self._send_error_json(400, "invalid_profile", str(exc))
+            return
+
+        run_id = str(plr["run_id"])
+        run_dir = state.runs_dir / run_id
+        if run_dir.exists():
+            self._send_error_json(409, "conflict", f"Run already exists: {run_id}")
+            return
+        run_dir.mkdir(parents=True)
+
+        base = state.launcher
+
+        def _profile_launcher(
+            rid: str, rdir: Path, base: RunLauncher = base, profile: dict = profile
+        ) -> int:
+            code = base(rid, rdir)
+            artifact = build_resolved_profile_artifact(profile, rid)
+            (rdir / "resolved-profile.json").write_text(
+                json.dumps(artifact, ensure_ascii=False, indent=2, sort_keys=True),
+                encoding="utf-8",
+            )
+            return code
+
+        self._launch_run_async(run_id, run_dir, _profile_launcher)
+        self._send_json(
+            202,
+            {
+                "run_id": run_id,
+                "profile_name": profile["name"],
+                "mode": plr["mode"],
+                "status": "queued",
+            },
+        )
+
     def do_POST(self) -> None:
         segments = self._path_segments()
         try:
             if segments == ["api", "runs"]:
                 body = self._read_json_body()
+                if "profile" in body or "profile_name" in body:
+                    self._handle_profile_launch(body)
+                    return
                 launch = parse_launch_request(body)
                 run_id = launch["run_id"]
                 run_dir = self._get_state().runs_dir / run_id
@@ -291,29 +407,7 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
                     )
                     return
                 run_dir.mkdir(parents=True)
-
-                self._set_status(run_id, "queued")
-
-                state = self._get_state()
-                launcher = state.launcher
-
-                def _run_thread() -> None:
-                    self._set_status(run_id, "running")
-                    try:
-                        ret = launcher(run_id, run_dir)
-                    except Exception as exc:
-                        self._set_error(run_id, str(exc))
-                        self._set_status(run_id, "failed")
-                        return
-                    if ret == 0:
-                        self._set_status(run_id, "completed")
-                    else:
-                        self._set_error(run_id, f"Launcher returned code {ret}")
-                        self._set_status(run_id, "failed")
-
-                t = Thread(target=_run_thread, daemon=True)
-                t.start()
-
+                self._launch_run_async(run_id, run_dir, self._get_state().launcher)
                 self._send_json(
                     202,
                     {
@@ -322,6 +416,21 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
                         "mode": launch["mode"],
                         "status": "queued",
                     },
+                )
+                return
+
+            if segments == ["api", "profiles", "validate"]:
+                body = self._read_json_body()
+                errors: list[str] = []
+                resolved: list[dict[str, object]] = []
+                try:
+                    validate_profile(body)
+                    resolved = resolve_profile(body)
+                except ProfileValidationError as exc:
+                    errors.append(str(exc))
+                self._send_json(
+                    200,
+                    {"valid": not errors, "errors": errors, "resolved_seats": resolved},
                 )
                 return
 
@@ -409,13 +518,19 @@ def create_observer_server(
     port: int,
     runs_dir: Path,
     launcher: RunLauncher | None = None,
+    profiles_dir: Path | None = None,
 ) -> ThreadingHTTPServer:
     """Create and configure a threaded observer HTTP server."""
     if launcher is None:
         launcher = default_fake_launcher
     runs_dir.mkdir(parents=True, exist_ok=True)
+    if profiles_dir is None:
+        profiles_dir = runs_dir.parent / "profiles"
+    profiles_dir.mkdir(parents=True, exist_ok=True)
 
-    state = ObserverServerState(runs_dir=runs_dir, launcher=launcher)
+    state = ObserverServerState(
+        runs_dir=runs_dir, launcher=launcher, profiles_dir=profiles_dir
+    )
 
     class _BoundHandler(ObserverRequestHandler):
         pass

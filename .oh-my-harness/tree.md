@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 221
+- Entries: 233
 
 ```text
 ./
@@ -55,19 +55,27 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   └── qt_observer/
 │       ├── qml/
 │       │   ├── components/
+│       │   │   ├── AppBackground.qml
+│       │   │   ├── AppButton.qml
+│       │   │   ├── AppCard.qml
 │       │   │   ├── AuditLinksPanel.qml
+│       │   │   ├── EmptyState.qml
 │       │   │   ├── EventTimeline.qml
+│       │   │   ├── GlowDot.qml
 │       │   │   ├── PerspectiveSwitcher.qml
 │       │   │   ├── ProjectionProofPanel.qml
 │       │   │   ├── RoleCard.qml
+│       │   │   ├── SectionHeader.qml
 │       │   │   ├── StatusBadge.qml
 │       │   │   └── ViewBoundaryBadge.qml
 │       │   ├── AppShell.qml
 │       │   ├── HistoryView.qml
 │       │   ├── HomeView.qml
+│       │   ├── I18n.qml
 │       │   ├── LiveCockpitView.qml
 │       │   ├── MatchSetupView.qml
-│       │   └── PreflightView.qml
+│       │   ├── PreflightView.qml
+│       │   └── Theme.qml
 │       ├── src/
 │       │   ├── ObserverApiClient.cpp
 │       │   ├── ObserverApiClient.h
@@ -166,7 +174,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   │   ├── 2026-06-03--g1h-live-runtime-event-spine-plan.md
 │   │   │   ├── 2026-06-03--g2a-local-observer-server-protocol-control-plane-plan.md
 │   │   │   ├── 2026-06-03--g2b-qt-observer-cockpit-mvp-plan.md
-│   │   │   └── 2026-06-03--g2c-god-role-view-visibility-trust-plan.md
+│   │   │   ├── 2026-06-03--g2c-god-role-view-visibility-trust-plan.md
+│   │   │   └── 2026-06-04--g2d-prompt-configuration-mvp-plan.md
 │   │   └── reviews/
 │   │       ├── 2026-06-01--g1c-project-healthcheck-final.md
 │   │       ├── 2026-06-01--g1c-project-healthcheck.md
@@ -183,6 +192,9 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   ├── agent-workflow.md
 │   │   ├── review-guidelines.md
 │   │   └── review-packet-gate.md
+│   ├── superpowers/
+│   │   └── specs/
+│   │       └── 2026-06-04-g2d-prompt-configuration-design.md
 │   ├── CHECKPOINT_TEMPLATE.md
 │   ├── EVALUATION_RUBRIC.md
 │   ├── GOLD_DEMO.md
@@ -215,6 +227,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       ├── observer_protocol.py
 │       ├── observer_server.py
 │       ├── observer_visibility.py
+│       ├── profile_config.py
 │       ├── provider_agent.py
 │       ├── provider_contract.py
 │       ├── render_demo.py
@@ -257,6 +270,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── test_observer_protocol.py
 │   ├── test_observer_server.py
 │   ├── test_observer_visibility.py
+│   ├── test_profile_config.py
 │   ├── test_provider_contract.py
 │   ├── test_qt_observer_static_contract.py
 │   ├── test_render_demo.py
