@@ -79,11 +79,11 @@ G2d-1 does NOT include:
 4. `template ∈ ALLOWED_TEMPLATES` (`default_6p_fake`).
 5. `role_defaults` covers exactly `{werewolf, seer, witch, villager}`; each fragment keys ⊆ `{provider, model, prompt, strategy}`, no `role`, with `provider`/`model`/`strategy` required and all values strings.
 6. `seat_overrides` keys ⊆ `p1..p6`; each fragment keys ⊆ `{provider, model, prompt, strategy}`, no `role`, values strings.
-7. **Secret-like keys rejected** (keys + nesting) via a dedicated walker — independent of `redact_secret_values`.
+7. **Secret-like keys AND values rejected** via two dedicated walkers — independent of `redact_secret_values`. Keys: any fragment of `api_key`/`secret`/`token`/`bearer`/`authorization`/`password`/`credential`/`access_key`. Values: a *narrower* credential-marker set (`sk-`, `bearer ` with space, `api_key`, `api-key`, `apikey`, `authorization`, `access_key`, `deepseek_api_key`) so free-text prompts with generic words (e.g. "keep your role secret") still pass.
 8. Role multiset == `{werewolf:2, seer:1, witch:1, villager:2}`.
 9. **Resolved-seat coherence (post-merge):** each seat resolved (role default ← override) must satisfy `provider ∈ ALLOWED_PROVIDERS`, `model ∈ ALLOWED_MODELS[provider]`, `strategy ∈ ALLOWED_STRATEGIES`, `len(prompt) ≤ PROMPT_MAX_LEN`. A partial override (e.g. `model` alone over a `fake_deterministic` default) is rejected.
 
-Secret VALUES cannot reach the artifact because provider/model/strategy are allowlisted (no free credential strings), `prompt` is hashed (never stored verbatim), and `redact_secret_values` is applied to the output artifact as defense-in-depth.
+Defense-in-depth: `prompt` is hashed (never stored verbatim), provider/model/strategy are allowlisted, and `redact_secret_values` is applied to the output artifact.
 
 ### Launch payload (exactly one source)
 
@@ -131,10 +131,11 @@ docs/ROADMAP.md
 docs/TASKS.md
 docs/harness/plans/2026-06-04--g2d-prompt-configuration-mvp-plan.md
 docs/superpowers/specs/2026-06-04-g2d-prompt-configuration-design.md
+.logs/review/latest/review-packet.md
 .oh-my-harness/tree.md
 ```
 
-`README.md`, `docs/ROADMAP.md`, `docs/TASKS.md` are allowed **only** for the Task 1 status flip. `.oh-my-harness/tree.md` is allowed only if refreshed by `node .codex/hooks/tree.mjs --force`.
+`README.md`, `docs/ROADMAP.md`, `docs/TASKS.md` are allowed **only** for the Task 1 status flip. `.logs/review/latest/review-packet.md` is allowed only for the Task 6 review packet (the file is git-tracked despite `.gitignore`). `.oh-my-harness/tree.md` is allowed only if refreshed by `node .codex/hooks/tree.mjs --force`.
 
 ## Forbidden Scope
 
@@ -176,9 +177,53 @@ Replace with:
 G-track 后续路线已在 `docs/ROADMAP.md` 固化：G2c God View / Role View 已完成，下一候选开发点是 G2d Prompt Configuration MVP。
 ```
 
-- [ ] **Step 3: Mark G2c completed in TASKS**
+- [ ] **Step 3a: Fix the stale TASKS.md status summary**
 
-In `docs/TASKS.md`, locate the G2b completed entry block. Immediately after it, add a G2c completed entry mirroring the existing entry format (status `completed`, dependency `G2a/G2b`, core artifacts `src/werewolf_eval/observer_visibility.py`, `/api/runs/{id}/projection` endpoint, `tests/test_observer_visibility.py`, Qt `ViewBoundaryBadge.qml` / `ProjectionProofPanel.qml`). Then add a G2d entry with status `active` / `in_progress` referencing `docs/superpowers/specs/2026-06-04-g2d-prompt-configuration-design.md` and this plan. Keep wording minimal and consistent with surrounding entries; do not restructure the file.
+In `docs/TASKS.md`, the summary paragraph (around line 84) ends with a stale "next candidate" clause. Find:
+
+```text
+下一候选开发点是 G2b Qt Observer MVP；
+```
+
+Replace with:
+
+```text
+G2b Qt Observer MVP、G2c God View / Role View 已完成，下一候选开发点是 G2d Prompt Configuration MVP；
+```
+
+- [ ] **Step 3b: Insert exact G2c (completed) and G2d (active) entries**
+
+In `docs/TASKS.md`, find the end of the G2b block (its Non-goals line, immediately before the `#### Backlog / prerequisite fix candidate` heading):
+
+```text
+- Non-goals：不做 prompt/profile editor，不做 Web observer client，不做 human-vs-AI UI，不做 multi-provider arena，不做 leaderboard，不做 Python runtime 直接绑定，不做本地 artifact 文件读取。
+
+#### Backlog / prerequisite fix candidate：Decision Round Scoring Disambiguation
+```
+
+Replace with (insert the two new entries between them — exact text):
+
+```text
+- Non-goals：不做 prompt/profile editor，不做 Web observer client，不做 human-vs-AI UI，不做 multi-provider arena，不做 leaderboard，不做 Python runtime 直接绑定，不做本地 artifact 文件读取。
+
+#### G2c：God View / Role View Visibility Trust
+
+- 状态：`completed`（plan 文件 `docs/harness/plans/2026-06-03--g2c-god-role-view-visibility-trust-plan.md`）
+- 作用：将 god-view state 与 role-view projection 分离，使隐藏信息在 God/Public/Role/Team 视角下显式、可审计、端到端可执行；通过 G2a protocol 暴露 server-side visibility projection。
+- 核心产物：`src/werewolf_eval/observer_visibility.py`、`/api/runs/{run_id}/projection` 端点、`tests/test_observer_visibility.py`、`clients/qt_observer/qml/components/ViewBoundaryBadge.qml` / `ProjectionProofPanel.qml`。
+- 依赖：G2a / G2b。
+- Non-goals：不做 prompt/profile editor，不做 multi-run experiment system。
+
+#### G2d：Prompt Configuration MVP
+
+- 状态：`active`（spec `docs/superpowers/specs/2026-06-04-g2d-prompt-configuration-design.md`；plan `docs/harness/plans/2026-06-04--g2d-prompt-configuration-mvp-plan.md`）
+- 作用：通过受控的 JSON profile surface 配置可复用、可校验、可审计的 role defaults / seat overrides / resolved seat configs，并以 fake-deterministic 执行记录 declared provider/model/prompt/strategy（G2d-1 backend slice，无 Qt UI）。
+- 核心产物：`src/werewolf_eval/profile_config.py`、`/api/profiles` / `/api/profiles/{name}` / `/api/profiles/validate` 端点、`POST /api/runs` profile launch + `resolved-profile.json`、`tests/test_profile_config.py`。
+- 依赖：G2a / G2c。
+- Non-goals：不做 Qt/Web setup UI（留待 G2d-2），不做 live provider calls / API keys / secrets，不做 multi-provider arena，不做 leaderboard，不改 game engine / fake runtime。
+
+#### Backlog / prerequisite fix candidate：Decision Round Scoring Disambiguation
+```
 
 - [ ] **Step 4: Verify route docs**
 
@@ -302,6 +347,19 @@ class ProfileValidationTests(unittest.TestCase):
             validate_profile(p)
         self.assertIn("secret", str(ctx.exception).lower())
 
+    def test_rejects_secret_like_value_in_prompt(self):
+        p = _valid_profile()
+        p["role_defaults"]["seer"]["prompt"] = "use key sk-ABCDEF0123456789TOKEN"
+        with self.assertRaises(ProfileValidationError) as ctx:
+            validate_profile(p)
+        self.assertIn("secret", str(ctx.exception).lower())
+
+    def test_allows_generic_word_secret_in_prompt(self):
+        # "secret" as a plain game word must NOT be rejected (no credential marker).
+        p = _valid_profile()
+        p["role_defaults"]["seer"]["prompt"] = "keep your seer role secret"
+        validate_profile(p)
+
 
 if __name__ == "__main__":
     unittest.main()
@@ -384,6 +442,20 @@ _SECRET_KEY_FRAGMENTS = (
     "credential",
     "access_key",
 )
+# Value markers are intentionally NARROWER than key fragments: they target
+# high-confidence credential shapes so free-text prompts (e.g. "keep your role
+# secret") are NOT rejected, while real credentials (api keys, bearer tokens)
+# are.  No bare "secret"/"token"/"password" here.
+_VALUE_SECRET_MARKERS = (
+    "sk-",
+    "bearer ",
+    "api_key",
+    "api-key",
+    "apikey",
+    "authorization",
+    "access_key",
+    "deepseek_api_key",
+)
 
 
 class ProfileValidationError(ValueError):
@@ -405,6 +477,21 @@ def _reject_secret_like_keys(obj: Any, path: str = "") -> None:
     elif isinstance(obj, list):
         for index, item in enumerate(obj):
             _reject_secret_like_keys(item, f"{path}{index}.")
+
+
+def _reject_secret_like_values(obj: Any, path: str = "") -> None:
+    if isinstance(obj, dict):
+        for key, value in obj.items():
+            _reject_secret_like_values(value, f"{path}{key}.")
+    elif isinstance(obj, list):
+        for index, item in enumerate(obj):
+            _reject_secret_like_values(item, f"{path}{index}.")
+    elif isinstance(obj, str):
+        lowered = obj.lower()
+        if any(marker in lowered for marker in _VALUE_SECRET_MARKERS):
+            raise ProfileValidationError(
+                f"secret-like value not allowed at {path.rstrip('.')}"
+            )
 
 
 def _template_seat_roles(template: str) -> dict[str, str]:
@@ -469,8 +556,9 @@ def validate_profile(profile: object) -> None:
     """Raise ``ProfileValidationError`` on the first failed rule; else return."""
     if not isinstance(profile, dict):
         raise ProfileValidationError("profile must be a JSON object")
-    # Secret-like keys first, so the failure reason is explicit.
+    # Secret-like keys and values first, so the failure reason is explicit.
     _reject_secret_like_keys(profile)
+    _reject_secret_like_values(profile)
     allowed_top = {"schema_version", "name", "template", "role_defaults", "seat_overrides"}
     extra = set(profile) - allowed_top
     if extra:
@@ -564,7 +652,7 @@ class ProfileArtifactTests(unittest.TestCase):
     def test_artifact_shape_and_hashing(self):
         art = build_resolved_profile_artifact(
             _valid_profile(seat_overrides={
-                "p3": {"provider": "deepseek", "model": "deepseek-chat", "prompt": "secret-strategy", "strategy": "cautious"},
+                "p3": {"provider": "deepseek", "model": "deepseek-chat", "prompt": "custom-strategy-text", "strategy": "cautious"},
             }),
             run_id="run123",
         )
@@ -576,8 +664,8 @@ class ProfileArtifactTests(unittest.TestCase):
         self.assertEqual(len(art["seats"]), 6)
         p3 = next(s for s in art["seats"] if s["player_id"] == "p3")
         self.assertEqual(len(p3["prompt_hash"]), 64)
-        # raw prompt text never stored
-        self.assertNotIn("secret-strategy", json.dumps(art))
+        # raw prompt text never stored (only its hash)
+        self.assertNotIn("custom-strategy-text", json.dumps(art))
 
     def test_artifact_has_no_absolute_paths(self):
         art = build_resolved_profile_artifact(_valid_profile(), run_id="run123")
@@ -665,11 +753,16 @@ def build_resolved_profile_artifact(profile: dict, run_id: str) -> dict:
 
 def load_profile(path: Path) -> dict:
     """Read and parse a profile JSON file; raise ProfileValidationError on
-    malformed JSON or non-object content."""
+    malformed JSON or non-object content.  Error messages use the basename
+    only — never the absolute path — so server responses cannot leak local
+    paths."""
+    p = Path(path)
     try:
-        data = json.loads(Path(path).read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        raise ProfileValidationError(f"cannot read profile {path}: {exc}") from exc
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ProfileValidationError(f"invalid JSON in {p.name}: {exc}") from exc
+    except OSError:
+        raise ProfileValidationError(f"cannot read profile {p.name}")
     if not isinstance(data, dict):
         raise ProfileValidationError("profile file must contain a JSON object")
     return data
@@ -778,6 +871,15 @@ class ProfileLaunchRequestTests(unittest.TestCase):
     def test_rejects_unsafe_profile_name(self):
         with self.assertRaises(ObserverProtocolError):
             parse_profile_launch_request({"profile_name": "../escape"})
+
+    def test_rejects_non_string_profile_name(self):
+        for bad in (None, 123, ["x"]):
+            with self.assertRaises(ObserverProtocolError):
+                parse_profile_launch_request({"profile_name": bad})
+
+    def test_rejects_non_string_run_id(self):
+        with self.assertRaises(ObserverProtocolError):
+            parse_profile_launch_request({"profile_name": "demo", "run_id": 123})
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
@@ -837,7 +939,10 @@ def parse_profile_launch_request(payload: dict[str, object]) -> dict[str, object
     if mode not in ALLOWED_MODES:
         raise ObserverProtocolError(f"Unknown mode: {mode!r}.  Allowed: {ALLOWED_MODES}")
 
-    run_id = str(payload.get("run_id", ""))
+    run_id_raw = payload.get("run_id", "")
+    if not isinstance(run_id_raw, str):
+        raise ObserverProtocolError("run_id must be a string")
+    run_id = run_id_raw
     if run_id:
         validate_run_id(run_id)
     else:
@@ -851,8 +956,8 @@ def parse_profile_launch_request(payload: dict[str, object]) -> dict[str, object
             raise ObserverProtocolError("'profile' must be a JSON object")
         return {"kind": "inline", "profile": profile, "run_id": run_id, "mode": mode}
 
-    profile_name = str(payload["profile_name"])
-    if not _SAFE_NAME_RE.match(profile_name):
+    profile_name = payload["profile_name"]
+    if not isinstance(profile_name, str) or not _SAFE_NAME_RE.match(profile_name):
         raise ObserverProtocolError(f"Unsafe profile_name: {profile_name!r}")
     return {"kind": "named", "profile_name": profile_name, "run_id": run_id, "mode": mode}
 ```
@@ -1003,6 +1108,31 @@ class ObserverServerProfileTests(TestCase):
             payload={"profile_name": "demo", "template": "default_6p_fake"},
         )
         self.assertEqual(result.get("code"), "invalid_request")
+
+    def test_responses_have_no_absolute_paths_or_secret_markers(self):
+        # malformed-profile errors (listing + get-by-name) must not leak the
+        # absolute profiles dir
+        broken = self._profiles / "broken.json"
+        broken.write_text("{ not json", encoding="utf-8")
+        try:
+            listing = _request_json(self._base_url, "/api/profiles")
+            self.assertNotIn(str(self._profiles), json.dumps(listing))
+            get_broken = _request_json(self._base_url, "/api/profiles/broken")
+            self.assertNotIn(str(self._profiles), json.dumps(get_broken))
+        finally:
+            broken.unlink()
+        # a launched run's resolved-profile artifact must not leak paths/secrets
+        _request_json(
+            self._base_url, "/api/runs", method="POST",
+            payload={"profile_name": "demo", "run_id": "g2d_leak_run"},
+        )
+        _wait_for_status(self._base_url, "g2d_leak_run", "completed")
+        art_text = _request_text(
+            self._base_url, "/api/runs/g2d_leak_run/artifacts/resolved-profile.json"
+        )
+        self.assertNotIn(str(self._runs), art_text)
+        for marker in ("sk-", "Bearer ", "DEEPSEEK_API_KEY", "api_key"):
+            self.assertNotIn(marker, art_text)
 ```
 
 Add a polling helper near the other module-level test helpers (if no equivalent exists):
@@ -1369,7 +1499,7 @@ git commit -m "docs(g2d): add review packet and refresh tree"
 - **A2.** `GET /api/profiles`, `GET /api/profiles/{name}`, `POST /api/profiles/validate` behave per spec §5.3. *(ObserverServerProfileTests)*
 - **A3.** `POST /api/runs` launches a fake run from an inline or named profile and writes `resolved-profile.json`. *(test_launch_from_named_profile_writes_resolved_artifact, test_launch_from_inline_profile)*
 - **A4.** `resolved-profile.json` records declared per-seat provider/model/prompt(hash)/strategy + `execution_mode="fake"` / `live_api="not_used"`; no secrets or absolute paths. *(ProfileArtifactTests)*
-- **A5.** Validation rejects bad schema, bad role layout, disallowed provider/model/strategy, unsafe names, extra keys, secret-like keys, and post-merge incoherence. *(ProfileValidationTests)*
+- **A5.** Validation rejects bad schema, bad role layout, disallowed provider/model/strategy, unsafe names, extra keys, secret-like keys, secret-like values (credential markers), and post-merge incoherence; generic words like "secret" in a prompt are allowed. *(ProfileValidationTests)*
 - **A6.** Template launch path and all G2a/G2c endpoints unchanged. *(existing test_observer_server suites still pass)*
 - **A7.** No live providers, no new dependencies, no engine/runtime changes; route-doc changes limited to §2A alignment. *(allowlist + forbidden checks)*
 - **A8.** Focused tests pass; server tests pass or are documented with the exact environmental limitation. *(Task 6)*

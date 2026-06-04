@@ -131,7 +131,7 @@ The profile layer is a pure module. The server owns endpoints and the launcher c
   }
   ```
   Prompt text is **hashed** (reuse `_hash_prompt_text`) and never stored verbatim; `redact_secret_values` is applied to the whole artifact.
-- `load_profile(path: Path) -> dict` — read + parse a profile JSON file; raises `ProfileValidationError` on malformed JSON.
+- `load_profile(path: Path) -> dict` — read + parse a profile JSON file; raises `ProfileValidationError` on malformed JSON. Error messages use the **basename only** (never the absolute path), so server responses that surface a load error cannot leak local paths.
 - `save_profile(profile: dict, profiles_dir: Path) -> Path` — validate, then write `<profiles_dir>/<safe_name>.json`. The filename is derived from `name` through a path-safety check (reuse the existing `_SAFE_NAME_RE` / `validate_run_id` style); never escapes `profiles_dir`. **This is a pure module helper for tests, scripts, and the future G2d-2 UI — it is NOT wired to any server write endpoint this slice** (per D4, the server only reads profiles).
 - `list_profiles(profiles_dir: Path) -> list[dict]` — return per-file metadata `[{name, template, valid, error?}]`; a malformed file is reported `valid: false` with a short reason and never raises.
 
@@ -188,7 +188,7 @@ A profile is rejected (`ProfileValidationError`) unless **all** hold:
 7. The resolved role multiset equals `CANONICAL_DEFAULT_6P_ROLES` (the template's fixed layout). Seat roles come from the template, not the profile, so this is enforced by construction; the validator additionally rejects any attempt to set a seat `role`.
 8. `seat_overrides` (if present) keys ⊆ `DEFAULT_SEAT_IDS`; each value has keys ⊆ `{provider, model, prompt, strategy}` (no `role`).
 9. **Resolved-seat coherence (post-merge):** the validator resolves each seat (role default ← seat override) and checks the *resolved* config, so a partial override cannot desync provider/model. For every resolved seat: `provider ∈ ALLOWED_PROVIDERS`; `model ∈ ALLOWED_MODELS[provider]`; `strategy ∈ ALLOWED_STRATEGIES`; `prompt` is a string with `len ≤ PROMPT_MAX_LEN`. (Rule 6 checks the raw role defaults; this rule re-checks after overrides are applied.)
-10. **No secret-like fields anywhere — keys *and* values.** This needs a **dedicated profile check**, not just the existing `redact_secret_values` helper, which recurses on values only and *preserves* dict keys (`runtime_events.py:96`). `profile_config` adds `_reject_secret_like_keys(obj)` that walks the whole profile and raises if any key contains a secret fragment (case-insensitive: `api_key`, `api-key`, `apikey`, `authorization`, `secret`, `token`, `bearer`, `password`, `credential`, `access_key`). String values are additionally screened with the codebase's existing secret-marker detection. `redact_secret_values` is still applied to the *output* artifact as defense-in-depth, but it is not the gate.
+10. **No secret-like fields anywhere — keys *and* values.** This needs a **dedicated profile check**, not just the existing `redact_secret_values` helper, which recurses on values only and *preserves* dict keys (`runtime_events.py:96`). `profile_config` adds `_reject_secret_like_keys(obj)` that walks the whole profile and raises if any **key** contains a secret fragment (case-insensitive: `api_key`, `api-key`, `apikey`, `authorization`, `secret`, `token`, `bearer`, `password`, `credential`, `access_key`). A second walker `_reject_secret_like_values(obj)` screens string **values** against a deliberately *narrower* marker set — `sk-`, `bearer ` (with space), `api_key`, `api-key`, `apikey`, `authorization`, `access_key`, `deepseek_api_key` — so high-confidence credential shapes are rejected while free-text prompts containing generic words (e.g. "keep your role **secret**") are **not**. `redact_secret_values` is still applied to the *output* artifact as defense-in-depth, but the two walkers are the gate.
 
 `validate_profile` raises on the **first** failure. `POST /api/profiles/validate` wraps it and returns `{valid:false, errors:[<first message>]}` — single-error mode is sufficient for this no-UI MVP; a collect-all validator is a future enhancement (YAGNI), avoided here so there is one source of truth for validation logic (no duplicated collecting validator).
 
@@ -223,7 +223,7 @@ The G2c projection endpoints continue to work against the run's events/snapshots
 - valid profile passes; resolution applies role defaults then seat overrides in seat order;
 - rejects: wrong `schema_version`, extra top-level keys, bad `template`, missing role default, seat override setting `role`, seat ID outside p1–p6, provider/model/strategy outside allowlist, oversized prompt;
 - **resolved-seat coherence:** a seat override that sets `model` alone while inheriting an incompatible `provider` (e.g. `{"model":"deepseek-chat"}` over a `fake_deterministic` default) is **rejected** (rule 9), and the symmetric provider-only desync is rejected; an override that sets a coherent `{provider, model}` pair passes;
-- **secret rejection (keys *and* values):** a profile with a secret-like **key** (e.g. `"api_key"`, `"authorization"`) at any depth is rejected even when its value is innocuous (guards against the value-only `redact_secret_values` gap); a secret-like **value** is also rejected;
+- **secret rejection (keys *and* values):** a profile with a secret-like **key** (e.g. `"api_key"`, `"authorization"`) at any depth is rejected even when its value is innocuous (guards against the value-only `redact_secret_values` gap); a **value** carrying a credential marker (e.g. a prompt containing `sk-…`) is rejected, while a prompt with the generic word "secret" passes;
 - role multiset enforcement matches `CANONICAL_DEFAULT_6P_ROLES`;
 - `build_resolved_profile_artifact` shape: has `execution_mode="fake"`, `live_api="not_used"`, `secrets_redacted=true`, prompt **hashed not stored**, no absolute paths;
 - `save_profile`/`load_profile` round-trip; `save_profile` rejects unsafe names; `list_profiles` reports malformed files as `valid:false`.
@@ -260,6 +260,7 @@ tests/test_profile_config.py                  (new)
 tests/test_observer_protocol.py               (launch-payload + ALLOWED_ARTIFACTS tests)
 tests/test_observer_server.py                 (profile endpoint + launch tests)
 docs/superpowers/specs/2026-06-04-g2d-prompt-configuration-design.md  (this spec)
+.logs/review/latest/review-packet.md           (review packet only; git-tracked)
 .oh-my-harness/tree.md                         (refresh via tree hook only)
 
 # route alignment (§2A — minimal status flip only)
