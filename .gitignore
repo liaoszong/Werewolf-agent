@@ -28,3 +28,7 @@ clients/qt_observer/.qtcreator/
 clients/qt_observer/*.user
 clients/qt_observer/*.user.*
 clients/qt_observer/build/
+
+.worktrees/
+
+.omo/
