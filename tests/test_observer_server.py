@@ -44,10 +44,11 @@ def _event(kind: str = "test", visibility: str = "public", seq: int = 0) -> dict
 def _start_server(
     runs_dir: Path,
     launcher: object = None,
+    profiles_dir: Path | None = None,
 ) -> tuple[object, str]:
     """Start an observer server on a random port.  Returns (server, base_url)."""
     server = create_observer_server(
-        "127.0.0.1", 0, runs_dir, launcher=launcher
+        "127.0.0.1", 0, runs_dir, launcher=launcher, profiles_dir=profiles_dir
     )
     port = server.server_address[1]
     base_url = f"http://127.0.0.1:{port}"
@@ -917,3 +918,136 @@ class ObserverServerProjectionDegradationTests(TestCase):
         self.assertIsInstance(result, dict)
         self.assertEqual(result.get("contract_version"), "g2c.visibility.v1")  # type: ignore[union-attr]
         self.assertEqual(result.get("events"), [])  # type: ignore[union-attr]
+
+
+def _valid_profile_payload(name: str = "demo", seat_overrides: dict | None = None) -> dict:
+    payload: dict = {
+        "schema_version": "g2d.profile.v1",
+        "name": name,
+        "template": "default_6p_fake",
+        "role_defaults": {
+            "werewolf": {"provider": "fake_deterministic", "model": "none", "prompt": "", "strategy": "default"},
+            "seer": {"provider": "fake_deterministic", "model": "none", "prompt": "", "strategy": "default"},
+            "witch": {"provider": "fake_deterministic", "model": "none", "prompt": "", "strategy": "default"},
+            "villager": {"provider": "fake_deterministic", "model": "none", "prompt": "", "strategy": "default"},
+        },
+    }
+    if seat_overrides:
+        payload["seat_overrides"] = seat_overrides
+    return payload
+
+
+def _wait_for_status(base_url: str, run_id: str, target: str, timeout: float = 10.0) -> None:
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        detail = _request_json(base_url, f"/api/runs/{run_id}")
+        if isinstance(detail, dict) and detail.get("status") == target:
+            return
+        time.sleep(0.1)
+    raise AssertionError(f"run {run_id} did not reach {target}")
+
+
+class ObserverServerProfileTests(TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls._tmp = TemporaryDirectory()
+        root = Path(cls._tmp.name)
+        cls._runs = root / "runs"
+        cls._profiles = root / "profiles"
+        cls._runs.mkdir(parents=True)
+        cls._profiles.mkdir(parents=True)
+        (cls._profiles / "demo.json").write_text(
+            json.dumps(_valid_profile_payload("demo")), encoding="utf-8"
+        )
+        cls._server, cls._base_url = _start_server(cls._runs, profiles_dir=cls._profiles)
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls._server.shutdown()
+        cls._tmp.cleanup()
+
+    def test_list_profiles(self) -> None:
+        result = _request_json(self._base_url, "/api/profiles")
+        names = {p["name"] for p in result["profiles"]}
+        self.assertIn("demo", names)
+
+    def test_get_profile(self) -> None:
+        result = _request_json(self._base_url, "/api/profiles/demo")
+        self.assertEqual(result["name"], "demo")
+
+    def test_get_unknown_profile_404(self) -> None:
+        result = _request_json(self._base_url, "/api/profiles/nope")
+        self.assertEqual(result.get("code"), "not_found")
+
+    def test_validate_inline_profile(self) -> None:
+        result = _request_json(
+            self._base_url, "/api/profiles/validate", method="POST",
+            payload=_valid_profile_payload("inline"),
+        )
+        self.assertTrue(result["valid"])
+        self.assertEqual(len(result["resolved_seats"]), 6)
+
+    def test_validate_reports_invalid(self) -> None:
+        bad = _valid_profile_payload("bad")
+        bad["seat_overrides"] = {"p3": {"model": "deepseek-chat"}}
+        result = _request_json(self._base_url, "/api/profiles/validate", method="POST", payload=bad)
+        self.assertFalse(result["valid"])
+        self.assertTrue(result["errors"])
+
+    def test_launch_from_named_profile_writes_resolved_artifact(self) -> None:
+        resp = _request_json(
+            self._base_url, "/api/runs", method="POST",
+            payload={"profile_name": "demo", "run_id": "g2d_named_run"},
+        )
+        self.assertEqual(resp["status"], "queued")
+        _wait_for_status(self._base_url, "g2d_named_run", "completed")
+        art = _request_json(self._base_url, "/api/runs/g2d_named_run/artifacts/resolved-profile.json")
+        self.assertEqual(art["execution_mode"], "fake")
+        self.assertEqual(art["live_api"], "not_used")
+        self.assertEqual(len(art["seats"]), 6)
+
+    def test_launch_from_inline_profile(self) -> None:
+        resp = _request_json(
+            self._base_url, "/api/runs", method="POST",
+            payload={"profile": _valid_profile_payload("inlinerun"), "run_id": "g2d_inline_run"},
+        )
+        self.assertEqual(resp["status"], "queued")
+        _wait_for_status(self._base_url, "g2d_inline_run", "completed")
+
+    def test_launch_rejects_invalid_profile(self) -> None:
+        bad = _valid_profile_payload("badrun")
+        bad["template"] = "nope"
+        result = _request_json(self._base_url, "/api/runs", method="POST", payload={"profile": bad})
+        self.assertEqual(result.get("code"), "invalid_profile")
+
+    def test_launch_rejects_mixed_template_and_profile(self) -> None:
+        result = _request_json(
+            self._base_url, "/api/runs", method="POST",
+            payload={"profile_name": "demo", "template": "default_6p_fake"},
+        )
+        self.assertEqual(result.get("code"), "invalid_request")
+
+    def test_responses_have_no_absolute_paths_or_secret_markers(self) -> None:
+        # malformed-profile errors (listing + get-by-name) must not leak the
+        # absolute profiles dir
+        broken = self._profiles / "broken.json"
+        broken.write_text("{ not json", encoding="utf-8")
+        try:
+            listing = _request_json(self._base_url, "/api/profiles")
+            self.assertNotIn(str(self._profiles), json.dumps(listing))
+            get_broken = _request_json(self._base_url, "/api/profiles/broken")
+            self.assertNotIn(str(self._profiles), json.dumps(get_broken))
+        finally:
+            broken.unlink()
+        # a launched run's resolved-profile artifact must not leak paths/secrets
+        _request_json(
+            self._base_url, "/api/runs", method="POST",
+            payload={"profile_name": "demo", "run_id": "g2d_leak_run"},
+        )
+        _wait_for_status(self._base_url, "g2d_leak_run", "completed")
+        art_text = _request_text(
+            self._base_url, "/api/runs/g2d_leak_run/artifacts/resolved-profile.json"
+        )
+        self.assertNotIn(str(self._runs), art_text)
+        for marker in ("sk-", "Bearer ", "DEEPSEEK_API_KEY", "api_key"):
+            self.assertNotIn(marker, art_text)
