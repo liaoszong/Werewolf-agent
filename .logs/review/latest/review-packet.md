@@ -1,252 +1,150 @@
-# Review Packet
+# Review Packet — G2d-1 Prompt Configuration MVP (Backend)
 
-## Metadata
+## 1. Metadata
+
+- Plan: `docs/harness/plans/2026-06-04--g2d-prompt-configuration-mvp-plan.md`
+- Spec: `docs/superpowers/specs/2026-06-04-g2d-prompt-configuration-design.md`
+- Implementer: Claude Code (superpowers executing-plans, inline)
+- Date: 2026-06-04
+- Branch: `feat/g2d-prompt-configuration`
 - Base: `main`
-- Branch: `feat/g2c-god-role-view-visibility-trust`
-- Generated: 2026-06-03T13:45:48.662265+00:00
+- PR: not-opened
+- Verdict target: G2d-1 backend config layer only
 
-## Changed Files
-- `.oh-my-harness/tree.md`
-- `clients/qt_observer/CMakeLists.txt`
-- `clients/qt_observer/qml/LiveCockpitView.qml`
-- `clients/qt_observer/qml/components/AuditLinksPanel.qml`
-- `clients/qt_observer/qml/components/ProjectionProofPanel.qml`
-- `clients/qt_observer/qml/components/RoleCard.qml`
-- `clients/qt_observer/qml/components/ViewBoundaryBadge.qml`
-- `clients/qt_observer/src/ObserverApiClient.cpp`
-- `clients/qt_observer/src/ObserverApiClient.h`
-- `src/werewolf_eval/observer_server.py`
-- `src/werewolf_eval/observer_visibility.py`
-- `tests/test_observer_server.py`
-- `tests/test_observer_visibility.py`
-- `tests/test_qt_observer_static_contract.py`
+## 2. Changed Files
 
-## Diff Stat
-```
-.oh-my-harness/tree.md                             |  11 +-
- clients/qt_observer/CMakeLists.txt                 |   2 +
- clients/qt_observer/qml/LiveCockpitView.qml        |  33 +-
- .../qt_observer/qml/components/AuditLinksPanel.qml |   5 +
- .../qml/components/ProjectionProofPanel.qml        |  78 ++
- clients/qt_observer/qml/components/RoleCard.qml    |  33 +-
- .../qml/components/ViewBoundaryBadge.qml           |  53 ++
- clients/qt_observer/src/ObserverApiClient.cpp      |  62 +-
- clients/qt_observer/src/ObserverApiClient.h        |  25 +
- src/werewolf_eval/observer_server.py               |  20 +
- src/werewolf_eval/observer_visibility.py           | 782 +++++++++++++++++++++
- tests/test_observer_server.py                      | 257 +++++++
- tests/test_observer_visibility.py                  | 625 ++++++++++++++++
- tests/test_qt_observer_static_contract.py          |  92 +++
- 14 files changed, 2062 insertions(+), 16 deletions(-)
-```
-
-## Diff Check
-```
-clients/qt_observer/qml/components/ProjectionProofPanel.qml:42: trailing whitespace.
-+            text: "Self: " + (root.proof && root.proof.self_role ? root.proof.self_role : "N/A") +
-tests/test_observer_server.py:831: trailing whitespace.
-+                self.assertIn(p.get("display_role"), ("werewolf",),
-```
-
-## Allowed Files Check
-ALLOWLIST_CHECK = PASS
-
-## Forbidden Patterns Check
-FORBIDDEN_PATTERN_SCAN = WARN
-
-**Self-reference (docs/scripts/tests mention forbidden terms — not new runtime capability):**
-- network: QNetworkRequest req(url); [plan-spec: CLI flag or test harness, not new runtime capability]
-- network: QNetworkReply *reply = m_network->get(req); [plan-spec: CLI flag or test harness, not new runtime capability]
-- network: connect(reply, &QNetworkReply::finished, this, [this, reply, requestSerial, requ [plan-spec: CLI flag or test harness, not new runtime capability]
-- network: if (reply->error() != QNetworkReply::NoError) { [plan-spec: CLI flag or test harness, not new runtime capability]
-- provider: _event("provider_request", "private", 1), [plan-spec: CLI flag or test harness, not new runtime capability]
-- fallback: def test_infer_player_ids_fallback(self) -> None: [plan-spec: CLI flag or test harness, not new runtime capability]
-- env: # Step 6: Projection envelope builder [plan-spec: CLI flag or test harness, not new runtime capability]
-- env: class VisibilityEnvelopeTests(unittest.TestCase): [plan-spec: CLI flag or test harness, not new runtime capability]
-- env: """Test build_projection_envelope.""" [plan-spec: CLI flag or test harness, not new runtime capability]
-- env: def test_projection_envelope_contains_contract_version_and_proof(self) -> None: [plan-spec: CLI flag or test harness, not new runtime capability]
-- env: self.assertEqual(envelope["contract_version"], CONTRACT_VERSION) [plan-spec: CLI flag or test harness, not new runtime capability]
-- env: self.assertEqual(envelope["run_id"], "run-1") [plan-spec: CLI flag or test harness, not new runtime capability]
-- env: self.assertEqual(envelope["perspective"], "god") [plan-spec: CLI flag or test harness, not new runtime capability]
-- env: self.assertEqual(envelope["view_kind"], "god") [plan-spec: CLI flag or test harness, not new runtime capability]
-- env: self.assertIn("proof", envelope) [plan-spec: CLI flag or test harness, not new runtime capability]
-- env: self.assertIsInstance(envelope["proof"], dict) [plan-spec: CLI flag or test harness, not new runtime capability]
-- env: self.assertIn("source", envelope["proof"]) [plan-spec: CLI flag or test harness, not new runtime capability]
-- env: self.assertIn("rules", envelope["proof"]) [plan-spec: CLI flag or test harness, not new runtime capability]
-- env: self.assertEqual(envelope["proof"]["source"], "snapshots") [plan-spec: CLI flag or test harness, not new runtime capability]
-- env: def test_projection_envelope_uses_insufficient_artifacts_source_when_no_trusted_ [plan-spec: CLI flag or test harness, not new runtime capability]
-- ... (6) more self-reference hits truncated — all in plan-spec file paths, doc/test strings, or CLI argument definitions
-
-**Real risk (forbidden term in runtime code):**
-- env: build_projection_envelope,
-- env: envelope = build_projection_envelope(
-- env: self._send_json(200, envelope)
-- env: projection envelopes for each observer perspective (god / public / role:pN /
-- network: network I/O or server lifecycle.
-- default: DEFAULT_PLAYER_IDS: tuple[str, ...] = tuple(f"p{i}" for i in range(1, 7))
-- default: return list(DEFAULT_PLAYER_IDS)
-- provider: 6. Do not return prompt text, provider secrets, local absolute paths, or
-- fallback: # Fallback: unknown alive status.
-- optional: # Safe optional fields
-- env: # Projection envelope builder (Step 6)
-- env: def build_projection_envelope(
-- env: """Build the top-level projection envelope consumed by observer clients.
-- env: """Build the ``proof`` section of a projection envelope."""
-
-## Dependency / Import Diff
-### Dependency manifest changes
-(none)
-
-### Added imports
-- `import QtQuick`
-- `import QtQuick.Controls`
-- `import QtQuick`
-- `import QtQuick.Controls`
-- `from __future__ import annotations`
-- `import json`
-- `from pathlib import Path`
-- `from typing import Any`
-- `from __future__ import annotations`
-- `import json`
-- `import tempfile`
-- `import unittest`
-- `from pathlib import Path`
-
-## Test Summary
-### `='src'; python -m unittest tests.test_observer_visibility tests.test_observer_server -v`
-Exit: 1 (FAIL)
-```
-''src'' �����ڲ����ⲿ���Ҳ���ǿ����еĳ���
-���������ļ���
-```
-
-## Key Hunks
-### src/werewolf_eval/observer_server.py
-```diff
-@@ -35,6 +35,10 @@ from werewolf_eval.observer_protocol import (
-     safe_child_path,
-     validate_run_id,
- )
-+from werewolf_eval.observer_visibility import (
-+    VisibilityProjectionError,
-+    build_projection_envelope,
-+)
- from werewolf_eval.run_g1h_fake_runtime import run_fake_runtime
- from werewolf_eval.runtime_events import RuntimeEventError, read_events_jsonl
+`git diff --name-only main...HEAD` (code/docs):
 
 ```
-
-### tests/test_qt_observer_static_contract.py
-```diff
-@@ -193,6 +193,70 @@ class QtObserverProtocolEndpointTests(unittest.TestCase):
-         self.assertNotIn("file://", content)
-
-
-+class QtObserverProjectionClientTests(unittest.TestCase):
-+    def test_observer_client_uses_projection_endpoint(self) -> None:
-+        content = (QT / "src/ObserverApiClient.cpp").read_text(encoding="utf-8")
-+        self.assertIn("/projection", content)
-+        self.assertIn("perspective", content)
-+
-+    def test_observer_client_exposes_projection_properties(self) -> None:
-+        content = (QT / "src/ObserverApiClient.h").read_text(encoding="utf-8")
-+        self.assertIn("playerItems", content)
-+        self.assertIn("projectionProof", content)
-+        self.assertIn("hiddenEventCount", content)
-+        self.assertIn("hiddenSnapshotCount", content)
-+        self.assertIn("visibilityContractVersion", content)
-+
-+    def test_projection_refresh_happens_on_perspective_change(self) -> None:
-+        content = (QT / "src/ObserverApiClient.cpp").read_text(encoding="utf-8")
-+        # setCurrentPerspective should contain refreshProjection() call (across lines)
-+        self.assertRegex(
-+            content, r"setCurrentPerspective[\s\S]*?refreshProjection",
-+        )
-+
-+    def test_projection_request_uses_latest_wins_guard(self) -> None:
-+        content = (QT / "src/ObserverApiClient.cpp").read_text(encoding="utf-8")
-+        self.assertIn("m_projectionRequestSerial", content)
-+        self.assertIn("requestSerial", content)
-+        self.assertIn("requestedRunId", content)
-+        self.assertIn("requestedPerspective", content)
-+
-+    def test_audit_links_contains_projection_path(self) -> None:
-+        content = (QT / "src/ObserverApiClient.cpp").read_text(encoding="utf-8")
-+        self.assertIn("/projection?perspective=", content)
-+
-+
-+class QtObserverHiddenInfoBoundaryTests(unittest.TestCase):
-+    def test_live_cockpit_does_not_embed_static_role_assignments(self) -> None:
-+        content = (QT / "qml/LiveCockpitView.qml").read_text(encoding="utf-8")
-+        # Must not use hardcoded role arrays like `role: "Werewolf"` as the live player model
-+        self.assertNotRegex(content, r'role:\s*"(?:Werewolf|Seer|Witch|Villager)"',
-+                            "LiveCockpitView.qml contains hardcoded role assignments in static model")
-+
-+    def test_qml_boundary_copy_mentions_server_projection(self) -> None:
-+        content = (QT / "qml/LiveCockpitView.qml").read_text(encoding="utf-8")
-+        # Should reference ObserverClient projection properties or projection-related data
-+        has_projection = any(tag in content for tag in [
-+            "playerItems", "projectionProof", "visibilityContractVersion",
-+            "hiddenEventCount", "hiddenSnapshotCount",
-+        ])
-+        if not has_projection:
-+            # qml may use projection via component without explicit property name
-+            pass  # Accept if ViewBoundaryBadge is present (checked separately)
-+
-+    def test_qt_client_does_not_use_local_snapshot_or_event_paths(self) -> None:
-+        for src_file in sorted((QT / "src").rglob("*")):
-+            content = src_file.read_text(encoding="utf-8")
-+            for forbidden in ["events.jsonl", "snapshots/"]:
-+                self.assertNotIn(forbidden, content,
-+                                 f"Forbidden pattern '{forbidden}' in {src_file.relative_to(QT)}")
-+        for qml_file in sorted(QT.rglob("*.qml")):
-+            content = qml_file.read_text(encoding="utf-8")
-+            for forbidden in ["events.jsonl", "snapshots/", "QFile", "QDir"]:
-+                self.assertNotIn(forbidden, content,
-+                                 f"Forbidden pattern '{forbidden}' in {qml_file.relative_to(QT)}")
-+
-+
- class QtObserverReadmeTests(unittest.TestCase):
-     def test_readme_documents_mvp_status_and_non_goals(self) -> None:
-         content = (QT / "README.md").read_text(encoding="utf-8")
+README.md
+docs/ROADMAP.md
+docs/TASKS.md
+docs/harness/plans/2026-06-04--g2d-prompt-configuration-mvp-plan.md
+docs/superpowers/specs/2026-06-04-g2d-prompt-configuration-design.md
+src/werewolf_eval/observer_protocol.py
+src/werewolf_eval/observer_server.py
+src/werewolf_eval/profile_config.py
+tests/test_observer_protocol.py
+tests/test_observer_server.py
+tests/test_profile_config.py
 ```
 
-**KEY_HUNKS_TRUNCATED = YES**
+Plus this Task-6 commit adds: `.logs/review/latest/review-packet.md`, `.oh-my-harness/tree.md`.
 
-Truncation does not block A档 for this PR. Key hunks were omitted because the diff exceeds the packet size limit. Verify hunks by reading the changed files directly or running `git diff` with narrowed paths.
+## 3. Diff Stat
 
-If B档 is needed, Minimal Next Reads (line ranges):
-- `scripts/dev/build_review_packet.py:1-220` (generator core + evidence logic)
-- `tests/test_build_review_packet.py:1-160` (test assertions)
-- `docs/specs/review-packet-gate.md:1-120` (gate contract)
-- `.github/codex-review-comment.md` (A档 guidance block)
+`git diff --stat main...HEAD` → 11 files changed, +2722 / -29.
+Key: `profile_config.py` +314 (new), `observer_server.py` +165, `observer_protocol.py` +51, `tests/test_profile_config.py` +182 (new), `tests/test_observer_server.py` +136, `tests/test_observer_protocol.py` +42.
 
-## Evidence Map
+## 4. Diff Check
+
+`git diff --check main...HEAD` → no output. `DIFF_CHECK = PASS`.
+
+## 5. Allowed Files Check
+
+All 11 changed paths are in the plan allowlist (impl + tests + §2A route docs + spec/plan). Task-6 adds `.logs/review/latest/review-packet.md` and `.oh-my-harness/tree.md` (both allowlisted). `ALLOWLIST_CHECK = PASS`.
+
+## 6. Forbidden Patterns Check
+
+`FORBIDDEN_SCOPE_CHECK = PASS` (no game_engine / fake runtime / scoring / provider / route-product-doc / generated-fixture changes).
+`FORBIDDEN_PATTERN_CHECK = PASS` with two safe negative-test fixtures:
+
+```
+SAFE_TEST_MARKER_HITS:
+- tests/test_profile_config.py: provider = "openai"   (test_rejects_disallowed_provider — asserts rejection)
+- tests/test_profile_config.py: prompt = "...sk-ABCDEF0123456789TOKEN"  (test_rejects_secret_like_value_in_prompt — asserts rejection)
+```
+
+No real credentials, no live-provider imports, no `QProcess`/`file://`/PySide/PyQt.
+
+## 7. Dependency / Import Diff
+
+`DEPENDENCY_DIFF_CHECK = PASS` — no changes to `pyproject.toml`/`requirements.txt`/lockfiles.
+`RISKY_IMPORT_CHECK = PASS` — `profile_config.py` is stdlib-only (`hashlib`, `json`, `re`, `pathlib`, `typing`); `observer_server.py` adds only intra-package imports (`profile_config`, `redact_secret_values`, `parse_profile_launch_request`) + stdlib `re`.
+
+## 8. Test Summary
+
+| Command | Result |
+|---------|--------|
+| `python -m unittest tests.test_profile_config` | **OK** — 22 tests |
+| `python -m unittest tests.test_observer_protocol` | **OK** — 48 tests (39 prior + 9 new) |
+| `python -m unittest tests.test_profile_config tests.test_observer_protocol` | **OK** — 70 tests |
+| `python -m unittest tests.test_observer_server` | environmental: all error `RemoteDisconnected` (see note) |
+| `python -m unittest discover -s tests -p "test_*.py"` | 426 tests; 1 failure + 46 errors — all pre-existing/environmental (see below) |
+| `python -m compileall src tests` | **0 failures** |
+| offline functional check (profile launch → fake run → `resolved-profile.json`) | **PASS** (92 runtime events, 11 snapshots, 6 seats, declared p3=deepseek, execution_mode=fake, no path leak) |
+
+**Environmental server-test limitation (documented):** `tests/test_observer_server.py` cannot complete in this sandbox. A minimal 5-line `http.server` round-trip fails identically:
+
+```
+python -c "...minimal http.server GET..."  →  MINIMAL_HTTP_FAILED: RemoteDisconnected
+```
+
+This affects every HTTP test on any branch (incl. the pre-existing G2a `/health` test), not G2d logic. The 46 errors = 36 pre-existing G2a server-test errors + 10 new G2d profile-server tests, all `RemoteDisconnected`. The new server logic is verified by the offline functional check above + clean import/construct (`state.profiles_dir` correct).
+
+**Pre-existing unrelated failure (documented):** `test_context_budget.ContextBudgetGateDocsTests.test_agents_documents_context_budget_gate` fails because `AGENTS.md` lacks "Context Budget Gate" strings. Proof it is pre-existing: `git diff main...HEAD -- AGENTS.md` is empty; `git show main:AGENTS.md | grep -c "Context Budget Gate"` = 0. Not touched by G2d.
+
+## 9. Key Hunks
+
+- `profile_config.py:19-77` — constants (`PROFILE_SCHEMA_VERSION`, allowlists, `_VALUE_SECRET_MARKERS`).
+- `profile_config.py:88-117` — `_reject_secret_like_keys` + `_reject_secret_like_values` (keys+values gate).
+- `profile_config.py:173-216` — `validate_profile` (9 rules incl. post-merge coherence).
+- `profile_config.py:219-256` — `resolve_profile` + `build_resolved_profile_artifact` (execution_mode=fake, hashed prompts).
+- `profile_config.py:258-313` — `load_profile` (basename-only errors), `save_profile`, `list_profiles`.
+- `observer_protocol.py:27-36` — `ALLOWED_ARTIFACTS` += `resolved-profile.json`.
+- `observer_protocol.py:341-391` — `parse_profile_launch_request` (exactly-one-source, type-checked).
+- `observer_server.py:185-210` — `GET /api/profiles`, `GET /api/profiles/{name}`.
+- `observer_server.py:320-411` — `_launch_run_async` + `_handle_profile_launch` (profile-bound launcher).
+- `observer_server.py:413-435` — `POST /api/runs` profile routing + `POST /api/profiles/validate`.
+- `tests/test_profile_config.py` — 22 unit tests; `tests/test_observer_server.py` `ObserverServerProfileTests` — 10 server tests incl. non-leak.
+
+## 10. Evidence Map
+
 | Acceptance | Evidence | Status |
-|---|---|---|
-| All G2c projection endpoints return correct contract version | (manual) | MANUAL_REVIEW_REQUIRED |
-| Public view hides all role/team info | (manual) | MANUAL_REVIEW_REQUIRED |
-| Role view exposes self role only | (manual) | MANUAL_REVIEW_REQUIRED |
-| Team werewolf exposes trusted wolves only | (manual) | MANUAL_REVIEW_REQUIRED |
-| Unknown perspective returns 400 | (manual) | MANUAL_REVIEW_REQUIRED |
-| No absolute paths in responses | (manual) | MANUAL_REVIEW_REQUIRED |
+|------------|----------|--------|
+| A1 module + schema | `profile_config.py:19,173,219,229`; `test_profile_config` (22) | PASS |
+| A2 three endpoints | `observer_server.py:185,190,422`; `ObserverServerProfileTests.test_list_profiles/get_profile/validate_*` | PASS (offline + env-blocked HTTP) |
+| A3 launch from profile | `observer_server.py:341`; `test_launch_from_named/inline`; offline func check | PASS |
+| A4 resolved-profile.json | `profile_config.py:229`; `ProfileArtifactTests`; offline func check | PASS |
+| A5 validation rejects | `profile_config.py:173`; `ProfileValidationTests` (keys+values, coherence) | PASS |
+| A6 template path unchanged | `observer_server.py:413` (routes only on profile/profile_name); `_launch_run_async` preserves template 202 | PASS (HTTP env-blocked) |
+| A7 no providers/deps/engine | §6/§7 checks; FORBIDDEN_SCOPE_OK; DEP_MANIFEST_OK | PASS |
+| A8 tests pass/documented | §8 (70 focused OK; server env-documented; 1 pre-existing failure proven) | PASS |
+| A9 exactly-one-source | `observer_protocol.py:341`; `ProfileLaunchRequestTests` (both/neither/template/non-string) | PASS |
+| A10 route docs aligned | `ROADMAP.md:255`, `README.md:31`, `TASKS.md:84,217,225` (G2c completed, G2d active) | PASS |
 
-## Acceptance Checklist
-- [ ] All G2c projection endpoints return correct contract version
-- [ ] Public view hides all role/team info
-- [ ] Role view exposes self role only
-- [ ] Team werewolf exposes trusted wolves only
-- [ ] Unknown perspective returns 400
-- [ ] No absolute paths in responses
+## 11. Acceptance Checklist
 
-## Implementer Risk Notes
-(to be filled by implementer)
+- [x] A1 `profile_config.py` schema `g2d.profile.v1` + validate/resolve/artifact/persist
+- [x] A2 `/api/profiles`, `/api/profiles/{name}`, `/api/profiles/validate`
+- [x] A3 `POST /api/runs` inline/named profile launch writes `resolved-profile.json`
+- [x] A4 artifact records declared config + `execution_mode=fake`/`live_api=not_used`; no secrets/paths
+- [x] A5 validation rejects bad schema/role/provider/model/strategy/name/extra/secret-keys/secret-values/incoherence
+- [x] A6 template launch + G2a/G2c endpoints unchanged
+- [x] A7 no live providers / new deps / engine / runtime changes
+- [x] A8 focused tests pass; server tests environment-documented; pre-existing failure proven
+- [x] A9 `parse_profile_launch_request` exactly-one-source
+- [x] A10 route docs mark G2c completed, G2d active
 
-## Review Trigger Result
-**RISK_TRIGGERS_FIRED**
-- changed_file_count=14 > 8
-- changed_lines=2078 > 500
-- key_hunks_truncated
-- forbidden_pattern_risk=network
+## 12. Implementer Risk Notes
 
+- Server HTTP tests are unrunnable in this sandbox (`RemoteDisconnected` on localhost; reproduced with a 5-line `http.server`). Run `python -m unittest tests.test_observer_server` in a normal environment to green the 10 new profile-server tests.
+- `_launch_run_async` is a behavior-preserving extraction of the existing inline template-launch thread; the template 202 shape is unchanged.
+- Declared-vs-executed split: profiles may declare `deepseek` provider/model, but execution stays fake-deterministic and `resolved-profile.json` marks `execution_mode=fake`/`live_api=not_used`. No live calls, no API keys.
+- Secret gate is two walkers (keys broad, values narrow credential-markers) — generic prompt words like "secret" pass; prompts are hashed, never stored verbatim.
+
+## 13. Review Trigger Result
+
+```
 PACKET_TOO_LARGE = NO
+POTENTIAL_CODEX_B_DEEP_REVIEW_TRIGGER = YES (changed files = 11 > 8)
+CHANGED_FILES_COUNT = 11 (code/docs; +2 packet/tree in this commit)
+CHANGED_LINES = +2722 / -29
+B_DEEP_REVIEW_RANGES =
+  src/werewolf_eval/profile_config.py:88-313 (validation/secret-gate/artifact/persist)
+  src/werewolf_eval/observer_server.py:185-435 (endpoints + profile launcher)
+  src/werewolf_eval/observer_protocol.py:341-391 (launch parser)
+  tests/test_observer_server.py ObserverServerProfileTests (server behavior to verify in normal env)
+```
+
+`profile_config.py` = 314 lines (< 350 trigger). `observer_server.py` change is additive (no unrelated endpoint behavior touched). No forbidden-scope changes.
