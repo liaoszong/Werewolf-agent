@@ -936,17 +936,6 @@ def _valid_profile_payload(name: str = "demo", seat_overrides: dict | None = Non
         payload["seat_overrides"] = seat_overrides
     return payload
 
-
-def _wait_for_status(base_url: str, run_id: str, target: str, timeout: float = 10.0) -> None:
-    deadline = time.time() + timeout
-    while time.time() < deadline:
-        detail = _request_json(base_url, f"/api/runs/{run_id}")
-        if isinstance(detail, dict) and detail.get("status") == target:
-            return
-        time.sleep(0.1)
-    raise AssertionError(f"run {run_id} did not reach {target}")
-
-
 class ObserverServerProfileTests(TestCase):
     @classmethod
     def setUpClass(cls) -> None:
