@@ -94,6 +94,7 @@ The backend gains one read-only endpoint. The Qt client gains profile fetch/vali
 ### 5.5 `clients/qt_observer/qml/MatchSetupView.qml` (MODIFY — master-detail)
 
 - On entry: `ObserverClient.refreshProfiles()` + `refreshProfileSchema()`; **default-select the first item of `profileItems`** → `fetchProfile(name)`. If `profileItems` is empty, show an `EmptyState` ("no profiles — drop a JSON into the server's profiles/ dir") and disable Launch.
+- **Execution-mode banner** (`objectName: setupExecutionBanner`): a slim, low-opacity amber bar at the top — "Execution Mode: Deterministic Mock — no real API calls (provider/model recorded for audit only)". Surfaces the declared-vs-executed distinction **once, globally** (never per-seat spam); aligns with the auditability ethos and the `execution_mode=fake` the run already records.
 - Header: profile picker `ComboBox` (`objectName: setupProfilePicker`) bound to `ObserverClient.profileItems`; selecting → `fetchProfile(name)`.
 - Master (left): seat `Grid` of `RoleCard`s (keeps `setupRoleCards`) driven by the resolved seats of `loadedProfile` (+ local edits); clicking a seat selects it (highlight) and opens the detail.
 - Detail (right): `SeatEditorPanel` bound to the selected seat's resolved config; edits update a local `editedProfile` (clone of `loadedProfile` with `seat_overrides[pN]` applied).
@@ -199,6 +200,7 @@ docs/harness/plans/2026-06-04--g2d-2-qt-setup-ui-plan.md
 - A6. Static-contract test updated + green (new objectNames/components, README non-goal updated, forbidden patterns absent); Qt build exit 0; ctest green.
 - A7. Visual capture confirms the master-detail editor renders per the design system.
 - A8. No save endpoint, no local file I/O, no live providers, no new deps, no engine/route-doc changes.
+- A9. A global "Deterministic Mock" execution banner (`objectName: setupExecutionBanner`) communicates declared-vs-executed once at the top; no per-seat spam.
 
 ## 13. Future (out of scope)
 
@@ -208,10 +210,11 @@ docs/harness/plans/2026-06-04--g2d-2-qt-setup-ui-plan.md
 
 ### Deferred UX enhancements (from a frontend design review)
 
-This slice keeps the **master-detail + explicit-Validate** design. A reviewed-but-deferred richer iteration (a "G2d-3" UX pass) would, in priority order:
+This slice keeps the **master-detail + explicit-Validate** design and pulls in the **execution-mode banner** (item 1 below, now in §5.5). The remaining reviewed-but-deferred richer iteration (a "G2d-3" UX pass) would, in priority order:
 
-1. **Global "Deterministic Mock" execution banner** + a dropdown caption — surfaces the declared-vs-executed (`execution_mode=fake`) distinction so users never think a real LLM is called. (Cheap; strong fit with the auditability ethos — a good first fast-follow.)
-2. **Prompt focus-mode modal** — replace the inline `TextArea` with a read-only preview + `[↗ Edit Prompt]` opening a large centered modal (mono `Consolas`, big counter). An 8000-char prompt is cramped inline.
-3. **Accordion / all-seats-visible list** instead of master-detail — better for at-a-glance auditing of all 6 seats' configs.
-4. **Expose the two-tier model** — a Role Defaults section + per-seat "inherited → [Override]" toggles (the data model auditors care about), instead of always materializing full per-seat overrides. (Must respect G2d-1's resolved-seat coherence: overriding `provider` must also set a valid `model`.)
-5. **Live debounced validation** instead of an explicit Validate button — gated on enhancing the validate endpoint to **collect-all** errors (G2d-1 ships single-error mode) for per-field highlighting.
+1. **Prompt focus-mode modal** — replace the inline `TextArea` with a read-only preview + `[↗ Edit Prompt]` opening a large centered modal (mono `Consolas`, big counter). An 8000-char prompt is cramped inline.
+2. **Accordion / all-seats-visible list** instead of master-detail — better for at-a-glance auditing of all 6 seats' configs.
+3. **Expose the two-tier model** — a Role Defaults section + per-seat "inherited → [Override]" toggles (the data model auditors care about), instead of always materializing full per-seat overrides. (Must respect G2d-1's resolved-seat coherence: overriding `provider` must also set a valid `model`.)
+4. **Live debounced validation** instead of an explicit Validate button — gated on enhancing the validate endpoint to **collect-all** errors (G2d-1 ships single-error mode) for per-field highlighting.
+
+*(Pulled into this slice from the design review: the global "Deterministic Mock" execution banner — cheap, high-value, ethos-aligned.)*

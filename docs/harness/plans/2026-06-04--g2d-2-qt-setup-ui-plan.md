@@ -579,8 +579,10 @@ In `tests/test_qt_observer_static_contract.py`:
         self.assertNotIn('"deepseek-chat"', content)
         # launch is 202-gated via launchSucceeded, not optimistic navigation
         self.assertIn("launchSucceeded", content)
+        # declared-vs-executed trust banner is present
+        self.assertIn("Deterministic Mock", content)
 ```
-- Add `setupProfilePicker`, `setupValidateButton` to MatchSetupView's required objectNames (keep `matchSetupView`, `setupRoleCards`, `setupContinueButton`).
+- Add `setupProfilePicker`, `setupValidateButton`, `setupExecutionBanner` to MatchSetupView's required objectNames (keep `matchSetupView`, `setupRoleCards`, `setupContinueButton`).
 - In `QtObserverReadmeTests.test_readme_documents_mvp_status_and_non_goals`, replace `self.assertIn("no full prompt/profile editor", content)` with `self.assertIn("profile setup editor", content)`.
 
 Run → fail.
@@ -679,6 +681,40 @@ Item {
         anchors.leftMargin: Theme.layout.pageMargin
         anchors.rightMargin: Theme.layout.pageMargin
         spacing: Theme.space.md
+
+        // Declared-vs-executed trust cue: a profile may declare a provider/model,
+        // but this build always runs deterministic-fake. Surface it once (global),
+        // never per-seat. Low-opacity amber, on-palette.
+        Rectangle {
+            id: executionBanner
+            objectName: "setupExecutionBanner"
+            width: parent.width
+            implicitHeight: bannerRow.implicitHeight + Theme.space.sm * 2
+            color: Theme.withAlpha(Theme.color.warning, 0.10)
+            border.width: 1
+            border.color: Theme.withAlpha(Theme.color.warning, 0.35)
+            radius: Theme.radius.sm
+            Row {
+                id: bannerRow
+                anchors.left: parent.left
+                anchors.leftMargin: Theme.space.md
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: Theme.space.sm
+                Rectangle {
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 7; height: 7; radius: 3.5
+                    color: Theme.color.warning
+                }
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: I18n.t("执行模式：确定性模拟 — 不会发起真实 API 调用（供应方/模型仅用于审计记录）。",
+                                 "Execution Mode: Deterministic Mock — no real API calls (provider/model recorded for audit only).")
+                    color: Theme.color.textSecondary
+                    font.family: Theme.font.family
+                    font.pixelSize: Theme.size.caption
+                }
+            }
+        }
 
         Text {
             text: I18n.t("对局配置", "Match Setup")
@@ -948,6 +984,7 @@ git commit -m "docs(g2d-2): review packet + tree refresh"
 - **A6.** Static-contract test updated + green (new components/objectNames, README non-goal updated, forbidden patterns absent); Qt build exit 0; ctest green; qmllint clean.
 - **A7.** Visual capture confirms the master-detail editor renders per the design system. *(.tmp/g2d2_setup.png)*
 - **A8.** No save endpoint, no client file I/O, no live providers, no new deps, no engine/route-product-doc changes. *(hygiene checks)*
+- **A9.** A global "Deterministic Mock" execution banner (`objectName: setupExecutionBanner`, low-opacity `Theme.color.warning`) communicates declared-vs-executed at the top; no per-seat spam. *(test_setup_is_profile_driven asserts "Deterministic Mock"; visual)*
 
 ---
 
