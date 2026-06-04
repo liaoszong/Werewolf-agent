@@ -23,11 +23,18 @@ target_link_libraries(appqt_observer
     PRIVATE Qt6::Quick Qt6::QuickControls2 Qt6::Network
 )
 
+# Theme.qml (design tokens) and I18n.qml (runtime translations) are QML
+# singletons accessible module-wide as `Theme` and `I18n`.
+set_source_files_properties(qml/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
+set_source_files_properties(qml/I18n.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
+
 qt_add_qml_module(appqt_observer
     URI qt_observer
     VERSION 1.0
     QML_FILES
         Main.qml
+        qml/Theme.qml
+        qml/I18n.qml
         qml/AppShell.qml
         qml/HomeView.qml
         qml/MatchSetupView.qml
@@ -41,6 +48,12 @@ qt_add_qml_module(appqt_observer
         qml/components/StatusBadge.qml
         qml/components/ViewBoundaryBadge.qml
         qml/components/ProjectionProofPanel.qml
+        qml/components/AppBackground.qml
+        qml/components/GlowDot.qml
+        qml/components/AppCard.qml
+        qml/components/AppButton.qml
+        qml/components/SectionHeader.qml
+        qml/components/EmptyState.qml
 )
 
 set_target_properties(appqt_observer PROPERTIES

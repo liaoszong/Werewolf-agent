@@ -1,6 +1,7 @@
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQmlEngine>
+#include <QQuickStyle>
 #include "ObserverApiClient.h"
 
 static QString observerBaseUrlFromArgs(const QStringList &args)
@@ -15,6 +16,10 @@ static QString observerBaseUrlFromArgs(const QStringList &args)
 int main(int argc, char *argv[])
 {
     QGuiApplication app(argc, argv);
+
+    // Use the fully customizable Basic style so the dark theme controls render
+    // identically across platforms (native styles ignore custom backgrounds).
+    QQuickStyle::setStyle(QStringLiteral("Basic"));
 
     ObserverApiClient observerClient;
     observerClient.setBaseUrl(observerBaseUrlFromArgs(app.arguments()));

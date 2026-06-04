@@ -3,74 +3,193 @@ import QtQuick.Controls
 import qt_observer
 import "components"
 
+// Nightfall Home — the Observer cockpit entry point.
+// Presentation only: all ObserverClient bindings, navigation calls and
+// objectNames are preserved exactly; only layout / styling / copy changed.
 Item {
     id: root
     objectName: "homeView"
-    anchors.fill: parent
 
     Component.onCompleted: ObserverClient.checkHealth()
 
+    // Centered, top-anchored content column constrained to a comfortable max width.
     Column {
-        anchors.centerIn: parent
-        spacing: 20
+        id: content
+        width: Math.min(parent.width - Theme.space.xxl * 2, 900)
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.top: parent.top
+        anchors.topMargin: Theme.space.huge
+        spacing: Theme.space.xxl
 
-        Text {
-            text: qsTr("Werewolf Observer")
-            font.pixelSize: 32
-            anchors.horizontalCenter: parent.horizontalCenter
-        }
+        // ----------------------------------------------------------- (A) HERO
+        AppCard {
+            width: parent.width
+            implicitHeight: heroBody.implicitHeight + Theme.space.xxl * 2
 
-        Row {
-            anchors.horizontalCenter: parent.horizontalCenter
-            spacing: 8
+            Column {
+                id: heroBody
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.margins: Theme.space.xxl
+                spacing: Theme.space.md
 
-            Text { text: qsTr("Server:") }
-            StatusBadge {
-                id: serverStatusBadge
-                objectName: "serverStatusBadge"
-                status: ObserverClient.connected ? "connected" : "disconnected"
+                Text {
+                    text: I18n.t("观 战 席", "OBSERVER COCKPIT")
+                    color: Theme.color.textMuted
+                    font.family: Theme.font.family
+                    font.pixelSize: Theme.size.micro
+                    font.weight: Theme.weight.bold
+                    font.letterSpacing: 2
+                }
+
+                Text {
+                    text: I18n.t("狼人杀 · 观察席", "Werewolf Observer")
+                    color: Theme.color.text
+                    font.family: Theme.font.display
+                    font.pixelSize: Theme.size.display
+                    font.weight: Theme.weight.bold
+                }
+
+                Text {
+                    width: parent.width
+                    text: I18n.t("观察 AI 玩家如何欺骗、推理与投票 —— 一夜一局。", "Watch AI agents deceive, deduce, and vote — one night at a time.")
+                    color: Theme.color.textSecondary
+                    font.family: Theme.font.family
+                    font.pixelSize: Theme.size.body
+                    wrapMode: Text.WordWrap
+                }
+
+                // Server status line
+                Row {
+                    spacing: Theme.space.sm
+                    topPadding: Theme.space.xs
+
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: I18n.t("服务器", "Server")
+                        color: Theme.color.textSecondary
+                        font.family: Theme.font.family
+                        font.pixelSize: Theme.size.caption
+                    }
+
+                    StatusBadge {
+                        id: serverStatusBadge
+                        objectName: "serverStatusBadge"
+                        anchors.verticalCenter: parent.verticalCenter
+                        status: ObserverClient.connected ? "connected" : "disconnected"
+                    }
+                }
+
+                // Primary actions
+                Row {
+                    spacing: Theme.space.md
+                    topPadding: Theme.space.sm
+
+                    AppButton {
+                        id: startNewMatchButton
+                        objectName: "startNewMatchButton"
+                        text: I18n.t("开始新对局", "Start New Match")
+                        variant: "primary"
+                        onClicked: root.StackView.view.parent.navigateSetup()
+                    }
+
+                    AppButton {
+                        id: historyButton
+                        objectName: "historyButton"
+                        text: I18n.t("历史对局", "History")
+                        variant: "ghost"
+                        onClicked: {
+                            ObserverClient.refreshRuns()
+                            root.StackView.view.parent.navigateHistory()
+                        }
+                    }
+                }
             }
         }
 
-        Button {
-            id: startNewMatchButton
-            objectName: "startNewMatchButton"
-            text: qsTr("Start New Match")
-            anchors.horizontalCenter: parent.horizontalCenter
-            onClicked: root.StackView.view.parent.navigateSetup()
-        }
+        // ---------------------------------------------------- (B) RECENT RUNS
+        AppCard {
+            width: parent.width
+            implicitHeight: runsBody.implicitHeight + Theme.space.xxl * 2
 
-        Button {
-            id: historyButton
-            objectName: "historyButton"
-            text: qsTr("History")
-            anchors.horizontalCenter: parent.horizontalCenter
-            onClicked: {
-                ObserverClient.refreshRuns()
-                root.StackView.view.parent.navigateHistory()
-            }
-        }
+            Column {
+                id: runsBody
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.margins: Theme.space.xxl
+                spacing: Theme.space.lg
 
-        Text {
-            text: qsTr("Recent Runs:")
-            font.pixelSize: 14
-            anchors.horizontalCenter: parent.horizontalCenter
-        }
+                SectionHeader {
+                    title: I18n.t("最近对局", "Recent Runs")
+                }
 
-        ListView {
-            id: recentRunsList
-            objectName: "recentRunsList"
-            width: 400
-            height: 150
-            model: ObserverClient.runItems
-            clip: true
+                // Empty state when there is nothing to show.
+                EmptyState {
+                    width: parent.width
+                    visible: ObserverClient.runItems.length === 0
+                    title: I18n.t("暂无对局", "No matches yet")
+                    subtitle: I18n.t("开始一局，在此实时观战。", "Start a new match to watch it unfold here.")
+                }
 
-            delegate: ItemDelegate {
-                width: ListView.view.width
-                text: (modelData.run_id || "") + " [" + (modelData.status || "") + "]"
-                onClicked: {
-                    ObserverClient.openRun(modelData.run_id)
-                    root.StackView.view.parent.navigateCockpit()
+                ListView {
+                    id: recentRunsList
+                    objectName: "recentRunsList"
+                    width: parent.width
+                    height: 180
+                    clip: true
+                    visible: ObserverClient.runItems.length > 0
+                    model: ObserverClient.runItems
+                    spacing: Theme.space.xs
+                    boundsBehavior: Flickable.StopAtBounds
+
+                    delegate: Item {
+                        width: ListView.view.width
+                        height: 44
+
+                        Rectangle {
+                            id: rowBg
+                            anchors.fill: parent
+                            anchors.leftMargin: 0
+                            anchors.rightMargin: 0
+                            radius: Theme.radius.md
+                            color: hover.hovered ? Theme.color.surfaceAlt : "transparent"
+
+                            Behavior on color { ColorAnimation { duration: Theme.motion.fast } }
+
+                            Text {
+                                anchors.left: parent.left
+                                anchors.leftMargin: Theme.space.md
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: parent.width - statusBadge.width - Theme.space.md * 3
+                                elide: Text.ElideRight
+                                text: modelData.run_id || ""
+                                color: Theme.color.text
+                                font.family: Theme.font.mono
+                                font.pixelSize: Theme.size.small
+                            }
+
+                            StatusBadge {
+                                id: statusBadge
+                                anchors.right: parent.right
+                                anchors.rightMargin: Theme.space.md
+                                anchors.verticalCenter: parent.verticalCenter
+                                status: modelData.status || ""
+                            }
+                        }
+
+                        HoverHandler {
+                            id: hover
+                            cursorShape: Qt.PointingHandCursor
+                        }
+                        TapHandler {
+                            onTapped: {
+                                ObserverClient.openRun(modelData.run_id)
+                                root.StackView.view.parent.navigateCockpit()
+                            }
+                        }
+                    }
                 }
             }
         }
