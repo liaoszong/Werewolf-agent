@@ -10,7 +10,7 @@
 
 ## 1. Goal
 
-Make G2d profile configuration **user-facing**: turn the Qt cockpit's `MatchSetupView` into a profile-driven setup editor that loads a saved profile from the G2d-1 endpoints, lets the user edit per-seat provider/model/strategy/prompt, validates it server-side, and launches a fake run from it — all through the G2a protocol, with no local file I/O.
+Make G2d profile configuration **user-facing**: turn the Qt cockpit's `MatchSetupView` into a profile-driven setup editor that loads an existing server-side profile from the G2d-1 endpoints, lets the user edit per-seat provider/model/strategy/prompt, validates it server-side, and launches a fake run from it — all through the G2a protocol, with no local file I/O.
 
 This completes the G2d milestone end-to-end (G2d-1 = backend; G2d-2 = UI). It is the work the existing `MatchSetupView.qml` placeholder already announces ("提示词/档案编辑计划于 G2d 实现 / Prompt/profile editing is planned for G2d").
 
@@ -56,7 +56,6 @@ The backend gains one read-only endpoint. The Qt client gains profile fetch/vali
   ```json
   {
     "schema_version": "g2d.profile.v1",
-    "templates": ["default_6p_fake"],
     "providers": ["deepseek", "fake_deterministic"],
     "models": {"deepseek": ["deepseek-chat", "deepseek-reasoner"], "fake_deterministic": ["none"]},
     "strategies": ["aggressive", "cautious", "default"],
@@ -67,7 +66,7 @@ The backend gains one read-only endpoint. The Qt client gains profile fetch/vali
     "prompt_max_len": 8000
   }
   ```
-  Lists are sorted for determinism. No secrets, no paths.
+  Lists are sorted for determinism. No secrets, no paths. **No `templates` / profile-name list here** — the schema is dropdown/option metadata only; the set of available profiles comes solely from `GET /api/profiles`, so the UI never learns "which profiles exist" from two diverging sources.
 
 ### 5.2 `src/werewolf_eval/observer_server.py` + `observer_protocol.py` (MODIFY — one read endpoint)
 
@@ -81,7 +80,7 @@ The backend gains one read-only endpoint. The Qt client gains profile fetch/vali
   - `refreshProfileSchema()` → GET `/api/profiles/schema` → `profileSchema`.
   - `fetchProfile(QString name)` → GET `/api/profiles/{name}` → `loadedProfile`.
   - `validateProfile(QVariantMap profile)` → POST `/api/profiles/validate` → `profileValidation` (`{valid, errors, resolved_seats}`).
-  - `launchFromProfile(QVariantMap profile)` → POST `/api/runs` with `{profile}` → sets `currentRunId`/status (mirrors `startDefaultMatch`).
+  - `launchFromProfile(QVariantMap profile)` → POST `/api/runs` with `{profile}`. **Only on HTTP `202`** does it set `currentRunId`/status and emit `launchSucceeded()`; on any non-202 / network error it sets `lastError`, emits `launchFailed()`, and does **not** set `currentRunId` (mirrors `startDefaultMatch`'s success path but never advances optimistically).
 - Each GET/validate uses a monotonically increasing serial + run/name guard (the `refreshProjection` latest-wins pattern) so stale responses don't overwrite newer UI state.
 - JSON assembly via `QJsonDocument`/`QJsonObject` from the `QVariantMap` (no string building).
 
@@ -94,12 +93,13 @@ The backend gains one read-only endpoint. The Qt client gains profile fetch/vali
 
 ### 5.5 `clients/qt_observer/qml/MatchSetupView.qml` (MODIFY — master-detail)
 
-- On entry: `ObserverClient.refreshProfiles()` + `refreshProfileSchema()`; default-select a profile (first listed, or a built-in `default_6p_fake` profile fetched by name if present) → `fetchProfile`.
+- On entry: `ObserverClient.refreshProfiles()` + `refreshProfileSchema()`; **default-select the first item of `profileItems`** → `fetchProfile(name)`. If `profileItems` is empty, show an `EmptyState` ("no profiles — drop a JSON into the server's profiles/ dir") and disable Launch.
 - Header: profile picker `ComboBox` (`objectName: setupProfilePicker`) bound to `ObserverClient.profileItems`; selecting → `fetchProfile(name)`.
 - Master (left): seat `Grid` of `RoleCard`s (keeps `setupRoleCards`) driven by the resolved seats of `loadedProfile` (+ local edits); clicking a seat selects it (highlight) and opens the detail.
 - Detail (right): `SeatEditorPanel` bound to the selected seat's resolved config; edits update a local `editedProfile` (clone of `loadedProfile` with `seat_overrides[pN]` applied).
 - Validate affordance (`objectName: setupValidateButton`): `ObserverClient.validateProfile(editedProfile)`; render `profileValidation.valid` / `errors[]` inline (a `SectionHeader` caption or a small status row).
-- Action bar: Back (ghost left) → `navigateHome()`; **Launch** (primary right, keep objectName `setupContinueButton` so the existing contract assertion holds, label → "启动 / Launch") → `ObserverClient.launchFromProfile(editedProfile)` then `navigatePreflight()`.
+- Action bar: Back (ghost left) → `navigateHome()`; **Launch** (primary right, keep objectName `setupContinueButton` so the existing contract assertion holds, label → "启动 / Launch") → `ObserverClient.launchFromProfile(editedProfile)`. **The view advances to Preflight only after the launch request returns `202` and `currentRunId` is updated** (wire to `launchSucceeded()` / `onCurrentRunChanged`). On `launchFailed()` it stays on `MatchSetupView` and surfaces `lastError` (and any `profileValidation` error). No optimistic navigation.
+- Launch is enabled only when `profileValidation.valid` holds for the current edit (see §7) — so the user validates before launching.
 - Removes the static `roles` array and the "G2d planned / no editor" note.
 
 ### 5.6 `clients/qt_observer/CMakeLists.txt` (MODIFY)
@@ -118,16 +118,23 @@ The backend gains one read-only endpoint. The Qt client gains profile fetch/vali
 
 ## 6. Editing model & data flow
 
-1. `loadedProfile` (from `/api/profiles/{name}`) has `role_defaults` (+ maybe `seat_overrides`). The UI resolves seats client-side for display **only** (role/team come from `schema.seat_roles`; provider/model/strategy/prompt come from `seat_overrides[pN]` ?? `role_defaults[role]`).
-2. Editing seat `pN` writes `editedProfile.seat_overrides[pN] = {provider, model, strategy, prompt}` (full fragment, kept coherent: changing provider resets model to that provider's first allowed model).
+1. `loadedProfile` (from `/api/profiles/{name}`) has `role_defaults` (+ maybe partial `seat_overrides`). The UI resolves seats client-side for **display only**; role/team come from `schema.seat_roles` + `schema.role_teams`, and each config field is merged **field-by-field**:
+   ```
+   effective[field] = seat_overrides[player_id][field]  if that field is present,
+                      otherwise role_defaults[role][field]
+   for field in {provider, model, strategy, prompt}
+   ```
+   This tolerates existing profiles whose `seat_overrides[pN]` carry only some fields. The UI display logic is kept distinct from the server resolver — the server remains authoritative.
+2. Editing seat `pN` **materializes a full coherent fragment** `editedProfile.seat_overrides[pN] = {provider, model, strategy, prompt}` — seeded from the current *effective* values, with the edited field changed; changing `provider` resets `model` to that provider's first allowed model (so the materialized fragment always satisfies G2d-1's resolved-seat coherence rule).
 3. **Validate** posts `editedProfile` to `/api/profiles/validate` → inline verdict; the server is the single source of validity truth (UI does no independent validation beyond coherence-friendly dropdowns).
 4. **Launch** posts `{profile: editedProfile}` to `/api/runs`; on `202` the client tracks the run and the wizard advances to Preflight → Cockpit (where the existing G2c projection UI shows the run).
 
 ## 7. Error / validation UX
 
-- Invalid profile on Validate → show `profileValidation.errors[0]` (single-error mode from G2d-1) in a `Theme.color.danger` caption; Launch disabled until `profileValidation.valid` (or until a fresh edit clears the stale verdict).
+- **Validation is bound to the current edit via a local `profileRevision` counter.** Any edit (seat-override change or profile reload) increments `profileRevision` and clears `profileValidation`. The Validate handler remembers which revision it validated; **Launch is enabled only when `profileValidation.valid` is true for the current `profileRevision`** — so editing after a passing Validate re-disables Launch until re-validated. No stale "valid" state can leak into a launch.
+- Invalid profile on Validate → show `profileValidation.errors[0]` (single-error mode from G2d-1) in a `Theme.color.danger` caption.
 - Network/`lastError` surfaces in the existing error affordance.
-- Prompt over `prompt_max_len` → counter turns danger; Validate will also reject server-side.
+- Prompt over `prompt_max_len` → counter turns danger; Validate also rejects server-side.
 
 ## 8. Design-system adherence
 
@@ -136,7 +143,9 @@ The backend gains one read-only endpoint. The Qt client gains profile fetch/vali
 - Wizard layout: left-aligned at `pageMargin`, bottom action bar Back-left / primary-right; view root `Item` must not `anchors.fill: parent` (StackView sizes it).
 - `RoleCard` faction tints stay (this is god-view setup, roles are intentionally shown — distinct from the live-cockpit visibility boundary).
 
-## 9. Verification strategy (all runnable here)
+## 9. Verification strategy
+
+The Qt-side gates — build, static-contract, ctest, qmllint, visual — are **runnable in this environment**. The new `/api/profiles/schema` server endpoint test is **authored and documented but not canonically runnable here** (same `RemoteDisconnected` localhost limit as the other G2a/G2d server tests); the underlying `build_profile_schema()` is covered by a pure `test_profile_config` unit test that **does** run.
 
 - **Build:** `cmake --build .tmp/qt-observer-build --target appqt_observer` exit 0 (qmlcachegen AOT-compiles QML → syntactic validity gate). PATH via `/f/...` mount form.
 - **Static contract** (`tests/test_qt_observer_static_contract.py`) — **update + extend**:
@@ -186,7 +195,7 @@ docs/harness/plans/2026-06-04--g2d-2-qt-setup-ui-plan.md
 - A2. `ObserverApiClient` exposes `profileItems`, `profileSchema`, `loadedProfile`, `profileValidation` + `refreshProfiles`/`refreshProfileSchema`/`fetchProfile`/`validateProfile`/`launchFromProfile`, with latest-wins guards.
 - A3. `SeatEditorPanel.qml` edits provider/model(dependent)/strategy/prompt(with counter), registered in CMake, with the required objectNames.
 - A4. `MatchSetupView.qml` is profile-driven master-detail: picker + seat grid + editor + validate + launch; no static role array; consumes `profileSchema` (no hardcoded option lists).
-- A5. Launch sends the edited profile to `/api/runs` and advances the wizard; the run is observable via the existing cockpit.
+- A5. Launch sends the edited profile to `/api/runs` and **advances to Preflight only after `202` + `currentRunId` is set** (otherwise stays on MatchSetupView and shows the error); the run is observable via the existing cockpit.
 - A6. Static-contract test updated + green (new objectNames/components, README non-goal updated, forbidden patterns absent); Qt build exit 0; ctest green.
 - A7. Visual capture confirms the master-detail editor renders per the design system.
 - A8. No save endpoint, no local file I/O, no live providers, no new deps, no engine/route-doc changes.
