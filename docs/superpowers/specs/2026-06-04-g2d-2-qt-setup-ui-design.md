@@ -205,3 +205,13 @@ docs/harness/plans/2026-06-04--g2d-2-qt-setup-ui-plan.md
 - Server-side profile **save** endpoint + UI save/import-from-file (needs a write surface + path-safety, like G2d-1 `save_profile`).
 - Role-defaults editing mode (vs per-seat overrides), profile diffing, multi-template support.
 - G3 experiment orchestration over batches of profiles.
+
+### Deferred UX enhancements (from a frontend design review)
+
+This slice keeps the **master-detail + explicit-Validate** design. A reviewed-but-deferred richer iteration (a "G2d-3" UX pass) would, in priority order:
+
+1. **Global "Deterministic Mock" execution banner** + a dropdown caption — surfaces the declared-vs-executed (`execution_mode=fake`) distinction so users never think a real LLM is called. (Cheap; strong fit with the auditability ethos — a good first fast-follow.)
+2. **Prompt focus-mode modal** — replace the inline `TextArea` with a read-only preview + `[↗ Edit Prompt]` opening a large centered modal (mono `Consolas`, big counter). An 8000-char prompt is cramped inline.
+3. **Accordion / all-seats-visible list** instead of master-detail — better for at-a-glance auditing of all 6 seats' configs.
+4. **Expose the two-tier model** — a Role Defaults section + per-seat "inherited → [Override]" toggles (the data model auditors care about), instead of always materializing full per-seat overrides. (Must respect G2d-1's resolved-seat coherence: overriding `provider` must also set a valid `model`.)
+5. **Live debounced validation** instead of an explicit Validate button — gated on enhancing the validate endpoint to **collect-all** errors (G2d-1 ships single-error mode) for per-field highlighting.

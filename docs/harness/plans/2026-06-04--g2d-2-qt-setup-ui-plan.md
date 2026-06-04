@@ -187,8 +187,20 @@ class QtObserverProfileClientTests(unittest.TestCase):
         cpp = (QT / "src/ObserverApiClient.cpp").read_text(encoding="utf-8")
         self.assertIn("/api/profiles/schema", cpp)
         self.assertIn("/api/profiles/validate", cpp)
+        # launch advances only on HTTP 202 + a run_id, else launchFailed
+        self.assertIn("HttpStatusCodeAttribute", cpp)
+        self.assertIn("202", cpp)
+        self.assertIn("runId.isEmpty()", cpp)
         self.assertIn("launchSucceeded", cpp)
-        self.assertIn("202", cpp)  # launch advances only on 202
+        self.assertIn("launchFailed", cpp)
+
+    def test_profile_requests_use_latest_wins_guards(self) -> None:
+        h = (QT / "src/ObserverApiClient.h").read_text(encoding="utf-8")
+        cpp = (QT / "src/ObserverApiClient.cpp").read_text(encoding="utf-8")
+        # fetchProfile AND validateProfile must drop stale responses
+        self.assertIn("m_profileRequestSerial", h)
+        self.assertIn("m_profileValidateSerial", h)
+        self.assertIn("m_profileValidateSerial", cpp)
 ```
 
 Run → fail:
@@ -237,8 +249,9 @@ In the private members:
     QVariantMap m_loadedProfile;
     QVariantMap m_profileValidation;
     quint64 m_profileRequestSerial = 0;
+    quint64 m_profileValidateSerial = 0;
 ```
-Add `#include <QJsonArray>` if not present (it is used by existing code).
+Add `#include <QUrl>` (for percent-encoding in `fetchProfile`); `<QJsonArray>`/`<QJsonObject>`/`<QJsonDocument>` are already used by existing code.
 
 - [ ] **Step 3: Implement in `ObserverApiClient.cpp`**
 
@@ -282,7 +295,8 @@ void ObserverApiClient::refreshProfileSchema()
 void ObserverApiClient::fetchProfile(const QString &name)
 {
     const quint64 serial = ++m_profileRequestSerial;
-    QNetworkReply *reply = get(QStringLiteral("/api/profiles/") + name);
+    const QString encoded = QString::fromUtf8(QUrl::toPercentEncoding(name));
+    QNetworkReply *reply = get(QStringLiteral("/api/profiles/") + encoded);
     connect(reply, &QNetworkReply::finished, this, [this, reply, serial]() {
         reply->deleteLater();
         if (serial != m_profileRequestSerial) return;  // latest-wins
@@ -296,11 +310,14 @@ void ObserverApiClient::fetchProfile(const QString &name)
 
 void ObserverApiClient::validateProfile(const QVariantMap &profile)
 {
+    const quint64 serial = ++m_profileValidateSerial;   // latest-wins
     QJsonObject body = QJsonObject::fromVariantMap(profile);
     QNetworkReply *reply = post(QStringLiteral("/api/profiles/validate"),
                                 QJsonDocument(body).toJson(QJsonDocument::Compact));
-    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+    connect(reply, &QNetworkReply::finished, this, [this, reply, serial]() {
         reply->deleteLater();
+        if (serial != m_profileValidateSerial) return;  // a newer validate superseded this
+        if (reply->error() != QNetworkReply::NoError) { setError(reply->errorString()); return; }
         QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
         if (!doc.isObject()) { setError(QStringLiteral("Invalid validate response")); return; }
         m_profileValidation = doc.object().toVariantMap();
@@ -316,6 +333,16 @@ void ObserverApiClient::launchFromProfile(const QVariantMap &profile)
                                 QJsonDocument(body).toJson(QJsonDocument::Compact));
     connect(reply, &QNetworkReply::finished, this, [this, reply]() {
         reply->deleteLater();
+        // Explicit network-error path first (httpStatus may be 0 on transport error).
+        if (reply->error() != QNetworkReply::NoError) {
+            // 4xx bodies still carry a JSON {code,message}; surface that if present.
+            const QJsonDocument edoc = QJsonDocument::fromJson(reply->readAll());
+            const QString emsg = edoc.isObject()
+                ? edoc.object().value(QStringLiteral("message")).toString() : QString();
+            setError(emsg.isEmpty() ? reply->errorString() : emsg);
+            emit launchFailed();
+            return;
+        }
         const int httpStatus =
             reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
         QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
@@ -392,6 +419,12 @@ AppCard {
     property var schema: ({})
 
     signal edited(string field, var value)
+
+    // Suppress the emit that fires while the controls bind to initial values /
+    // when `config` rebinds on seat switch.  MatchSetupView.applyEdit also
+    // no-ops unchanged values, so a stale prompt can never reach the backend.
+    property bool _ready: false
+    Component.onCompleted: _ready = true
 
     readonly property var providerList: schema && schema.providers ? schema.providers : []
     readonly property var modelList: (schema && schema.models && config && config.provider
@@ -499,7 +532,8 @@ AppCard {
                         border.width: 1; border.color: Theme.color.border
                         radius: Theme.radius.sm
                     }
-                    onEditingFinished: root.edited("prompt", text)
+                    // Real-time sync so every edit clears the stale verdict.
+                    onTextChanged: if (root._ready) root.edited("prompt", text)
                 }
             }
         }
@@ -526,6 +560,10 @@ git commit -m "feat(g2d-2): add SeatEditorPanel.qml (per-seat provider/model/str
 ## Task 4: MatchSetupView master-detail rewrite
 
 **Files:** `clients/qt_observer/qml/MatchSetupView.qml`, `clients/qt_observer/README.md`, `tests/test_qt_observer_static_contract.py`
+
+- [ ] **Step 0: Verify component APIs before writing QML**
+
+Read `clients/qt_observer/qml/components/RoleCard.qml` and `EmptyState.qml`; use ONLY their actual public properties. Verified for this plan: **RoleCard** → `seatId`/`roleName`/`displayRole`/`displayTeam`/`visibilityLabel`/`aiLabel`/`statusText`/`accentText`/`selected`; **EmptyState** → `title`/`subtitle`. Do not invent property names — a wrong name fails the Qt build (`qmlcachegen`).
 
 - [ ] **Step 1: Update the contract assertions (test-first)**
 
@@ -615,6 +653,7 @@ Item {
     // Materialize a full coherent override fragment on edit.
     function applyEdit(seatId, field, value) {
         var eff = effective(seatId)
+        if (eff[field] === value) return   // no-op: ignore init/seat-switch re-binds; don't bump revision
         var frag = { provider: eff.provider, model: eff.model, strategy: eff.strategy, prompt: eff.prompt }
         frag[field] = value
         if (field === "provider") {
@@ -685,9 +724,9 @@ Item {
     EmptyState {
         anchors.centerIn: parent
         visible: ObserverClient.profileItems.length === 0
-        // caption guidance for an empty profiles dir
-        property string note: I18n.t("没有可用档案 — 在服务器 profiles/ 目录放入 JSON。",
-                                      "No profiles — drop a JSON into the server's profiles/ dir.")
+        title: I18n.t("没有可用档案", "No profiles")
+        subtitle: I18n.t("在服务器 profiles/ 目录放入一个 JSON 档案。",
+                         "Drop a JSON into the server's profiles/ dir.")
     }
 
     // ----------------------------------------------------- Master (seat grid)
@@ -710,13 +749,19 @@ Item {
             spacing: Theme.space.lg
             Repeater {
                 model: root.seatIds
+                // RoleCard verified public API (qml/components/RoleCard.qml):
+                //   seatId, roleName, displayRole, displayTeam, visibilityLabel,
+                //   aiLabel, statusText, accentText, selected. Use ONLY these.
                 delegate: RoleCard {
                     property var eff: root.effective(modelData)
                     seatId: modelData
                     roleName: eff.role
                     displayRole: eff.role
+                    displayTeam: eff.team || ""
+                    aiLabel: (eff.provider || "") + " · " + (eff.model || "")
+                    selected: root.selectedSeatId === modelData
                     width: 168
-                    height: 150
+                    height: 168
                     MouseArea { anchors.fill: parent; onClicked: root.selectedSeatId = modelData }
                 }
             }
@@ -818,18 +863,25 @@ qmllint -I .tmp/qt-observer-build clients/qt_observer/qml/MatchSetupView.qml cli
 ```
 Expected: contract `OK`; ctest `100%`; qmllint no `Error:` lines (ignore `[unqualified]`/`[missing-property]`).
 
-- [ ] **Step 3: Visual capture (grabToImage → PNG → Read)**
+- [ ] **Step 3: Visual capture (grabToImage → PNG → Read) — TEMPORARY, NEVER committed**
 
-Temporarily add to `AppShell.qml` a timer that navigates to setup, loads a profile, selects a seat, and grabs:
+The visual harness edits files **outside the allowlist** (`AppShell.qml`) and may seed mock data; none of it may be staged or committed. Use revertible edits + a hard gate.
+
+1. Temporarily add a navigate+grab timer to `AppShell.qml`:
 ```qml
-Timer {
-    interval: 1500; running: true; repeat: false
-    onTriggered: { navigateSetup(); grabTimer.start() }
-}
+Timer { interval: 1500; running: true; repeat: false
+    onTriggered: { navigateSetup(); grabTimer.start() } }
 Timer { id: grabTimer; interval: 1500; running: false
     onTriggered: stackView.grabToImage(function(r){ r.saveToFile("G:/Werewolf-agent/.tmp/g2d2_setup.png"); Qt.quit() }) }
 ```
-Run the app pointed at a live G2a server with a profile in `profiles/`, then **Read** `.tmp/g2d2_setup.png` to confirm: profile picker, seat grid (left), seat editor (right) with provider/model/strategy dropdowns + prompt area + counter, action bar with disabled Launch until validated. **Remove the temp timers afterward.**
+2. **Populate the editor:** if a live G2a server with a profile in `profiles/` is reachable, run against it. **If localhost HTTP is blocked here** (the G2d-1 `RemoteDisconnected` limit), seed mock data *for the screenshot only* — temporarily set `root.editedProfile` + a fake `ObserverClient`-shaped `profileSchema` in `MatchSetupView.qml`'s `Component.onCompleted` behind an obvious `// TEMP VISUAL ONLY` marker. With no data the screen correctly shows the `EmptyState`; that is also a valid (if less informative) capture.
+3. Build + run; **Read** `.tmp/g2d2_setup.png` to confirm: seat grid (left, provider/model on each card), seat editor (right) with dropdowns + prompt area + counter, the Deterministic-Mock banner, and Launch disabled until validated.
+4. **Revert ALL harness edits and prove the tree is clean before any commit:**
+```powershell
+git checkout -- clients/qt_observer/qml/AppShell.qml clients/qt_observer/qml/MatchSetupView.qml
+git diff --quiet -- clients/qt_observer/qml/AppShell.qml; if ($LASTEXITCODE -ne 0) { throw "AppShell.qml still modified — must be empty before commit" }
+```
+`git checkout -- MatchSetupView.qml` restores the **committed** Task 4 version (dropping only the temp mock seed). `AppShell.qml` MUST NOT be staged or committed at any point in G2d-2.
 
 - [ ] **Step 4: Full Python suite + compileall**
 
@@ -837,13 +889,18 @@ Run the app pointed at a live G2a server with a profile in `profiles/`, then **R
 $env:PYTHONPATH='src'; python -m unittest discover -s tests -p "test_*.py"
 python -m compileall src tests
 ```
-Expected: only the documented pre-existing `test_context_budget` failure + env-blocked server tests; compileall `0 failures`.
+Expected: `compileall` `0 failures`. The **only** acceptable suite failure is the documented pre-existing one — `test_context_budget.ContextBudgetGateDocsTests.test_agents_documents_context_budget_gate` (fails identically on `main`; `AGENTS.md` untouched). Server-endpoint tests may error with `RemoteDisconnected` only if localhost is blocked in this environment. **Any other new failure must be treated as a G2d-2 regression and fixed — do NOT classify it as "known".**
 
-- [ ] **Step 5: Commit any fixes**
+- [ ] **Step 5: Commit any fixes (explicit files only — never `git add -A`)**
 
+Stage only allowlisted files by name and assert `AppShell.qml` is not staged:
 ```powershell
-git add -A clients/qt_observer tests
-git commit -m "test(g2d-2): build/contract/visual verification fixes" --allow-empty
+git add clients/qt_observer/qml/MatchSetupView.qml clients/qt_observer/qml/components/SeatEditorPanel.qml `
+        clients/qt_observer/src/ObserverApiClient.cpp clients/qt_observer/src/ObserverApiClient.h `
+        clients/qt_observer/CMakeLists.txt clients/qt_observer/README.md `
+        tests/test_qt_observer_static_contract.py
+git diff --cached --name-only | python -c "import sys; s=[l.strip() for l in sys.stdin]; assert 'clients/qt_observer/qml/AppShell.qml' not in s, 'AppShell.qml must not be staged'; print('NO_APPSHELL_STAGED')"
+git commit -m "test(g2d-2): verification fixes" --allow-empty
 ```
 
 ---
