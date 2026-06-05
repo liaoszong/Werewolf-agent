@@ -25,6 +25,7 @@ Item {
     // the reason code/message are rendered verbatim (data-driven), never literals.
     readonly property bool liveAvailable: ObserverClient.liveAvailable
     readonly property string liveReasonCode: ObserverClient.liveReasonCode
+    readonly property string liveReasonMessage: ObserverClient.liveReasonMessage
 
     implicitWidth: 380
     implicitHeight: col.implicitHeight
@@ -138,10 +139,14 @@ Item {
         }
 
         // ---- Unavailable context — the server message, verbatim ----
+        // Gated on the MESSAGE (not the code): the reason code is already shown
+        // inline on the LIVE segment ("UNAVAIL · <code>"), and the "unreachable"
+        // posture has no server message — so this must NOT render an empty line
+        // (which previously opened a blank gap that pushed the page down).
         Text {
             width: parent.width
-            visible: !root.liveAvailable && root.liveReasonCode.length > 0
-            text: ObserverClient.liveReasonMessage
+            visible: !root.liveAvailable && root.liveReasonMessage.length > 0
+            text: root.liveReasonMessage
             wrapMode: Text.WordWrap
             color: Theme.color.textMuted
             font.family: Theme.font.family

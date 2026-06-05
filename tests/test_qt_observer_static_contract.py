@@ -442,6 +442,15 @@ class QtObserverModeControlComponentTests(unittest.TestCase):
                      "unsupported_live_provider", "mixed_models"]:
             self.assertNotIn(code, content, f"server code '{code}' must not be a literal in ModeControl.qml")
 
+    def test_unavailable_hint_gated_on_message_not_code(self) -> None:
+        # Regression (blank-gap bug): the unavailable-context line must be gated
+        # on the server MESSAGE length, not the reason code.  The "unreachable"
+        # posture has an EMPTY message, so a code-gated line rendered a blank,
+        # visible Text that opened a gap pushing the whole page down and never
+        # reverted.  The reason code is already shown inline on the LIVE segment.
+        content = (QT / "qml/components/ModeControl.qml").read_text(encoding="utf-8")
+        self.assertIn("liveReasonMessage.length", content)
+
     def test_data_source_chip_has_both_hud_labels(self) -> None:
         content = (QT / "qml/components/DataSourceChip.qml").read_text(encoding="utf-8")
         self.assertIn("SYS: LIVE_API", content)
