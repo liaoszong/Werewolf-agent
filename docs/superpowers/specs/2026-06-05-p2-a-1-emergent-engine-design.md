@@ -53,7 +53,7 @@ loop(round r, 1..max_day_rounds≈3):
     唱票   ← 每个存活者 ProviderAgent.decide() player_vote(存活目标)→ 计票
             最高票出局;平票 → 种子 RNG 在并列者中裁定 → player_eliminated + role_revealed(all)
     胜负判定(§6)→ 命中即跳出
-到回合上限未分胜负 → 收束为 inconclusive(§6)
+到回合上限/预算耗尽仍未分胜负 → fail-closed 失败收束(§6,不产出完整 game_log)
 end:  game_over(all) + 终局 god 快照
 ```
 
@@ -104,10 +104,11 @@ end:  game_over(all) + 终局 god 快照
 ---
 
 ## 6. 胜负与回合上限
-- **村民胜:** 所有狼人死亡。
-- **狼人胜:** 存活狼数 ≥ 存活非狼数(奇偶屠边)。
-- **每夜结算后、每次白天出局后**各判一次。
-- **回合上限(max_day_rounds)未分胜负** → 收束 `inconclusive`:`game_log.result` 记 `winner="inconclusive"`、`end_condition="round_cap"`/`budget_exhausted`,按存活快照收尾(fail-closed,不伪造胜负)。
+- **村民胜:** 所有狼人死亡 → `result.winner="villager"`、`end_condition="all_werewolves_eliminated"`。
+- **狼人胜:** 存活狼数 ≥ 存活非狼数(奇偶屠边) → `result.winner="werewolf"`、`end_condition="werewolves_reach_parity"`。
+- **每夜结算后、每次白天出局后**各判一次。6 人板每昼必出 1 人、每夜可死人,故正常局必在 `max_day_rounds` 内收到真实胜负。
+- **校验约束(已核对):** `game_log.py:137` 限定 `winner ∈ {villager, werewolf}`。因此**不引入 `inconclusive` winner**(否则破坏共享 P1-A 校验器)。
+- **回合上限 / 预算耗尽仍未分胜负 = fail-closed 失败路径**(非游戏结局):**不产出完整 game_log**,改为返回失败结果 + `failure_audit`(kind=`budget_exhausted`/`round_cap`),镜像现有 provider-failure 收束模式(见 `run_fake_provider_game.py:104` 失败分支)。`EmergentGameEngine.run()` 以一个可区分的 `GameOutcome`(completed vs failed)表达,绝不伪造胜负。
 
 ---
 
@@ -120,7 +121,8 @@ end:  game_over(all) + 终局 god 快照
 | 女巫 | 非法/越权用药 | 记 failure;兜底 = `witch_pass` |
 | 发言 | 空/超限/异常 | 占位文本;不记 failure(发言非裁决步) |
 | 投票 | `ProviderActionError` | 记 failure;兜底 = 弃权(不计票)或座位序首个合法目标(writing-plans 定) |
-| 真实路径 | 预算超限 | fail-closed → `budget_exhausted`,对局以 inconclusive 收尾 |
+| 真实路径 | 预算超限 | fail-closed → `budget_exhausted` 失败收束(不产出完整 game_log,记 failure_audit) |
+| 投票/夜晚 | `decision_type` 兜底 | 兜底决策记 `decision_type="default"`(∈ VALID_DECISION_TYPES) |
 
 ---
 
@@ -133,10 +135,15 @@ end:  game_over(all) + 终局 god 快照
 ---
 
 ## 9. Definition of Done
-1. `EmergentGameEngine` 离线 fake 跑完整局,同 seed 可复现,四 log 过校验。
-2. 上述全部单元/整局/回归测试绿。
-3. 真实 DeepSeek 通道接好,1 次手动冒烟跑通(记录调用数/结局)。
-4. 现有 cockpit 能读这局事件流(沿用 P1-C/P1-D,无需改协议)。
+1. `EmergentGameEngine` 离线 fake 跑完整局,同 seed 可复现,四 log 过校验。✅
+2. 上述全部单元/整局/回归测试绿(18 新测试 + g1b/g1d 回归)。✅
+3. 现有 cockpit 能读这局事件流(沿用 P1-C/P1-D,无需改协议)。✅(事件/可见性形状不变)
+4. ~~真实 DeepSeek 通道接好,1 次手动冒烟~~ → **拆出为 P2-A-2**(owner 决定 2026-06-05)。
+
+**实现期发现(2026-06-05):真实 live 涌现对局不是"薄接线",有两个真实前置依赖,故拆出 P2-A-2:**
+- (i) **发言 prompt 路径缺失:** `deepseek_provider.py:73` 取 `allowed_actions[0]`,发言(空 allowed_actions)会 IndexError;live 发言需要独立 prompt 方法。
+- (ii) **观察需文本化:** provider 把 `observation`(事件 **ID**,如 `p2a1_e017`)直接 dump 给模型(`:81`),LLM 无法据 ID 推理/发言;需把公共事件摘要 + 私有信息渲染进 prompt。
+- 二者正是本 spec §11 标注的 live open risk;P2-A-1 以"离线确定性整局 + 全测试绿"为已批准 DoD 门槛收口,live 留给 P2-A-2 单独做(含真实冒烟)。
 
 ## 10. Non-goals(本切片不做)
 - 漂亮的上帝视角观战 UI(= P2-C,下一切片;本切片用现有 cockpit 看)。
