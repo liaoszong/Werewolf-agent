@@ -65,7 +65,7 @@
 - **硬门槛②(真的是 live,非 fallback 糊过):** `max_requests_per_game=64`、`live_success_rate ≥ 0.80`、正常 6 人局 `live_success_actions ≥ 20`、`budget_exhausted` 一律 hard fail;兜底可救场不可过关,须按 `provider_result_kind`(live_success / invalid_then_fallback / timeout_then_fallback / error_then_fallback / budget_exhausted)统计并在 review packet 暴露。早终局致调用数低需在 packet 解释。
 - **硬门槛③(诚实链,复用 G3-3):** `source_label=="[DeepSeek API output]"`、manifest 记真实 model、`token_usage>0`(fake 恒 0)。
 - **软门槛(嘴漏=内容警告):** 模型幻觉自称拥有不可见系统事实 → 记 content warning,不阻断(除非破坏 action 契约/崩);狼人伪装/诈身份是正常玩法。
-- **运行:** dev-key / server 侧,agent 一手包办;`fake-deterministic` 仍是无条件默认。
+- **运行(spec-review 2026-06-05 supersede grill Q4):** **user-run / agent-offline-review** —— 用户本地用 dev key 跑 gated live smoke,agent 不接触 key,只对 raw artifacts 离线机检;`fake-deterministic` 仍是无条件默认。
 - **隔离:** P2-A-2 **不**实现用户 key 存储 / 模型下拉 / BYO-key 配置——那些属于 P2-B。
 
 ### P2-B 架构方向:BYO-key(grill 2026-06-05 定)

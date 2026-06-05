@@ -26,6 +26,10 @@ class DeterministicFakeProvider:
     def responses(self) -> list[ProviderResponse]:
         return list(self._responses)
 
+    @property
+    def model(self) -> str | None:
+        return None
+
     def respond(self, request: ProviderRequest) -> ProviderResponse:
         self._requests.append(request)
         key = (request.actor, request.phase, request.round)

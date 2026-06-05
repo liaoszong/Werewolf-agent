@@ -18,6 +18,12 @@ class ProviderRequest:
     allowed_actions: list[str]
     allowed_targets: list[str]
     response_format_version: str = "g1d-action-v1"
+    # P2-A-2 (additive, back-compat): role-safe readable observation text the
+    # engine renders; "action" (JSON) vs "speech" (free text) response mode; an
+    # optional per-request output-token cap (speech needs more than vote/action).
+    observation_text: str = ""
+    response_kind: str = "action"
+    max_output_tokens: int | None = None
 
 
 @dataclass(frozen=True)
