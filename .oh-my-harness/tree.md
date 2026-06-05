@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 236
+- Entries: 242
 
 ```text
 ./
@@ -177,7 +177,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   │   ├── 2026-06-03--g2b-qt-observer-cockpit-mvp-plan.md
 │   │   │   ├── 2026-06-03--g2c-god-role-view-visibility-trust-plan.md
 │   │   │   ├── 2026-06-04--g2d-2-qt-setup-ui-plan.md
-│   │   │   └── 2026-06-04--g2d-prompt-configuration-mvp-plan.md
+│   │   │   ├── 2026-06-04--g2d-prompt-configuration-mvp-plan.md
+│   │   │   └── 2026-06-05--g3-1-live-deepseek-execution-plan.md
 │   │   └── reviews/
 │   │       ├── 2026-06-01--g1c-project-healthcheck-final.md
 │   │       ├── 2026-06-01--g1c-project-healthcheck.md
@@ -197,7 +198,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── superpowers/
 │   │   └── specs/
 │   │       ├── 2026-06-04-g2d-2-qt-setup-ui-design.md
-│   │       └── 2026-06-04-g2d-prompt-configuration-design.md
+│   │       ├── 2026-06-04-g2d-prompt-configuration-design.md
+│   │       └── 2026-06-05-g3-1-live-deepseek-execution-design.md
 │   ├── CHECKPOINT_TEMPLATE.md
 │   ├── EVALUATION_RUBRIC.md
 │   ├── GOLD_DEMO.md
@@ -211,6 +213,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   └── build_task_context.py
 │   ├── dev/
 │   │   ├── build_review_packet.py
+│   │   ├── run_deepseek_live_smoke.py
 │   │   └── validate_brief.py
 │   └── research/
 │       └── evaluate_semantic_labels.py
@@ -221,6 +224,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       ├── attribution.py
 │       ├── consensus_log.py
 │       ├── decision_log.py
+│       ├── deepseek_launcher.py
 │       ├── deepseek_provider.py
 │       ├── failure_audit.py
 │       ├── fake_provider.py
@@ -261,6 +265,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── test_context_budget.py
 │   ├── test_decision_log.py
 │   ├── test_deepseek_consensus_game.py
+│   ├── test_deepseek_launcher.py
+│   ├── test_deepseek_live_smoke.py
 │   ├── test_deepseek_provider_game.py
 │   ├── test_deepseek_provider.py
 │   ├── test_failure_audit.py

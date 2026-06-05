@@ -1357,7 +1357,7 @@ class ObserverServerLiveOptInTests(TestCase):
             )
 
     def test_no_flag_yields_disabled(self) -> None:
-        live_enabled, launcher = self._resolve(["--runs-dir", "x"], {"DEEPSEEK_API_KEY": "sk-real"})
+        live_enabled, launcher = self._resolve(["--runs-dir", "x"], {"DEEPSEEK_API_KEY": "sk-test-fake-unused"})
         self.assertFalse(live_enabled)
         self.assertIsNone(launcher)
         # request-time effect: live → live_api_disabled
