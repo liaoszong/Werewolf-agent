@@ -124,8 +124,18 @@ class QtObserverSetupContractTests(unittest.TestCase):
         # C2: launch passes an EXPLICIT resolved mode from the control — never a
         # bare single-arg call that relies on a C++ default.
         self.assertRegex(content, r"launchFromProfile\([^)]+,\s*\w+\.resolvedMode")
-        # C3: a single disarm entry point is called on the disarm triggers.
-        self.assertIn("resetToFake(", content)
+        # C3: a single disarm entry point is wired to EACH disarm trigger —
+        # seat change, profile load, profile switch (picker), and live becoming
+        # unavailable.  Pin every site, not just one presence, so a regression
+        # that drops one trigger is caught.
+        self.assertIn("onSelectedSeatIdChanged: setupModeControl.resetToFake()", content)
+        self.assertRegex(content, r"onLoadedProfileChanged\(\)[\s\S]*?resetToFake\(")
+        self.assertRegex(content, r"onCapabilitiesChanged\(\)[\s\S]*?liveAvailable[\s\S]*?resetToFake\(")
+        self.assertRegex(content, r"onActivated:[\s\S]*?resetToFake\(")
+        self.assertGreaterEqual(
+            content.count("resetToFake("), 4,
+            "expected resetToFake() wired to all four C3 disarm triggers",
+        )
 
     def test_preflight_mentions_visibility_boundary_and_default_template(self) -> None:
         content = (QT / "qml/PreflightView.qml").read_text(encoding="utf-8")
@@ -362,15 +372,39 @@ class QtObserverModeControlClientTests(unittest.TestCase):
             "C1: launchFromProfile must not touch currentExecutionMode (intent != truth)",
         )
 
-    def test_stale_guard_reset_path_exists(self) -> None:
-        # C1-bis: currentExecutionMode is reset to "" on run change / missing
-        # field / request error so a prior live run can't leave a stale LIVE.
+    def test_stale_guard_reset_wired_to_every_c1bis_trigger(self) -> None:
+        # C1-bis: the reset must fire on EACH trigger — run change
+        # (setCurrentRunId), missing/non-string execution_mode AND detail error
+        # (openRun), and the capabilities request error (refreshCapabilities).
+        # A single global-OR over the file would miss a regression that drops the
+        # reset from one site (e.g. setCurrentRunId → the worst-case live-run-
+        # then-fake-run stale-LIVE flash the spec forbids), so pin each site.
         cpp = self._cpp()
+        # the reset helper must actually clear the field (anchor the name).
+        reset_body = self._method_body(cpp, "void ObserverApiClient::resetExecutionMode")
         self.assertTrue(
-            "m_currentExecutionMode.clear()" in cpp
-            or "m_currentExecutionMode = QString()" in cpp
-            or 'm_currentExecutionMode = QStringLiteral("")' in cpp,
-            "no reset path for m_currentExecutionMode (C1-bis stale guard)",
+            "m_currentExecutionMode.clear()" in reset_body
+            or "m_currentExecutionMode = QString()" in reset_body
+            or 'm_currentExecutionMode = QStringLiteral("")' in reset_body,
+            "resetExecutionMode() must clear m_currentExecutionMode",
+        )
+        # run change → reset (the worst-case stale-LIVE guard)
+        self.assertIn(
+            "resetExecutionMode",
+            self._method_body(cpp, "void ObserverApiClient::setCurrentRunId"),
+            "setCurrentRunId must reset executed truth on run change (C1-bis)",
+        )
+        # missing/non-string execution_mode AND a detail request/parse error → reset
+        open_body = self._method_body(cpp, "void ObserverApiClient::openRun")
+        self.assertGreaterEqual(
+            open_body.count("resetExecutionMode"), 2,
+            "openRun must reset on detail error AND on a missing/non-string execution_mode",
+        )
+        # capabilities request error → reset
+        self.assertIn(
+            "resetExecutionMode",
+            self._method_body(cpp, "void ObserverApiClient::refreshCapabilities"),
+            "refreshCapabilities must reset executed truth on a request error (C1-bis)",
         )
 
 
@@ -386,6 +420,18 @@ class QtObserverModeControlComponentTests(unittest.TestCase):
         self.assertIn("function resetToFake(", content)
         # the control exposes the resolved launch mode for the view to pass along.
         self.assertIn("resolvedMode", content)
+
+    def test_mode_control_resolved_mode_maps_only_confirmed_to_live(self) -> None:
+        # C2: resolvedMode is "live" ONLY in live_confirmed; fake/live_armed map to
+        # "fake".  (The "live_confirmed" token recurs in several visual bindings, so
+        # a plain presence check can't catch a ternary that maps live_armed → live —
+        # pin the exact mapping.)
+        content = (QT / "qml/components/ModeControl.qml").read_text(encoding="utf-8")
+        self.assertRegex(
+            content,
+            r'resolvedMode:\s*[^\n]*state\s*===\s*"live_confirmed"\s*\?\s*"live"\s*:\s*"fake"',
+            "resolvedMode must map ONLY live_confirmed to 'live' (C2)",
+        )
 
     def test_mode_control_renders_reason_code_data_driven(self) -> None:
         content = (QT / "qml/components/ModeControl.qml").read_text(encoding="utf-8")
