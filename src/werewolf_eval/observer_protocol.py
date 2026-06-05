@@ -22,6 +22,7 @@ ALLOWED_TEMPLATES: tuple[str, ...] = (
 
 ALLOWED_MODES: tuple[str, ...] = (
     "fake",
+    "live",
 )
 
 ALLOWED_ARTIFACTS: tuple[str, ...] = (
@@ -325,6 +326,12 @@ def parse_launch_request(payload: dict[str, object]) -> dict[str, object]:
     if mode not in ALLOWED_MODES:
         raise ObserverProtocolError(
             f"Unknown mode: {mode!r}.  Allowed: {ALLOWED_MODES}"
+        )
+    if mode == "live":
+        # Live execution is profile-only (G3-1); template launches may not go
+        # live this slice.  Use parse_profile_launch_request for live runs.
+        raise ObserverProtocolError(
+            "mode 'live' is not allowed for template launches (live is profile-only)"
         )
 
     run_id = str(payload.get("run_id", ""))

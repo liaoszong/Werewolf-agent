@@ -14,6 +14,7 @@ from werewolf_eval.observer_protocol import (
     ALLOWED_MODES,
     ALLOWED_PERSPECTIVES,
     ALLOWED_TEMPLATES,
+    DEFAULT_FAKE_MODE,
     RUN_STATUS_VALUES,
     ObserverProtocolError,
     artifact_path,
@@ -489,3 +490,36 @@ class ProfileLaunchRequestTests(TestCase):
     def test_rejects_non_string_run_id(self) -> None:
         with self.assertRaises(ObserverProtocolError):
             parse_profile_launch_request({"profile_name": "demo", "run_id": 123})
+
+
+# ---------------------------------------------------------------------------
+# LiveModeTests (G3-1) — live is profile-only
+# ---------------------------------------------------------------------------
+
+
+class LiveModeTests(TestCase):
+    def test_live_is_in_allowed_modes(self) -> None:
+        self.assertIn("live", ALLOWED_MODES)
+
+    def test_profile_launch_accepts_live_mode(self) -> None:
+        out = parse_profile_launch_request({"profile": {"name": "x"}, "mode": "live"})
+        self.assertEqual(out["mode"], "live")
+        self.assertEqual(out["kind"], "inline")
+
+    def test_named_profile_launch_accepts_live_mode(self) -> None:
+        out = parse_profile_launch_request({"profile_name": "demo", "mode": "live"})
+        self.assertEqual(out["mode"], "live")
+
+    def test_profile_launch_defaults_to_fake_when_mode_omitted(self) -> None:
+        out = parse_profile_launch_request({"profile": {"name": "x"}})
+        self.assertEqual(out["mode"], DEFAULT_FAKE_MODE)
+        self.assertEqual(out["mode"], "fake")
+
+    def test_template_launch_rejects_live_mode(self) -> None:
+        # Live is profile-only — a template launch may not go live this slice.
+        with self.assertRaises(ObserverProtocolError):
+            parse_launch_request({"template": "default_6p_fake", "mode": "live"})
+
+    def test_template_launch_still_accepts_fake_mode(self) -> None:
+        out = parse_launch_request({"template": "default_6p_fake", "mode": "fake"})
+        self.assertEqual(out["mode"], "fake")
