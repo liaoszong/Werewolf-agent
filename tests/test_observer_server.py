@@ -1326,3 +1326,89 @@ class LiveDispatchTests(TestCase):
         art = self._resolved_artifact(runs, "r_fake_mark")
         self.assertEqual(art["execution_mode"], "fake")
         self.assertEqual(art["live_api"], "not_used")
+
+
+# ---------------------------------------------------------------------------
+# G3-1 run_observer_server live opt-in — wired via the pure builder helper
+# (localhost HTTP is blocked here, so the request-time effect is proven by
+# feeding the resolved (live_enabled, live_launcher) into _check_live_capability
+# rather than starting a real socket).
+# ---------------------------------------------------------------------------
+
+
+class ObserverServerLiveOptInTests(TestCase):
+    def _args(self, argv: list[str]):
+        from werewolf_eval.run_observer_server import build_arg_parser
+
+        return build_arg_parser().parse_args(argv)
+
+    def _resolve(self, argv: list[str], environ: dict):
+        from werewolf_eval.run_observer_server import resolve_live_launcher
+
+        return resolve_live_launcher(self._args(argv), environ)
+
+    def _state(self, live_enabled: bool, live_launcher: object) -> ObserverServerState:
+        with TemporaryDirectory() as tmp:
+            runs = Path(tmp) / "runs"
+            runs.mkdir()
+            return ObserverServerState(
+                runs_dir=runs, launcher=default_fake_launcher,
+                live_enabled=live_enabled, live_launcher=live_launcher,  # type: ignore[arg-type]
+            )
+
+    def test_no_flag_yields_disabled(self) -> None:
+        live_enabled, launcher = self._resolve(["--runs-dir", "x"], {"DEEPSEEK_API_KEY": "sk-real"})
+        self.assertFalse(live_enabled)
+        self.assertIsNone(launcher)
+        # request-time effect: live → live_api_disabled
+        st = self._state(live_enabled, launcher)
+        self.assertEqual(_check_live_capability(st, "live")[1], "live_api_disabled")  # type: ignore[index]
+
+    def test_flag_on_missing_key_yields_enabled_no_launcher(self) -> None:
+        live_enabled, launcher = self._resolve(
+            ["--allow-live-api", "--api-key-env", "DOES_NOT_EXIST_XXXX"], {}
+        )
+        self.assertTrue(live_enabled)
+        self.assertIsNone(launcher)
+        st = self._state(live_enabled, launcher)
+        self.assertEqual(_check_live_capability(st, "live")[1], "missing_api_key")  # type: ignore[index]
+
+    def test_flag_on_with_key_builds_launcher(self) -> None:
+        live_enabled, launcher = self._resolve(
+            ["--allow-live-api"], {"DEEPSEEK_API_KEY": "sk-test-fake-key"}
+        )
+        self.assertTrue(live_enabled)
+        self.assertTrue(callable(launcher))
+        st = self._state(live_enabled, launcher)
+        self.assertIsNone(_check_live_capability(st, "live"))  # proceeds
+
+    def test_custom_api_key_env_is_honored(self) -> None:
+        live_enabled, launcher = self._resolve(
+            ["--allow-live-api", "--api-key-env", "MY_KEY"], {"MY_KEY": "sk-test-fake-key"}
+        )
+        self.assertTrue(live_enabled)
+        self.assertTrue(callable(launcher))
+
+    def test_help_lists_live_flags(self) -> None:
+        import subprocess
+        import sys
+
+        result = subprocess.run(
+            [sys.executable, "-m", "werewolf_eval.run_observer_server", "--help"],
+            capture_output=True, text=True,
+        )
+        self.assertEqual(result.returncode, 0)
+        for flag in ("--allow-live-api", "--api-key-env", "--max-live-requests",
+                     "--deepseek-base-url", "--deepseek-model"):
+            self.assertIn(flag, result.stdout)
+
+    def test_help_output_never_contains_a_key(self) -> None:
+        import subprocess
+        import sys
+
+        result = subprocess.run(
+            [sys.executable, "-m", "werewolf_eval.run_observer_server", "--help"],
+            capture_output=True, text=True,
+        )
+        for marker in ("sk-", "Bearer ", "Authorization"):
+            self.assertNotIn(marker, result.stdout)
