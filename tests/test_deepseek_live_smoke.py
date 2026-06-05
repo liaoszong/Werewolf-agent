@@ -1,0 +1,70 @@
+"""Gated wrapper for the manual DeepSeek live smoke (G3-1).
+
+By default the live test SKIPS — the skip gate reads ONLY
+``RUN_DEEPSEEK_LIVE_SMOKE`` (evaluated at discovery); ``DEEPSEEK_API_KEY`` is
+read only INSIDE the test body after the gate opens.  The default suite never
+reads the key and never hits the network.
+"""
+
+from __future__ import annotations
+
+import importlib.util
+import os
+import unittest
+from pathlib import Path
+
+_SMOKE_PATH = (
+    Path(__file__).resolve().parents[1] / "scripts" / "dev" / "run_deepseek_live_smoke.py"
+)
+
+
+def _load_smoke_module():
+    spec = importlib.util.spec_from_file_location("run_deepseek_live_smoke", _SMOKE_PATH)
+    assert spec is not None and spec.loader is not None
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+class DeepSeekLiveSmokeGateClosedTests(unittest.TestCase):
+    """Default-suite-safe: with the gate closed, main() is a key-free no-op."""
+
+    def test_gate_closed_is_noop_and_reads_no_key(self) -> None:
+        import io
+        import sys
+        from contextlib import redirect_stdout
+
+        mod = _load_smoke_module()
+        saved_argv = sys.argv
+        saved_gate = os.environ.pop("RUN_DEEPSEEK_LIVE_SMOKE", None)
+        try:
+            sys.argv = ["run_deepseek_live_smoke.py"]
+            buf = io.StringIO()
+            with redirect_stdout(buf):
+                code = mod.main()
+            self.assertEqual(code, 0)
+            self.assertIn("smoke=skipped", buf.getvalue())
+        finally:
+            sys.argv = saved_argv
+            if saved_gate is not None:
+                os.environ["RUN_DEEPSEEK_LIVE_SMOKE"] = saved_gate
+
+
+@unittest.skipUnless(
+    os.environ.get("RUN_DEEPSEEK_LIVE_SMOKE") == "1", "live smoke disabled"
+)
+class DeepSeekLiveSmokeTests(unittest.TestCase):
+    def test_live_smoke_structural_success(self) -> None:
+        # Reached only when the gate is open; the key is read HERE, never at
+        # discovery.  Asserts structural success only — no model text.
+        api_key = os.environ.get("DEEPSEEK_API_KEY", "")
+        if not api_key:
+            self.skipTest("no DEEPSEEK_API_KEY")
+        mod = _load_smoke_module()
+        result = mod.run_live_smoke(api_key=api_key)
+        self.assertTrue(result["passed"], result.get("checks"))
+        self.assertGreaterEqual(result["real_response_count"], 1)
+
+
+if __name__ == "__main__":
+    unittest.main()
