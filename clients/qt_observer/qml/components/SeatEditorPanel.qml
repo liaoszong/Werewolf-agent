@@ -21,11 +21,28 @@ AppCard {
 
     signal edited(string field, string value)
 
-    // Suppress the emit that fires while the controls bind to initial values /
-    // when `config` rebinds on seat switch.  MatchSetupView.applyEdit also
-    // no-ops unchanged values, so a stale prompt can never reach the backend.
+    // A control's declarative binding to `config` is severed the instant the
+    // user interacts with it (typing into the TextArea, picking a ComboBox
+    // item).  So on every seat switch / `config` rebind we re-push each control
+    // imperatively from `config` via _syncControls, toggling `_ready` so the
+    // programmatic prompt write never re-emits `edited`.  MatchSetupView.applyEdit
+    // also no-ops unchanged values as a second backstop.
     property bool _ready: false
-    Component.onCompleted: _ready = true
+    Component.onCompleted: { _syncControls(); _ready = true }
+    onConfigChanged: _syncControls()
+
+    function _syncControls() {
+        providerBox.currentIndex = Math.max(0, root.providerList.indexOf(root.config.provider))
+        modelBox.currentIndex = Math.max(0, root.modelList.indexOf(root.config.model))
+        strategyBox.currentIndex = Math.max(0, root.strategyList.indexOf(root.config.strategy))
+        var p = (root.config && root.config.prompt) ? root.config.prompt : ""
+        if (promptArea.text !== p) {
+            var was = root._ready
+            root._ready = false
+            promptArea.text = p
+            root._ready = was
+        }
+    }
 
     readonly property var providerList: schema && schema.providers ? schema.providers : []
     readonly property var modelList: (schema && schema.models && config && config.provider
@@ -59,7 +76,7 @@ AppCard {
                 objectName: "seatEditorProvider"
                 width: parent.width
                 model: root.providerList
-                currentIndex: Math.max(0, root.providerList.indexOf(root.config.provider))
+                // currentIndex is driven imperatively by root._syncControls.
                 onActivated: root.edited("provider", root.providerList[currentIndex])
             }
         }
@@ -78,7 +95,7 @@ AppCard {
                 objectName: "seatEditorModel"
                 width: parent.width
                 model: root.modelList
-                currentIndex: Math.max(0, root.modelList.indexOf(root.config.model))
+                // currentIndex is driven imperatively by root._syncControls.
                 onActivated: root.edited("model", root.modelList[currentIndex])
             }
         }
@@ -97,7 +114,7 @@ AppCard {
                 objectName: "seatEditorStrategy"
                 width: parent.width
                 model: root.strategyList
-                currentIndex: Math.max(0, root.strategyList.indexOf(root.config.strategy))
+                // currentIndex is driven imperatively by root._syncControls.
                 onActivated: root.edited("strategy", root.strategyList[currentIndex])
             }
         }
@@ -131,7 +148,8 @@ AppCard {
                 TextArea {
                     id: promptArea
                     objectName: "seatEditorPrompt"
-                    text: root.config.prompt || ""
+                    // text is driven imperatively by root._syncControls (a user
+                    // keystroke would otherwise sever a declarative text binding).
                     wrapMode: TextArea.Wrap
                     color: Theme.color.text
                     background: Rectangle {

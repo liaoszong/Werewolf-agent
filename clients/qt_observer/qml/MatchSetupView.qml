@@ -21,6 +21,7 @@ Item {
         && ObserverClient.profileValidation.valid === true
         && root._validatedRevision === root.profileRevision
     property int _validatedRevision: -1
+    property bool _initialLoadDone: false
     readonly property int cardWidth: 168
 
     Component.onCompleted: {
@@ -32,8 +33,13 @@ Item {
     Connections {
         target: ObserverClient
         function onProfileItemsChanged() {
-            if (root.editedProfile.name === undefined && ObserverClient.profileItems.length > 0)
+            // One-shot initial auto-load of the first profile; keyed on a
+            // dedicated flag so it never competes with an explicit picker-driven
+            // fetch (which momentarily clears editedProfile).
+            if (!root._initialLoadDone && ObserverClient.profileItems.length > 0) {
+                root._initialLoadDone = true
                 ObserverClient.fetchProfile(ObserverClient.profileItems[0].name)
+            }
         }
         function onLoadedProfileChanged() {
             root.editedProfile = JSON.parse(JSON.stringify(ObserverClient.loadedProfile))

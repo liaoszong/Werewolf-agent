@@ -122,11 +122,15 @@ class QtObserverSetupContractTests(unittest.TestCase):
         self.assertIn("default_6p_fake", content)
         self.assertRegex(content, r"(?i)visibility.?(boundary|filter)")
 
-    def test_no_prompt_editor_is_added(self) -> None:
-        for qml_path in REQUIRED_QML_VIEWS:
-            content = (QT / qml_path).read_text(encoding="utf-8")
-            self.assertNotIn("promptEditor", content, f"promptEditor found in {qml_path}")
-            self.assertNotIn("PromptEditor", content, f"PromptEditor found in {qml_path}")
+    def test_prompt_editor_is_server_profile_scoped(self) -> None:
+        # G2d-2 adds a per-seat prompt editor, but it edits a server-sourced
+        # profile only — never a local prompt-template library or file source.
+        panel = (QT / "qml/components/SeatEditorPanel.qml").read_text(encoding="utf-8")
+        self.assertIn('objectName: "seatEditorPrompt"', panel)
+        self.assertIn("root.config", panel)  # prompt value comes from the passed-in server config
+        for forbidden in ["promptLibrary", "PromptLibrary", "templateLibrary",
+                          "TemplateLibrary", ".txt", "QFile", "QDir", "file://"]:
+            self.assertNotIn(forbidden, panel, f"local prompt source '{forbidden}' in SeatEditorPanel")
 
 
 class QtObserverCockpitContractTests(unittest.TestCase):
@@ -263,9 +267,11 @@ class QtObserverProfileClientTests(unittest.TestCase):
     def test_profile_requests_use_latest_wins_guards(self) -> None:
         h = (QT / "src/ObserverApiClient.h").read_text(encoding="utf-8")
         cpp = (QT / "src/ObserverApiClient.cpp").read_text(encoding="utf-8")
-        # fetchProfile AND validateProfile must drop stale responses
+        # fetchProfile AND validateProfile must drop stale responses — pin BOTH
+        # latest-wins guards in the .cpp (the .h only proves declaration).
         self.assertIn("m_profileRequestSerial", h)
         self.assertIn("m_profileValidateSerial", h)
+        self.assertIn("m_profileRequestSerial", cpp)
         self.assertIn("m_profileValidateSerial", cpp)
 
 
