@@ -89,7 +89,7 @@ No edits to `deepseek_provider.py` / `provider_agent.py` / `provider_contract.py
   4. `mode="live"`, server built with a `live_launcher` but flagged key-missing (see Task 5 seam: pass `live_enabled=True, live_launcher=None`) → `403 missing_api_key`; no `run_dir`.
   5. `mode="live"` + a seat resolving to a non-deepseek provider → `400 unsupported_live_provider`; no `run_dir`.
   6. `mode="live"` + deepseek seats with **>1 distinct model** → `400 mixed_models`; no `run_dir`.
-  7. `mode="live"` + single-model deepseek profile + `live_launcher` set → the **fake live_launcher ran** (sentinel present) and `resolved-profile.json` shows `execution_mode="live"` (after Task 4).
+  7. `mode="live"` + single-model deepseek profile + `live_launcher` set → the **fake live_launcher ran** (sentinel present). *(The `resolved-profile.json` `execution_mode="live"` marker is asserted in **Task 4** — where the artifact is parameterized and the wrapper threaded — NOT here. Task 2 only proves the right launcher is selected.)*
   8. **(capability precedes validity/shape)** `mode="live"`, server **not** live-enabled, with a **malformed** profile (and separately a non-deepseek profile) → `403 live_api_disabled` — **NOT** `invalid_profile` / `unsupported_live_provider`; no `run_dir`. Likewise `mode="live"` + flag-on + key-missing + malformed profile → `403 missing_api_key`.
   Run → fail.
 - [ ] **Step 2 (green):** `observer_server.py`:
@@ -105,7 +105,7 @@ No edits to `deepseek_provider.py` / `provider_agent.py` / `provider_contract.py
     7. else `base = state.live_launcher`.
   - Factor steps 2–3 into pure `_check_live_capability(state, mode)` and steps 5–6 into pure `_check_live_profile_shape(resolved_seats)`; unit-test both offline (no socket).
   - In `_launch_run_async`/error recording, map the live launcher exit code to a **key-free** reason: `3 → budget_exhausted`, `2`/other → `provider_failure`.
-  - Thread `execution_mode`/`live_api` into `_profile_launcher` so it stamps the artifact per the chosen base (`"live"`/`"used"` when `base is live_launcher`, else `"fake"`/`"not_used"`). (Artifact parameterization lands in Task 4.)
+  - **Task 2 does NOT change `_profile_launcher`'s artifact stamping** — it keeps calling `build_resolved_profile_artifact(profile, run_id)` unchanged, so `resolved-profile.json` stays `execution_mode=fake` even for the injected fake-live sentinel (not asserted here). The honest `execution_mode=live` marker + the wrapper threading land in **Task 4** (whose prerequisite is the artifact parameterization). This keeps Task 2 green without touching `profile_config.py`.
   Run → fail-then-green (server-socket tests env-blocked here → validate the gate logic via the two pure helpers `_check_live_capability(state, mode)` and `_check_live_profile_shape(resolved_seats)` unit-tested offline).
 - [ ] **Step 3:** Focused tests OK (offline gate-helper unit tests green; document server-socket tests as env-blocked). Commit: `feat(g3-1): server live-mode gate matrix + launcher dispatch`.
 
@@ -130,16 +130,18 @@ No edits to `deepseek_provider.py` / `provider_agent.py` / `provider_contract.py
 
 ---
 
-## Task 4 — Honest `resolved-profile.json` + prompt-manifest model
+## Task 4 — Honest `resolved-profile.json` live marker (artifact param + wrapper threading)
 
-**Files:** `src/werewolf_eval/profile_config.py`, `tests/test_profile_config.py` (+ live-path wiring already in Tasks 2/3)
+**Files:** `src/werewolf_eval/profile_config.py`, `src/werewolf_eval/observer_server.py`, `tests/test_profile_config.py`, `tests/test_observer_server.py`
 
-- [ ] **Step 1 (red):** `tests/test_profile_config.py` add `LiveArtifactTests`:
-  - `build_resolved_profile_artifact(profile, run_id, execution_mode="live", live_api="used")` → dict with `execution_mode=="live"`, `live_api=="used"`, `secrets_redacted is True`, prompts still hash-only (no raw prompt text).
-  - the artifact's per-seat entries record the **resolved real model** (authoritative model record — this is what satisfies A3, NOT the prompt-manifest).
-  - default call (no kwargs) still yields `execution_mode=="fake"`, `live_api=="not_used"` (back-compat).
+- [ ] **Step 1 (red):**
+  - `tests/test_profile_config.py` `LiveArtifactTests`:
+    - `build_resolved_profile_artifact(profile, run_id, execution_mode="live", live_api="used")` → `execution_mode=="live"`, `live_api=="used"`, `secrets_redacted is True`, prompts hash-only (no raw prompt text).
+    - per-seat entries record the **resolved real model** (authoritative model record — satisfies A3, NOT the prompt-manifest).
+    - default call (no kwargs) still yields `execution_mode=="fake"`, `live_api=="not_used"` (back-compat).
+  - `tests/test_observer_server.py` — **extend the injected-fake-`live_launcher` dispatch test from Task 2**: a `mode=live` dispatch now asserts `resolved-profile.json` shows `execution_mode="live"`/`live_api="used"`; a fake dispatch shows `execution_mode="fake"`/`live_api="not_used"`. (This is the marker assertion deferred out of Task 2.)
   Run → fail.
-- [ ] **Step 2 (green):** parameterize `build_resolved_profile_artifact(profile, run_id, *, execution_mode="fake", live_api="not_used")`. The live launcher / `_profile_launcher` passes `execution_mode="live", live_api="used"` on the live base. **Model record:** `resolved-profile.json` already carries the resolved per-seat `model` — that is the authoritative record (A3). Do **NOT** edit the consensus runner; the runtime-spine `prompt-manifest.json` model stays `"unknown"` this slice (documented limitation; add a one-line note in the spec/packet and a named follow-up). No test asserts the manifest model == real model.
+- [ ] **Step 2 (green):** (a) parameterize `build_resolved_profile_artifact(profile, run_id, *, execution_mode="fake", live_api="not_used")`. (b) Thread it into `observer_server.py`'s `_profile_launcher`: stamp `execution_mode="live"`/`live_api="used"` when `base is state.live_launcher`, else `"fake"`/`"not_used"`. **Model record:** `resolved-profile.json` already carries the resolved per-seat `model` (authoritative — A3). Do **NOT** edit the consensus runner; the runtime-spine `prompt-manifest.json` model stays `"unknown"` (documented limitation; named follow-up). No test asserts the manifest model == real model.
 - [ ] **Step 3:** Focused OK. Commit: `feat(g3-1): honest execution markers in resolved-profile artifact`.
 
 ---

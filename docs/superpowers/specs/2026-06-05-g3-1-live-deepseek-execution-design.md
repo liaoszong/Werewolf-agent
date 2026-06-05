@@ -36,12 +36,15 @@ The live primitives already exist and are independently offline-tested; this sli
 HTTP POST /api/runs {profile, mode:"live"}
    -> parse_profile_launch_request  (mode in ALLOWED_MODES incl. "live")
    -> _handle_profile_launch:
-        validate profile
-        dispatch = live?  AND  state.live_launcher set (server --allow-live-api + key)
-                          AND  resolved seats all use provider "deepseek"
-                          AND  all deepseek seats share ONE model   (else 400)
-        if mode=="live" but not live-enabled -> 403 live_api_disabled (BEFORE run_dir)
-        base = state.live_launcher  (else state.launcher = fake)
+        parse mode
+        if mode=="live": CAPABILITY gate (BEFORE load/validate, no run_dir on reject)
+              not live_enabled        -> 403 live_api_disabled
+              live_launcher is None   -> 403 missing_api_key
+        load + validate profile       -> 400 invalid_profile on failure; then resolve_profile
+        if mode=="live": SHAPE gate (AFTER validate)
+              any seat not deepseek   -> 400 unsupported_live_provider
+              deepseek seats >1 model -> 400 mixed_models
+        base = state.live_launcher (live) else state.launcher (fake)
    -> _profile_launcher wraps base, writes resolved-profile.json (execution_mode/live_api per base)
    -> _launch_run_async (daemon thread): base(run_id, run_dir) -> int status
         live base = build_deepseek_launcher(...)(run_id, run_dir)
