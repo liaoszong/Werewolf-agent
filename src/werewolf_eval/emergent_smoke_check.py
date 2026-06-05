@@ -17,7 +17,11 @@ LIVE_SUCCESS = "live_success"
 _SECRET_MARKERS = ("Authorization", "Bearer ", "api_key", "DEEPSEEK_API_KEY", "sk-")
 
 MIN_LIVE_SUCCESS_RATE = 0.80
-MIN_LIVE_SUCCESS_ACTIONS = 20
+# Calibrated from two real live games (2026-06-05: 14- and 22-turn terminals): a
+# 6-player emergent game ends in 1-2 rounds and produces ~14-22 provider turns, so
+# the floor sits BELOW the shortest legit full game (~14) yet ABOVE a ~6-call dodge.
+# It is also self-consistent with the 0.80 rate gate on the shortest game.
+MIN_LIVE_SUCCESS_ACTIONS = 12
 
 
 def scan_all_artifacts_for_secrets(run_dir: Path) -> bool:

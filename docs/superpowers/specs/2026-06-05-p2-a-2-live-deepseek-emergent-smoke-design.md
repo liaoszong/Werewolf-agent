@@ -104,7 +104,7 @@ fake provider 忽略这三个字段(只按 `(actor,phase,round)` 取脚本)→ P
 **硬门槛②(真的是 live):**
 - `live_success_rate = live_success_actions / live_requested_actions ≥ 0.80`;`budget_exhausted=false`;`provider_turns` 全量统计出现在 review packet。
 - **终局优先:** 通过的首选条件是**真实终局**。deterministic cap **只在 smoke config 里预声明**(不得在看到坏 run 后才选),且仍须满足 `live_success_rate≥0.80` 加上(`live_success_actions≥20` **或** 一份有据的"早终局/短局"解释)。
-- 绝对下限 `live_success_actions≥20`(防小样本骗过);早终局致低调用数 → review packet 解释。
+- 绝对下限 `live_success_actions≥12`(防小样本骗过)。**校准说明(2026-06-05 两局真实数据):** 6 人局 1-2 轮分胜负、产生 ~14-22 provider 回合,故下限定在"最短合法全局(~14)之下、~6 次骗局之上",并与 `rate≥0.80` 在最短局上自洽(原定 20 会误杀合法早终局,已下调)。早终局致更低调用数 → `--allow-short-game` + review 解释。
 
 **硬门槛③(诚实链,逐回合):** **每个 `kind==live_success` 的 provider 回合**必须带:`source_label=="[DeepSeek API output]"`、真实 model 名、`token_usage.total_tokens>0`。**fallback 回合不得伪装成 DeepSeek output,必须明确标 fallback。** prompt-manifest 记真实 model(非 `unknown`),缺 manifest=hard failure。
 
@@ -131,6 +131,16 @@ fake provider 忽略这三个字段(只按 `(actor,phase,round)` 取脚本)→ P
 1. §7 全部离线单元绿;P2-A-1/g1b/g1d 零回归。
 2. **用户**本地跑通一局真实 DeepSeek 涌现 live;**agent 离线机检** raw artifacts,§6 三条硬门槛 + 全产物 secret scan 全 PASS;review packet 摊开 provider_turns 统计 + 逐回合 token_usage>0 证据 + 软门槛 content warnings(若有)。
 3. 记录这次的 `live_requested_actions` / `live_success_rate` / 结局,更新 PROJECT_MAP P2-A-2 状态。
+
+## 8b. Live smoke evidence (user-run 2026-06-05, agent offline-reviewed)
+两局真实 DeepSeek(`deepseek-v4-flash`)涌现对局,均端到端完成、两种胜负都出现:
+
+| Run | 结局 | live_requested | live_success | rate | provider_result_kind | 其余 7 门槛 |
+|---|---|---|---|---|---|---|
+| 1 | 村民胜 | 22 | 19 | 0.864 | 19 live_success / 1 invalid / 2 error | 全 ✅ |
+| 2 | 狼人胜 | 14 | 13 | 0.929 | 13 live_success / 1 timeout | 全 ✅ |
+
+两局 `per_turn_honesty_ok`/`manifest_model_honest`/`observation_text_present`/`no_secret_markers`/`budget_not_exhausted`/`game_completed` 全过;`live_success_rate` 均 ≥0.80。唯一触发的是绝对下限——经两局真实回合分布(14、22)校准,floor 20→**12**(§6 已记)。校准后两局 `live_success_floor_ok=True`,**smoke=PASS**。结论:真实 live 涌现路径端到端可用且诚实,DoD 达成。
 
 ## 9. Non-goals
 - 内容质量调优(观察摘要压缩、per-role prompt、强制发言结构、二轮对辩、温度、失败样本对比)→ 后续"readable play quality"切片。

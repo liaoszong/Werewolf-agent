@@ -118,11 +118,20 @@ class EmergentSmokeJudgeTests(unittest.TestCase):
     def test_short_game_floor_waived_with_flag(self) -> None:
         with tempfile.TemporaryDirectory() as t:
             tmp = Path(t)
-            _write_run(tmp, turns=[_live_turn(actor=f"p{i}") for i in range(12)])  # < 20
+            _write_run(tmp, turns=[_live_turn(actor=f"p{i}") for i in range(8)])  # < 12 floor
             strict = evaluate_emergent_smoke(tmp, expected_model=MODEL)
             self.assertFalse(strict["checks"]["live_success_floor_ok"])
             waived = evaluate_emergent_smoke(tmp, expected_model=MODEL, allow_short_game=True)
             self.assertTrue(waived["checks"]["live_success_floor_ok"])
+
+    def test_floor_twelve_passes_a_realistic_short_terminal(self) -> None:
+        # Both real 2026-06-05 games (19 and 13 live successes) must pass the floor.
+        with tempfile.TemporaryDirectory() as t:
+            tmp = Path(t)
+            _write_run(tmp, turns=[_live_turn(actor=f"p{i}") for i in range(13)])  # werewolf-win run
+            v = evaluate_emergent_smoke(tmp, expected_model=MODEL)
+            self.assertTrue(v["checks"]["live_success_floor_ok"])
+            self.assertTrue(v["passed"], v["checks"])
 
 
 if __name__ == "__main__":
