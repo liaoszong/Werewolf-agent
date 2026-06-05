@@ -143,6 +143,28 @@ def _build_capabilities_payload(state: ObserverServerState) -> dict[str, object]
     )
 
 
+def _read_execution_mode(run_dir: Path) -> str | None:
+    """Read ``execution_mode`` from the run's OWN ``resolved-profile.json``.
+
+    Returns the string value when present, else ``None`` (missing/corrupt
+    artifact, or a non-string value → the HUD chip conservatively falls back to
+    ``SYS: SIMULATION``).  Guards JSON/OS errors, never raises, and never exposes
+    a path.  This is a server-local file read, NOT a secret — the Qt client
+    performs no file I/O and consumes this only as a run-detail JSON field."""
+    path = run_dir / "resolved-profile.json"
+    if not path.exists():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
+    if isinstance(data, dict):
+        value = data.get("execution_mode")
+        if isinstance(value, str):
+            return value
+    return None
+
+
 def _map_launcher_exit_reason(code: int) -> str:
     """Map a launcher exit code to a key-free run-status reason (G3-1, A7).
 
@@ -448,12 +470,19 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
         ).start()
 
     def _run_detail_with_reason(self, run_id: str, run_dir: Path) -> dict[str, object]:
-        """Build run detail and attach the key-free run-status reason, if any."""
+        """Build run detail and attach the key-free run-status reason (if any)
+        plus the executed-truth ``execution_mode`` read from the run's OWN
+        ``resolved-profile.json`` (G3-2).  ``execution_mode`` is the HUD chip's
+        ONLY source of truth; it is omitted when no string value is present so
+        the chip falls back to ``SYS: SIMULATION``."""
         mem_status = self._get_status(run_id, run_dir)
         detail = build_run_detail(run_dir, status=mem_status)
         reason = self._get_error(run_id)
         if reason is not None:
             detail["reason"] = reason
+        execution_mode = _read_execution_mode(run_dir)
+        if execution_mode is not None:
+            detail["execution_mode"] = execution_mode
         return detail
 
     def _handle_profile_launch(self, body: dict[str, object]) -> None:

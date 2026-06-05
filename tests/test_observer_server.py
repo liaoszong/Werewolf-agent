@@ -1674,3 +1674,73 @@ class LiveRunStatusReasonTests(TestCase):
         detail = h._run_detail_with_reason("rrx", run_dir)
         self.assertEqual(detail["status"], "failed")
         self.assertEqual(detail["reason"], "provider_failure")
+
+
+# ---------------------------------------------------------------------------
+# G3-2 run-detail execution_mode — the server reads its OWN resolved-profile.json
+# and surfaces execution_mode as a JSON field so the Qt HUD chip can show
+# executed truth with ZERO client file I/O.  Validated offline (no socket).
+# ---------------------------------------------------------------------------
+
+
+class RunDetailExecutionModeTests(TestCase):
+    def setUp(self) -> None:
+        self._tmp = TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self._runs = Path(self._tmp.name)
+
+    def _handler(self) -> "_InProcessHandler":
+        state = ObserverServerState(runs_dir=self._runs, launcher=default_fake_launcher)
+        return _InProcessHandler(state)
+
+    _OMIT = object()
+
+    def _run_dir(self, run_id: str, *, execution_mode: object = _OMIT) -> Path:
+        run_dir = self._runs / run_id
+        run_dir.mkdir()
+        if execution_mode is not self._OMIT:
+            artifact: dict[str, object] = {"schema_version": "g2d.profile.v1", "run_id": run_id}
+            if execution_mode is not None:
+                artifact["execution_mode"] = execution_mode
+            (run_dir / "resolved-profile.json").write_text(
+                json.dumps(artifact), encoding="utf-8"
+            )
+        return run_dir
+
+    def test_live_execution_mode_surfaced(self) -> None:
+        run_dir = self._run_dir("rd_live", execution_mode="live")
+        detail = self._handler()._run_detail_with_reason("rd_live", run_dir)
+        self.assertEqual(detail["execution_mode"], "live")
+
+    def test_fake_execution_mode_surfaced(self) -> None:
+        run_dir = self._run_dir("rd_fake", execution_mode="fake")
+        detail = self._handler()._run_detail_with_reason("rd_fake", run_dir)
+        self.assertEqual(detail["execution_mode"], "fake")
+
+    def test_no_artifact_omits_execution_mode(self) -> None:
+        run_dir = self._run_dir("rd_none")  # no resolved-profile.json
+        detail = self._handler()._run_detail_with_reason("rd_none", run_dir)
+        self.assertNotIn("execution_mode", detail)
+
+    def test_non_string_execution_mode_is_omitted(self) -> None:
+        # A malformed artifact (non-string execution_mode) must NOT surface a
+        # truthy field — the chip then conservatively falls back to SIMULATION.
+        run_dir = self._run_dir("rd_bad", execution_mode=123)
+        detail = self._handler()._run_detail_with_reason("rd_bad", run_dir)
+        self.assertNotIn("execution_mode", detail)
+
+    def test_corrupt_artifact_is_tolerated(self) -> None:
+        run_dir = self._runs / "rd_corrupt"
+        run_dir.mkdir()
+        (run_dir / "resolved-profile.json").write_text("{ not json", encoding="utf-8")
+        detail = self._handler()._run_detail_with_reason("rd_corrupt", run_dir)
+        self.assertNotIn("execution_mode", detail)
+        self.assertIn("status", detail)  # detail still builds
+
+    def test_execution_mode_coexists_with_reason(self) -> None:
+        run_dir = self._run_dir("rd_both", execution_mode="live")
+        h = self._handler()
+        h._set_error("rd_both", "provider_failure")
+        detail = h._run_detail_with_reason("rd_both", run_dir)
+        self.assertEqual(detail["execution_mode"], "live")
+        self.assertEqual(detail["reason"], "provider_failure")
