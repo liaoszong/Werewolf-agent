@@ -53,7 +53,7 @@ Item {
                 Behavior on color { ColorAnimation { duration: Theme.motion.fast } }
                 Text {
                     anchors.centerIn: parent
-                    text: I18n.t("确定性", "DETERMINISTIC")
+                    text: I18n.t("模拟（免费）", "SIMULATION (FREE)")
                     color: root.state === "fake" ? Theme.color.text : Theme.color.textMuted
                     font.family: Theme.font.family
                     font.pixelSize: Theme.size.micro
@@ -91,8 +91,8 @@ Item {
                         // The <reason_code> is server-supplied (verbatim), so it is a
                         // property reference here, never a client source literal (C4).
                         text: root.liveAvailable
-                              ? I18n.t("实时接口", "LIVE API")
-                              : I18n.t("禁用 · ", "UNAVAIL · ") + root.liveReasonCode
+                              ? I18n.t("真实AI（计费）", "LIVE AI (BILLED)")
+                              : I18n.t("不可用 · ", "UNAVAILABLE · ") + root.liveReasonCode
                         color: segLive.engaged ? Theme.color.text : Theme.color.textMuted
                         font.family: Theme.font.family
                         font.pixelSize: Theme.size.micro
@@ -122,8 +122,8 @@ Item {
             Text {
                 anchors.centerIn: parent
                 text: armRow.confirmed
-                      ? I18n.t("实时接口已接入", "LIVE ENGAGED")
-                      : I18n.t("接入实时接口（计费）", "ARM LIVE (BILLED)")
+                      ? I18n.t("真实AI已启用", "LIVE AI ENGAGED")
+                      : I18n.t("确认使用真实AI（计费）", "CONFIRM LIVE AI (BILLED)")
                 color: Theme.color.text
                 font.family: Theme.font.family
                 font.pixelSize: Theme.size.micro

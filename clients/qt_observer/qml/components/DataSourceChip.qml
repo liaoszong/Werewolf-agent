@@ -39,8 +39,8 @@ Rectangle {
         Text {
             anchors.verticalCenter: parent.verticalCenter
             text: root._live
-                  ? I18n.t("环境: 实时接口", "SYS: LIVE_API")
-                  : I18n.t("环境: 离线模拟", "SYS: SIMULATION")
+                  ? I18n.t("环境: 真实AI", "SYS: LIVE_API")
+                  : I18n.t("环境: 模拟", "SYS: SIMULATION")
             color: root._live ? Theme.color.text : Theme.color.textMuted
             font.family: Theme.font.mono
             font.pixelSize: Theme.size.micro
