@@ -47,11 +47,15 @@ The current main branch has completed:
 - G1h Live Runtime Event Spine.
 - G2a Local Observer Server / Protocol Control Plane.
 - G2b Qt Observer Cockpit MVP.
+- G2c God View / Role View.
+- G2d Prompt Configuration MVP (incl. G2d-2 Qt profile setup UI).
+- G3-1 live DeepSeek execution (server-side, opt-in, fake-by-default).
+- G3-2 Qt live/fake toggle (read-only capabilities endpoint, honest HUD chip).
+- G3-3 runtime prompt-manifest real-model + gated real-DeepSeek smoke (PASSED).
 
 The current main branch has not completed:
 
 - Web observer client.
-- Prompt editor UI.
 - Multi-provider arena.
 - human-vs-AI UI.
 - G4 evaluation platform / real multi-game Leaderboard.
@@ -174,24 +178,41 @@ Goal: expose the G1h runtime event spine through local observer surfaces without
 
 #### G2c: God View / Role View
 
+- Status: `completed`.
 - Role: separate god-view state from role-view projections so hidden information remains auditable.
 - Boundary: no prompt editor or multi-run experiment system.
 
 #### G2d: Prompt Configuration MVP
 
-- Role: configure local prompt/profile/model/temperature/strategy parameters through a controlled profile surface.
-- Boundary: no hosted account system, no multi-provider arena, no leaderboard.
+- Status: `completed` (incl. G2d-2 Qt profile setup UI).
+- Role: configure local prompt/profile/model/temperature/strategy parameters through a controlled server-side profile surface (select/edit/validate/launch).
+- Boundary: server-side profiles only — no local prompt template library; no hosted account system, no multi-provider arena, no leaderboard.
 
 ### Phase 3+ / G3: experiment route
 
 Goal: support repeatable experiment profiles and unify replay/live operation.
 
-G3 candidates:
+Completed:
 
-- Experiment profiles.
-- Replay + live dual mode over the same observer protocol.
-- Multi-provider arena.
-- Batch run metadata and comparison-ready exports.
+#### G3-1: live DeepSeek execution (server-side)
+
+- Status: `completed`.
+- Role: launch a profile via the real DeepSeek provider through the observer server — opt-in, fake-by-default. Quadruple gate (`mode=live` + `--allow-live-api` + env key + all-deepseek single-model seats); fail-closed budget (`max_requests=32`) classified into key-free run-status reasons (`budget_exhausted`/`provider_failure`).
+- Boundary: server-side only; the API key lives only in the server env; default suite stays offline.
+
+#### G3-2: Qt live/fake toggle
+
+- Status: `completed`.
+- Role: bring G3-1's live capability onto the Qt cockpit — read-only `GET /api/runtime/capabilities`, a two-click live-arming `ModeControl`, and a global `DataSourceChip` HUD showing executed truth from run-detail `execution_mode`. Intent (setup) vs. truth (HUD); reason codes rendered data-driven.
+- Boundary: no API-key UI; no Qt artifact file I/O; fake stays the unconditional default; the key never touches the client.
+
+#### G3-3: runtime-manifest honesty + real smoke + budget evidence
+
+- Status: `completed`.
+- Role: thread the real deepseek model into the runtime-spine `prompt-manifest.json` (was hard-coded `"unknown"`); add a text-free `manifest_model_honest` check to the gated smoke; run the real-DeepSeek smoke once (PASSED — a full 6-player game used ~10 provider calls, so `max_requests=32` stays).
+- Boundary: smoke is gated/manual; no CI live calls.
+
+Remaining G3 candidates (not started): multi-provider arena; batch run metadata and comparison-ready exports.
 
 Boundary: G3 depends on G1h event spine and G2 observer contracts.
 
@@ -252,7 +273,7 @@ G1h event spine
 
 ## Current Priority
 
-G1h Live Runtime Event Spine, G2a Local Observer Server / Protocol Control Plane, G2b Qt Observer Cockpit MVP, and G2c God View / Role View are now `completed`. The next implementation candidate is G2d Prompt Configuration MVP.
+G1h–G2d and G3-1/G3-2/G3-3 are now `completed`: the live observer platform supports a configurable server-side profile, an opt-in real-DeepSeek live execution path (fake-by-default), a Qt live/fake toggle with an honest HUD, and a runtime prompt-manifest that records the real model (validated by a passing real-DeepSeek smoke). The next implementation candidate is the G4 evaluation platform (real multi-game leaderboard, role-separated scorecards, provider/model/version comparison), which depends on capturing enough multi-game live run data.
 
 G1 series retrospective:
 - G1a proved fresh generated logs can feed validators, scoring, metrics, and replay demo.
