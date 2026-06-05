@@ -1,5 +1,7 @@
 # ROADMAP — Werewolf-agent
 
+> **⚠️ 产品阶段以 `docs/PROJECT_MAP.md` 为准(2026-06-05 起)。** 本文件原有的 "Phase 1 / 2A / 2B / 3-G-track / 4-G4" 命名是**工程层**框架,已被 PROJECT_MAP 的**产品三阶段**(P1 地基 / P2 观战客户端 / P3 评测·复盘·排行榜)重构。旧 G/E/S 编号 → 新 P 编号的映射见 PROJECT_MAP「Reconcile」表。本文件保留为**工程依赖图 + 历史记录**;"下一候选 = G4 评测平台"一句已 **superseded**,真实下一步是 `P2-A-1`(涌现式引擎,即旧临时名 G4-1)。
+
 ## Purpose
 
 `ROADMAP.md` is the canonical route alignment document for Phase 2 / Phase 3+ planning. It explains what the project is ultimately trying to become, where the current main branch stands, and how the route proceeds from offline replay foundation toward a client-agnostic live AI Werewolf experiment platform.

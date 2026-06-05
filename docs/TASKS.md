@@ -1,5 +1,7 @@
 # TASKS — Werewolf-agent Task Status
 
+> **⚠️ 产品阶段与"下一步"以 `docs/PROJECT_MAP.md` 为准(2026-06-05 起)。** 本文件中"下一候选 = G4 evaluation platform"已 **superseded**;真实当前工作任务是 `P2-A-1`(涌现式游戏引擎,旧临时名 G4-1)。旧 G/E/S → 新 P 编号映射见 PROJECT_MAP「Reconcile」表。
+
 > **Progress note:** 本文件描述 Phase 1 任务依赖关系和计划状态，但任务完成状态可能滞后于实际进度。判断当前进度时，必须以已合入 PR 和 main 上实际存在的产物文件为准。如果本文件状态与 PR / main 文件冲突，以 PR / main 文件为准。
 
 > **Roadmap note:** Phase 2 / Phase 3 route boundaries are defined in `docs/ROADMAP.md`. This file tracks task status and candidate engineering work; it does not replace the roadmap.
