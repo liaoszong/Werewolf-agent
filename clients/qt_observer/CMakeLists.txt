@@ -55,6 +55,8 @@ qt_add_qml_module(appqt_observer
         qml/components/SectionHeader.qml
         qml/components/EmptyState.qml
         qml/components/SeatEditorPanel.qml
+        qml/components/ModeControl.qml
+        qml/components/DataSourceChip.qml
 )
 
 set_target_properties(appqt_observer PROPERTIES

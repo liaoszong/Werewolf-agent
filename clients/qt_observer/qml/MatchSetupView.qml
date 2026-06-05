@@ -27,7 +27,13 @@ Item {
     Component.onCompleted: {
         ObserverClient.refreshProfileSchema()
         ObserverClient.refreshProfiles()
+        // Learn the live posture BEFORE launch (no "guess, click, get 403").
+        ObserverClient.refreshCapabilities()
     }
+
+    // C3: any profile/seat change or live becoming unavailable disarms the FSM
+    // through the SINGLE resetToFake() entry — the parent never mutates state.
+    onSelectedSeatIdChanged: setupModeControl.resetToFake()
 
     // Load the first profile once the list arrives.
     Connections {
@@ -47,6 +53,11 @@ Item {
             root.profileRevision++
             root._validatedRevision = -1
             if (!root.selectedSeatId && root.seatIds.length > 0) root.selectedSeatId = root.seatIds[0]
+            setupModeControl.resetToFake()   // C3: a new profile disarms live
+        }
+        // C3: live becoming unavailable must disarm any armed/confirmed state.
+        function onCapabilitiesChanged() {
+            if (!ObserverClient.liveAvailable) setupModeControl.resetToFake()
         }
         function onLaunchSucceeded() { root.StackView.view.parent.navigatePreflight() }
     }
@@ -95,38 +106,15 @@ Item {
         anchors.rightMargin: Theme.layout.pageMargin
         spacing: Theme.space.md
 
-        // Declared-vs-executed trust cue: a profile may declare a provider/model,
-        // but this build always runs deterministic-fake. Surface it once (global),
-        // never per-seat. Low-opacity amber, on-palette.
-        Rectangle {
-            id: executionBanner
-            objectName: "setupExecutionBanner"
-            width: parent.width
-            implicitHeight: bannerRow.implicitHeight + Theme.space.sm * 2
-            color: Theme.withAlpha(Theme.color.warning, 0.10)
-            border.width: 1
-            border.color: Theme.withAlpha(Theme.color.warning, 0.35)
-            radius: Theme.radius.sm
-            Row {
-                id: bannerRow
-                anchors.left: parent.left
-                anchors.leftMargin: Theme.space.md
-                anchors.verticalCenter: parent.verticalCenter
-                spacing: Theme.space.sm
-                Rectangle {
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: 7; height: 7; radius: 3.5
-                    color: Theme.color.warning
-                }
-                Text {
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: I18n.t("执行模式：确定性模拟 — 不会发起真实 API 调用（供应方/模型仅用于审计记录）。",
-                                 "Execution Mode: Deterministic Mock — no real API calls (provider/model recorded for audit only).")
-                    color: Theme.color.textSecondary
-                    font.family: Theme.font.family
-                    font.pixelSize: Theme.size.caption
-                }
-            }
+        // Intent (setup control), NOT executed truth.  The segmented fake/live
+        // arming control replaces the old amber deterministic-mock banner.
+        // Fake stays the unconditional default; live arms in two deliberate
+        // clicks and is available only when the server's capabilities say so.
+        // (Executed truth lives in the global AppShell DataSourceChip, driven by
+        // run-detail execution_mode — never local files.)
+        ModeControl {
+            id: setupModeControl
+            objectName: "setupModeControl"
         }
 
         Text {
@@ -146,6 +134,7 @@ Item {
                 onActivated: {
                     root.editedProfile = ({})
                     root.selectedSeatId = ""
+                    setupModeControl.resetToFake()   // C3: switching profile disarms live
                     ObserverClient.fetchProfile(ObserverClient.profileItems[currentIndex].name)
                 }
             }
@@ -260,7 +249,9 @@ Item {
             anchors.right: parent.right; anchors.rightMargin: Theme.layout.pageMargin
             anchors.verticalCenter: parent.verticalCenter
             // Advances to Preflight only via onLaunchSucceeded (202 + currentRunId).
-            onClicked: ObserverClient.launchFromProfile(root.editedProfile)
+            // C2: pass an EXPLICIT resolved mode ("fake"|"live") — "live" only
+            // when the arming FSM is live_confirmed; never a C++ default arg.
+            onClicked: ObserverClient.launchFromProfile(root.editedProfile, setupModeControl.resolvedMode)
         }
     }
 }

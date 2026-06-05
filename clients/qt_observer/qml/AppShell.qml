@@ -88,6 +88,15 @@ Item {
                 }
             }
 
+            // Global HUD data-source chip — executed truth (run-detail
+            // execution_mode), NOT intent.  Conservative SYS: SIMULATION until a
+            // run detail returns a mode; never optimistic-live.
+            DataSourceChip {
+                objectName: "dataSourceChip"
+                anchors.verticalCenter: parent.verticalCenter
+                mode: ObserverClient.currentExecutionMode
+            }
+
             // Divider
             Rectangle {
                 anchors.verticalCenter: parent.verticalCenter

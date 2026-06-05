@@ -39,14 +39,16 @@ REQUIRED_QML_VIEWS = [
     "qml/components/AuditLinksPanel.qml",
     "qml/components/StatusBadge.qml",
     "qml/components/SeatEditorPanel.qml",
+    "qml/components/ModeControl.qml",
+    "qml/components/DataSourceChip.qml",
 ]
 
 REQUIRED_OBJECT_NAMES = {
     "Main.qml": ["werewolfObserverMainWindow", "appShellLoader"],
-    "qml/AppShell.qml": ["appShell", "appShellStack"],
+    "qml/AppShell.qml": ["appShell", "appShellStack", "dataSourceChip"],
     "qml/HomeView.qml": ["homeView", "startNewMatchButton", "historyButton", "serverStatusBadge", "recentRunsList"],
     "qml/MatchSetupView.qml": ["matchSetupView", "setupRoleCards", "setupContinueButton",
-                               "setupProfilePicker", "setupValidateButton", "setupExecutionBanner"],
+                               "setupProfilePicker", "setupValidateButton", "setupModeControl"],
     "qml/PreflightView.qml": ["preflightView", "preflightServerStatus", "preflightTemplateSummary", "preflightVisibilitySummary", "startMatchButton"],
     "qml/LiveCockpitView.qml": ["liveCockpitView", "runStatusBadge", "playerPanelGrid", "eventTimeline", "perspectiveSwitcher", "auditLinksPanel", "providerFailureSummary"],
     "qml/HistoryView.qml": ["historyView", "historyRunsList", "historyRefreshButton"],
@@ -114,8 +116,16 @@ class QtObserverSetupContractTests(unittest.TestCase):
         # launch is 202-gated: the view navigates only from the launchSucceeded
         # signal handler, never optimistically on click.
         self.assertIn("onLaunchSucceeded", content)
-        # declared-vs-executed trust banner is present
-        self.assertIn("Deterministic Mock", content)
+        # G3-2: the amber "Deterministic Mock" banner is replaced by ModeControl.
+        self.assertNotIn("Deterministic Mock", content)
+        # MatchSetupView instantiates the segmented arming control (C2/C3).
+        self.assertIn("ModeControl", content)
+        self.assertIn('objectName: "setupModeControl"', content)
+        # C2: launch passes an EXPLICIT resolved mode from the control — never a
+        # bare single-arg call that relies on a C++ default.
+        self.assertRegex(content, r"launchFromProfile\([^)]+,\s*\w+\.resolvedMode")
+        # C3: a single disarm entry point is called on the disarm triggers.
+        self.assertIn("resetToFake(", content)
 
     def test_preflight_mentions_visibility_boundary_and_default_template(self) -> None:
         content = (QT / "qml/PreflightView.qml").read_text(encoding="utf-8")
@@ -362,6 +372,43 @@ class QtObserverModeControlClientTests(unittest.TestCase):
             or 'm_currentExecutionMode = QStringLiteral("")' in cpp,
             "no reset path for m_currentExecutionMode (C1-bis stale guard)",
         )
+
+
+class QtObserverModeControlComponentTests(unittest.TestCase):
+    """G3-2: the segmented arming control (FSM) and the HUD data-source chip."""
+
+    def test_mode_control_declares_canonical_fsm_tokens(self) -> None:
+        content = (QT / "qml/components/ModeControl.qml").read_text(encoding="utf-8")
+        # Canonical FSM state tokens (asserted verbatim so the contract pins them).
+        for token in ['"fake"', '"live_armed"', '"live_confirmed"']:
+            self.assertIn(token, content, f"ModeControl.qml missing FSM token {token}")
+        # C3: a single disarm entry point.
+        self.assertIn("function resetToFake(", content)
+        # the control exposes the resolved launch mode for the view to pass along.
+        self.assertIn("resolvedMode", content)
+
+    def test_mode_control_renders_reason_code_data_driven(self) -> None:
+        content = (QT / "qml/components/ModeControl.qml").read_text(encoding="utf-8")
+        # disabled state reads the SERVER reason code (verbatim), never a literal.
+        self.assertIn("liveAvailable", content)
+        self.assertIn("liveReasonCode", content)
+        for code in ["live_api_disabled", "missing_api_key",
+                     "unsupported_live_provider", "mixed_models"]:
+            self.assertNotIn(code, content, f"server code '{code}' must not be a literal in ModeControl.qml")
+
+    def test_data_source_chip_has_both_hud_labels(self) -> None:
+        content = (QT / "qml/components/DataSourceChip.qml").read_text(encoding="utf-8")
+        self.assertIn("SYS: LIVE_API", content)
+        self.assertIn("SYS: SIMULATION", content)
+        # the chip is driven by a mode property (executed truth), not intent.
+        self.assertIn("mode", content)
+
+    def test_app_shell_binds_chip_to_execution_mode(self) -> None:
+        content = (QT / "qml/AppShell.qml").read_text(encoding="utf-8")
+        self.assertIn("DataSourceChip", content)
+        self.assertIn('objectName: "dataSourceChip"', content)
+        # C1: the chip's mode is bound to executed truth, not intent.
+        self.assertIn("ObserverClient.currentExecutionMode", content)
 
 
 class QtObserverHiddenInfoBoundaryTests(unittest.TestCase):
