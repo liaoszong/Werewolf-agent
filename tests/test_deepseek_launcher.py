@@ -155,6 +155,28 @@ class DeepSeekLauncherTests(unittest.TestCase):
             self.assertTrue((out_dir / "failure-audit.json").exists())
             self.assertFalse((out_dir / "game-log.json").exists())
 
+    def test_config_key_absent_from_raised_errors(self) -> None:
+        # Regression: a fake key passed to DeepSeekProviderConfig must never
+        # surface in a raised error string (offline; reuses provider patterns).
+        from werewolf_eval.deepseek_provider import DeepSeekProvider, DeepSeekProviderConfig
+        from werewolf_eval.provider_contract import ProviderRequest
+
+        def _boom(url, headers, payload, timeout_seconds):  # type: ignore[no-untyped-def]
+            raise RuntimeError("HTTP 500 upstream error")
+
+        provider = DeepSeekProvider(
+            DeepSeekProviderConfig(api_key="sk-test-fake-key"), transport=_boom
+        )
+        req = ProviderRequest(
+            request_id="g3_r01_p3", game_id="g3", actor="p3", phase="night", round=1,
+            observation={"role": "seer", "alive": ["p1", "p2", "p3"]},
+            allowed_actions=["seer_check"], allowed_targets=["p1", "p2", "p3"],
+        )
+        with self.assertRaises(RuntimeError) as ctx:
+            provider.respond(req)
+        self.assertNotIn("sk-test-fake-key", str(ctx.exception))
+        self.assertNotIn("sk-test", str(ctx.exception))
+
     def test_key_never_in_artifacts(self) -> None:
         launcher = self._build(_ok_factory)
         with TemporaryDirectory() as tmp:

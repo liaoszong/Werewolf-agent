@@ -1412,3 +1412,128 @@ class ObserverServerLiveOptInTests(TestCase):
         )
         for marker in ("sk-", "Bearer ", "Authorization"):
             self.assertNotIn(marker, result.stdout)
+
+
+# ---------------------------------------------------------------------------
+# G3-1 secret-scan + artifact-contract regression (offline, in-process)
+# ---------------------------------------------------------------------------
+
+
+class _ConsensusFakeProvider:
+    """Deterministic fake that drives a real consensus game to completion."""
+
+    def __init__(self) -> None:
+        self.requests: list = []
+        self.responses: list = []
+
+    def respond(self, request: object) -> object:
+        from werewolf_eval.provider_contract import ProviderResponse
+
+        self.requests.append(request)
+        action = request.allowed_actions[0] if request.allowed_actions else "player_vote"  # type: ignore[attr-defined]
+        obs = request.observation  # type: ignore[attr-defined]
+        role = obs.get("role", "")
+        phase = obs.get("phase", "")
+        if role == "werewolf" and phase == "night":
+            target = "p5" if 1 in (request.round,) else "p3"  # type: ignore[attr-defined]
+        else:
+            target = request.allowed_targets[0] if request.allowed_targets else request.actor  # type: ignore[attr-defined]
+        raw = json.dumps({
+            "action": action, "target": target, "reason_summary": "auto",
+            "decision_type": "team_coordinated" if role == "werewolf" and phase == "night" else "inference_based",
+            "confidence": 1.0,
+        })
+        resp = ProviderResponse(
+            request_id=request.request_id,  # type: ignore[attr-defined]
+            provider_name="deepseek", source_label="[DeepSeek API output]",
+            raw_content=raw, latency_ms=1,
+            token_usage={"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+        )
+        self.responses.append(resp)
+        return resp
+
+
+def _consensus_ok_factory(player_id: str) -> object:
+    from werewolf_eval.provider_agent import ProviderAgent
+
+    return ProviderAgent(player_id, _ConsensusFakeProvider())
+
+
+_LIVE_SECRET_MARKERS = ("Authorization", "Bearer ", "api_key", "DEEPSEEK_API_KEY", "sk-")
+
+
+class LiveArtifactContractTests(TestCase):
+    """A faked live launch yields the same top-level artifact set as a fake
+    launch — only the execution markers differ — and leaks no secret."""
+
+    def setUp(self) -> None:
+        self._tmp = TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self._root = Path(self._tmp.name)
+
+    def _dispatch_real(self, run_id: str, mode: str) -> Path:
+        from werewolf_eval.deepseek_launcher import build_deepseek_launcher
+
+        runs = self._root / mode / "runs"
+        runs.mkdir(parents=True, exist_ok=True)
+        live_launcher = build_deepseek_launcher(
+            api_key="sk-test-fake-key", base_url="https://api.deepseek.com",
+            model="deepseek-chat", max_tokens=64, max_requests=32,
+            provider_factory=_consensus_ok_factory,
+        )
+        state = ObserverServerState(
+            runs_dir=runs, launcher=default_fake_launcher,
+            profiles_dir=self._root / "profiles",
+            live_enabled=True, live_launcher=live_launcher,
+        )
+        handler = _InProcessHandler(state)
+        handler._handle_profile_launch(
+            {"profile": _deepseek_profile(), "run_id": run_id, "mode": mode}
+        )
+        self.assertEqual(handler.responses[-1][0], 202)
+        return runs / run_id
+
+    @staticmethod
+    def _top_level_files(run_dir: Path) -> list[str]:
+        return sorted(p.name for p in run_dir.iterdir() if p.is_file())
+
+    def test_live_and_fake_produce_same_top_level_artifact_set(self) -> None:
+        fake_dir = self._dispatch_real("contract_fake", "fake")
+        live_dir = self._dispatch_real("contract_live", "live")
+        self.assertEqual(self._top_level_files(fake_dir), self._top_level_files(live_dir))
+        # both have non-empty snapshots dirs
+        self.assertTrue(any((fake_dir / "snapshots").glob("*.json")))
+        self.assertTrue(any((live_dir / "snapshots").glob("*.json")))
+
+    def test_only_execution_markers_differ(self) -> None:
+        fake_dir = self._dispatch_real("contract_fake2", "fake")
+        live_dir = self._dispatch_real("contract_live2", "live")
+        fake_art = json.loads((fake_dir / "resolved-profile.json").read_text(encoding="utf-8"))
+        live_art = json.loads((live_dir / "resolved-profile.json").read_text(encoding="utf-8"))
+        self.assertEqual(fake_art["execution_mode"], "fake")
+        self.assertEqual(live_art["execution_mode"], "live")
+        self.assertEqual(fake_art["live_api"], "not_used")
+        self.assertEqual(live_art["live_api"], "used")
+        # everything else (seats/profile_name/template/run_id-aside) identical
+        fake_rest = {k: v for k, v in fake_art.items()
+                     if k not in ("execution_mode", "live_api", "run_id")}
+        live_rest = {k: v for k, v in live_art.items()
+                     if k not in ("execution_mode", "live_api", "run_id")}
+        self.assertEqual(fake_rest, live_rest)
+
+    def test_faked_live_artifacts_contain_no_secret_markers(self) -> None:
+        live_dir = self._dispatch_real("contract_scan", "live")
+        for path in live_dir.rglob("*"):
+            if not path.is_file():
+                continue
+            text = path.read_text(encoding="utf-8", errors="replace")
+            self.assertNotIn("sk-test-fake-key", text, path.name)
+            for marker in _LIVE_SECRET_MARKERS:
+                self.assertNotIn(marker, text, f"{marker!r} in {path.name}")
+
+    def test_secrets_redacted_true_in_manifest_and_resolved_profile(self) -> None:
+        live_dir = self._dispatch_real("contract_redacted", "live")
+        manifest = json.loads((live_dir / "prompt-manifest.json").read_text(encoding="utf-8"))
+        resolved = json.loads((live_dir / "resolved-profile.json").read_text(encoding="utf-8"))
+        self.assertTrue(manifest.get("secrets_redacted"))
+        self.assertTrue(resolved.get("secrets_redacted"))
