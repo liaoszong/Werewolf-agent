@@ -10,6 +10,7 @@
   - `189a3b2` feat(g2d-2): add profile fetch/validate/launch to ObserverApiClient
   - `c5642ff` feat(g2d-2): add SeatEditorPanel.qml (per-seat provider/model/strategy/prompt)
   - `562b3c7` feat(g2d-2): profile-driven master-detail MatchSetupView with 202-gated launch
+  - `42f3106` fix(g2d-2): address adversarial review — imperative SeatEditorPanel control sync, one-shot auto-load, sharper contract tests
   - (+ `816a0c1` pre-existing on branch: Deterministic Mock execution banner; `0e973fe`/`fdf93de` docs)
 
 ## Changed Files (code)
@@ -109,6 +110,17 @@ All 11 code files + 2 docs match the plan Allowlist. No new server **write** end
 - [x] A8 scope boundaries held
 - [x] A9 execution banner
 
+## Post-Implementation Adversarial Review (commit `42f3106`)
+A 4-dimension review (backend / C++ client / QML reactivity / scope+contract) with per-finding independent verification was run over the committed diff. **5 findings confirmed; all fixed:**
+- **HIGH — SeatEditorPanel lost-binding (correctness/data-integrity):** a `TextArea.text` (and ComboBox `currentIndex`) declarative binding to `config` is severed the instant the user interacts; on seat-switch the editor would show/save the *previous* seat's values (cross-seat corruption reaching validate/launch). **Fixed:** removed the declarative `text:`/`currentIndex:` bindings; all four controls are now pushed imperatively from `config` via `_syncControls()` on `Component.onCompleted` + `onConfigChanged`, with `_ready` toggled so the programmatic prompt write does not re-emit `edited`.
+  - **Runtime-verified** with a seeded p1→p3 switch capture (`.tmp/g2d2_switch.png`): editor correctly updated Provider deepseek→fake_deterministic, Model deepseek-chat→none, Strategy aggressive→default, Prompt 134→0/8000. Harness edits reverted.
+- **LOW — `_ready` comment/robustness:** subsumed by the `_syncControls` fix; comment corrected.
+- **LOW — auto-load race:** `onProfileItemsChanged` now keyed on a one-shot `_initialLoadDone` flag, so it can never clobber an explicit picker-driven fetch.
+- **LOW — vacuous test:** `test_no_prompt_editor_is_added` (forbade never-used identifiers, contradicted the shipped editor) replaced by `test_prompt_editor_is_server_profile_scoped` (asserts the real boundary: prompt sourced from server `config`, no local template/library/file source).
+- **LOW — test adequacy:** `test_profile_requests_use_latest_wins_guards` now pins `m_profileRequestSerial` in the `.cpp` (not just the `.h`), symmetric with the validate guard.
+
+Post-fix re-verification: Qt build exit 0, qmllint 0 errors, static contract 36/36 OK.
+
 ## Review Trigger Result
-- Visual harness edits (`AppShell.qml` + temp seed in `MatchSetupView.qml`) used for `.tmp/g2d2_setup.png` were **fully reverted**; `git status` clean; `git diff --quiet` on both files passes; no `TEMP VISUAL ONLY` markers remain; `AppShell.qml` never staged/committed.
-- Suggested reviewer focus: server route ordering (`/api/profiles/schema` vs name branch); client 202 gate + dual latest-wins serials; QML reactivity of `effective()`/`profileRevision` Validate→Launch gating.
+- Visual harness edits (`AppShell.qml` + temp seed in `MatchSetupView.qml`) used for `.tmp/g2d2_setup.png` and the `.tmp/g2d2_switch.png` re-verify were **fully reverted** each time; `git status` clean; `git diff --quiet` passes; no `TEMP VISUAL ONLY` markers remain; `AppShell.qml` never staged/committed.
+- Suggested reviewer focus: server route ordering (`/api/profiles/schema` vs name branch); client 202 gate + dual latest-wins serials; SeatEditorPanel `_syncControls` imperative-sync + `_ready` interplay with `applyEdit`'s no-op guard.
