@@ -27,6 +27,11 @@ class ObserverApiClient : public QObject {
     Q_PROPERTY(int hiddenEventCount READ hiddenEventCount NOTIFY projectionChanged)
     Q_PROPERTY(int hiddenSnapshotCount READ hiddenSnapshotCount NOTIFY projectionChanged)
     Q_PROPERTY(QString visibilityContractVersion READ visibilityContractVersion NOTIFY projectionChanged)
+    // G2d-2 profile setup properties
+    Q_PROPERTY(QVariantList profileItems READ profileItems NOTIFY profileItemsChanged)
+    Q_PROPERTY(QVariantMap profileSchema READ profileSchema NOTIFY profileSchemaChanged)
+    Q_PROPERTY(QVariantMap loadedProfile READ loadedProfile NOTIFY loadedProfileChanged)
+    Q_PROPERTY(QVariantMap profileValidation READ profileValidation NOTIFY profileValidationChanged)
 
 public:
     explicit ObserverApiClient(QObject *parent = nullptr);
@@ -51,6 +56,11 @@ public:
     int hiddenEventCount() const;
     int hiddenSnapshotCount() const;
     QString visibilityContractVersion() const;
+    // G2d-2 profile setup accessors
+    QVariantList profileItems() const;
+    QVariantMap profileSchema() const;
+    QVariantMap loadedProfile() const;
+    QVariantMap profileValidation() const;
 
 public slots:
     Q_INVOKABLE void checkHealth();
@@ -61,6 +71,12 @@ public slots:
     Q_INVOKABLE void disconnectStream();
     Q_INVOKABLE void refreshAuditLinks();
     Q_INVOKABLE void refreshProjection();
+    // G2d-2 profile setup invokables
+    Q_INVOKABLE void refreshProfiles();
+    Q_INVOKABLE void refreshProfileSchema();
+    Q_INVOKABLE void fetchProfile(const QString &name);
+    Q_INVOKABLE void validateProfile(const QVariantMap &profile);
+    Q_INVOKABLE void launchFromProfile(const QVariantMap &profile);
 
 signals:
     void baseUrlChanged();
@@ -76,6 +92,13 @@ signals:
     void playerItemsChanged();
     void projectionProofChanged();
     void projectionChanged();
+    // G2d-2 profile setup signals
+    void profileItemsChanged();
+    void profileSchemaChanged();
+    void loadedProfileChanged();
+    void profileValidationChanged();
+    void launchSucceeded();
+    void launchFailed();
 
 private slots:
     void onStreamReadyRead();
@@ -105,6 +128,13 @@ private:
     int m_hiddenSnapshotCount = 0;
     QString m_visibilityContractVersion;
     quint64 m_projectionRequestSerial = 0;
+    // G2d-2 profile setup state
+    QVariantList m_profileItems;
+    QVariantMap m_profileSchema;
+    QVariantMap m_loadedProfile;
+    QVariantMap m_profileValidation;
+    quint64 m_profileRequestSerial = 0;
+    quint64 m_profileValidateSerial = 0;
 
     QNetworkAccessManager *m_network;
     QNetworkReply *m_streamReply;

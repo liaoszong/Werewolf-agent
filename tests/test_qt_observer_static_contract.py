@@ -226,6 +226,37 @@ class QtObserverProjectionClientTests(unittest.TestCase):
         self.assertIn("/projection?perspective=", content)
 
 
+class QtObserverProfileClientTests(unittest.TestCase):
+    def test_client_exposes_profile_properties(self) -> None:
+        h = (QT / "src/ObserverApiClient.h").read_text(encoding="utf-8")
+        for prop in ["profileItems", "profileSchema", "loadedProfile", "profileValidation"]:
+            self.assertIn(prop, h)
+        for inv in ["refreshProfiles", "refreshProfileSchema", "fetchProfile",
+                    "validateProfile", "launchFromProfile"]:
+            self.assertIn(inv, h)
+        for sig in ["launchSucceeded", "launchFailed"]:
+            self.assertIn(sig, h)
+
+    def test_client_launch_is_202_gated(self) -> None:
+        cpp = (QT / "src/ObserverApiClient.cpp").read_text(encoding="utf-8")
+        self.assertIn("/api/profiles/schema", cpp)
+        self.assertIn("/api/profiles/validate", cpp)
+        # launch advances only on HTTP 202 + a run_id, else launchFailed
+        self.assertIn("HttpStatusCodeAttribute", cpp)
+        self.assertIn("202", cpp)
+        self.assertIn("runId.isEmpty()", cpp)
+        self.assertIn("launchSucceeded", cpp)
+        self.assertIn("launchFailed", cpp)
+
+    def test_profile_requests_use_latest_wins_guards(self) -> None:
+        h = (QT / "src/ObserverApiClient.h").read_text(encoding="utf-8")
+        cpp = (QT / "src/ObserverApiClient.cpp").read_text(encoding="utf-8")
+        # fetchProfile AND validateProfile must drop stale responses
+        self.assertIn("m_profileRequestSerial", h)
+        self.assertIn("m_profileValidateSerial", h)
+        self.assertIn("m_profileValidateSerial", cpp)
+
+
 class QtObserverHiddenInfoBoundaryTests(unittest.TestCase):
     def test_live_cockpit_does_not_embed_static_role_assignments(self) -> None:
         content = (QT / "qml/LiveCockpitView.qml").read_text(encoding="utf-8")
