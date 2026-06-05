@@ -16,11 +16,13 @@ from werewolf_eval.observer_protocol import (
     ALLOWED_TEMPLATES,
     DEFAULT_FAKE_MODE,
     RUN_STATUS_VALUES,
+    RUNTIME_CAPABILITIES_SCHEMA_VERSION,
     ObserverProtocolError,
     artifact_path,
     build_artifact_registry,
     build_run_detail,
     build_run_summary,
+    build_runtime_capabilities,
     build_snapshot_registry,
     event_visible_to_perspective,
     filter_events_for_perspective,
@@ -533,3 +535,97 @@ class LiveModeTests(TestCase):
     def test_template_launch_still_accepts_fake_mode(self) -> None:
         out = parse_launch_request({"template": "default_6p_fake", "mode": "fake"})
         self.assertEqual(out["mode"], "fake")
+
+
+# ---------------------------------------------------------------------------
+# RuntimeCapabilitiesTests (G3-2) — read-only live-posture payload helper
+# ---------------------------------------------------------------------------
+
+
+class RuntimeCapabilitiesTests(TestCase):
+    """``build_runtime_capabilities`` produces the ``g3.runtime_capabilities.v1``
+    payload for the three server postures and never leaks a secret.
+
+    NOTE on the no-secret scan: the canonical key-free reason code
+    ``missing_api_key`` legitimately contains the substring ``api_key`` and MUST
+    appear in the payload (it has to equal the launch-time 403 code from
+    ``_check_live_capability``).  So this payload scan uses the *real-secret*
+    markers — ``Authorization``/``Bearer ``/``DEEPSEEK_API_KEY``/``sk-`` — exactly
+    as the server response scan (``ObserverServerSecretScanTests``) does, and
+    NOT the client-source ``api_key`` substring.  The ``api_key`` substring ban
+    is a *client-source* contract (the Qt client must render codes data-driven),
+    enforced in ``test_qt_observer_static_contract.py``."""
+
+    _SECRET_MARKERS = ("Authorization", "Bearer ", "DEEPSEEK_API_KEY", "sk-")
+
+    def test_available_posture_has_no_reason(self) -> None:
+        cap = build_runtime_capabilities(live_enabled=True, deepseek_available=True)
+        self.assertEqual(cap["schema_version"], "g3.runtime_capabilities.v1")
+        self.assertEqual(cap["schema_version"], RUNTIME_CAPABILITIES_SCHEMA_VERSION)
+        self.assertEqual(cap["default_mode"], "fake")
+        live = cap["live_api"]
+        self.assertTrue(live["enabled"])
+        deepseek = live["providers"]["deepseek"]
+        self.assertTrue(deepseek["available"])
+        self.assertNotIn("reason_code", deepseek)
+        self.assertNotIn("message", deepseek)
+
+    def test_disabled_posture(self) -> None:
+        cap = build_runtime_capabilities(
+            live_enabled=False,
+            deepseek_available=False,
+            reason_code="live_api_disabled",
+            message="live API is not enabled on this server",
+        )
+        self.assertEqual(cap["default_mode"], "fake")
+        live = cap["live_api"]
+        self.assertFalse(live["enabled"])
+        deepseek = live["providers"]["deepseek"]
+        self.assertFalse(deepseek["available"])
+        self.assertEqual(deepseek["reason_code"], "live_api_disabled")
+        self.assertTrue(deepseek["message"])
+
+    def test_flag_on_no_key_posture(self) -> None:
+        cap = build_runtime_capabilities(
+            live_enabled=True,
+            deepseek_available=False,
+            reason_code="missing_api_key",
+            message="live API key is not configured on this server",
+        )
+        live = cap["live_api"]
+        self.assertTrue(live["enabled"])
+        deepseek = live["providers"]["deepseek"]
+        self.assertFalse(deepseek["available"])
+        self.assertEqual(deepseek["reason_code"], "missing_api_key")
+
+    def test_available_posture_ignores_stray_reason(self) -> None:
+        # reason_code/message are attached ONLY when not available — an available
+        # posture never carries a reason even if one is passed.
+        cap = build_runtime_capabilities(
+            live_enabled=True,
+            deepseek_available=True,
+            reason_code="missing_api_key",
+            message="should be ignored",
+        )
+        deepseek = cap["live_api"]["providers"]["deepseek"]
+        self.assertNotIn("reason_code", deepseek)
+        self.assertNotIn("message", deepseek)
+
+    def test_no_secret_markers_in_any_posture(self) -> None:
+        postures = [
+            build_runtime_capabilities(live_enabled=True, deepseek_available=True),
+            build_runtime_capabilities(
+                live_enabled=False, deepseek_available=False,
+                reason_code="live_api_disabled",
+                message="live API is not enabled on this server",
+            ),
+            build_runtime_capabilities(
+                live_enabled=True, deepseek_available=False,
+                reason_code="missing_api_key",
+                message="live API key is not configured on this server",
+            ),
+        ]
+        for cap in postures:
+            text = json.dumps(cap, ensure_ascii=False, sort_keys=True)
+            for marker in self._SECRET_MARKERS:
+                self.assertNotIn(marker, text, f"{marker!r} leaked in {text}")

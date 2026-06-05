@@ -16,6 +16,9 @@ OBSERVER_SERVICE_NAME = "werewolf-observer"
 DEFAULT_FAKE_TEMPLATE = "default_6p_fake"
 DEFAULT_FAKE_MODE = "fake"
 
+# G3-2 read-only runtime-capabilities payload (live posture, never a secret).
+RUNTIME_CAPABILITIES_SCHEMA_VERSION = "g3.runtime_capabilities.v1"
+
 ALLOWED_TEMPLATES: tuple[str, ...] = (
     "default_6p_fake",
 )
@@ -393,6 +396,39 @@ def parse_profile_launch_request(payload: dict[str, object]) -> dict[str, object
     if not isinstance(profile_name, str) or not _SAFE_NAME_RE.match(profile_name):
         raise ObserverProtocolError(f"Unsafe profile_name: {profile_name!r}")
     return {"kind": "named", "profile_name": profile_name, "run_id": run_id, "mode": mode}
+
+
+def build_runtime_capabilities(
+    *,
+    live_enabled: bool,
+    deepseek_available: bool,
+    reason_code: str | None = None,
+    message: str | None = None,
+) -> dict[str, object]:
+    """Build the read-only ``g3.runtime_capabilities.v1`` live-posture payload.
+
+    ``default_mode`` is hard-coded ``"fake"`` — live being *available* never
+    changes the default selection.  ``reason_code``/``message`` are attached
+    ONLY when the provider is not available (``deepseek_available`` is False), so
+    that the code mirrors the launch-time 403 from ``_check_live_capability``.
+
+    This payload carries posture only — ``enabled``/``available`` plus a key-free
+    canonical ``reason_code``/``message`` — and NEVER the key, the env var name,
+    an ``Authorization`` header, or a base-url secret."""
+    deepseek: dict[str, object] = {"available": bool(deepseek_available)}
+    if not deepseek_available:
+        if reason_code is not None:
+            deepseek["reason_code"] = reason_code
+        if message is not None:
+            deepseek["message"] = message
+    return {
+        "schema_version": RUNTIME_CAPABILITIES_SCHEMA_VERSION,
+        "default_mode": DEFAULT_FAKE_MODE,
+        "live_api": {
+            "enabled": bool(live_enabled),
+            "providers": {"deepseek": deepseek},
+        },
+    }
 
 
 def generate_run_id(prefix: str = "g2a_default_6p_fake") -> str:
