@@ -275,6 +275,95 @@ class QtObserverProfileClientTests(unittest.TestCase):
         self.assertIn("m_profileValidateSerial", cpp)
 
 
+class QtObserverModeControlClientTests(unittest.TestCase):
+    """G3-2: ObserverApiClient gains a launch ``mode`` param, read-only runtime
+    capabilities, and an API-mediated ``currentExecutionMode`` (C1/C1-bis/C2/C4)."""
+
+    # server-owned reason codes — rendered data-driven (verbatim), NEVER as
+    # client source literals (C4; also keeps the ``api_key`` secret-scan green).
+    SERVER_REASON_CODES = [
+        "live_api_disabled", "missing_api_key", "unsupported_live_provider",
+        "mixed_models", "provider_failure", "budget_exhausted",
+    ]
+
+    def _h(self) -> str:
+        return (QT / "src/ObserverApiClient.h").read_text(encoding="utf-8")
+
+    def _cpp(self) -> str:
+        return (QT / "src/ObserverApiClient.cpp").read_text(encoding="utf-8")
+
+    @staticmethod
+    def _method_body(cpp: str, signature_prefix: str) -> str:
+        """Slice a single ``void ObserverApiClient::<name>`` definition body."""
+        start = cpp.index(signature_prefix)
+        nxt = cpp.find("\nvoid ObserverApiClient::", start + len(signature_prefix))
+        return cpp[start:] if nxt == -1 else cpp[start:nxt]
+
+    def test_header_declares_capability_properties_and_invokable(self) -> None:
+        h = self._h()
+        for prop in ["liveAvailable", "liveReasonCode", "liveReasonMessage",
+                     "defaultMode", "currentExecutionMode"]:
+            self.assertIn(prop, h, f"missing property '{prop}' in ObserverApiClient.h")
+        self.assertIn("refreshCapabilities", h)
+
+    def test_cpp_calls_capabilities_endpoint(self) -> None:
+        self.assertIn("/api/runtime/capabilities", self._cpp())
+
+    def test_launch_from_profile_takes_mode_and_writes_body_mode(self) -> None:
+        cpp = self._cpp()
+        h = self._h()
+        # signature carries an explicit mode arg (C2: no reliance on a default)
+        self.assertRegex(h, r"launchFromProfile\([^)]*QString\s*&?\s*mode")
+        self.assertRegex(cpp, r"launchFromProfile\([^)]*QString\s*&?\s*mode")
+        # and the POST body carries it verbatim
+        self.assertRegex(cpp, r'body\[\s*QStringLiteral\("mode"\)\s*\]\s*=\s*mode')
+
+    def test_capabilities_error_uses_client_only_unreachable_code(self) -> None:
+        # C4: 'unreachable' is the ONLY client-owned reason code.
+        self.assertIn("unreachable", self._cpp())
+
+    def test_no_server_reason_codes_are_client_literals(self) -> None:
+        # C4: server-owned codes are data-driven (read from JSON), never embedded
+        # as client source literals — in BOTH the header and the cpp.
+        for src_name, src in (("ObserverApiClient.h", self._h()),
+                              ("ObserverApiClient.cpp", self._cpp())):
+            for code in self.SERVER_REASON_CODES:
+                self.assertNotIn(
+                    code, src,
+                    f"server reason code '{code}' must not be a literal in {src_name}",
+                )
+
+    def test_current_execution_mode_parsed_from_run_detail(self) -> None:
+        # C1: currentExecutionMode is sourced from a run-detail execution_mode
+        # field (parsed in openRun), never from intent or the 202 echo.
+        cpp = self._cpp()
+        self.assertIn("execution_mode", cpp)
+        open_body = self._method_body(cpp, "void ObserverApiClient::openRun")
+        self.assertIn("execution_mode", open_body,
+                      "openRun must parse the run-detail execution_mode field")
+
+    def test_launch_handler_never_sets_execution_mode(self) -> None:
+        # C1: launchFromProfile must NOT set currentExecutionMode — intent and
+        # the 202 mode echo are not executed truth.
+        cpp = self._cpp()
+        launch_body = self._method_body(cpp, "void ObserverApiClient::launchFromProfile")
+        self.assertNotIn(
+            "m_currentExecutionMode", launch_body,
+            "C1: launchFromProfile must not touch currentExecutionMode (intent != truth)",
+        )
+
+    def test_stale_guard_reset_path_exists(self) -> None:
+        # C1-bis: currentExecutionMode is reset to "" on run change / missing
+        # field / request error so a prior live run can't leave a stale LIVE.
+        cpp = self._cpp()
+        self.assertTrue(
+            "m_currentExecutionMode.clear()" in cpp
+            or "m_currentExecutionMode = QString()" in cpp
+            or 'm_currentExecutionMode = QStringLiteral("")' in cpp,
+            "no reset path for m_currentExecutionMode (C1-bis stale guard)",
+        )
+
+
 class QtObserverHiddenInfoBoundaryTests(unittest.TestCase):
     def test_live_cockpit_does_not_embed_static_role_assignments(self) -> None:
         content = (QT / "qml/LiveCockpitView.qml").read_text(encoding="utf-8")

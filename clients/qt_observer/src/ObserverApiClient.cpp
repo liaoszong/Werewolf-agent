@@ -71,6 +71,13 @@ QVariantMap ObserverApiClient::profileSchema() const { return m_profileSchema; }
 QVariantMap ObserverApiClient::loadedProfile() const { return m_loadedProfile; }
 QVariantMap ObserverApiClient::profileValidation() const { return m_profileValidation; }
 
+// G3-2 capability posture + executed-truth getters
+bool ObserverApiClient::liveAvailable() const { return m_liveAvailable; }
+QString ObserverApiClient::liveReasonCode() const { return m_liveReasonCode; }
+QString ObserverApiClient::liveReasonMessage() const { return m_liveReasonMessage; }
+QString ObserverApiClient::defaultMode() const { return m_defaultMode; }
+QString ObserverApiClient::currentExecutionMode() const { return m_currentExecutionMode; }
+
 QNetworkReply *ObserverApiClient::get(const QString &path)
 {
     QNetworkRequest req(QUrl(m_baseUrl + path));
@@ -90,6 +97,25 @@ void ObserverApiClient::setError(const QString &msg)
 {
     m_lastError = msg;
     emit lastErrorChanged();
+}
+
+void ObserverApiClient::setCurrentRunId(const QString &runId)
+{
+    if (m_currentRunId == runId)
+        return;
+    m_currentRunId = runId;
+    emit currentRunChanged();
+    // C1-bis: a new run must never inherit the prior run's executed truth — the
+    // HUD chip falls back to SYS: SIMULATION until run detail returns a mode.
+    resetExecutionMode();
+}
+
+void ObserverApiClient::resetExecutionMode()
+{
+    if (!m_currentExecutionMode.isEmpty()) {
+        m_currentExecutionMode.clear();
+        emit currentExecutionModeChanged();
+    }
 }
 
 void ObserverApiClient::checkHealth()
@@ -166,9 +192,8 @@ void ObserverApiClient::startDefaultMatch()
             return;
         }
 
-        m_currentRunId = runId;
+        setCurrentRunId(runId);   // template launch is always fake → chip SIMULATION
         m_currentStatus = status;
-        emit currentRunChanged();
         emit currentStatusChanged();
         refreshAuditLinks();
         refreshProjection();
@@ -183,20 +208,34 @@ void ObserverApiClient::openRun(const QString &runId)
         reply->deleteLater();
         if (reply->error() != QNetworkReply::NoError) {
             setError(reply->errorString());
+            resetExecutionMode();   // C1-bis: detail request error → "" (SIMULATION)
             return;
         }
         QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
         if (!doc.isObject()) {
             setError(QStringLiteral("Invalid run detail response"));
+            resetExecutionMode();   // C1-bis: malformed detail → "" (SIMULATION)
             return;
         }
         QJsonObject obj = doc.object();
-        m_currentRunId = runId;
+        setCurrentRunId(runId);     // C1-bis: resets executed truth on run change
         m_currentStatus = obj.value(QStringLiteral("status")).toString();
-        emit currentRunChanged();
         emit currentStatusChanged();
         refreshAuditLinks();
         refreshProjection();
+
+        // C1: executed truth comes ONLY from the run-detail execution_mode field
+        // (never from intent or the 202 echo).  A missing/non-string value falls
+        // back to "" so the HUD chip shows the conservative SYS: SIMULATION.
+        const QJsonValue executionMode = obj.value(QStringLiteral("execution_mode"));
+        if (executionMode.isString() && !executionMode.toString().isEmpty()) {
+            if (m_currentExecutionMode != executionMode.toString()) {
+                m_currentExecutionMode = executionMode.toString();
+                emit currentExecutionModeChanged();
+            }
+        } else {
+            resetExecutionMode();   // C1-bis: missing/non-string execution_mode → ""
+        }
 
         QNetworkReply *eventsReply = get(
             QStringLiteral("/api/runs/") + runId + QStringLiteral("/events?perspective=") + m_currentPerspective);
@@ -463,10 +502,47 @@ void ObserverApiClient::validateProfile(const QVariantMap &profile)
     });
 }
 
-void ObserverApiClient::launchFromProfile(const QVariantMap &profile)
+void ObserverApiClient::refreshCapabilities()
+{
+    // Read-only live posture (g3.runtime_capabilities.v1).  No key, no provider
+    // call.  Server-supplied reason_code/message are rendered verbatim; the ONLY
+    // client-owned reason code is "unreachable" (transport failure).
+    QNetworkReply *reply = get(QStringLiteral("/api/runtime/capabilities"));
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        reply->deleteLater();
+        QJsonDocument doc = (reply->error() == QNetworkReply::NoError)
+            ? QJsonDocument::fromJson(reply->readAll())
+            : QJsonDocument();
+        if (!doc.isObject()) {
+            m_liveAvailable = false;
+            m_liveReasonCode = QStringLiteral("unreachable");
+            m_liveReasonMessage.clear();
+            emit capabilitiesChanged();
+            resetExecutionMode();   // C1-bis: capabilities request error → "" (SIMULATION)
+            return;
+        }
+        const QJsonObject obj = doc.object();
+        m_defaultMode = obj.value(QStringLiteral("default_mode")).toString(QStringLiteral("fake"));
+        const QJsonObject deepseek =
+            obj.value(QStringLiteral("live_api")).toObject()
+               .value(QStringLiteral("providers")).toObject()
+               .value(QStringLiteral("deepseek")).toObject();
+        m_liveAvailable = deepseek.value(QStringLiteral("available")).toBool(false);
+        // Data-driven (verbatim) — never a client-side reason-code literal.
+        m_liveReasonCode = deepseek.value(QStringLiteral("reason_code")).toString();
+        m_liveReasonMessage = deepseek.value(QStringLiteral("message")).toString();
+        emit capabilitiesChanged();
+    });
+}
+
+void ObserverApiClient::launchFromProfile(const QVariantMap &profile, const QString &mode)
 {
     QJsonObject body;
     body[QStringLiteral("profile")] = QJsonObject::fromVariantMap(profile);
+    // C2: the resolved launch mode is explicit ("fake"|"live").  "live" is sent
+    // ONLY when the ModeControl FSM is live_confirmed; an omitted mode is fake
+    // server-side.  Template launches stay fake — only profile launch can go live.
+    body[QStringLiteral("mode")] = mode;
     QNetworkReply *reply = post(QStringLiteral("/api/runs"),
                                 QJsonDocument(body).toJson(QJsonDocument::Compact));
     connect(reply, &QNetworkReply::finished, this, [this, reply]() {
@@ -493,9 +569,11 @@ void ObserverApiClient::launchFromProfile(const QVariantMap &profile)
             emit launchFailed();
             return;
         }
-        m_currentRunId = runId;
+        // C1: launch is intent, not executed truth — never set currentExecutionMode
+        // here, even though the 202 echoes mode.  setCurrentRunId resets any stale
+        // truth (C1-bis); the chip stays conservative until openRun returns a mode.
+        setCurrentRunId(runId);
         m_currentStatus = obj.value(QStringLiteral("status")).toString();
-        emit currentRunChanged();
         emit currentStatusChanged();
         refreshAuditLinks();
         emit launchSucceeded();

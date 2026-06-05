@@ -32,6 +32,16 @@ class ObserverApiClient : public QObject {
     Q_PROPERTY(QVariantMap profileSchema READ profileSchema NOTIFY profileSchemaChanged)
     Q_PROPERTY(QVariantMap loadedProfile READ loadedProfile NOTIFY loadedProfileChanged)
     Q_PROPERTY(QVariantMap profileValidation READ profileValidation NOTIFY profileValidationChanged)
+    // G3-2 live/fake toggle: read-only capability posture (intent) + executed
+    // truth.  liveReasonCode/liveReasonMessage are server-supplied and rendered
+    // verbatim; the ONLY client-owned code is "unreachable".  currentExecutionMode
+    // is set ONLY from run-detail execution_mode (C1) and reset to "" on run
+    // change / missing field / request error (C1-bis).
+    Q_PROPERTY(bool liveAvailable READ liveAvailable NOTIFY capabilitiesChanged)
+    Q_PROPERTY(QString liveReasonCode READ liveReasonCode NOTIFY capabilitiesChanged)
+    Q_PROPERTY(QString liveReasonMessage READ liveReasonMessage NOTIFY capabilitiesChanged)
+    Q_PROPERTY(QString defaultMode READ defaultMode NOTIFY capabilitiesChanged)
+    Q_PROPERTY(QString currentExecutionMode READ currentExecutionMode NOTIFY currentExecutionModeChanged)
 
 public:
     explicit ObserverApiClient(QObject *parent = nullptr);
@@ -61,6 +71,12 @@ public:
     QVariantMap profileSchema() const;
     QVariantMap loadedProfile() const;
     QVariantMap profileValidation() const;
+    // G3-2 capability + executed-truth accessors
+    bool liveAvailable() const;
+    QString liveReasonCode() const;
+    QString liveReasonMessage() const;
+    QString defaultMode() const;
+    QString currentExecutionMode() const;
 
 public slots:
     Q_INVOKABLE void checkHealth();
@@ -76,7 +92,10 @@ public slots:
     Q_INVOKABLE void refreshProfileSchema();
     Q_INVOKABLE void fetchProfile(const QString &name);
     Q_INVOKABLE void validateProfile(const QVariantMap &profile);
-    Q_INVOKABLE void launchFromProfile(const QVariantMap &profile);
+    // C2: QML always passes an explicit mode ("fake"|"live") — no C++ default arg.
+    Q_INVOKABLE void launchFromProfile(const QVariantMap &profile, const QString &mode);
+    // G3-2 read-only live posture (no key, no provider call).
+    Q_INVOKABLE void refreshCapabilities();
 
 signals:
     void baseUrlChanged();
@@ -99,6 +118,9 @@ signals:
     void profileValidationChanged();
     void launchSucceeded();
     void launchFailed();
+    // G3-2 capability + executed-truth signals
+    void capabilitiesChanged();
+    void currentExecutionModeChanged();
 
 private slots:
     void onStreamReadyRead();
@@ -111,6 +133,9 @@ private:
     void setError(const QString &msg);
     void startStreamRequest();
     void stopStream();
+    // C1-bis: a run change must never inherit the prior run's executed truth.
+    void setCurrentRunId(const QString &runId);
+    void resetExecutionMode();
 
     QString m_baseUrl;
     bool m_connected;
@@ -135,6 +160,12 @@ private:
     QVariantMap m_profileValidation;
     quint64 m_profileRequestSerial = 0;
     quint64 m_profileValidateSerial = 0;
+    // G3-2 live capability posture + executed truth
+    bool m_liveAvailable = false;
+    QString m_liveReasonCode;
+    QString m_liveReasonMessage;
+    QString m_defaultMode = QStringLiteral("fake");
+    QString m_currentExecutionMode;
 
     QNetworkAccessManager *m_network;
     QNetworkReply *m_streamReply;
