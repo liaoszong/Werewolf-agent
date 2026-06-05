@@ -38,6 +38,7 @@ REQUIRED_QML_VIEWS = [
     "qml/components/PerspectiveSwitcher.qml",
     "qml/components/AuditLinksPanel.qml",
     "qml/components/StatusBadge.qml",
+    "qml/components/SeatEditorPanel.qml",
 ]
 
 REQUIRED_OBJECT_NAMES = {
@@ -49,6 +50,10 @@ REQUIRED_OBJECT_NAMES = {
     "qml/LiveCockpitView.qml": ["liveCockpitView", "runStatusBadge", "playerPanelGrid", "eventTimeline", "perspectiveSwitcher", "auditLinksPanel", "providerFailureSummary"],
     "qml/HistoryView.qml": ["historyView", "historyRunsList", "historyRefreshButton"],
     "qml/components/RoleCard.qml": ["roleCard"],
+    "qml/components/SeatEditorPanel.qml": [
+        "seatEditorPanel", "seatEditorProvider", "seatEditorModel",
+        "seatEditorStrategy", "seatEditorPrompt",
+    ],
 }
 
 
