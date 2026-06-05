@@ -42,6 +42,7 @@ class ProviderAgent:
         self._failure_mode = failure_mode
         self._runtime_events = runtime_events
         self._failures: list[ProviderFailure] = []
+        self._last_response: Any | None = None
 
     @property
     def provider(self) -> Any:
@@ -50,6 +51,12 @@ class ProviderAgent:
     @property
     def failures(self) -> list[ProviderFailure]:
         return list(self._failures)
+
+    @property
+    def last_response(self) -> Any | None:
+        """The most recent ProviderResponse (P2-A-2: lets the engine read
+        per-turn source_label / token_usage evidence). None before any call."""
+        return self._last_response
 
     def _emit_provider_event(
         self,
@@ -71,7 +78,13 @@ class ProviderAgent:
                 payload=payload,
             )
 
-    def decide(self, observation: AgentObservation | dict[str, Any]) -> AgentAction:
+    def decide(
+        self,
+        observation: AgentObservation | dict[str, Any],
+        observation_text: str = "",
+        response_kind: str = "action",
+        max_output_tokens: int | None = None,
+    ) -> AgentAction:
         if isinstance(observation, dict):
             observation = AgentObservation(
                 game_id=str(observation["game_id"]),
@@ -125,6 +138,9 @@ class ProviderAgent:
             observation=observation.to_dict(),
             allowed_actions=allowed_actions,
             allowed_targets=allowed_targets,
+            observation_text=observation_text,
+            response_kind=response_kind,
+            max_output_tokens=max_output_tokens,
         )
 
         self._emit_provider_event(
@@ -139,8 +155,10 @@ class ProviderAgent:
             },
         )
 
+        self._last_response = None
         try:
             response = self._provider.respond(request)
+            self._last_response = response
         except Exception as exc:
             failure = ProviderFailure(
                 request_id=request_id,

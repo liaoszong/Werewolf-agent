@@ -32,6 +32,11 @@ if _SRC.is_dir() and str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
 from werewolf_eval.deepseek_launcher import build_deepseek_launcher  # noqa: E402
+from werewolf_eval.emergent_smoke_check import evaluate_emergent_smoke  # noqa: E402
+from werewolf_eval.run_emergent_deepseek_game import (  # noqa: E402
+    _deepseek_factory,
+    run_emergent_deepseek_game,
+)
 
 DEEPSEEK_SOURCE_LABEL = "[DeepSeek API output]"
 _SECRET_MARKERS = ("Authorization", "Bearer ", "api_key", "DEEPSEEK_API_KEY", "sk-")
@@ -132,12 +137,42 @@ def run_live_smoke(
     }
 
 
+def run_emergent_live_smoke(
+    *,
+    api_key: str,
+    base_url: str,
+    model: str,
+    max_requests_per_game: int = 64,
+    max_day_rounds: int = 3,
+    allow_short_game: bool = False,
+) -> dict:
+    """P2-A-2: run ONE real-DeepSeek emergent game, then JUDGE the raw artifacts
+    offline (gate ①②③ + all-artifact secret scan). Text-free result."""
+    factory = _deepseek_factory(
+        api_key=api_key, base_url=base_url, model=model,
+        timeout_seconds=30, max_tokens=256, max_requests=max_requests_per_game,
+    )
+    with TemporaryDirectory() as tmp:
+        run_dir = Path(tmp)
+        run_emergent_deepseek_game(
+            game_id="p2a2_emergent_live_smoke", out_dir=run_dir, provider_factory=factory,
+            model=model, seed=0, max_requests_per_game=max_requests_per_game, max_day_rounds=max_day_rounds,
+        )
+        verdict = evaluate_emergent_smoke(run_dir, expected_model=model, allow_short_game=allow_short_game)
+    return verdict
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Gated manual DeepSeek live smoke.")
     parser.add_argument("--api-key-env", default="DEEPSEEK_API_KEY")
     parser.add_argument("--base-url", default="https://api.deepseek.com")
     parser.add_argument("--model", default="deepseek-chat")
     parser.add_argument("--max-requests", type=int, default=32)
+    parser.add_argument("--emergent", action="store_true", default=False,
+                        help="P2-A-2: run the emergent engine live smoke instead of the g1f consensus smoke.")
+    parser.add_argument("--max-requests-per-game", type=int, default=64)
+    parser.add_argument("--allow-short-game", action="store_true", default=False,
+                        help="Waive the live_success_actions>=20 floor for a valid early-terminal game.")
     args = parser.parse_args()
 
     if os.environ.get("RUN_DEEPSEEK_LIVE_SMOKE") != "1":
@@ -148,6 +183,20 @@ def main() -> int:
     if not api_key:
         print(f"smoke=error reason=missing_{args.api_key_env}")
         return 2
+
+    if args.emergent:
+        result = run_emergent_live_smoke(
+            api_key=api_key, base_url=args.base_url, model=args.model,
+            max_requests_per_game=args.max_requests_per_game, allow_short_game=args.allow_short_game,
+        )
+        print(f"smoke={'PASS' if result['passed'] else 'FAIL'}")
+        print(f"live_requested_actions={result['live_requested_actions']}")
+        print(f"live_success_actions={result['live_success_actions']}")
+        print(f"live_success_rate={result['live_success_rate']}")
+        print(f"by_provider_result_kind={result['by_provider_result_kind']}")
+        for name, ok in result["checks"].items():
+            print(f"check_{name}={ok}")
+        return 0 if result["passed"] else 1
 
     result = run_live_smoke(
         api_key=api_key,

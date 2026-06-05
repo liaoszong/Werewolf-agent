@@ -28,6 +28,7 @@ from werewolf_eval.game_engine import (
     build_default_config,
     build_failure,
 )
+from werewolf_eval.runtime_events import build_god_snapshot
 from werewolf_eval.provider_agent import ProviderActionError
 from werewolf_eval.provider_contract import ProviderRequest
 
@@ -44,6 +45,78 @@ WITCH_PASS = "witch_pass"
 WITCH_ACTIONS = (WITCH_SAVE, WITCH_KILL, WITCH_PASS)
 
 FALLBACK_DECISION_TYPE = "default"
+
+# Per-request output-token caps (P2-A-2): speeches need more than votes/actions.
+SPEECH_MAX_OUTPUT_TOKENS = 250
+ACTION_MAX_OUTPUT_TOKENS = 120
+
+# provider_result_kind taxonomy (P2-A-2 gate ②).
+LIVE_SUCCESS = "live_success"
+INVALID_FALLBACK = "invalid_then_fallback"
+TIMEOUT_FALLBACK = "timeout_then_fallback"
+ERROR_FALLBACK = "error_then_fallback"
+
+
+def _fallback_kind_for(failure_kind: str) -> str:
+    if failure_kind == "timeout":
+        return TIMEOUT_FALLBACK
+    if failure_kind in ("invalid_action", "parse_failure"):
+        return INVALID_FALLBACK
+    return ERROR_FALLBACK
+
+
+@dataclass(frozen=True)
+class RenderedObservation:
+    """Readable, ROLE-SAFE observation text for a live provider prompt, plus the
+    exact event ids it was rendered from (for the visibility-no-feed-leak gate)."""
+
+    text: str
+    source_event_ids: list[str]
+
+
+def render_observation_text(
+    obs: AgentObservation, events_by_id: dict[str, dict[str, Any]]
+) -> RenderedObservation:
+    """Render `obs` into readable prompt text. HARD invariant (P2-A-2 gate ①):
+    rendered ONLY from `obs.public_event_ids ∪ obs.private_event_ids` and
+    `obs.known_roles` — never the global event store or global role map. The
+    caller passes `events_by_id`, but this function touches only the ids that
+    already appear in `obs`'s role-filtered ref lists, so a hidden event whose id
+    is not in those lists can never leak in.
+    """
+    visible_ids: list[str] = []
+    seen: set[str] = set()
+    for ref in list(obs.public_event_ids) + list(obs.private_event_ids):
+        if ref not in seen:
+            seen.add(ref)
+            visible_ids.append(ref)
+
+    lines: list[str] = [
+        f"你是 {obs.player_id}(身份:{obs.role},阵营:{obs.team})。",
+        f"当前:第 {obs.round} 轮 {obs.phase} 阶段。存活玩家:{', '.join(obs.alive_players)}。",
+    ]
+    # known_roles comes ONLY from the role-filtered observation (self + wolf
+    # teammates for a wolf), never a global seat-role index / god snapshot.
+    known_others = {pid: role for pid, role in obs.known_roles.items() if pid != obs.player_id}
+    if known_others:
+        lines.append("你已知的身份:" + ", ".join(f"{pid}={role}" for pid, role in sorted(known_others.items())) + "。")
+
+    source_event_ids: list[str] = []
+    event_lines: list[str] = []
+    for ref in visible_ids:
+        event = events_by_id.get(ref)
+        if event is None:
+            continue
+        summary = event.get("data", {}).get("summary", "")
+        if not summary:
+            continue
+        source_event_ids.append(ref)
+        event_lines.append(f"- (r{event.get('round')} {event.get('phase')}) {summary}")
+    if event_lines:
+        lines.append("你能看到的事件:")
+        lines.extend(event_lines)
+
+    return RenderedObservation(text="\n".join(lines), source_event_ids=source_event_ids)
 
 
 class BudgetExhausted(Exception):
@@ -80,10 +153,27 @@ class GameOutcome:
     consensus_log: dict[str, Any] | None
     failure_audit: dict[str, Any] | None
     end_condition: str
+    provider_turns: list[dict[str, Any]] = field(default_factory=list)
 
     @property
     def completed(self) -> bool:
         return self.status == "completed"
+
+    @property
+    def live_requested_actions(self) -> int:
+        return sum(1 for t in self.provider_turns if t.get("live_requested"))
+
+    @property
+    def live_success_actions(self) -> int:
+        return sum(1 for t in self.provider_turns if t.get("kind") == LIVE_SUCCESS)
+
+    @property
+    def live_success_rate(self) -> float:
+        """live_success_actions / live_requested_actions (P2-A-2 gate ②).
+        1.0 when no live was requested (vacuous; the smoke also checks the
+        absolute floor live_success_actions >= 20)."""
+        denom = self.live_requested_actions
+        return self.live_success_actions / denom if denom else 1.0
 
 
 def build_emergent_config(game_id: str = "p2a1_emergent_001") -> GameConfig:
@@ -114,6 +204,7 @@ class EmergentGameEngine:
         self._decisions: list[dict[str, Any]] = []
         self._consensus_entries: list[dict[str, Any]] = []
         self._failures: list[dict[str, Any]] = []
+        self._provider_turns: list[dict[str, Any]] = []
         self._seq = 0
         self._d_counter = 0
         self._alive: set[str] = set(self._players_by_id)
@@ -214,6 +305,19 @@ class EmergentGameEngine:
     ) -> None:
         self._failures.append(build_failure(self._game_id, rnd, phase, actor, kind, reason, target))
 
+    def _write_god_snapshot(self, name: str, rnd: int, phase: str) -> None:
+        """Write a god-view snapshot to the runtime spine (P2-A-2 mandatory spine
+        needs a non-empty snapshots/ dir). No-op without a runtime writer."""
+        if self._runtime_events is None:
+            return
+        players = [{"player_id": p.player_id, "role": p.role, "team": p.team} for p in self._config.players]
+        snap = build_god_snapshot(
+            run_id=self._game_id, game_id=self._game_id, round=rnd, phase=phase,
+            players=players, alive_players=sorted(self._alive),
+            public_event_ids=self._public_refs(), private_event_ids=[],
+        )
+        self._runtime_events.write_snapshot(name, snap, visibility="internal", round=rnd, phase=phase, actor="system")
+
     def _build_obs(self, player_id: str, phase: str, rnd: int) -> AgentObservation:
         p = self._players_by_id[player_id]
         known_roles = {player_id: p.role}
@@ -233,11 +337,68 @@ class EmergentGameEngine:
             known_roles=known_roles,
         )
 
-    def _charge_and_decide(self, player_id: str, phase: str, rnd: int) -> AgentAction:
-        """Charge budget then call the player's ProviderAgent (full validation)."""
-        self._budget.charge()
+    def _events_by_id(self) -> dict[str, dict[str, Any]]:
+        return {e["event_id"]: e for e in self._events}
+
+    def _provider_action(
+        self, player_id: str, phase: str, rnd: int
+    ) -> tuple[AgentAction | None, ProviderActionError | Exception | None, dict[str, Any]]:
+        """Charge budget, render ROLE-SAFE observation text, call the player's
+        ProviderAgent (full validation), and record one rich provider_turn.
+        Returns (action, error, turn): action is None on failure (caller falls
+        back). The turn is appended to `self._provider_turns`; the caller may
+        downgrade `turn["kind"]` to a fallback kind if it then rejects the live
+        action on an engine-level game rule (so live_success_rate stays honest)."""
+        self._budget.charge()  # may raise BudgetExhausted -> propagates to run()
         obs = self._build_obs(player_id, phase, rnd)
-        return self._agents[player_id].decide(obs)
+        rendered = render_observation_text(obs, self._events_by_id())
+        agent = self._agents[player_id]
+        turn: dict[str, Any] = {
+            "request_id": f"{self._game_id}_r{rnd:02d}_{player_id}",
+            "round": rnd,
+            "phase": phase,
+            "actor": player_id,
+            "response_kind": "action",
+            "live_requested": True,
+            "kind": None,
+            "fallback_reason": None,
+            "source_label": None,
+            "model": getattr(agent.provider, "model", None),
+            "token_usage": None,
+            "observation_source_event_ids": list(rendered.source_event_ids),
+        }
+        try:
+            action = agent.decide(
+                obs,
+                observation_text=rendered.text,
+                response_kind="action",
+                max_output_tokens=ACTION_MAX_OUTPUT_TOKENS,
+            )
+        except ProviderActionError as exc:
+            turn["kind"] = _fallback_kind_for(exc.failure.kind)
+            turn["fallback_reason"] = exc.failure.reason
+            self._provider_turns.append(turn)
+            return None, exc, turn
+        except Exception as exc:  # noqa: BLE001 - defensive; never abort the game
+            turn["kind"] = ERROR_FALLBACK
+            turn["fallback_reason"] = f"{type(exc).__name__}: {exc}"
+            self._provider_turns.append(turn)
+            return None, exc, turn
+        resp = getattr(agent, "last_response", None)
+        turn["kind"] = LIVE_SUCCESS
+        if resp is not None:
+            turn["source_label"] = resp.source_label
+            turn["token_usage"] = dict(resp.token_usage)
+        self._provider_turns.append(turn)
+        return action, None, turn
+
+    def _downgrade_turn(self, turn: dict[str, Any], reason: str) -> None:
+        """A live action was returned but rejected by an engine game rule -> the
+        live result was not used, so it must not count toward live_success."""
+        turn["kind"] = INVALID_FALLBACK
+        turn["fallback_reason"] = reason
+        turn["source_label"] = None
+        turn["token_usage"] = None
 
     # ---- win condition -------------------------------------------------
 
@@ -259,15 +420,12 @@ class EmergentGameEngine:
         consensus_id = f"{self._game_id}_consensus_r{rnd:02d}"
         proposals: list[tuple[str, str]] = []  # (wolf, target)
         for wolf in wolves:
-            try:
-                action = self._charge_and_decide(wolf, "night", rnd)
-            except BudgetExhausted:
-                raise
-            except ProviderActionError as exc:
-                self._record_failure(rnd, "night", wolf, exc.failure.kind, exc.failure.reason, exc.failure.target)
-                continue
-            except Exception as exc:  # noqa: BLE001 - defensive
-                self._record_failure(rnd, "night", wolf, "agent_error", f"{wolf} raised {type(exc).__name__}: {exc}")
+            action, err, turn = self._provider_action(wolf, "night", rnd)
+            if err is not None:
+                if isinstance(err, ProviderActionError):
+                    self._record_failure(rnd, "night", wolf, err.failure.kind, err.failure.reason, err.failure.target)
+                else:
+                    self._record_failure(rnd, "night", wolf, "agent_error", f"{wolf} raised {type(err).__name__}: {err}")
                 continue
             valid = (
                 action.action == "werewolf_kill"
@@ -277,6 +435,7 @@ class EmergentGameEngine:
             )
             if not valid:
                 self._record_failure(rnd, "night", wolf, "invalid_action", f"{wolf} proposed invalid kill {action.target}", action.target)
+                self._downgrade_turn(turn, f"engine rejected kill target {action.target}")
                 continue
             proposals.append((wolf, action.target))
 
@@ -367,18 +526,17 @@ class EmergentGameEngine:
             return
         seer = seers[0]
         target: str | None = None
-        try:
-            action = self._charge_and_decide(seer, "night", rnd)
-            if action.action == "seer_check" and action.target in self._alive and action.target != seer:
-                target = action.target
+        action, err, turn = self._provider_action(seer, "night", rnd)
+        if err is not None:
+            if isinstance(err, ProviderActionError):
+                self._record_failure(rnd, "night", seer, err.failure.kind, err.failure.reason, err.failure.target)
             else:
-                self._record_failure(rnd, "night", seer, "invalid_action", f"{seer} bad seer_check {action.target}", action.target)
-        except BudgetExhausted:
-            raise
-        except ProviderActionError as exc:
-            self._record_failure(rnd, "night", seer, exc.failure.kind, exc.failure.reason, exc.failure.target)
-        except Exception as exc:  # noqa: BLE001
-            self._record_failure(rnd, "night", seer, "agent_error", f"{seer} raised {type(exc).__name__}: {exc}")
+                self._record_failure(rnd, "night", seer, "agent_error", f"{seer} raised {type(err).__name__}: {err}")
+        elif action.action == "seer_check" and action.target in self._alive and action.target != seer:
+            target = action.target
+        else:
+            self._record_failure(rnd, "night", seer, "invalid_action", f"{seer} bad seer_check {action.target}", action.target)
+            self._downgrade_turn(turn, f"engine rejected seer_check {action.target}")
         if target is None:
             cands = self._alive_in_seat_order(exclude={seer})
             if not cands:
@@ -397,9 +555,10 @@ class EmergentGameEngine:
         if not witches:
             return False, None, save_used, poison_used
         witch = witches[0]
-        self._budget.charge()
+        self._budget.charge()  # may raise BudgetExhausted -> propagates to run()
         provider = self._agents[witch].provider
         obs = self._build_obs(witch, "night", rnd)
+        rendered = render_observation_text(obs, self._events_by_id())
         request = ProviderRequest(
             request_id=f"{self._game_id}_r{rnd:02d}_{witch}_witch",
             game_id=self._game_id,
@@ -409,31 +568,52 @@ class EmergentGameEngine:
             observation=obs.to_dict(),
             allowed_actions=list(WITCH_ACTIONS),
             allowed_targets=sorted(self._alive),
+            observation_text=rendered.text,
+            response_kind="action",
+            max_output_tokens=ACTION_MAX_OUTPUT_TOKENS,
         )
+        turn: dict[str, Any] = {
+            "request_id": request.request_id, "round": rnd, "phase": "night", "actor": witch,
+            "response_kind": "action", "live_requested": True, "kind": None, "fallback_reason": None,
+            "source_label": None, "model": getattr(provider, "model", None), "token_usage": None,
+            "observation_source_event_ids": list(rendered.source_event_ids),
+        }
+        self._provider_turns.append(turn)
         action_name = WITCH_PASS
         target: str | None = None
         try:
-            raw = provider.respond(request).raw_content
-            parsed = json.loads(raw)
+            response = provider.respond(request)
+            turn["source_label"] = response.source_label
+            turn["token_usage"] = dict(response.token_usage)
+            parsed = json.loads(response.raw_content)
             if not isinstance(parsed, dict):
                 raise ValueError("witch response not a JSON object")
             action_name = parsed.get("action", WITCH_PASS)
             target = parsed.get("target")
+            turn["kind"] = LIVE_SUCCESS
         except Exception as exc:  # noqa: BLE001
             self._record_failure(rnd, "night", witch, "parse_failure", f"{witch} witch parse failed: {exc}")
+            turn["kind"] = INVALID_FALLBACK
+            turn["fallback_reason"] = f"witch parse failed: {exc}"
+            turn["source_label"] = None
+            turn["token_usage"] = None
             action_name = WITCH_PASS
 
-        # validate
+        # validate (a parsed-but-illegal potion use is rejected -> fall back to
+        # pass AND downgrade the turn: the live result was not used)
         if action_name == WITCH_SAVE:
             if save_used or victim is None or target != victim:
                 self._record_failure(rnd, "night", witch, "invalid_action", f"{witch} invalid witch_save target={target}", target)
+                self._downgrade_turn(turn, f"invalid witch_save target={target}")
                 action_name = WITCH_PASS
         elif action_name == WITCH_KILL:
             if poison_used or target not in self._alive or target == witch:
                 self._record_failure(rnd, "night", witch, "invalid_action", f"{witch} invalid witch_kill target={target}", target)
+                self._downgrade_turn(turn, f"invalid witch_kill target={target}")
                 action_name = WITCH_PASS
         elif action_name != WITCH_PASS:
             self._record_failure(rnd, "night", witch, "invalid_action", f"{witch} unknown witch action {action_name}")
+            self._downgrade_turn(turn, f"unknown witch action {action_name}")
             action_name = WITCH_PASS
 
         if action_name == WITCH_SAVE:
@@ -452,9 +632,10 @@ class EmergentGameEngine:
     # ---- day sub-phases ------------------------------------------------
 
     def _resolve_speech(self, player_id: str, rnd: int) -> None:
-        self._budget.charge()
+        self._budget.charge()  # may raise BudgetExhausted -> propagates to run()
         provider = self._agents[player_id].provider
         obs = self._build_obs(player_id, SPEECH_REQUEST_PHASE, rnd)
+        rendered = render_observation_text(obs, self._events_by_id())
         request = ProviderRequest(
             request_id=f"{self._game_id}_r{rnd:02d}_{player_id}_speech",
             game_id=self._game_id,
@@ -464,15 +645,37 @@ class EmergentGameEngine:
             observation=obs.to_dict(),
             allowed_actions=[],
             allowed_targets=[],
+            observation_text=rendered.text,
+            response_kind="speech",
+            max_output_tokens=SPEECH_MAX_OUTPUT_TOKENS,
         )
+        turn: dict[str, Any] = {
+            "request_id": request.request_id, "round": rnd, "phase": "day", "actor": player_id,
+            "response_kind": "speech", "live_requested": True, "kind": None, "fallback_reason": None,
+            "source_label": None, "model": getattr(provider, "model", None), "token_usage": None,
+            "observation_source_event_ids": list(rendered.source_event_ids),
+        }
+        self._provider_turns.append(turn)
         text = ""
         try:
-            text = provider.respond(request).raw_content or ""
-        except Exception:  # noqa: BLE001 - speech is non-adjudicating; never abort
+            response = provider.respond(request)
+            text = response.raw_content or ""
+            turn["source_label"] = response.source_label
+            turn["token_usage"] = dict(response.token_usage)
+        except Exception as exc:  # noqa: BLE001 - speech is non-adjudicating; never abort
             text = ""
+            turn["fallback_reason"] = f"speech provider error: {exc}"
         text = text.strip()[:SPEECH_MAX_CHARS]
         if not text:
+            # empty/whitespace live text -> placeholder; not a live_success turn
             text = SPEECH_EMPTY_PLACEHOLDER
+            turn["kind"] = ERROR_FALLBACK if turn["fallback_reason"] else INVALID_FALLBACK
+            if turn["kind"] == INVALID_FALLBACK and not turn["fallback_reason"]:
+                turn["fallback_reason"] = "empty speech text"
+            turn["source_label"] = None
+            turn["token_usage"] = None
+        else:
+            turn["kind"] = LIVE_SUCCESS
         self._emit("day", rnd, "player_speech", player_id, "none", "public", text)
 
     def _resolve_votes(self, rnd: int) -> str | None:
@@ -480,18 +683,17 @@ class EmergentGameEngine:
         tally: dict[str, int] = {}
         for voter in self._alive_in_seat_order():
             target: str | None = None
-            try:
-                action = self._charge_and_decide(voter, "day", rnd)
-                if action.action == "player_vote" and action.target in self._alive and action.target != voter:
-                    target = action.target
+            action, err, turn = self._provider_action(voter, "day", rnd)
+            if err is not None:
+                if isinstance(err, ProviderActionError):
+                    self._record_failure(rnd, "day", voter, err.failure.kind, err.failure.reason, err.failure.target)
                 else:
-                    self._record_failure(rnd, "day", voter, "invalid_action", f"{voter} bad vote {action.target}", action.target)
-            except BudgetExhausted:
-                raise
-            except ProviderActionError as exc:
-                self._record_failure(rnd, "day", voter, exc.failure.kind, exc.failure.reason, exc.failure.target)
-            except Exception as exc:  # noqa: BLE001
-                self._record_failure(rnd, "day", voter, "agent_error", f"{voter} raised {type(exc).__name__}: {exc}")
+                    self._record_failure(rnd, "day", voter, "agent_error", f"{voter} raised {type(err).__name__}: {err}")
+            elif action.action == "player_vote" and action.target in self._alive and action.target != voter:
+                target = action.target
+            else:
+                self._record_failure(rnd, "day", voter, "invalid_action", f"{voter} bad vote {action.target}", action.target)
+                self._downgrade_turn(turn, f"engine rejected vote {action.target}")
             if target is None:
                 cands = self._alive_in_seat_order(exclude={voter})
                 if not cands:
@@ -534,12 +736,14 @@ class EmergentGameEngine:
             consensus_log=None,
             failure_audit=failure_audit,
             end_condition=end_condition,
+            provider_turns=self._provider_turns,
         )
 
     def _run_inner(self) -> GameOutcome:
         game_id = self._game_id
         # setup
         self._emit("setup", 0, "role_assignment", "system", "none", "public", "Roles assigned to all 6 players.")
+        self._write_god_snapshot("setup_god_view", 0, "setup")
 
         save_used = False
         poison_used = False
@@ -602,6 +806,7 @@ class EmergentGameEngine:
             "all",
             f"{'All werewolves eliminated. Villager team wins.' if winner == 'villager' else 'Werewolves reached parity. Werewolf team wins.'}",
         )
+        self._write_god_snapshot("final_god_view", end_round, "game_end")
 
         game_log = {
             "game_id": game_id,
@@ -639,4 +844,5 @@ class EmergentGameEngine:
             consensus_log=consensus_log,
             failure_audit=failure_audit,
             end_condition=end_condition,
+            provider_turns=self._provider_turns,
         )
