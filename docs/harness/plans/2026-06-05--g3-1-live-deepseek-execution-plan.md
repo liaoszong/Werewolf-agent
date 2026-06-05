@@ -59,7 +59,7 @@ docs/harness/plans/2026-06-05--g3-1-live-deepseek-execution-plan.md
 ```
 
 ## Forbidden Scope
-No edits to `deepseek_provider.py` / `provider_agent.py` / `provider_contract.py` / `game_engine.py` / consensus-runner internals (reuse verbatim). No Qt client changes (live UI toggle = G3-2). No `docs/ROADMAP.md` / `docs/TASKS.md` / `docs/adr/**` edits. No new deps. **No secret in any committed file/fixture; no test reads `DEEPSEEK_API_KEY` or opens a real socket to api.deepseek.com.** No per-seat models, no template live launch, no retries, no `g1b_default` live.
+No edits to `deepseek_provider.py` / `provider_agent.py` / `provider_contract.py` / `game_engine.py` / `run_deepseek_consensus_game.py` internals (reuse verbatim). **Explicitly PERMITTED** (not "internals"): the new `deepseek_launcher.py` may **read the output artifacts it caused** (`failure-audit.json`) to classify the failure reason; `observer_server.py` may **map the live launcher's exit code** to a run-status reason. The runtime-spine `prompt-manifest.json` model stays the runner's `"unknown"` (accepted limitation — `resolved-profile.json` is the authoritative model record; threading the manifest model is a named follow-up). No Qt client changes (live UI toggle = G3-2). No `docs/ROADMAP.md` / `docs/TASKS.md` / `docs/adr/**` edits. No new deps. **No secret in any committed file/fixture; no test reads `DEEPSEEK_API_KEY` or opens a real socket to api.deepseek.com.** No per-seat models, no template live launch, no retries, no `g1b_default` live.
 
 ---
 
@@ -90,17 +90,21 @@ No edits to `deepseek_provider.py` / `provider_agent.py` / `provider_contract.py
   5. `mode="live"` + a seat resolving to a non-deepseek provider → `400 unsupported_live_provider`; no `run_dir`.
   6. `mode="live"` + deepseek seats with **>1 distinct model** → `400 mixed_models`; no `run_dir`.
   7. `mode="live"` + single-model deepseek profile + `live_launcher` set → the **fake live_launcher ran** (sentinel present) and `resolved-profile.json` shows `execution_mode="live"` (after Task 4).
+  8. **(capability precedes validity/shape)** `mode="live"`, server **not** live-enabled, with a **malformed** profile (and separately a non-deepseek profile) → `403 live_api_disabled` — **NOT** `invalid_profile` / `unsupported_live_provider`; no `run_dir`. Likewise `mode="live"` + flag-on + key-missing + malformed profile → `403 missing_api_key`.
   Run → fail.
 - [ ] **Step 2 (green):** `observer_server.py`:
   - `ObserverServerState`: add `live_enabled: bool = False` and `live_launcher: RunLauncher | None = None`.
   - `create_observer_server(..., live_enabled=False, live_launcher=None)` → store on state.
-  - `_handle_profile_launch`: after profile validation, compute `mode = plr["mode"]` and the resolved seats (`resolve_profile`). Implement the **canonical gate order** (all rejects BEFORE `run_dir.mkdir`):
-    1. `mode != "live"` → `base = state.launcher` (fake).
-    2. `mode == "live"` and `not state.live_enabled` → `_send_error_json(403,"live_api_disabled",...)`, return.
-    3. `mode == "live"` and `state.live_launcher is None` → `_send_error_json(403,"missing_api_key",...)`, return.
-    4. any resolved seat `provider != "deepseek"` → `_send_error_json(400,"unsupported_live_provider",...)`, return.
-    5. distinct deepseek seat models > 1 → `_send_error_json(400,"mixed_models",...)`, return.
-    6. else `base = state.live_launcher`.
+  - `_handle_profile_launch`: compute `mode = plr["mode"]` **from the parsed request**. Canonical gate order (all rejects BEFORE `run_dir.mkdir`), **capability BEFORE load/validate, shape AFTER**:
+    1. `mode != "live"` → `base = state.launcher` (fake); proceed to load+validate as today.
+    2. **(capability, BEFORE load/validate)** `mode == "live"` and `not state.live_enabled` → `_send_error_json(403,"live_api_disabled",...)`, return.
+    3. **(capability, BEFORE load/validate)** `mode == "live"` and `state.live_launcher is None` → `_send_error_json(403,"missing_api_key",...)`, return.
+    4. load profile + `validate_profile` (existing) → `400 invalid_profile` on failure; then `resolve_profile`.
+    5. **(shape, AFTER validate)** any resolved seat `provider != "deepseek"` → `_send_error_json(400,"unsupported_live_provider",...)`, return.
+    6. **(shape)** distinct deepseek seat models > 1 → `_send_error_json(400,"mixed_models",...)`, return.
+    7. else `base = state.live_launcher`.
+  - Factor steps 2–3 into pure `_check_live_capability(state, mode)` and steps 5–6 into pure `_check_live_profile_shape(resolved_seats)`; unit-test both offline (no socket).
+  - In `_launch_run_async`/error recording, map the live launcher exit code to a **key-free** reason: `3 → budget_exhausted`, `2`/other → `provider_failure`.
   - Thread `execution_mode`/`live_api` into `_profile_launcher` so it stamps the artifact per the chosen base (`"live"`/`"used"` when `base is live_launcher`, else `"fake"`/`"not_used"`). (Artifact parameterization lands in Task 4.)
   Run → fail-then-green (server tests env-blocked here → validate the gate logic via a thin unit harness that calls the handler's gate helper directly; factor the gate decision into a pure helper `_resolve_launch_base(state, mode, resolved_seats) -> (base, error)` and unit-test THAT offline).
 - [ ] **Step 3:** Focused tests OK (offline gate-helper unit tests green; document server-socket tests as env-blocked). Commit: `feat(g3-1): server live-mode gate matrix + launcher dispatch`.
@@ -115,12 +119,13 @@ No edits to `deepseek_provider.py` / `provider_agent.py` / `provider_contract.py
 
 - [ ] **Step 0:** Re-read `run_deepseek_consensus_game_with_provider_factory` signature + `_build_deepseek_agent` + `_FakeDeepSeekProvider`/`provider_factory` injection in `tests/test_deepseek_consensus_game.py`. Confirm how a provider failure / budget error surfaces (exit code + recorded reason).
 - [ ] **Step 1 (red):** `tests/test_deepseek_launcher.py`:
-  - `test_launcher_writes_spine_and_bundle`: build `build_deepseek_launcher(api_key="sk-test-… (fake)", base_url=..., model="deepseek-chat", timeout_seconds=30, max_tokens=..., max_requests=32, provider_factory=<fake returning _FakeDeepSeekProvider>)`. Call `launcher(run_id, run_dir)` → returns 0; assert `events.jsonl`, `snapshots/`, `prompt-manifest.json`, and the game/decision/consensus/provider-trace/failure-audit bundle exist; `prompt-manifest.json` model == the resolved real model (not `"unknown"`).
+  - `test_launcher_writes_spine_and_bundle`: build `build_deepseek_launcher(api_key="sk-test-… (fake)", base_url=..., model="deepseek-chat", timeout_seconds=30, max_tokens=..., max_requests=32, provider_factory=<fake returning _FakeDeepSeekProvider>)`. Call `launcher(run_id, run_dir)` → returns 0; assert `events.jsonl`, `snapshots/`, `prompt-manifest.json`, and the game/decision/consensus/provider-trace/failure-audit bundle exist; `resolved-profile.json` records the resolved real per-seat model (the `prompt-manifest.json` model stays `"unknown"` — NOT asserted this slice).
   - `test_launcher_default_budget_is_32`: assert the launcher passes `max_requests=32` into the provider config by default; an explicit arg overrides it.
-  - `test_budget_exhaustion_fails_closed`: a fake provider that raises the budget error → launcher returns nonzero; `provider-trace.json` + `failure-audit.json` exist; no valid completed game log.
+  - `test_budget_exhaustion_classified`: a fake provider that raises `RuntimeError("request budget exceeded: 32")` → the runner writes `failure-audit.json` with `failures[].reason` containing `budget exceeded`; the launcher reads it and returns **exit 3**; `provider-trace.json` + `failure-audit.json` exist; no valid completed game log.
+  - `test_generic_provider_failure_is_exit_2`: a fake provider raising a non-budget error → launcher returns **exit 2** (`provider_failure`).
   - `test_key_never_in_artifacts`: pass a fake `sk-test-key`; rglob the output dir for `['Authorization','Bearer ','api_key','DEEPSEEK_API_KEY','sk-']` → none; assert the key string itself is absent.
   Run → fail (module missing).
-- [ ] **Step 2 (green):** `deepseek_launcher.py`: `build_deepseek_launcher(*, api_key, base_url, model, timeout_seconds=30, max_tokens, max_requests=32, provider_factory=None) -> RunLauncher`. Default `provider_factory` = `_build_deepseek_agent(...)`-shaped (one shared `DeepSeekProvider`). The returned `Callable[[str,Path],int]` calls `run_deepseek_consensus_game_with_provider_factory(game_id=run_id, out_dir=run_dir, provider_factory=..., write_runtime_spine=True)` and returns its exit code; on budget/provider failure return nonzero and let the runner's artifacts record the reason. Inject `provider_factory` so tests pass a fake (no real transport).
+- [ ] **Step 2 (green):** `deepseek_launcher.py`: `build_deepseek_launcher(*, api_key, base_url, model, timeout_seconds=30, max_tokens, max_requests=32, provider_factory=None) -> RunLauncher`. Default `provider_factory` = `_build_deepseek_agent(...)`-shaped (one shared `DeepSeekProvider`). The returned `Callable[[str,Path],int]` calls `run_deepseek_consensus_game_with_provider_factory(game_id=run_id, out_dir=run_dir, provider_factory=..., write_runtime_spine=True)`. On **0** → return 0. On the runner's **nonzero** (its exit 2), read `run_dir/failure-audit.json`; if any `failures[].reason` contains the substring `budget exceeded` → return **3** (`budget_exhausted`), else return **2** (`provider_failure`). This classification lives entirely in the new launcher (reads its own output; no runner/provider edit). Inject `provider_factory` so tests pass a fake (no real transport).
 - [ ] **Step 3:** Focused OK. Commit: `feat(g3-1): build_deepseek_launcher delegating to spine consensus runner (budget=32)`.
 
 ---
@@ -131,9 +136,10 @@ No edits to `deepseek_provider.py` / `provider_agent.py` / `provider_contract.py
 
 - [ ] **Step 1 (red):** `tests/test_profile_config.py` add `LiveArtifactTests`:
   - `build_resolved_profile_artifact(profile, run_id, execution_mode="live", live_api="used")` → dict with `execution_mode=="live"`, `live_api=="used"`, `secrets_redacted is True`, prompts still hash-only (no raw prompt text).
+  - the artifact's per-seat entries record the **resolved real model** (authoritative model record — this is what satisfies A3, NOT the prompt-manifest).
   - default call (no kwargs) still yields `execution_mode=="fake"`, `live_api=="not_used"` (back-compat).
   Run → fail.
-- [ ] **Step 2 (green):** parameterize `build_resolved_profile_artifact(profile, run_id, *, execution_mode="fake", live_api="not_used")`. Ensure the live launcher / `_profile_launcher` passes `execution_mode="live", live_api="used"` on the live base. Ensure the live prompt-manifest model is the resolved model (fix the consensus runner's `"unknown"` ONLY via the launcher's inputs — do NOT edit the runner; if the runner hard-codes `"unknown"`, record the resolved model in `resolved-profile.json` instead and note the manifest limitation).
+- [ ] **Step 2 (green):** parameterize `build_resolved_profile_artifact(profile, run_id, *, execution_mode="fake", live_api="not_used")`. The live launcher / `_profile_launcher` passes `execution_mode="live", live_api="used"` on the live base. **Model record:** `resolved-profile.json` already carries the resolved per-seat `model` — that is the authoritative record (A3). Do **NOT** edit the consensus runner; the runtime-spine `prompt-manifest.json` model stays `"unknown"` this slice (documented limitation; add a one-line note in the spec/packet and a named follow-up). No test asserts the manifest model == real model.
 - [ ] **Step 3:** Focused OK. Commit: `feat(g3-1): honest execution markers in resolved-profile artifact`.
 
 ---
@@ -170,7 +176,7 @@ No edits to `deepseek_provider.py` / `provider_agent.py` / `provider_contract.py
 **Files:** `scripts/dev/run_deepseek_live_smoke.py` (new), `tests/test_deepseek_live_smoke.py` (new)
 
 - [ ] **Step 1:** `scripts/dev/run_deepseek_live_smoke.py`: builds the live launcher from `os.environ[DEEPSEEK_API_KEY]`, runs ONE game into a temp dir, prints a **text-free** PASS/FAIL (run completed, spine + bundle exist, `live_api=used`, no secret marker in output). It **must not** print the key, the `Authorization` header, or the full raw request. Refuses to run unless `RUN_DEEPSEEK_LIVE_SMOKE=1` and the key is present.
-- [ ] **Step 2:** `tests/test_deepseek_live_smoke.py`: a `unittest.skipUnless(os.environ.get("RUN_DEEPSEEK_LIVE_SMOKE")=="1" and os.environ.get("DEEPSEEK_API_KEY"), "live smoke disabled")` wrapper that invokes the script's entry and asserts structural success only. **By default this test SKIPS** — it is never a CI/acceptance gate.
+- [ ] **Step 2:** `tests/test_deepseek_live_smoke.py`: `@unittest.skipUnless(os.environ.get("RUN_DEEPSEEK_LIVE_SMOKE") == "1", "live smoke disabled")` — the skip gate reads **only** `RUN_DEEPSEEK_LIVE_SMOKE` (it must **NOT** read `DEEPSEEK_API_KEY` at discovery, per A5). **Inside** the test body (only reached when the gate is open), read `DEEPSEEK_API_KEY`; if absent → `self.skipTest("no key")`; else invoke the script entry and assert structural success only. **By default this test SKIPS and never reads the key.**
 - [ ] **Step 3:** Run the default suite → confirm the smoke test **skips** and nothing hits the network. Commit: `feat(g3-1): gated manual DeepSeek live smoke (script + skipUnless wrapper)`.
 - [ ] **Step 4 (manual, pre-merge):** with a real key, run `RUN_DEEPSEEK_LIVE_SMOKE=1 DEEPSEEK_API_KEY=… python scripts/dev/run_deepseek_live_smoke.py`; record the **text-free** result (pass/fail, request count, `live_api=used`, no leak) in the review packet. If 32 truncated the game, note it and (separately) bump to 48/64 with evidence.
 
@@ -187,13 +193,13 @@ No edits to `deepseek_provider.py` / `provider_agent.py` / `provider_contract.py
 ---
 
 ## Acceptance Criteria (hard)
-- **A1 — Gate matrix** holds branch-by-branch (omitted/fake→fake; live+no-flag→403 `live_api_disabled`; live+flag+no-key→403 `missing_api_key`; live+non-deepseek→400 `unsupported_live_provider`; live+mixed-models→400 `mixed_models`; live+valid→live launcher; template+live→400). **No `run_dir` on any reject.** *(Task 1/2)*
+- **A1 — Gate matrix** holds branch-by-branch (omitted/fake→fake; live+no-flag→403 `live_api_disabled`; live+flag+no-key→403 `missing_api_key`; live+non-deepseek→400 `unsupported_live_provider`; live+mixed-models→400 `mixed_models`; live+valid→live launcher; template+live→400). **Capability precedes validity/shape:** live+disabled (or flag-on+no-key) + a malformed/non-deepseek profile → `live_api_disabled`/`missing_api_key`, NOT `invalid_profile`/`unsupported_live_provider`. **No `run_dir` on any reject.** *(Task 1/2)*
 - **A2** Live launch runs via `DeepSeekProvider` (server-side env key) and writes the full spine + bundle. *(Task 3, injected fake)*
-- **A3** `resolved-profile.json` honest (`execution_mode=live`/`live_api=used`/`secrets_redacted=true`); manifest model = resolved real model (or documented limitation). *(Task 4)*
+- **A3** `resolved-profile.json` honest (`execution_mode=live`/`live_api=used`/`secrets_redacted=true`) and records the **resolved real per-seat model** (authoritative). Runtime-spine `prompt-manifest.json` model stays `"unknown"` (documented limitation; named follow-up). *(Task 4)*
 - **A4** Fake is the unconditional default; live needs flag+key+mode+deepseek; mixed models → 400. *(Task 2/5)*
 - **A5** No secret in any artifact/event/snapshot/response/error; **no default test reads the key or opens a real socket.** *(Task 6)*
 - **A6** Default suite offline & green (env-blocked server tests excepted); smoke **skips** by default; manual smoke run once pre-merge, text-free result recorded. *(Task 7/8)*
-- **A7** `max_requests=32` default, server-override-only; reaching it **fails closed** `budget_exhausted`. *(Task 3/5)*
+- **A7** `max_requests=32` default, server-override-only; reaching it **fails closed** — launcher classifies `budget_exhausted` (exit 3) vs `provider_failure` (exit 2) from `failure-audit.json`; server maps the code to a key-free run-status reason. *(Task 3/5)*
 
 ---
 
