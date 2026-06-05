@@ -74,6 +74,60 @@ class ObserverServerState:
     run_status: dict[str, str] = field(default_factory=dict)
     run_errors: dict[str, str] = field(default_factory=dict)
     lock: Lock = field(default_factory=Lock)
+    # G3-1 live opt-in: ``live_enabled`` reflects ``--allow-live-api``;
+    # ``live_launcher`` is wired only when an env API key was present at start.
+    live_enabled: bool = False
+    live_launcher: RunLauncher | None = None
+
+
+def _check_live_capability(
+    state: ObserverServerState, mode: str
+) -> tuple[int, str, str] | None:
+    """Capability gate for live launches — evaluated BEFORE the profile is
+    loaded/validated, so an un-provisioned server rejects even a malformed or
+    non-deepseek profile with a capability code (never ``invalid_profile`` or a
+    shape error).  Returns ``(status, code, message)`` to reject, or ``None`` to
+    proceed.  Non-live modes always proceed."""
+    if mode != "live":
+        return None
+    if not state.live_enabled:
+        return (403, "live_api_disabled", "live API is not enabled on this server")
+    if state.live_launcher is None:
+        return (403, "missing_api_key", "live API key is not configured on this server")
+    return None
+
+
+def _check_live_profile_shape(
+    resolved_seats: list[dict],
+) -> tuple[int, str, str] | None:
+    """Shape gate for live launches — evaluated AFTER validation, only for live
+    mode.  Provider check precedes the model check (gate order E before F).
+    Returns ``(status, code, message)`` to reject, or ``None`` to proceed."""
+    providers = {seat.get("provider") for seat in resolved_seats}
+    if providers - {"deepseek"}:
+        return (
+            400,
+            "unsupported_live_provider",
+            "live launch requires every seat to use the deepseek provider",
+        )
+    models = {seat.get("model") for seat in resolved_seats}
+    if len(models) > 1:
+        return (
+            400,
+            "mixed_models",
+            "live launch requires a single shared deepseek model",
+        )
+    return None
+
+
+def _map_launcher_exit_reason(code: int) -> str:
+    """Map a launcher exit code to a key-free run-status reason (G3-1, A7).
+
+    The live deepseek launcher returns 3 when the request budget was exhausted
+    and 2 on any other provider failure; both fail closed with no secret."""
+    if code == 3:
+        return "budget_exhausted"
+    return "provider_failure"
 
 
 # ---------------------------------------------------------------------------
@@ -342,7 +396,7 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
             if ret == 0:
                 self._set_status(run_id, "completed")
             else:
-                self._set_error(run_id, f"Launcher returned code {ret}")
+                self._set_error(run_id, _map_launcher_exit_reason(ret))
                 self._set_status(run_id, "failed")
 
         Thread(target=_run_thread, daemon=True).start()
@@ -350,6 +404,17 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
     def _handle_profile_launch(self, body: dict[str, object]) -> None:
         plr = parse_profile_launch_request(body)
         state = self._get_state()
+        mode = str(plr["mode"])
+
+        # CAPABILITY gate (BEFORE load/validate) — live only.  Capability
+        # precedes validity/shape: an un-provisioned server returns
+        # live_api_disabled/missing_api_key even for a malformed or
+        # non-deepseek profile, and never creates a run_dir.
+        cap_reject = _check_live_capability(state, mode)
+        if cap_reject is not None:
+            self._send_error_json(*cap_reject)
+            return
+
         if plr["kind"] == "named":
             ppath = state.profiles_dir / f"{plr['profile_name']}.json"
             if not ppath.exists():
@@ -368,6 +433,13 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
             self._send_error_json(400, "invalid_profile", str(exc))
             return
 
+        # SHAPE gate (AFTER validate) — live only.
+        if mode == "live":
+            shape_reject = _check_live_profile_shape(resolve_profile(profile))
+            if shape_reject is not None:
+                self._send_error_json(*shape_reject)
+                return
+
         run_id = str(plr["run_id"])
         run_dir = state.runs_dir / run_id
         if run_dir.exists():
@@ -375,7 +447,7 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
             return
         run_dir.mkdir(parents=True)
 
-        base = state.launcher
+        base = state.live_launcher if mode == "live" else state.launcher
 
         def _profile_launcher(
             rid: str, rdir: Path, base: RunLauncher = base, profile: dict = profile
@@ -528,8 +600,14 @@ def create_observer_server(
     runs_dir: Path,
     launcher: RunLauncher | None = None,
     profiles_dir: Path | None = None,
+    live_enabled: bool = False,
+    live_launcher: RunLauncher | None = None,
 ) -> ThreadingHTTPServer:
-    """Create and configure a threaded observer HTTP server."""
+    """Create and configure a threaded observer HTTP server.
+
+    ``live_enabled``/``live_launcher`` wire the G3-1 opt-in live path: live is
+    the only mode that consults them, and only a profile launch (not a template
+    launch) may select it.  Both default off so the server stays fake-only."""
     if launcher is None:
         launcher = default_fake_launcher
     runs_dir.mkdir(parents=True, exist_ok=True)
@@ -538,7 +616,11 @@ def create_observer_server(
     profiles_dir.mkdir(parents=True, exist_ok=True)
 
     state = ObserverServerState(
-        runs_dir=runs_dir, launcher=launcher, profiles_dir=profiles_dir
+        runs_dir=runs_dir,
+        launcher=launcher,
+        profiles_dir=profiles_dir,
+        live_enabled=live_enabled,
+        live_launcher=live_launcher,
     )
 
     class _BoundHandler(ObserverRequestHandler):

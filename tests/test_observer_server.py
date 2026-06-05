@@ -16,7 +16,11 @@ from werewolf_eval.observer_protocol import (
     ALLOWED_PERSPECTIVES,
 )
 from werewolf_eval.observer_server import (
+    ObserverRequestHandler,
     ObserverServerState,
+    _check_live_capability,
+    _check_live_profile_shape,
+    _map_launcher_exit_reason,
     create_observer_server,
     default_fake_launcher,
 )
@@ -1046,3 +1050,255 @@ class ObserverServerProfileTests(TestCase):
         self.assertNotIn(str(self._runs), art_text)
         for marker in ("sk-", "Bearer ", "DEEPSEEK_API_KEY", "api_key"):
             self.assertNotIn(marker, art_text)
+
+
+# ---------------------------------------------------------------------------
+# G3-1 live-mode gate matrix — validated OFFLINE (localhost HTTP is blocked in
+# this env).  The two pure helpers cover the decision logic; the in-process
+# handler harness covers dispatch (run_dir-not-created, launcher selection,
+# capability-before-validate-before-shape ordering) with no socket.
+# ---------------------------------------------------------------------------
+
+
+def _deepseek_profile(name: str = "dsprofile", model: str = "deepseek-chat") -> dict:
+    rd = {
+        role: {"provider": "deepseek", "model": model, "prompt": "", "strategy": "default"}
+        for role in ("werewolf", "seer", "witch", "villager")
+    }
+    return {
+        "schema_version": "g2d.profile.v1",
+        "name": name,
+        "template": "default_6p_fake",
+        "role_defaults": rd,
+    }
+
+
+def _mixed_model_deepseek_profile(name: str = "mixedmodel") -> dict:
+    p = _deepseek_profile(name)
+    p["seat_overrides"] = {
+        "p3": {"provider": "deepseek", "model": "deepseek-reasoner", "prompt": "", "strategy": "default"}
+    }
+    return p
+
+
+def _resolved_seats(provider: str, model: str) -> list[dict]:
+    return [{"player_id": f"p{i}", "provider": provider, "model": model} for i in range(1, 7)]
+
+
+class LiveGateHelperTests(TestCase):
+    """Pure-helper unit tests for the live-mode gate matrix (no socket)."""
+
+    def _state(self, *, live_enabled: bool, live_launcher: object) -> ObserverServerState:
+        with TemporaryDirectory() as tmp:
+            runs = Path(tmp) / "runs"
+            runs.mkdir()
+            return ObserverServerState(
+                runs_dir=runs,
+                launcher=default_fake_launcher,
+                live_enabled=live_enabled,
+                live_launcher=live_launcher,  # type: ignore[arg-type]
+            )
+
+    # -- capability (BEFORE load/validate) --------------------------------
+
+    def test_capability_fake_mode_always_proceeds(self) -> None:
+        st = self._state(live_enabled=False, live_launcher=None)
+        self.assertIsNone(_check_live_capability(st, "fake"))
+
+    def test_capability_live_not_enabled_is_403_disabled(self) -> None:
+        st = self._state(live_enabled=False, live_launcher=None)
+        result = _check_live_capability(st, "live")
+        self.assertEqual(result, (403, "live_api_disabled", result[2]))  # type: ignore[index]
+
+    def test_capability_live_enabled_no_launcher_is_403_missing_key(self) -> None:
+        st = self._state(live_enabled=True, live_launcher=None)
+        result = _check_live_capability(st, "live")
+        self.assertEqual(result[0], 403)  # type: ignore[index]
+        self.assertEqual(result[1], "missing_api_key")  # type: ignore[index]
+
+    def test_capability_live_enabled_with_launcher_proceeds(self) -> None:
+        st = self._state(live_enabled=True, live_launcher=lambda r, d: 0)
+        self.assertIsNone(_check_live_capability(st, "live"))
+
+    # -- shape (AFTER validate) -------------------------------------------
+
+    def test_shape_all_deepseek_single_model_proceeds(self) -> None:
+        self.assertIsNone(_check_live_profile_shape(_resolved_seats("deepseek", "deepseek-chat")))
+
+    def test_shape_non_deepseek_is_400_unsupported(self) -> None:
+        result = _check_live_profile_shape(_resolved_seats("fake_deterministic", "none"))
+        self.assertEqual(result[0], 400)  # type: ignore[index]
+        self.assertEqual(result[1], "unsupported_live_provider")  # type: ignore[index]
+
+    def test_shape_mixed_models_is_400_mixed(self) -> None:
+        seats = _resolved_seats("deepseek", "deepseek-chat")
+        seats[2]["model"] = "deepseek-reasoner"
+        result = _check_live_profile_shape(seats)
+        self.assertEqual(result[0], 400)  # type: ignore[index]
+        self.assertEqual(result[1], "mixed_models")  # type: ignore[index]
+
+    def test_shape_provider_check_precedes_model_check(self) -> None:
+        # A profile that is BOTH non-deepseek AND mixed-model → provider error wins.
+        seats = _resolved_seats("deepseek", "deepseek-chat")
+        seats[0]["provider"] = "fake_deterministic"
+        seats[0]["model"] = "none"
+        result = _check_live_profile_shape(seats)
+        self.assertEqual(result[1], "unsupported_live_provider")  # type: ignore[index]
+
+    # -- exit-code → reason map -------------------------------------------
+
+    def test_exit_code_3_maps_to_budget_exhausted(self) -> None:
+        self.assertEqual(_map_launcher_exit_reason(3), "budget_exhausted")
+
+    def test_exit_code_2_maps_to_provider_failure(self) -> None:
+        self.assertEqual(_map_launcher_exit_reason(2), "provider_failure")
+
+    def test_other_nonzero_maps_to_provider_failure(self) -> None:
+        self.assertEqual(_map_launcher_exit_reason(1), "provider_failure")
+
+
+class _FakeServer:
+    def __init__(self, state: ObserverServerState) -> None:
+        self.state = state
+
+
+class _InProcessHandler(ObserverRequestHandler):
+    """Drive ``_handle_profile_launch`` with no socket.  Overrides only the
+    response sink and the async-launch hook; the chosen launcher runs
+    synchronously so run_dir artifacts are deterministic."""
+
+    def __init__(self, state: ObserverServerState) -> None:  # noqa: D107 - skips socket init intentionally
+        self.server = _FakeServer(state)  # type: ignore[assignment]
+        self.responses: list[tuple[int, dict]] = []
+        self.launched: list[tuple[str, Path]] = []
+        self.last_code: int | None = None
+
+    def _send_json(self, status: int, payload: object) -> None:  # type: ignore[override]
+        self.responses.append((status, payload))  # type: ignore[arg-type]
+
+    def _launch_run_async(self, run_id: str, run_dir: Path, launcher: object) -> None:  # type: ignore[override]
+        self.launched.append((run_id, run_dir))
+        self.last_code = launcher(run_id, run_dir)  # type: ignore[operator]
+
+
+class LiveDispatchTests(TestCase):
+    """In-process dispatch tests for the live gate matrix (no socket)."""
+
+    def _live_launcher(self, run_id: str, run_dir: Path) -> int:
+        (run_dir / "live.sentinel").write_text("live", encoding="utf-8")
+        return 0
+
+    def _fake_launcher(self, run_id: str, run_dir: Path) -> int:
+        (run_dir / "fake.sentinel").write_text("fake", encoding="utf-8")
+        return 0
+
+    def _dispatch(
+        self,
+        body: dict,
+        *,
+        live_enabled: bool = False,
+        live_launcher_set: bool = False,
+        tmp: Path | None = None,
+    ) -> tuple[_InProcessHandler, Path]:
+        runs = (tmp or Path(self._tmp.name)) / "runs"
+        runs.mkdir(parents=True, exist_ok=True)
+        profiles = (tmp or Path(self._tmp.name)) / "profiles"
+        profiles.mkdir(parents=True, exist_ok=True)
+        state = ObserverServerState(
+            runs_dir=runs,
+            launcher=self._fake_launcher,
+            profiles_dir=profiles,
+            live_enabled=live_enabled,
+            live_launcher=self._live_launcher if live_launcher_set else None,
+        )
+        handler = _InProcessHandler(state)
+        handler._handle_profile_launch(body)
+        return handler, runs
+
+    def setUp(self) -> None:
+        self._tmp = TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+
+    def _run_dir(self, runs: Path, run_id: str) -> Path:
+        return runs / run_id
+
+    # 1. mode omitted + deepseek profile → fake launcher ran (no live sentinel)
+    def test_mode_omitted_runs_fake_launcher(self) -> None:
+        body = {"profile": _deepseek_profile(), "run_id": "r_omit"}
+        h, runs = self._dispatch(body, live_enabled=True, live_launcher_set=True)
+        self.assertEqual(h.responses[-1][0], 202)
+        self.assertEqual(h.responses[-1][1]["mode"], "fake")
+        rd = self._run_dir(runs, "r_omit")
+        self.assertTrue((rd / "fake.sentinel").exists())
+        self.assertFalse((rd / "live.sentinel").exists())
+
+    # 2. mode=fake → fake launcher ran
+    def test_mode_fake_runs_fake_launcher(self) -> None:
+        body = {"profile": _deepseek_profile(), "run_id": "r_fake", "mode": "fake"}
+        h, runs = self._dispatch(body, live_enabled=True, live_launcher_set=True)
+        rd = self._run_dir(runs, "r_fake")
+        self.assertTrue((rd / "fake.sentinel").exists())
+        self.assertFalse((rd / "live.sentinel").exists())
+
+    # 3. mode=live, server NOT live-enabled → 403 live_api_disabled, no run_dir
+    def test_live_not_enabled_403_disabled_no_run_dir(self) -> None:
+        body = {"profile": _deepseek_profile(), "run_id": "r_dis", "mode": "live"}
+        h, runs = self._dispatch(body, live_enabled=False, live_launcher_set=False)
+        self.assertEqual(h.responses[-1][0], 403)
+        self.assertEqual(h.responses[-1][1]["code"], "live_api_disabled")
+        self.assertFalse(self._run_dir(runs, "r_dis").exists())
+
+    # 4. mode=live, enabled but launcher=None (key missing) → 403 missing_api_key
+    def test_live_enabled_no_key_403_missing_no_run_dir(self) -> None:
+        body = {"profile": _deepseek_profile(), "run_id": "r_key", "mode": "live"}
+        h, runs = self._dispatch(body, live_enabled=True, live_launcher_set=False)
+        self.assertEqual(h.responses[-1][0], 403)
+        self.assertEqual(h.responses[-1][1]["code"], "missing_api_key")
+        self.assertFalse(self._run_dir(runs, "r_key").exists())
+
+    # 5. mode=live + non-deepseek provider → 400 unsupported_live_provider
+    def test_live_non_deepseek_400_unsupported_no_run_dir(self) -> None:
+        body = {"profile": _valid_profile_payload("fakeonly"), "run_id": "r_unsup", "mode": "live"}
+        h, runs = self._dispatch(body, live_enabled=True, live_launcher_set=True)
+        self.assertEqual(h.responses[-1][0], 400)
+        self.assertEqual(h.responses[-1][1]["code"], "unsupported_live_provider")
+        self.assertFalse(self._run_dir(runs, "r_unsup").exists())
+
+    # 6. mode=live + >1 distinct deepseek model → 400 mixed_models
+    def test_live_mixed_models_400_no_run_dir(self) -> None:
+        body = {"profile": _mixed_model_deepseek_profile(), "run_id": "r_mix", "mode": "live"}
+        h, runs = self._dispatch(body, live_enabled=True, live_launcher_set=True)
+        self.assertEqual(h.responses[-1][0], 400)
+        self.assertEqual(h.responses[-1][1]["code"], "mixed_models")
+        self.assertFalse(self._run_dir(runs, "r_mix").exists())
+
+    # 7. mode=live + single-model deepseek + live_launcher → live launcher ran
+    def test_live_valid_runs_live_launcher(self) -> None:
+        body = {"profile": _deepseek_profile(), "run_id": "r_live", "mode": "live"}
+        h, runs = self._dispatch(body, live_enabled=True, live_launcher_set=True)
+        self.assertEqual(h.responses[-1][0], 202)
+        self.assertEqual(h.responses[-1][1]["mode"], "live")
+        rd = self._run_dir(runs, "r_live")
+        self.assertTrue((rd / "live.sentinel").exists())
+        self.assertFalse((rd / "fake.sentinel").exists())
+
+    # 8. capability precedes validity/shape: not-enabled + malformed profile
+    def test_capability_precedes_validity_disabled_with_malformed(self) -> None:
+        body = {"profile": {"name": "x"}, "run_id": "r_cap1", "mode": "live"}
+        h, runs = self._dispatch(body, live_enabled=False, live_launcher_set=False)
+        self.assertEqual(h.responses[-1][1]["code"], "live_api_disabled")
+        self.assertFalse(self._run_dir(runs, "r_cap1").exists())
+
+    # 8b. capability precedes validity/shape: not-enabled + non-deepseek profile
+    def test_capability_precedes_shape_disabled_with_non_deepseek(self) -> None:
+        body = {"profile": _valid_profile_payload("fakeonly"), "run_id": "r_cap2", "mode": "live"}
+        h, runs = self._dispatch(body, live_enabled=False, live_launcher_set=False)
+        self.assertEqual(h.responses[-1][1]["code"], "live_api_disabled")
+        self.assertFalse(self._run_dir(runs, "r_cap2").exists())
+
+    # 8c. flag-on + key-missing + malformed → missing_api_key (capability wins)
+    def test_capability_missing_key_precedes_validity(self) -> None:
+        body = {"profile": {"name": "x"}, "run_id": "r_cap3", "mode": "live"}
+        h, runs = self._dispatch(body, live_enabled=True, live_launcher_set=False)
+        self.assertEqual(h.responses[-1][1]["code"], "missing_api_key")
+        self.assertFalse(self._run_dir(runs, "r_cap3").exists())
