@@ -6,6 +6,7 @@ from pathlib import Path
 from werewolf_eval.profile_config import (
     PROFILE_SCHEMA_VERSION,
     ProfileValidationError,
+    build_profile_schema,
     build_resolved_profile_artifact,
     list_profiles,
     load_profile,
@@ -176,6 +177,25 @@ class ProfilePersistenceTests(unittest.TestCase):
             self.assertTrue(listed["good"]["valid"])
             self.assertFalse(listed["bad"]["valid"])
             self.assertIsNotNone(listed["bad"]["error"])
+
+
+class ProfileSchemaTests(unittest.TestCase):
+    def test_schema_shape(self):
+        s = build_profile_schema()
+        self.assertEqual(s["schema_version"], PROFILE_SCHEMA_VERSION)
+        self.assertEqual(set(s["providers"]), {"fake_deterministic", "deepseek"})
+        self.assertEqual(s["models"]["deepseek"], ["deepseek-chat", "deepseek-reasoner"])
+        self.assertEqual(s["models"]["fake_deterministic"], ["none"])
+        self.assertIn("default", s["strategies"])
+        self.assertEqual(s["seat_roles"]["p1"], "werewolf")
+        self.assertEqual(s["seat_roles"]["p3"], "seer")
+        self.assertEqual(s["seat_ids"], ["p1", "p2", "p3", "p4", "p5", "p6"])
+        self.assertEqual(s["prompt_max_len"], 8000)
+        self.assertNotIn("templates", s)
+        # sorted + leak-free
+        self.assertEqual(s["providers"], sorted(s["providers"]))
+        blob = json.dumps(s)
+        self.assertNotIn(":\\", blob)
 
 
 if __name__ == "__main__":

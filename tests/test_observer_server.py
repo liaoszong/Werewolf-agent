@@ -968,6 +968,12 @@ class ObserverServerProfileTests(TestCase):
         result = _request_json(self._base_url, "/api/profiles/nope")
         self.assertEqual(result.get("code"), "not_found")
 
+    def test_schema_endpoint(self) -> None:
+        s = _request_json(self._base_url, "/api/profiles/schema")
+        self.assertEqual(s["seat_roles"]["p1"], "werewolf")
+        self.assertIn("deepseek", s["providers"])
+        self.assertNotIn("templates", s)
+
     def test_validate_inline_profile(self) -> None:
         result = _request_json(
             self._base_url, "/api/profiles/validate", method="POST",

@@ -43,6 +43,7 @@ from werewolf_eval.observer_visibility import (
 )
 from werewolf_eval.profile_config import (
     ProfileValidationError,
+    build_profile_schema,
     build_resolved_profile_artifact,
     list_profiles,
     load_profile,
@@ -182,12 +183,20 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
                 self._send_json(200, {"runs": runs})
                 return
 
+            if segments == ["api", "profiles", "schema"]:
+                self._send_json(200, build_profile_schema())
+                return
+
             if segments == ["api", "profiles"]:
                 profiles = list_profiles(self._get_state().profiles_dir)
                 self._send_json(200, {"profiles": profiles})
                 return
 
-            if len(segments) == 3 and segments[:2] == ["api", "profiles"]:
+            if (
+                len(segments) == 3
+                and segments[:2] == ["api", "profiles"]
+                and segments[2] != "schema"
+            ):
                 name = segments[2]
                 if not _PROFILE_NAME_RE.match(name):
                     self._send_error_json(400, "invalid_request", "unsafe profile name")
