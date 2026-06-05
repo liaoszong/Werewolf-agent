@@ -499,7 +499,13 @@ def format_sse_event(event: dict[str, object]) -> bytes:
     return f"event: runtime_event\ndata: {data}\n\n".encode("utf-8")
 
 
-def format_sse_status(run_id: str, status: str) -> bytes:
-    """Format a run-status SSE message."""
-    data = json.dumps({"run_id": run_id, "status": status}, ensure_ascii=False, sort_keys=True)
+def format_sse_status(run_id: str, status: str, reason: str | None = None) -> bytes:
+    """Format a run-status SSE message.
+
+    When *reason* is provided (a key-free run-status reason such as
+    ``budget_exhausted``/``provider_failure``) it is included in the payload."""
+    payload: dict[str, str] = {"run_id": run_id, "status": status}
+    if reason is not None:
+        payload["reason"] = reason
+    data = json.dumps(payload, ensure_ascii=False, sort_keys=True)
     return f"event: run_status\ndata: {data}\n\n".encode("utf-8")

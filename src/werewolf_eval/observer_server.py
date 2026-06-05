@@ -196,6 +196,11 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
         with state.lock:
             state.run_errors[run_id] = error
 
+    def _get_error(self, run_id: str) -> str | None:
+        state = self._get_state()
+        with state.lock:
+            return state.run_errors.get(run_id)
+
     def _run_dir(self, run_id: str) -> Path:
         validate_run_id(run_id)
         return self._get_state().runs_dir / run_id
@@ -233,7 +238,11 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
                 runs: list[object] = []
                 for d in dirs:
                     mem_status = self._get_status(d.name, d)
-                    runs.append(build_run_summary(d, status=mem_status))
+                    summary = build_run_summary(d, status=mem_status)
+                    reason = self._get_error(d.name)
+                    if reason is not None:
+                        summary["reason"] = reason
+                    runs.append(summary)
                 self._send_json(200, {"runs": runs})
                 return
 
@@ -329,8 +338,7 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
 
                 # /api/runs/{run_id} with no sub-path -> run detail
                 if not sub_path:
-                    mem_status = self._get_status(run_id, run_dir)
-                    detail = build_run_detail(run_dir, status=mem_status)
+                    detail = self._run_detail_with_reason(run_id, run_dir)
                     self._send_json(200, detail)
                     return
 
@@ -380,26 +388,43 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
         except Exception:
             self._send_error_json(500, "internal_error", "Internal server error")
 
+    def _execute_run(
+        self, run_id: str, run_dir: Path, launcher: RunLauncher
+    ) -> None:
+        """Run *launcher* synchronously and record status + a key-free reason.
+
+        Always records a canonical run-status reason on failure
+        (``budget_exhausted``/``provider_failure``) — never raw exception text —
+        because the reason is exposed via run detail/list/SSE (A7)."""
+        self._set_status(run_id, "running")
+        try:
+            ret = launcher(run_id, run_dir)
+        except Exception:  # noqa: BLE001
+            self._set_error(run_id, "provider_failure")
+            self._set_status(run_id, "failed")
+            return
+        if ret == 0:
+            self._set_status(run_id, "completed")
+        else:
+            self._set_error(run_id, _map_launcher_exit_reason(ret))
+            self._set_status(run_id, "failed")
+
     def _launch_run_async(
         self, run_id: str, run_dir: Path, launcher: RunLauncher
     ) -> None:
         self._set_status(run_id, "queued")
+        Thread(
+            target=self._execute_run, args=(run_id, run_dir, launcher), daemon=True
+        ).start()
 
-        def _run_thread() -> None:
-            self._set_status(run_id, "running")
-            try:
-                ret = launcher(run_id, run_dir)
-            except Exception as exc:  # noqa: BLE001
-                self._set_error(run_id, str(exc))
-                self._set_status(run_id, "failed")
-                return
-            if ret == 0:
-                self._set_status(run_id, "completed")
-            else:
-                self._set_error(run_id, _map_launcher_exit_reason(ret))
-                self._set_status(run_id, "failed")
-
-        Thread(target=_run_thread, daemon=True).start()
+    def _run_detail_with_reason(self, run_id: str, run_dir: Path) -> dict[str, object]:
+        """Build run detail and attach the key-free run-status reason, if any."""
+        mem_status = self._get_status(run_id, run_dir)
+        detail = build_run_detail(run_dir, status=mem_status)
+        reason = self._get_error(run_id)
+        if reason is not None:
+            detail["reason"] = reason
+        return detail
 
     def _handle_profile_launch(self, body: dict[str, object]) -> None:
         plr = parse_profile_launch_request(body)
@@ -586,7 +611,9 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
                             self.wfile.write(format_sse_event(event))
                             self.wfile.flush()
                         sent_count += 1
-                    final_sse = format_sse_status(run_id, current_status)
+                    final_sse = format_sse_status(
+                        run_id, current_status, self._get_error(run_id)
+                    )
                     self.wfile.write(final_sse)
                     self.wfile.flush()
                     self.close_connection = True

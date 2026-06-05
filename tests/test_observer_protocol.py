@@ -235,6 +235,16 @@ class ObserverVisibilityTests(TestCase):
         self.assertIn("completed", text)
         self.assertTrue(text.endswith("\n\n"))
 
+    def test_sse_status_includes_reason_when_present(self) -> None:
+        text = format_sse_status("run_01", "failed", "budget_exhausted").decode("utf-8")
+        self.assertIn("failed", text)
+        self.assertIn("budget_exhausted", text)
+        self.assertIn("reason", text)
+
+    def test_sse_status_omits_reason_when_absent(self) -> None:
+        text = format_sse_status("run_01", "completed").decode("utf-8")
+        self.assertNotIn("reason", text)
+
     def test_filter_events_for_perspective_returns_dict_with_count(self) -> None:
         events = [
             self._make_event("public"),

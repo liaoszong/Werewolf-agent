@@ -1537,3 +1537,66 @@ class LiveArtifactContractTests(TestCase):
         resolved = json.loads((live_dir / "resolved-profile.json").read_text(encoding="utf-8"))
         self.assertTrue(manifest.get("secrets_redacted"))
         self.assertTrue(resolved.get("secrets_redacted"))
+
+
+# ---------------------------------------------------------------------------
+# G3-1 run-status reason exposure (A7) — the key-free reason recorded for a
+# failed live run must surface in run detail / list / SSE, not just internally.
+# Validated offline via the in-process handler harness (no socket).
+# ---------------------------------------------------------------------------
+
+
+class LiveRunStatusReasonTests(TestCase):
+    def setUp(self) -> None:
+        self._tmp = TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self._runs = Path(self._tmp.name)
+
+    def _handler(self) -> "_InProcessHandler":
+        state = ObserverServerState(runs_dir=self._runs, launcher=default_fake_launcher)
+        return _InProcessHandler(state)
+
+    def _run(self, run_id: str, code: int) -> "_InProcessHandler":
+        run_dir = self._runs / run_id
+        run_dir.mkdir()
+        h = self._handler()
+        h._execute_run(run_id, run_dir, lambda rid, rd, c=code: c)
+        return h
+
+    def test_exit_3_exposes_budget_exhausted_in_detail(self) -> None:
+        h = self._run("rr3", 3)
+        run_dir = self._runs / "rr3"
+        self.assertEqual(h._get_status("rr3", run_dir), "failed")
+        self.assertEqual(h._get_error("rr3"), "budget_exhausted")
+        detail = h._run_detail_with_reason("rr3", run_dir)
+        self.assertEqual(detail["status"], "failed")
+        self.assertEqual(detail["reason"], "budget_exhausted")
+
+    def test_exit_2_exposes_provider_failure_in_detail(self) -> None:
+        h = self._run("rr2", 2)
+        run_dir = self._runs / "rr2"
+        detail = h._run_detail_with_reason("rr2", run_dir)
+        self.assertEqual(detail["status"], "failed")
+        self.assertEqual(detail["reason"], "provider_failure")
+
+    def test_exit_0_completed_has_no_reason(self) -> None:
+        h = self._run("rr0", 0)
+        run_dir = self._runs / "rr0"
+        self.assertEqual(h._get_status("rr0", run_dir), "completed")
+        detail = h._run_detail_with_reason("rr0", run_dir)
+        self.assertNotIn("reason", detail)
+
+    def test_launcher_exception_records_provider_failure_reason(self) -> None:
+        run_dir = self._runs / "rrx"
+        run_dir.mkdir()
+        h = self._handler()
+
+        def _boom(rid: str, rd: Path) -> int:
+            raise RuntimeError("kaboom")
+
+        h._execute_run("rrx", run_dir, _boom)
+        self.assertEqual(h._get_status("rrx", run_dir), "failed")
+        # an exception (not an exit code) still records a key-free reason
+        detail = h._run_detail_with_reason("rrx", run_dir)
+        self.assertEqual(detail["status"], "failed")
+        self.assertEqual(detail["reason"], "provider_failure")
