@@ -15,7 +15,16 @@ Status: G2b Observer Cockpit MVP
 - `ObserverApiClient` — QML-facing singleton that communicates with the G2a observer server via REST and SSE.
 - `ObserverSseParser` — SSE frame parser that handles `runtime_event` and `run_status` event types.
 - QML views: Home, Match Setup, Preflight, Live Cockpit, History.
-- QML components: RoleCard, EventTimeline, PerspectiveSwitcher, AuditLinksPanel, StatusBadge.
+- QML components: RoleCard, EventTimeline, PerspectiveSwitcher, AuditLinksPanel, StatusBadge, ModeControl, DataSourceChip.
+
+## Live / fake execution toggle (G3-2)
+
+Fake-deterministic execution stays the **unconditional default**. The API key is **never** entered, displayed, or handled by the Qt client.
+
+- **Capabilities before launch.** On the Match Setup page the client reads the server's live posture via a read-only `GET /api/runtime/capabilities` (`g3.runtime_capabilities.v1`) — no "guess, click, get a 403". The endpoint exposes posture only (`enabled` / `available` / a key-free `reason_code` + `message`); it never returns a key, env-var name, header, or base-url secret.
+- **Intent vs. truth.** Intent lives in the setup `ModeControl` (a segmented `[DETERMINISTIC | LIVE API]` control with a two-click arming FSM `fake → live_armed → live_confirmed`). Switching profile/seat, clicking DETERMINISTIC, or live becoming unavailable disarms it through a single `resetToFake()`. The launch sends `mode="live"` **only** when fully confirmed; otherwise fake. Only a profile launch can request live — template launches stay fake.
+- **Executed truth via the API.** The global `DataSourceChip` HUD shows the run's executed truth (`SYS: LIVE_API` / `SYS: SIMULATION`) sourced **only** from the run-detail `execution_mode` field (the server reads its own `resolved-profile.json`). It is conservative — `SYS: SIMULATION` until run detail returns a mode, never optimistic-live — and resets on run change / missing field / request error so a prior live run can't leave a stale `LIVE` reading. The Qt client performs **no local artifact file reads** (no `QFile`/`QDir`/`file://`/`resolved-profile.json`).
+- **Reason codes are server-owned.** Unavailable and gate-error states render the server's `reason_code`/`message` **verbatim** (data-driven). The only client-owned reason code is `unreachable` (transport failure). No API key UI exists anywhere in the client.
 
 ## Non-goals
 
