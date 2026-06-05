@@ -1,174 +1,154 @@
-# Review Packet — G3-1 Live DeepSeek Execution (opt-in, fake-by-default)
+# Review Packet — G3-2 Qt Live/Fake Toggle (capabilities endpoint, honest HUD)
 
 ## Metadata
-- **Branch:** `feat/g3-1-live-deepseek-execution`  •  **Base:** `main`
+- **Branch:** `feat/g3-2-qt-live-toggle`  •  **Base:** `main`
 - **Date:** 2026-06-05  •  **Author:** liaoszong
-- **Spec:** `docs/superpowers/specs/2026-06-05-g3-1-live-deepseek-execution-design.md`
-- **Plan:** `docs/harness/plans/2026-06-05--g3-1-live-deepseek-execution-plan.md`
-- **Scope:** thin WIRING slice — reuse `DeepSeekProvider` / `ProviderAgent` /
-  `run_deepseek_consensus_game_with_provider_factory(write_runtime_spine=True)` verbatim.
+- **Spec:** `docs/superpowers/specs/2026-06-05-g3-2-qt-live-toggle-design.md`
+- **Plan:** `docs/harness/plans/2026-06-05--g3-2-qt-live-toggle-plan.md`
+- **Scope:** bring G3-1's server-side live capability onto the Qt cockpit user path —
+  read-only `GET /api/runtime/capabilities`, a `mode=live` profile launch, an honest HUD
+  data-source chip driven by run-detail `execution_mode`, verbatim gate-error surfacing.
+  Fake stays the unconditional default; the Qt client never holds/handles a key.
 - **Implementation commits (TDD, one per task):**
-  - `99a84df` feat(g3-1): allow mode=live for profile launches (protocol)
-  - `b2f8647` feat(g3-1): server live-mode gate matrix + launcher dispatch
-  - `edca049` feat(g3-1): build_deepseek_launcher delegating to spine consensus runner (budget=32)
-  - `dfb560b` feat(g3-1): honest execution markers in resolved-profile artifact
-  - `eaaca99` feat(g3-1): run_observer_server --allow-live-api/--api-key-env/--max-live-requests
-  - `ce3fa17` test(g3-1): secret-scan + artifact-contract regression for live path
-  - `34dfbf1` feat(g3-1): gated manual DeepSeek live smoke (script + skipUnless wrapper)
-  - `69454e8` docs(g3-1): tree refresh + normalize fake-key fixture + review packet
-  - `4a1a2ba` fix(g3-1): expose key-free run-status reason in run detail/list/SSE *(review round 1, P1)*
+  - `f3ea636` feat(g3-2): build_runtime_capabilities protocol helper (g3.runtime_capabilities.v1)
+  - `3c4cbc9` feat(g3-2): GET /api/runtime/capabilities (read-only live posture)
+  - `877e961` feat(g3-2): surface execution_mode in run detail (API-mediated HUD truth)
+  - `289615c` feat(g3-2): ObserverApiClient mode param + runtime capabilities + execution-mode
+  - `2de1651` feat(g3-2): ModeControl arming FSM + DataSourceChip HUD + MatchSetup/AppShell wiring
+  - `f6ece92` docs(g3-2): README live toggle + boundary reaffirmation; secret/boundary regression green
+  - `8c9eb91` test(g3-2): pin C1-bis reset per-trigger + C2 resolvedMode + C3 disarm wiring (review)
+- Docs (already on branch): `1f50571` spec, `6b5ef3c` plan, `c3be5c9` plan-review round 1.
 
-> **Review round 1 (BLOCK) — addressed.** P1: the key-free run reason
-> (`budget_exhausted`/`provider_failure`) was recorded in `state.run_errors` but
-> not surfaced; now exposed in run detail (`/api/runs/{id}`), the run list, and the
-> final SSE `run_status` (commit `4a1a2ba`). P2: the packet under
-> `.logs/review/latest/` is **tracked** (the `latest/` dir holds the current
-> slice's packet — G2d-2 set that precedent); this slice replaces the stale G2d-2
-> packet with this one. The earlier "gitignored/local-only" handoff note was
-> incorrect.
-
-## Changed files & diff stat (implementation, `2435caa..HEAD`)
+## Changed files & diff stat (`main...HEAD`, implementation only)
 ```
- scripts/dev/run_deepseek_live_smoke.py   | 145 +  (new, gated, not in default suite)
- src/werewolf_eval/deepseek_launcher.py   | 121 +  (new)
- src/werewolf_eval/observer_protocol.py   |   7 +
- src/werewolf_eval/observer_server.py     | 104 +-
- src/werewolf_eval/profile_config.py      |  19 +-
- src/werewolf_eval/run_observer_server.py |  69 +-
- tests/test_deepseek_launcher.py          | 195 +  (new)
- tests/test_deepseek_live_smoke.py        |  70 +  (new, skipUnless wrapper)
- tests/test_observer_protocol.py          |  34 +
- tests/test_observer_server.py            | 491 +
- tests/test_profile_config.py             |  50 +
- 11 files changed, 1291 insertions(+), 14 deletions(-)
+ src/werewolf_eval/observer_protocol.py             |  36 +   (build_runtime_capabilities + schema ver)
+ src/werewolf_eval/observer_server.py               |  61 +-  (capabilities route + _read_execution_mode)
+ tests/test_observer_protocol.py                    |  96 +
+ tests/test_observer_server.py                      | 144 +
+ clients/qt_observer/src/ObserverApiClient.h        |  33 +-
+ clients/qt_observer/src/ObserverApiClient.cpp      |  92 +-
+ clients/qt_observer/qml/MatchSetupView.qml         |  57 +-  (banner -> ModeControl + wiring)
+ clients/qt_observer/qml/AppShell.qml               |   9 +   (DataSourceChip in top bar)
+ clients/qt_observer/qml/components/ModeControl.qml | 151 +   (new)
+ clients/qt_observer/qml/components/DataSourceChip.qml | 51 + (new)
+ clients/qt_observer/CMakeLists.txt                 |   2 +   (register both components)
+ clients/qt_observer/README.md                      |  11 +   (live toggle + boundary reaffirmation)
+ tests/test_qt_observer_static_contract.py          | 144 +-  (+ review hardening)
 ```
-Plus the previously-committed docs (spec 178, plan 215) already on the branch.
-`compileall src tests scripts` → clean.
+`compileall src tests` → clean.
 
 ## Allowlist conformance
-- Every changed file is in the plan Allowlist. PASS
-- **Forbidden files untouched** (verified `git diff --name-only main...HEAD`):
-  no `deepseek_provider.py` / `provider_agent.py` / `provider_contract.py` /
-  `game_engine.py` / `run_deepseek_consensus_game.py`; no Qt; no
-  `docs/ROADMAP|TASKS|adr`; no new third-party deps. PASS
+- Every changed file is in the plan Allowlist. **PASS**
+- **Forbidden scope untouched** (`git diff --name-only main...HEAD`): no edits to G3-1 gate
+  logic (`_check_live_capability`/`_check_live_profile_shape` reused verbatim), no
+  `deepseek_provider.py` / `provider_agent.py` / consensus runner / `game_engine.py`; no API-key
+  UI; no new artifact-read endpoint; no `docs/ROADMAP|TASKS|adr`; no new deps; no Web client. **PASS**
 
-## A1 — Gate matrix (capability -> validate -> shape; no run_dir on any reject)
-Two pure helpers + an in-process dispatch harness validate every branch
-**offline** (localhost HTTP is blocked in this env -> socket tests error by
-design; the helpers + harness need no socket).
+## A1 — `GET /api/runtime/capabilities` (read-only; reuses `_check_live_capability`)
+Localhost HTTP is env-blocked (`RemoteDisconnected`), so the read-only endpoint is proven
+**offline** by feeding a real `ObserverServerState` through the pure derivation helper
+`_build_capabilities_payload`, exactly as the G3-1 gate matrix is proven via `_check_live_capability`.
+The live-socket GET variant is env-blocked and intentionally not exercised.
 
-| # | Request | Result | Code | run_dir | Test |
-|---|---------|--------|------|---------|------|
-| 1 | mode omitted + deepseek | fake launcher | 202 | created | `LiveDispatchTests.test_mode_omitted_runs_fake_launcher` |
-| 2 | mode=fake | fake launcher | 202 | created | `...test_mode_fake_runs_fake_launcher` |
-| 3 | live, not `--allow-live-api` | reject | 403 `live_api_disabled` | **none** | `...test_live_not_enabled_403_disabled_no_run_dir` |
-| 4 | live, flag on, no key | reject | 403 `missing_api_key` | **none** | `...test_live_enabled_no_key_403_missing_no_run_dir` |
-| 5 | live, non-deepseek seat | reject | 400 `unsupported_live_provider` | **none** | `...test_live_non_deepseek_400_unsupported_no_run_dir` |
-| 6 | live, >1 deepseek model | reject | 400 `mixed_models` | **none** | `...test_live_mixed_models_400_no_run_dir` |
-| 7 | live, single-model deepseek + launcher | live launcher | 202 | created | `...test_live_valid_runs_live_launcher` |
-| 8 | template + live | reject (parser) | `ObserverProtocolError` | — | `LiveModeTests.test_template_launch_rejects_live_mode` |
-| 9 | **capability precedes validity**: live disabled + malformed | reject | 403 `live_api_disabled` (not `invalid_profile`) | **none** | `...test_capability_precedes_validity_disabled_with_malformed` |
-| 10 | **capability precedes shape**: live disabled + non-deepseek | reject | 403 `live_api_disabled` (not shape error) | **none** | `...test_capability_precedes_shape_disabled_with_non_deepseek` |
-| 11 | flag-on + key-missing + malformed | reject | 403 `missing_api_key` (capability wins) | **none** | `...test_capability_missing_key_precedes_validity` |
+| Posture | `enabled` | `available` | `reason_code` | == launch-time 403 code | Test |
+|---|---|---|---|---|---|
+| flag off | false | false | `live_api_disabled` | yes | `RuntimeCapabilitiesEndpointTests.test_disabled_posture_reason_matches_launch_403` |
+| flag on, no key | true | false | `missing_api_key` | yes | `...test_flag_on_no_key_posture_reason_matches_launch_403` |
+| flag on + launcher | true | true | (omitted) | gate proceeds | `...test_available_posture_proceeds_with_no_reason` |
 
-`_check_live_capability` runs BEFORE profile load/validate; `_check_live_profile_shape`
-(provider-check before model-check) runs AFTER validate; all rejects precede
-`run_dir.mkdir`. `LiveGateHelperTests` (12) unit-tests both helpers directly.
+- Posture derives ONLY from `_check_live_capability(state,"live")` (None ⇒ available; tuple ⇒
+  `(status, reason_code, message)`), so the capabilities `reason_code` is identical to the
+  launch-time 403 code. `default_mode` is hard-coded `"fake"`. Read-only: no writes, no provider call.
+- Pure helper unit tests: `RuntimeCapabilitiesTests` (available / disabled / flag-on-no-key /
+  available-ignores-stray-reason / no-secret).
+- **No secret:** every posture's JSON contains none of `Authorization`/`Bearer `/`DEEPSEEK_API_KEY`/`sk-`
+  (`RuntimeCapabilitiesTests.test_no_secret_markers_in_any_posture`,
+  `RuntimeCapabilitiesEndpointTests.test_payload_carries_no_secret_in_any_posture`). The key-free
+  canonical reason `missing_api_key` legitimately appears (it must equal the 403 code) — the
+  `api_key` substring ban is a *client-source* contract, not a payload contract (mirrors the
+  existing `ObserverServerSecretScanTests` markers).
 
-## A7 — Budget=32 default, fail-closed classification
-- `DEFAULT_MAX_LIVE_REQUESTS = 32` (`deepseek_launcher.py:32`); server-override-only via
-  `--max-live-requests`; never per-request.
-- `build_deepseek_provider_config` default `max_requests=32`; explicit overrides.
-  Tests: `DeepSeekLauncherConfigTests.test_default_budget_is_32` / `..._explicit_budget_overrides_default`.
-- Fail-closed chain (reuse verbatim): provider raises `RuntimeError("request budget exceeded: N")`
-  -> `ProviderAgent` wraps reason `"provider error: request budget exceeded: N"` -> runner writes
-  `failure-audit.json` + returns 2. `deepseek_launcher._classify_failure` reads that audit:
-  reason contains `"budget exceeded"` -> **exit 3** (`budget_exhausted`), else **exit 2**
-  (`provider_failure`); corrupt/missing audit -> 2 (no crash). Tests:
-  `...test_budget_exhaustion_classified_exit_3`, `...test_generic_provider_failure_classified_exit_2`.
-- Server maps the code to a **key-free** run-status reason via `_map_launcher_exit_reason`
-  (3->`budget_exhausted`, else->`provider_failure`). Tests: `LiveGateHelperTests.test_exit_code_*`.
-- **The reason is exposed** (not just recorded): `_execute_run` stores a canonical key-free
-  reason in `state.run_errors` (exceptions also map to `provider_failure`, never raw text), and
-  `_run_detail_with_reason` attaches it to `GET /api/runs/{id}` and the run list; the final SSE
-  `run_status` carries it via `format_sse_status(..., reason)`. Tests:
-  `LiveRunStatusReasonTests` (exit 3->`budget_exhausted`, exit 2->`provider_failure`, exit 0->no
-  reason, exception->`provider_failure`) + `ObserverVisibilityTests.test_sse_status_*`.
+## A2 — `execution_mode` in run detail (server reads its OWN artifact; Qt does zero file I/O)
+- `_run_detail_with_reason` attaches `execution_mode` via `_read_execution_mode(run_dir)`, which
+  reads the run's own `resolved-profile.json` (guards JSON/OS errors; returns None on missing/corrupt/
+  non-string → chip falls back to `SYS: SIMULATION`). Never raises, never exposes a path.
+- Tests `RunDetailExecutionModeTests`: live→`"live"`, fake→`"fake"`, no-artifact→omitted,
+  non-string(123)→omitted, corrupt-JSON→tolerated+detail still builds, coexists-with-reason.
+- **Qt reads no artifact files:** `QtObserverBoundaryTests` + `test_qt_client_does_not_use_local_snapshot_or_event_paths`
+  confirm no `QFile`/`QDir`/`file://`/`resolved-profile.json`/`events.jsonl`/`snapshots/` in any
+  client `.cpp/.h/.qml`. Direct grep over `clients/qt_observer/src|qml` → **NONE**.
 
-## A2/A3 — Live execution + honest artifacts
-- A2: the live launcher delegates to `run_deepseek_consensus_game_with_provider_factory(
-  write_runtime_spine=True)` and writes the full spine (`events.jsonl`, `snapshots/`,
-  `prompt-manifest.json`) + bundle (`game/decision/consensus/provider-trace/failure-audit`).
-  Proven with an injected fake provider: `DeepSeekLauncherTests.test_launcher_writes_spine_and_bundle`.
-- A3: `build_resolved_profile_artifact(..., execution_mode, live_api)` is parameterized; the server
-  `_profile_launcher` wrapper stamps `execution_mode="live"`/`live_api="used"` only for live
-  (else `fake`/`not_used`), `secrets_redacted=True` always, and records the **resolved real
-  per-seat model** (authoritative). The launcher does NOT write `resolved-profile.json` (server
-  wrapper's artifact). Runtime-spine `prompt-manifest.json` model stays `"unknown"` — documented
-  runner limitation, **named follow-up** (not a bug). Tests: `LiveArtifactTests`,
-  `LiveDispatchTests.test_live_dispatch_stamps_live_markers` / `..._fake_dispatch_stamps_fake_markers`.
+## C1–C4 hard-constraint evidence
+| # | Constraint | Implementation | Pinning test |
+|---|---|---|---|
+| **C1** | `currentExecutionMode` set ONLY from run-detail `execution_mode` (never intent/202 echo) | `openRun` parses `execution_mode` (isString && !empty); `launchFromProfile` never touches it | `test_current_execution_mode_parsed_from_run_detail`, `test_launch_handler_never_sets_execution_mode` (slices launchFromProfile body) |
+| **C1-bis** | reset to `""` on run change / missing-string field / detail+capabilities error | `setCurrentRunId` (run change) + `openRun` (error/malformed/else) + `refreshCapabilities` (error) all call `resetExecutionMode()` (`m_currentExecutionMode.clear()`) | `test_stale_guard_reset_wired_to_every_c1bis_trigger` (per-site, mutation-verified: deleting the setCurrentRunId reset turns it red) |
+| **C2** | QML passes explicit mode; `live` only in `live_confirmed`; no C++ default arg | `launchFromProfile(profile, mode)` no default; `body["mode"]=mode`; `resolvedMode = state==="live_confirmed" ? "live" : "fake"`; view passes `setupModeControl.resolvedMode` | `test_launch_from_profile_takes_mode_and_writes_body_mode`, `test_mode_control_resolved_mode_maps_only_confirmed_to_live`, `test_setup_is_profile_driven` (regex `launchFromProfile(..., \w+.resolvedMode)`) |
+| **C3** | `resetToFake()` single disarm; parent calls it on profile/loadedProfile/seat change + `liveAvailable→false`; never mutates FSM state | `ModeControl.resetToFake()`; MatchSetupView calls it from `onSelectedSeatIdChanged`, `onLoadedProfileChanged`, `onActivated`, `onCapabilitiesChanged`(!liveAvailable). FSM tokens `fake`/`live_armed`/`live_confirmed` | `test_mode_control_declares_canonical_fsm_tokens`, `test_setup_is_profile_driven` (4 disarm sites pinned) |
+| **C4** | `unreachable` is the ONLY client-owned code; server codes data-driven (verbatim) | capabilities error → `liveReasonCode="unreachable"`; success reads `reason_code`/`message` from JSON; ModeControl renders `liveReasonCode` as a property ref | `test_no_server_reason_codes_are_client_literals` (.h+.cpp), `test_mode_control_renders_reason_code_data_driven`, `test_capabilities_error_uses_client_only_unreachable_code` |
 
-## A4 — Fake is the unconditional default
-Live requires the quadruple gate: `mode=live` + `--allow-live-api` + env key +
-all-deepseek single-model seats. `create_observer_server` defaults `live_enabled=False`,
-`live_launcher=None`. `resolve_live_launcher` wires the launcher only with flag+key.
-Tests: `ObserverServerLiveOptInTests` (no-flag->disabled; flag+no-key->no launcher;
-flag+key->launcher; custom `--api-key-env` honored).
+Direct grep: server reason codes (`live_api_disabled`/`missing_api_key`/`unsupported_live_provider`/
+`mixed_models`/`provider_failure`/`budget_exhausted`) in client `src|qml` → **NONE** (C4). `unreachable`
+present only in `ObserverApiClient.cpp` (1 literal + comments).
 
-## A5 — No secrets; default suite never reads the key or opens a socket
-- **Secret-scan over the diff:** the only `sk-...` literals are clearly-fake (`sk-test-fake*`,
-  `sk-test-fake-unused`); no real key, no real `Authorization` header value committed
-  (`Authorization`/`Bearer `/`api_key`/`DEEPSEEK_API_KEY`/`sk-` appear only as **scan markers**).
-- **Key read:** the ONLY `os.environ` read of `DEEPSEEK_API_KEY` in tests is INSIDE the
-  `@skipUnless(RUN_DEEPSEEK_LIVE_SMOKE==1)` body of `test_deepseek_live_smoke.py` (never at
-  discovery). The smoke script reads the key only after the `RUN_DEEPSEEK_LIVE_SMOKE` gate and
-  never prints key/Authorization/raw request.
-- **No socket in the default suite:** every *executed* launcher uses an injected fake
-  `provider_factory`. The one test that builds a real-provider launcher
-  (`test_flag_on_with_key_builds_launcher`) only asserts `callable(...)` — never calls it
-  (a `DeepSeekProvider` opens no socket until `respond()`).
-- **Artifact non-leak:** `DeepSeekLauncherTests.test_key_never_in_artifacts` and
-  `LiveArtifactContractTests.test_faked_live_artifacts_contain_no_secret_markers` rglob the
-  output dir for the marker set -> none; `..._config_key_absent_from_raised_errors` proves the
-  key never surfaces in a raised error string; `secrets_redacted=True` in manifest + resolved-profile.
+## A3–A6 — toggle behavior, HUD, gate errors
+- **A3 (launch mode rule):** `mode="live"` sent only in `live_confirmed`; `fake`/`live_armed` → fake;
+  omitted ⇒ fake server-side; template launches stay fake (parser rejects `template`+`live`).
+- **A4 (arming FSM):** two-click `fake → live_armed → live_confirmed`; LIVE disabled +
+  `UNAVAIL · <reason_code>` when `!liveAvailable`; pulsing GlowDot at `live_confirmed`. Fake default.
+- **A5 (HUD truth):** `DataSourceChip` shows `SYS: LIVE_API` iff `mode==="live"` (from
+  `currentExecutionMode`), else conservative `SYS: SIMULATION`; resets so a prior live run can't
+  leave a stale LIVE (C1-bis). Amber "Deterministic Mock" banner removed.
+- **A6 (gate errors verbatim):** unavailable + gate errors render server `reason_code`/`message`
+  verbatim; `unreachable` is the only client-owned code.
 
-> Forbidden-pattern note: this packet and the G3-1 tests contain the literal scan markers
-> `Authorization` / `Bearer ` / `api_key` / `DEEPSEEK_API_KEY` / `sk-test-*` **only** as
-> redaction/secret-scan patterns and clearly-fake fixtures — never a real credential.
+## A7 — Secret/boundary + offline suite
+- **Secret-scan:** `QtObserverSecretBoundaryTests` (no `Authorization:`/`Bearer `/`DEEPSEEK_API_KEY=`/
+  `sk-`/`api_key`/`api-key` in any `.cpp/.h/.qml`) green; the `api_key`-bearing reason
+  (`missing_api_key`) lives only in server payloads, never a client literal (C4).
+- **No file I/O / no key UI:** boundary + no-snapshot/event-path tests green; no API-key input or
+  displayed string anywhere.
+- **Full offline suite** `python -m unittest discover -s tests -p "test_*.py"`:
+  **516 ran, 1 failure, 47 errors, 1 skipped.**
+  - 47 errors = ALL `test_observer_server` **HTTP-socket** classes (env-blocked `RemoteDisconnected`);
+    the new G3-2 offline classes (`RuntimeCapabilitiesEndpointTests`, `RunDetailExecutionModeTests`)
+    are NOT among them.
+  - 1 failure = pre-existing unrelated `test_context_budget.ContextBudgetGateDocsTests` (AGENTS.md docs gate).
+  - 1 skipped = G3-1 gated live smoke (never reads the key).
+  - +27 tests vs. G3-1's 489 baseline (5+4+6+8+4 new), all green.
 
-## A6 — Offline suite green; smoke skips; artifact contract
-- Full suite `python -m unittest discover -s tests -p "test_*.py"`:
-  **489 ran, 1 failure, 47 errors, 1 skipped.**
-  - 47 errors = ALL `test_observer_server` **HTTP-socket** tests (env-blocked `RemoteDisconnected`);
-    every exception is a connection error, none a refactor regression (verified).
-  - 1 failure = pre-existing `test_context_budget.ContextBudgetGateDocsTests` (AGENTS.md docs gate,
-    unrelated to this slice).
-  - 1 skipped = the live smoke (gated; never reads the key).
-- Focused offline G3-1 classes: **52 tests OK (1 skipped).**
-- Artifact contract: a faked live launch yields the **same top-level artifact set** as a fake
-  launch (`LiveArtifactContractTests.test_live_and_fake_produce_same_top_level_artifact_set`); only
-  the execution markers differ (`...test_only_execution_markers_differ`).
+## Qt build / ctest / runtime (on F:, Qt 6.10.0 mingw)
+- `cmake -S clients/qt_observer -B .tmp/qt-observer-build` → configure OK (both new QML files registered).
+- `cmake --build ... --target appqt_observer` → **exit 0**; `ModeControl_qml`/`DataSourceChip_qml`
+  AOT-compiled by `qmlcachegen` (⇒ all QML syntactically valid, incl. the `state`-property FSM); the
+  C++ `ObserverApiClient` changes compiled and linked.
+- `ctest --test-dir .tmp/qt-observer-build` → **1/1 passed** (SSE parser).
+- `qmllint` on the changed QML → no `Error:` lines (only ignorable `[unqualified]`/`[missing-property]`).
+- **Runtime:** ran the GUI (exit 0) with a temp screenshot harness (since removed): the top-bar
+  `DataSourceChip` renders `环境：离线模拟` (SYS: SIMULATION) and the `ModeControl` renders the
+  segmented `[确定性 | 禁用·]` with DETERMINISTIC selected and LIVE disabled (no server →
+  `liveAvailable=false`, reason data-driven). Amber banner gone; layout balanced, on-palette.
 
-## Adversarial review (workflow `wf_b457156c-e8a`)
-5 independent skeptic agents reviewed the committed code across `gate-order`,
-`secret-offline`, `budget-failclosed`, `artifact-honesty`, `scope-compliance`,
-each finding verified by a second agent. **0 candidate findings, 0 confirmed
-findings.** (~397k tokens, 259 tool uses.)
+## Adversarial review (workflow `wf_29a74582-f04`)
+5 review dimensions (constraints / correctness / security / reuse-plan / tests), each finding
+independently verified by a refute-by-default agent (11 agents, ~580k tokens, 172 tool uses).
+**6 findings, 1 confirmed, 5 refuted.**
+- **Confirmed (fixed, `8c9eb91`):** the C1-bis stale-guard test was a single global-OR over the whole
+  `.cpp` — it proved a reset literal existed somewhere but not that the reset is wired to each trigger;
+  a regression dropping `resetExecutionMode()` from `setCurrentRunId` (the spec's worst-case
+  live→fake stale-LIVE flash) would have stayed green. Hardened to per-site pins (+C2 ternary, +C3
+  4-trigger wiring) and **mutation-verified**. Production code unchanged (it was already correct).
+- **Refuted (5):** all test-hardening suggestions where production code is correct and the constraint
+  is pinned elsewhere or structurally guaranteed (e.g. cross-run reset via `setCurrentRunId`; non-string
+  `execution_mode` → `""` → SIMULATION; run detail carries only `execution_mode`, not the 202 `mode`
+  echo). Two of these (C2/C3 presence-only) overlapped the confirmed theme and were folded into the fix.
 
-## Manual real-DeepSeek smoke (A6) — PENDING owner, pre-merge
-**Not run in this environment** — it requires a real `DEEPSEEK_API_KEY` and outbound
-network, and this env blocks both (localhost/socket access is blocked; no key present, and
-the default suite must never read one). Owner to run once before merge:
-```
-RUN_DEEPSEEK_LIVE_SMOKE=1 DEEPSEEK_API_KEY=... PYTHONPATH=src python scripts/dev/run_deepseek_live_smoke.py
-```
-Record the **text-free** result here: `smoke=PASS/FAIL`, `exit_code`, `real_response_count`,
-`check_*` booleans (no model text, no key). If `max_requests=32` truncated the game, note it and
-bump to 48/64 in a separate evidence-based commit. The optional wrapper
-`tests/test_deepseek_live_smoke.py` runs the same path when `RUN_DEEPSEEK_LIVE_SMOKE=1`.
+## Env-deferred (not blockers)
+- **Optional QtTest** `tst_observer_api_client_mode.cpp` (plan T4 Step 3) not added: the Qt toolchain
+  builds on F: but adding an uncompilable-in-session C++ test risks the owner's ctest; the offline
+  static-contract suite + the successful F: build/ctest are the authoritative gates this slice.
 
-## Open / follow-ups (named, out of scope)
-- Thread the real model into runtime-spine `prompt-manifest.json` (stays `"unknown"`; needs a
-  consensus-runner change). `resolved-profile.json` is the authoritative model record.
-- Qt live/fake toggle = **G3-2**.
-- Per-seat distinct models; template live launch; retries — all deferred.
+## Acceptance summary
+A1 ✅ · A2 ✅ · A3 ✅ · A4 ✅ · A5 ✅ · A6 ✅ · A7 ✅ — all met offline; Qt validated on F: (build exit 0,
+ctest 1/1, qmllint clean, runtime render confirmed). Default suite stays offline; the Qt client never
+holds a key.
