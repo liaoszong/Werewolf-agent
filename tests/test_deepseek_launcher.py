@@ -134,6 +134,20 @@ class DeepSeekLauncherTests(unittest.TestCase):
             # resolved-profile.json is the server wrapper's artifact, NOT the launcher's
             self.assertFalse((out_dir / "resolved-profile.json").exists())
 
+    def test_launcher_records_real_model_in_manifest(self) -> None:
+        # G3-3 end-to-end: a live launch records the model the launcher was
+        # configured with ("deepseek-chat"), not the legacy hard-coded "unknown".
+        launcher = self._build(_ok_factory)
+        with TemporaryDirectory() as tmp:
+            out_dir = Path(tmp)
+            self.assertEqual(launcher("g3_live_model", out_dir), 0)
+            manifest = json.loads(
+                (out_dir / "prompt-manifest.json").read_text(encoding="utf-8")
+            )
+            models = {a.get("model") for a in manifest["agents"]}
+            self.assertEqual(models, {"deepseek-chat"})
+            self.assertNotIn("unknown", models)
+
     def test_budget_exhaustion_classified_exit_3(self) -> None:
         launcher = self._build(_BUDGET_FACTORY)
         with TemporaryDirectory() as tmp:

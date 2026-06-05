@@ -53,6 +53,25 @@ def _scan_for_secret_markers(run_dir: Path) -> bool:
     return True
 
 
+def _manifest_model_honest(run_dir: Path, expected_model: str) -> bool:
+    """Return True iff prompt-manifest.json records the REAL model for every
+    agent (== ``expected_model``, never the legacy ``"unknown"``).  Text-free:
+    compares only the configured model string, never raw model output (G3-3)."""
+    path = run_dir / "prompt-manifest.json"
+    if not path.exists():
+        return False
+    try:
+        manifest = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    agents = manifest.get("agents")
+    if not isinstance(agents, list) or not agents:
+        return False
+    return all(
+        isinstance(a, dict) and a.get("model") == expected_model for a in agents
+    )
+
+
 def run_live_smoke(
     *,
     api_key: str,
@@ -94,6 +113,8 @@ def run_live_smoke(
                 real_responses = 0
 
         no_secret = _scan_for_secret_markers(run_dir)
+        # G3-3: the manifest must record the real model, not the legacy "unknown".
+        manifest_model_ok = _manifest_model_honest(run_dir, model)
 
     checks = {
         "exit_zero": exit_code == 0,
@@ -101,6 +122,7 @@ def run_live_smoke(
         "bundle_present": bundle_ok,
         "real_response_present": real_responses >= 1,
         "no_secret_markers": no_secret,
+        "manifest_model_honest": manifest_model_ok,
     }
     return {
         "passed": all(checks.values()),

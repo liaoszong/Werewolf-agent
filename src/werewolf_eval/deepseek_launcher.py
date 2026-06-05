@@ -113,6 +113,7 @@ def build_deepseek_launcher(
             out_dir=rdir,
             provider_factory=factory,
             write_runtime_spine=True,
+            model=model,  # G3-3: record the real deepseek model in the manifest
         )
         if code == 0:
             return 0

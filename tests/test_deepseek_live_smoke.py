@@ -9,9 +9,11 @@ reads the key and never hits the network.
 from __future__ import annotations
 
 import importlib.util
+import json
 import os
 import unittest
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 _SMOKE_PATH = (
     Path(__file__).resolve().parents[1] / "scripts" / "dev" / "run_deepseek_live_smoke.py"
@@ -48,6 +50,41 @@ class DeepSeekLiveSmokeGateClosedTests(unittest.TestCase):
             sys.argv = saved_argv
             if saved_gate is not None:
                 os.environ["RUN_DEEPSEEK_LIVE_SMOKE"] = saved_gate
+
+
+class SmokeManifestModelHelperTests(unittest.TestCase):
+    """Offline (un-gated): the smoke's manifest-model honesty check (G3-3) — no
+    key, no network.  Pins that the real smoke fails if the manifest records the
+    legacy ``"unknown"`` instead of the configured model."""
+
+    @staticmethod
+    def _write_manifest(run_dir: Path, models: list[str]) -> None:
+        (run_dir / "prompt-manifest.json").write_text(
+            json.dumps({"agents": [
+                {"player_id": f"p{i}", "provider": "deepseek", "model": m}
+                for i, m in enumerate(models, start=1)
+            ]}),
+            encoding="utf-8",
+        )
+
+    def test_true_when_all_agents_match(self) -> None:
+        mod = _load_smoke_module()
+        with TemporaryDirectory() as tmp:
+            rd = Path(tmp)
+            self._write_manifest(rd, ["deepseek-chat"] * 6)
+            self.assertTrue(mod._manifest_model_honest(rd, "deepseek-chat"))
+
+    def test_false_when_any_agent_is_unknown(self) -> None:
+        mod = _load_smoke_module()
+        with TemporaryDirectory() as tmp:
+            rd = Path(tmp)
+            self._write_manifest(rd, ["deepseek-chat"] * 5 + ["unknown"])
+            self.assertFalse(mod._manifest_model_honest(rd, "deepseek-chat"))
+
+    def test_false_when_manifest_missing(self) -> None:
+        mod = _load_smoke_module()
+        with TemporaryDirectory() as tmp:
+            self.assertFalse(mod._manifest_model_honest(Path(tmp), "deepseek-chat"))
 
 
 @unittest.skipUnless(

@@ -79,6 +79,56 @@ def _failing_provider_factory(player_id: str) -> Any:
     return ProviderAgent(player_id, provider)
 
 
+class ManifestModelTests(unittest.TestCase):
+    """G3-3: the runtime-spine prompt-manifest records the REAL model threaded
+    by the caller (not the hard-coded ``"unknown"``), on both the success and
+    failure paths; an omitted model still falls back to ``"unknown"`` (back-compat)."""
+
+    @staticmethod
+    def _manifest_models(out_dir: Path) -> list:
+        manifest = json.loads((out_dir / "prompt-manifest.json").read_text(encoding="utf-8"))
+        return [a.get("model") for a in manifest["agents"]]
+
+    def test_success_manifest_records_real_model(self) -> None:
+        with TemporaryDirectory() as tmp:
+            out_dir = Path(tmp)
+            code = run_deepseek_consensus_game_with_provider_factory(
+                game_id="g3_3_model_ok",
+                out_dir=out_dir,
+                provider_factory=_fake_provider_factory,
+                write_runtime_spine=True,
+                model="deepseek-chat",
+            )
+            self.assertEqual(code, 0)
+            models = self._manifest_models(out_dir)
+            self.assertEqual(set(models), {"deepseek-chat"})
+            self.assertNotIn("unknown", models)
+
+    def test_failure_manifest_records_real_model(self) -> None:
+        with TemporaryDirectory() as tmp:
+            out_dir = Path(tmp)
+            code = run_deepseek_consensus_game_with_provider_factory(
+                game_id="g3_3_model_fail",
+                out_dir=out_dir,
+                provider_factory=_failing_provider_factory,
+                write_runtime_spine=True,
+                model="deepseek-chat",
+            )
+            self.assertEqual(code, 2)
+            self.assertEqual(set(self._manifest_models(out_dir)), {"deepseek-chat"})
+
+    def test_omitted_model_falls_back_to_unknown(self) -> None:
+        with TemporaryDirectory() as tmp:
+            out_dir = Path(tmp)
+            run_deepseek_consensus_game_with_provider_factory(
+                game_id="g3_3_model_none",
+                out_dir=out_dir,
+                provider_factory=_fake_provider_factory,
+                write_runtime_spine=True,
+            )
+            self.assertEqual(set(self._manifest_models(out_dir)), {"unknown"})
+
+
 class DeepSeekConsensusGameCliTests(unittest.TestCase):
     def test_cli_without_allow_live_api_exits_nonzero_and_writes_nothing(self) -> None:
         import subprocess

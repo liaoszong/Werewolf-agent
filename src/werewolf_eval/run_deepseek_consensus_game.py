@@ -77,12 +77,18 @@ def run_deepseek_consensus_game_with_provider_factory(
     provider_factory: ProviderFactory,
     write_runtime_spine: bool = False,
     runtime_source_label: str | None = None,
+    model: str | None = None,
 ) -> int:
     writer: RuntimeEventWriter | None = None
     if write_runtime_spine:
         writer = RuntimeEventWriter(run_id=game_id, out_dir=out_dir)
 
     source_label = runtime_source_label or DEEPSEEK_PROVIDER_SOURCE_LABEL
+    # G3-3: record the REAL model in the prompt-manifest (the consensus runner
+    # used to hard-code "unknown"; resolved-profile.json was the only authoritative
+    # record).  The launcher/CLI thread their configured deepseek model here; an
+    # omitted model falls back to "unknown" for back-compat.
+    manifest_model = model if (isinstance(model, str) and model) else "unknown"
 
     def _wrap_factory(pid: str) -> ProviderAgent:
         agent = provider_factory(pid)
@@ -137,7 +143,7 @@ def run_deepseek_consensus_game_with_provider_factory(
                 run_id=game_id,
                 source_label=source_label,
                 agents=[
-                    {"player_id": pid, "provider": "deepseek", "model": "unknown"}
+                    {"player_id": pid, "provider": "deepseek", "model": manifest_model}
                     for pid in ["p1", "p2", "p3", "p4", "p5", "p6"]
                 ],
             )
@@ -204,7 +210,7 @@ def run_deepseek_consensus_game_with_provider_factory(
             run_id=game_id,
             source_label=source_label,
             agents=[
-                {"player_id": pid, "provider": "deepseek", "model": "unknown"}
+                {"player_id": pid, "provider": "deepseek", "model": manifest_model}
                 for pid in ["p1", "p2", "p3", "p4", "p5", "p6"]
             ],
         )
@@ -294,6 +300,7 @@ def main() -> int:
         out_dir=Path(args.out_dir),
         provider_factory=factory,
         write_runtime_spine=args.write_runtime_spine,
+        model=args.model,
     )
 
 
