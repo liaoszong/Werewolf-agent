@@ -255,6 +255,23 @@ def build_resolved_profile_artifact(profile: dict, run_id: str) -> dict:
     }
 
 
+def build_profile_schema() -> dict:
+    """Return read-only UI metadata (dropdown options + seat layout) derived
+    from the validation constants.  No profile-name list (that comes from
+    GET /api/profiles), no secrets, no paths."""
+    return {
+        "schema_version": PROFILE_SCHEMA_VERSION,
+        "providers": sorted(ALLOWED_PROVIDERS),
+        "models": {p: sorted(ALLOWED_MODELS[p]) for p in sorted(ALLOWED_MODELS)},
+        "strategies": sorted(ALLOWED_STRATEGIES),
+        "roles": sorted(ALLOWED_ROLES),
+        "role_teams": dict(ROLE_TEAMS),
+        "seat_roles": dict(DEFAULT_6P_SEAT_ROLES),
+        "seat_ids": list(DEFAULT_SEAT_IDS),
+        "prompt_max_len": PROMPT_MAX_LEN,
+    }
+
+
 def load_profile(path: Path) -> dict:
     """Read and parse a profile JSON file; raise ProfileValidationError on
     malformed JSON or non-object content.  Error messages use the basename

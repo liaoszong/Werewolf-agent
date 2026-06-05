@@ -19,7 +19,7 @@ Status: G2b Observer Cockpit MVP
 
 ## Non-goals
 
-- no full prompt/profile editor,
+- the G2d-2 profile setup editor edits server-side profiles only (select/edit/validate/launch a profile) — no local prompt template library, no provider secrets,
 - no Web observer client,
 - no human-vs-AI UI,
 - no multi-provider arena,

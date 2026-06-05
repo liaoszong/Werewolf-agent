@@ -65,6 +65,12 @@ int ObserverApiClient::hiddenEventCount() const { return m_hiddenEventCount; }
 int ObserverApiClient::hiddenSnapshotCount() const { return m_hiddenSnapshotCount; }
 QString ObserverApiClient::visibilityContractVersion() const { return m_visibilityContractVersion; }
 
+// G2d-2 profile setup getters
+QVariantList ObserverApiClient::profileItems() const { return m_profileItems; }
+QVariantMap ObserverApiClient::profileSchema() const { return m_profileSchema; }
+QVariantMap ObserverApiClient::loadedProfile() const { return m_loadedProfile; }
+QVariantMap ObserverApiClient::profileValidation() const { return m_profileValidation; }
+
 QNetworkReply *ObserverApiClient::get(const QString &path)
 {
     QNetworkRequest req(QUrl(m_baseUrl + path));
@@ -388,5 +394,110 @@ void ObserverApiClient::refreshProjection()
         emit playerItemsChanged();
         emit projectionProofChanged();
         emit projectionChanged();
+    });
+}
+
+// ---------------------------------------------------------------------------
+// G2d-2 profile setup methods
+// ---------------------------------------------------------------------------
+
+void ObserverApiClient::refreshProfiles()
+{
+    QNetworkReply *reply = get(QStringLiteral("/api/profiles"));
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        reply->deleteLater();
+        if (reply->error() != QNetworkReply::NoError) { setError(reply->errorString()); return; }
+        QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+        if (!doc.isObject()) { setError(QStringLiteral("Invalid profiles response")); return; }
+        QVariantList items;
+        for (const QJsonValue &v : doc.object().value(QStringLiteral("profiles")).toArray())
+            items.append(v.toObject().toVariantMap());
+        m_profileItems = items;
+        emit profileItemsChanged();
+    });
+}
+
+void ObserverApiClient::refreshProfileSchema()
+{
+    QNetworkReply *reply = get(QStringLiteral("/api/profiles/schema"));
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        reply->deleteLater();
+        if (reply->error() != QNetworkReply::NoError) { setError(reply->errorString()); return; }
+        QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+        if (!doc.isObject()) { setError(QStringLiteral("Invalid schema response")); return; }
+        m_profileSchema = doc.object().toVariantMap();
+        emit profileSchemaChanged();
+    });
+}
+
+void ObserverApiClient::fetchProfile(const QString &name)
+{
+    const quint64 serial = ++m_profileRequestSerial;
+    const QString encoded = QString::fromUtf8(QUrl::toPercentEncoding(name));
+    QNetworkReply *reply = get(QStringLiteral("/api/profiles/") + encoded);
+    connect(reply, &QNetworkReply::finished, this, [this, reply, serial]() {
+        reply->deleteLater();
+        if (serial != m_profileRequestSerial) return;  // latest-wins
+        if (reply->error() != QNetworkReply::NoError) { setError(reply->errorString()); return; }
+        QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+        if (!doc.isObject()) { setError(QStringLiteral("Invalid profile response")); return; }
+        m_loadedProfile = doc.object().toVariantMap();
+        emit loadedProfileChanged();
+    });
+}
+
+void ObserverApiClient::validateProfile(const QVariantMap &profile)
+{
+    const quint64 serial = ++m_profileValidateSerial;   // latest-wins
+    QJsonObject body = QJsonObject::fromVariantMap(profile);
+    QNetworkReply *reply = post(QStringLiteral("/api/profiles/validate"),
+                                QJsonDocument(body).toJson(QJsonDocument::Compact));
+    connect(reply, &QNetworkReply::finished, this, [this, reply, serial]() {
+        reply->deleteLater();
+        if (serial != m_profileValidateSerial) return;  // a newer validate superseded this
+        if (reply->error() != QNetworkReply::NoError) { setError(reply->errorString()); return; }
+        QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+        if (!doc.isObject()) { setError(QStringLiteral("Invalid validate response")); return; }
+        m_profileValidation = doc.object().toVariantMap();
+        emit profileValidationChanged();
+    });
+}
+
+void ObserverApiClient::launchFromProfile(const QVariantMap &profile)
+{
+    QJsonObject body;
+    body[QStringLiteral("profile")] = QJsonObject::fromVariantMap(profile);
+    QNetworkReply *reply = post(QStringLiteral("/api/runs"),
+                                QJsonDocument(body).toJson(QJsonDocument::Compact));
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        reply->deleteLater();
+        // Explicit network-error path first (httpStatus may be 0 on transport error).
+        if (reply->error() != QNetworkReply::NoError) {
+            // 4xx bodies still carry a JSON {code,message}; surface that if present.
+            const QJsonDocument edoc = QJsonDocument::fromJson(reply->readAll());
+            const QString emsg = edoc.isObject()
+                ? edoc.object().value(QStringLiteral("message")).toString() : QString();
+            setError(emsg.isEmpty() ? reply->errorString() : emsg);
+            emit launchFailed();
+            return;
+        }
+        const int httpStatus =
+            reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+        const QJsonObject obj = doc.isObject() ? doc.object() : QJsonObject();
+        const QString runId = obj.value(QStringLiteral("run_id")).toString();
+        // Advance ONLY on 202 with a run_id; never optimistically.
+        if (httpStatus != 202 || runId.isEmpty()) {
+            const QString msg = obj.value(QStringLiteral("message")).toString();
+            setError(msg.isEmpty() ? QStringLiteral("Launch failed (%1)").arg(httpStatus) : msg);
+            emit launchFailed();
+            return;
+        }
+        m_currentRunId = runId;
+        m_currentStatus = obj.value(QStringLiteral("status")).toString();
+        emit currentRunChanged();
+        emit currentStatusChanged();
+        refreshAuditLinks();
+        emit launchSucceeded();
     });
 }

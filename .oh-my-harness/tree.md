@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 233
+- Entries: 236
 
 ```text
 ./
@@ -65,6 +65,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       │   │   ├── PerspectiveSwitcher.qml
 │       │   │   ├── ProjectionProofPanel.qml
 │       │   │   ├── RoleCard.qml
+│       │   │   ├── SeatEditorPanel.qml
 │       │   │   ├── SectionHeader.qml
 │       │   │   ├── StatusBadge.qml
 │       │   │   └── ViewBoundaryBadge.qml
@@ -175,6 +176,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   │   ├── 2026-06-03--g2a-local-observer-server-protocol-control-plane-plan.md
 │   │   │   ├── 2026-06-03--g2b-qt-observer-cockpit-mvp-plan.md
 │   │   │   ├── 2026-06-03--g2c-god-role-view-visibility-trust-plan.md
+│   │   │   ├── 2026-06-04--g2d-2-qt-setup-ui-plan.md
 │   │   │   └── 2026-06-04--g2d-prompt-configuration-mvp-plan.md
 │   │   └── reviews/
 │   │       ├── 2026-06-01--g1c-project-healthcheck-final.md
@@ -194,6 +196,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   └── review-packet-gate.md
 │   ├── superpowers/
 │   │   └── specs/
+│   │       ├── 2026-06-04-g2d-2-qt-setup-ui-design.md
 │   │       └── 2026-06-04-g2d-prompt-configuration-design.md
 │   ├── CHECKPOINT_TEMPLATE.md
 │   ├── EVALUATION_RUBRIC.md

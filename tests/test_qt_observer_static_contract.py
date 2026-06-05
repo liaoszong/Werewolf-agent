@@ -38,17 +38,23 @@ REQUIRED_QML_VIEWS = [
     "qml/components/PerspectiveSwitcher.qml",
     "qml/components/AuditLinksPanel.qml",
     "qml/components/StatusBadge.qml",
+    "qml/components/SeatEditorPanel.qml",
 ]
 
 REQUIRED_OBJECT_NAMES = {
     "Main.qml": ["werewolfObserverMainWindow", "appShellLoader"],
     "qml/AppShell.qml": ["appShell", "appShellStack"],
     "qml/HomeView.qml": ["homeView", "startNewMatchButton", "historyButton", "serverStatusBadge", "recentRunsList"],
-    "qml/MatchSetupView.qml": ["matchSetupView", "setupRoleCards", "setupContinueButton"],
+    "qml/MatchSetupView.qml": ["matchSetupView", "setupRoleCards", "setupContinueButton",
+                               "setupProfilePicker", "setupValidateButton", "setupExecutionBanner"],
     "qml/PreflightView.qml": ["preflightView", "preflightServerStatus", "preflightTemplateSummary", "preflightVisibilitySummary", "startMatchButton"],
     "qml/LiveCockpitView.qml": ["liveCockpitView", "runStatusBadge", "playerPanelGrid", "eventTimeline", "perspectiveSwitcher", "auditLinksPanel", "providerFailureSummary"],
     "qml/HistoryView.qml": ["historyView", "historyRunsList", "historyRefreshButton"],
     "qml/components/RoleCard.qml": ["roleCard"],
+    "qml/components/SeatEditorPanel.qml": [
+        "seatEditorPanel", "seatEditorProvider", "seatEditorModel",
+        "seatEditorStrategy", "seatEditorPrompt",
+    ],
 }
 
 
@@ -98,23 +104,33 @@ class QtObserverStaticContractTests(unittest.TestCase):
 
 
 class QtObserverSetupContractTests(unittest.TestCase):
-    def test_setup_contains_default_six_player_roles(self) -> None:
+    def test_setup_is_profile_driven(self) -> None:
         content = (QT / "qml/MatchSetupView.qml").read_text(encoding="utf-8")
-        for seat in ["p1", "p2", "p3", "p4", "p5", "p6"]:
-            self.assertIn(seat, content, f"Missing seat {seat}")
-        for role in ["Werewolf", "Seer", "Witch", "Villager"]:
-            self.assertIn(role, content, f"Missing role {role}")
+        for token in ["ObserverClient.profileItems", "ObserverClient.loadedProfile",
+                      "launchFromProfile", "validateProfile", "profileSchema"]:
+            self.assertIn(token, content)
+        # options must come from the schema, not a hardcoded provider list
+        self.assertNotIn('"deepseek-chat"', content)
+        # launch is 202-gated: the view navigates only from the launchSucceeded
+        # signal handler, never optimistically on click.
+        self.assertIn("onLaunchSucceeded", content)
+        # declared-vs-executed trust banner is present
+        self.assertIn("Deterministic Mock", content)
 
     def test_preflight_mentions_visibility_boundary_and_default_template(self) -> None:
         content = (QT / "qml/PreflightView.qml").read_text(encoding="utf-8")
         self.assertIn("default_6p_fake", content)
         self.assertRegex(content, r"(?i)visibility.?(boundary|filter)")
 
-    def test_no_prompt_editor_is_added(self) -> None:
-        for qml_path in REQUIRED_QML_VIEWS:
-            content = (QT / qml_path).read_text(encoding="utf-8")
-            self.assertNotIn("promptEditor", content, f"promptEditor found in {qml_path}")
-            self.assertNotIn("PromptEditor", content, f"PromptEditor found in {qml_path}")
+    def test_prompt_editor_is_server_profile_scoped(self) -> None:
+        # G2d-2 adds a per-seat prompt editor, but it edits a server-sourced
+        # profile only — never a local prompt-template library or file source.
+        panel = (QT / "qml/components/SeatEditorPanel.qml").read_text(encoding="utf-8")
+        self.assertIn('objectName: "seatEditorPrompt"', panel)
+        self.assertIn("root.config", panel)  # prompt value comes from the passed-in server config
+        for forbidden in ["promptLibrary", "PromptLibrary", "templateLibrary",
+                          "TemplateLibrary", ".txt", "QFile", "QDir", "file://"]:
+            self.assertNotIn(forbidden, panel, f"local prompt source '{forbidden}' in SeatEditorPanel")
 
 
 class QtObserverCockpitContractTests(unittest.TestCase):
@@ -226,6 +242,39 @@ class QtObserverProjectionClientTests(unittest.TestCase):
         self.assertIn("/projection?perspective=", content)
 
 
+class QtObserverProfileClientTests(unittest.TestCase):
+    def test_client_exposes_profile_properties(self) -> None:
+        h = (QT / "src/ObserverApiClient.h").read_text(encoding="utf-8")
+        for prop in ["profileItems", "profileSchema", "loadedProfile", "profileValidation"]:
+            self.assertIn(prop, h)
+        for inv in ["refreshProfiles", "refreshProfileSchema", "fetchProfile",
+                    "validateProfile", "launchFromProfile"]:
+            self.assertIn(inv, h)
+        for sig in ["launchSucceeded", "launchFailed"]:
+            self.assertIn(sig, h)
+
+    def test_client_launch_is_202_gated(self) -> None:
+        cpp = (QT / "src/ObserverApiClient.cpp").read_text(encoding="utf-8")
+        self.assertIn("/api/profiles/schema", cpp)
+        self.assertIn("/api/profiles/validate", cpp)
+        # launch advances only on HTTP 202 + a run_id, else launchFailed
+        self.assertIn("HttpStatusCodeAttribute", cpp)
+        self.assertIn("202", cpp)
+        self.assertIn("runId.isEmpty()", cpp)
+        self.assertIn("launchSucceeded", cpp)
+        self.assertIn("launchFailed", cpp)
+
+    def test_profile_requests_use_latest_wins_guards(self) -> None:
+        h = (QT / "src/ObserverApiClient.h").read_text(encoding="utf-8")
+        cpp = (QT / "src/ObserverApiClient.cpp").read_text(encoding="utf-8")
+        # fetchProfile AND validateProfile must drop stale responses — pin BOTH
+        # latest-wins guards in the .cpp (the .h only proves declaration).
+        self.assertIn("m_profileRequestSerial", h)
+        self.assertIn("m_profileValidateSerial", h)
+        self.assertIn("m_profileRequestSerial", cpp)
+        self.assertIn("m_profileValidateSerial", cpp)
+
+
 class QtObserverHiddenInfoBoundaryTests(unittest.TestCase):
     def test_live_cockpit_does_not_embed_static_role_assignments(self) -> None:
         content = (QT / "qml/LiveCockpitView.qml").read_text(encoding="utf-8")
@@ -261,7 +310,7 @@ class QtObserverReadmeTests(unittest.TestCase):
     def test_readme_documents_mvp_status_and_non_goals(self) -> None:
         content = (QT / "README.md").read_text(encoding="utf-8")
         self.assertIn("G2b Observer Cockpit MVP", content)
-        self.assertIn("no full prompt/profile editor", content)
+        self.assertIn("profile setup editor", content)
         self.assertIn("no Web observer client", content)
         self.assertIn("no direct Python runtime binding", content)
         self.assertIn("no local artifact file reads", content)
