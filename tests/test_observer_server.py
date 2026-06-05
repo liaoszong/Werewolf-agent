@@ -1302,3 +1302,27 @@ class LiveDispatchTests(TestCase):
         h, runs = self._dispatch(body, live_enabled=True, live_launcher_set=False)
         self.assertEqual(h.responses[-1][1]["code"], "missing_api_key")
         self.assertFalse(self._run_dir(runs, "r_cap3").exists())
+
+    # --- Task 4: honest execution markers on the wrapper's resolved-profile ---
+
+    def _resolved_artifact(self, runs: Path, run_id: str) -> dict:
+        return json.loads(
+            (self._run_dir(runs, run_id) / "resolved-profile.json").read_text(encoding="utf-8")
+        )
+
+    def test_live_dispatch_stamps_live_markers(self) -> None:
+        body = {"profile": _deepseek_profile(), "run_id": "r_live_mark", "mode": "live"}
+        h, runs = self._dispatch(body, live_enabled=True, live_launcher_set=True)
+        art = self._resolved_artifact(runs, "r_live_mark")
+        self.assertEqual(art["execution_mode"], "live")
+        self.assertEqual(art["live_api"], "used")
+        self.assertTrue(art["secrets_redacted"])
+        for seat in art["seats"]:
+            self.assertEqual(seat["provider"], "deepseek")
+
+    def test_fake_dispatch_stamps_fake_markers(self) -> None:
+        body = {"profile": _deepseek_profile(), "run_id": "r_fake_mark", "mode": "fake"}
+        h, runs = self._dispatch(body, live_enabled=True, live_launcher_set=True)
+        art = self._resolved_artifact(runs, "r_fake_mark")
+        self.assertEqual(art["execution_mode"], "fake")
+        self.assertEqual(art["live_api"], "not_used")

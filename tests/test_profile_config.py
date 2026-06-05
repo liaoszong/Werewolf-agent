@@ -156,6 +156,56 @@ class ProfileArtifactTests(unittest.TestCase):
         self.assertNotIn("/home/", blob)
 
 
+def _deepseek_profile(name="dsprofile", model="deepseek-chat"):
+    rd = {
+        role: {"provider": "deepseek", "model": model, "prompt": "p", "strategy": "default"}
+        for role in ("werewolf", "seer", "witch", "villager")
+    }
+    return {
+        "schema_version": PROFILE_SCHEMA_VERSION,
+        "name": name,
+        "template": "default_6p_fake",
+        "role_defaults": rd,
+    }
+
+
+class LiveArtifactTests(unittest.TestCase):
+    def test_live_markers_when_requested(self):
+        art = build_resolved_profile_artifact(
+            _deepseek_profile(), run_id="run_live",
+            execution_mode="live", live_api="used",
+        )
+        self.assertEqual(art["execution_mode"], "live")
+        self.assertEqual(art["live_api"], "used")
+        self.assertTrue(art["secrets_redacted"])
+
+    def test_records_resolved_real_per_seat_model(self):
+        # Authoritative model record (A3): each seat carries its resolved model.
+        art = build_resolved_profile_artifact(
+            _deepseek_profile(model="deepseek-chat"), run_id="run_live",
+            execution_mode="live", live_api="used",
+        )
+        self.assertEqual(len(art["seats"]), 6)
+        for seat in art["seats"]:
+            self.assertEqual(seat["provider"], "deepseek")
+            self.assertEqual(seat["model"], "deepseek-chat")
+
+    def test_live_artifact_stores_prompt_hash_only(self):
+        art = build_resolved_profile_artifact(
+            _deepseek_profile(), run_id="run_live",
+            execution_mode="live", live_api="used",
+        )
+        # prompts are hash-only; the raw prompt "p" must not appear as a value
+        for seat in art["seats"]:
+            self.assertEqual(len(seat["prompt_hash"]), 64)
+            self.assertNotIn("prompt", {k: v for k, v in seat.items() if k != "prompt_hash"}.values())
+
+    def test_default_call_stays_fake_back_compat(self):
+        art = build_resolved_profile_artifact(_deepseek_profile(), run_id="run_fake")
+        self.assertEqual(art["execution_mode"], "fake")
+        self.assertEqual(art["live_api"], "not_used")
+
+
 class ProfilePersistenceTests(unittest.TestCase):
     def test_save_and_load_round_trip(self):
         with tempfile.TemporaryDirectory() as tmp:

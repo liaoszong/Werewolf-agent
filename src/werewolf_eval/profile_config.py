@@ -226,9 +226,20 @@ def resolve_profile(profile: dict) -> list[dict]:
     ]
 
 
-def build_resolved_profile_artifact(profile: dict, run_id: str) -> dict:
+def build_resolved_profile_artifact(
+    profile: dict,
+    run_id: str,
+    *,
+    execution_mode: str = "fake",
+    live_api: str = "not_used",
+) -> dict:
     """Build the ``resolved-profile.json`` content: declared per-seat config
-    with hashed prompts and explicit fake-execution markers."""
+    with hashed prompts and explicit execution markers.
+
+    ``execution_mode``/``live_api`` default to the fake markers for back-compat;
+    the server live ``_profile_launcher`` wrapper passes ``"live"``/``"used"``.
+    The per-seat ``model`` is the resolved real model — this artifact is the
+    authoritative model record (A3)."""
     seats: list[dict[str, Any]] = []
     for seat_cfg in resolve_profile(profile):
         prompt = seat_cfg.get("prompt") or ""
@@ -248,8 +259,8 @@ def build_resolved_profile_artifact(profile: dict, run_id: str) -> dict:
         "run_id": run_id,
         "profile_name": profile["name"],
         "template": profile["template"],
-        "execution_mode": "fake",
-        "live_api": "not_used",
+        "execution_mode": execution_mode,
+        "live_api": live_api,
         "secrets_redacted": True,
         "seats": seats,
     }

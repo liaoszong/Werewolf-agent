@@ -447,13 +447,23 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
             return
         run_dir.mkdir(parents=True)
 
-        base = state.live_launcher if mode == "live" else state.launcher
+        is_live = mode == "live"
+        base = state.live_launcher if is_live else state.launcher
 
         def _profile_launcher(
-            rid: str, rdir: Path, base: RunLauncher = base, profile: dict = profile
+            rid: str,
+            rdir: Path,
+            base: RunLauncher = base,
+            profile: dict = profile,
+            is_live: bool = is_live,
         ) -> int:
             code = base(rid, rdir)
-            artifact = build_resolved_profile_artifact(profile, rid)
+            artifact = build_resolved_profile_artifact(
+                profile,
+                rid,
+                execution_mode="live" if is_live else "fake",
+                live_api="used" if is_live else "not_used",
+            )
             (rdir / "resolved-profile.json").write_text(
                 json.dumps(artifact, ensure_ascii=False, indent=2, sort_keys=True),
                 encoding="utf-8",
