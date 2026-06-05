@@ -15,7 +15,17 @@
   - `eaaca99` feat(g3-1): run_observer_server --allow-live-api/--api-key-env/--max-live-requests
   - `ce3fa17` test(g3-1): secret-scan + artifact-contract regression for live path
   - `34dfbf1` feat(g3-1): gated manual DeepSeek live smoke (script + skipUnless wrapper)
-  - (this commit) docs(g3-1): full-validation review packet + tree refresh
+  - `69454e8` docs(g3-1): tree refresh + normalize fake-key fixture + review packet
+  - `4a1a2ba` fix(g3-1): expose key-free run-status reason in run detail/list/SSE *(review round 1, P1)*
+
+> **Review round 1 (BLOCK) — addressed.** P1: the key-free run reason
+> (`budget_exhausted`/`provider_failure`) was recorded in `state.run_errors` but
+> not surfaced; now exposed in run detail (`/api/runs/{id}`), the run list, and the
+> final SSE `run_status` (commit `4a1a2ba`). P2: the packet under
+> `.logs/review/latest/` is **tracked** (the `latest/` dir holds the current
+> slice's packet — G2d-2 set that precedent); this slice replaces the stale G2d-2
+> packet with this one. The earlier "gitignored/local-only" handoff note was
+> incorrect.
 
 ## Changed files & diff stat (implementation, `2435caa..HEAD`)
 ```
@@ -78,6 +88,12 @@ design; the helpers + harness need no socket).
   `...test_budget_exhaustion_classified_exit_3`, `...test_generic_provider_failure_classified_exit_2`.
 - Server maps the code to a **key-free** run-status reason via `_map_launcher_exit_reason`
   (3->`budget_exhausted`, else->`provider_failure`). Tests: `LiveGateHelperTests.test_exit_code_*`.
+- **The reason is exposed** (not just recorded): `_execute_run` stores a canonical key-free
+  reason in `state.run_errors` (exceptions also map to `provider_failure`, never raw text), and
+  `_run_detail_with_reason` attaches it to `GET /api/runs/{id}` and the run list; the final SSE
+  `run_status` carries it via `format_sse_status(..., reason)`. Tests:
+  `LiveRunStatusReasonTests` (exit 3->`budget_exhausted`, exit 2->`provider_failure`, exit 0->no
+  reason, exception->`provider_failure`) + `ObserverVisibilityTests.test_sse_status_*`.
 
 ## A2/A3 — Live execution + honest artifacts
 - A2: the live launcher delegates to `run_deepseek_consensus_game_with_provider_factory(
@@ -122,7 +138,7 @@ flag+key->launcher; custom `--api-key-env` honored).
 
 ## A6 — Offline suite green; smoke skips; artifact contract
 - Full suite `python -m unittest discover -s tests -p "test_*.py"`:
-  **483 ran, 1 failure, 47 errors, 1 skipped.**
+  **489 ran, 1 failure, 47 errors, 1 skipped.**
   - 47 errors = ALL `test_observer_server` **HTTP-socket** tests (env-blocked `RemoteDisconnected`);
     every exception is a connection error, none a refactor regression (verified).
   - 1 failure = pre-existing `test_context_budget.ContextBudgetGateDocsTests` (AGENTS.md docs gate,
