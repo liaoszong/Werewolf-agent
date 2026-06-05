@@ -14,10 +14,12 @@ from urllib.request import Request, urlopen
 from werewolf_eval.observer_protocol import (
     ALLOWED_ARTIFACTS,
     ALLOWED_PERSPECTIVES,
+    RUNTIME_CAPABILITIES_SCHEMA_VERSION,
 )
 from werewolf_eval.observer_server import (
     ObserverRequestHandler,
     ObserverServerState,
+    _build_capabilities_payload,
     _check_live_capability,
     _check_live_profile_shape,
     _map_launcher_exit_reason,
@@ -1155,6 +1157,78 @@ class LiveGateHelperTests(TestCase):
 
     def test_other_nonzero_maps_to_provider_failure(self) -> None:
         self.assertEqual(_map_launcher_exit_reason(1), "provider_failure")
+
+
+class RuntimeCapabilitiesEndpointTests(TestCase):
+    """Offline derivation tests for GET /api/runtime/capabilities (G3-2).
+
+    Localhost HTTP is blocked in this env, so the read-only endpoint is proven
+    by feeding a real ``ObserverServerState`` through the pure derivation helper
+    (``_build_capabilities_payload``) — exactly as the G3-1 gate matrix is proven
+    via ``_check_live_capability``.  The live-socket variant (a real GET
+    round-trip) is env-blocked (RemoteDisconnected) and intentionally not
+    exercised here; document, don't 'fix'."""
+
+    def _state(self, *, live_enabled: bool, live_launcher: object) -> ObserverServerState:
+        with TemporaryDirectory() as tmp:
+            runs = Path(tmp) / "runs"
+            runs.mkdir()
+            return ObserverServerState(
+                runs_dir=runs,
+                launcher=default_fake_launcher,
+                live_enabled=live_enabled,
+                live_launcher=live_launcher,  # type: ignore[arg-type]
+            )
+
+    def test_available_posture_proceeds_with_no_reason(self) -> None:
+        st = self._state(live_enabled=True, live_launcher=lambda r, d: 0)
+        payload = _build_capabilities_payload(st)
+        self.assertEqual(payload["schema_version"], RUNTIME_CAPABILITIES_SCHEMA_VERSION)
+        self.assertEqual(payload["default_mode"], "fake")
+        live = payload["live_api"]
+        self.assertTrue(live["enabled"])
+        ds = live["providers"]["deepseek"]
+        self.assertTrue(ds["available"])
+        self.assertNotIn("reason_code", ds)
+        self.assertNotIn("message", ds)
+        # available <=> the launch-time capability gate proceeds
+        self.assertIsNone(_check_live_capability(st, "live"))
+
+    def test_disabled_posture_reason_matches_launch_403(self) -> None:
+        st = self._state(live_enabled=False, live_launcher=None)
+        payload = _build_capabilities_payload(st)
+        live = payload["live_api"]
+        self.assertFalse(live["enabled"])
+        ds = live["providers"]["deepseek"]
+        self.assertFalse(ds["available"])
+        self.assertEqual(ds["reason_code"], "live_api_disabled")
+        self.assertTrue(ds["message"])
+        # the capabilities reason_code is IDENTICAL to the launch-time 403 code
+        self.assertEqual(ds["reason_code"], _check_live_capability(st, "live")[1])  # type: ignore[index]
+
+    def test_flag_on_no_key_posture_reason_matches_launch_403(self) -> None:
+        st = self._state(live_enabled=True, live_launcher=None)
+        payload = _build_capabilities_payload(st)
+        live = payload["live_api"]
+        self.assertTrue(live["enabled"])
+        ds = live["providers"]["deepseek"]
+        self.assertFalse(ds["available"])
+        self.assertEqual(ds["reason_code"], "missing_api_key")
+        self.assertEqual(ds["reason_code"], _check_live_capability(st, "live")[1])  # type: ignore[index]
+
+    def test_payload_carries_no_secret_in_any_posture(self) -> None:
+        # Real-secret markers only — the canonical key-free reason code
+        # ``missing_api_key`` legitimately appears, mirroring the server response
+        # secret scan (which also excludes the ``api_key`` substring).
+        markers = ("Authorization", "Bearer ", "DEEPSEEK_API_KEY", "sk-")
+        for st in (
+            self._state(live_enabled=False, live_launcher=None),
+            self._state(live_enabled=True, live_launcher=None),
+            self._state(live_enabled=True, live_launcher=lambda r, d: 0),
+        ):
+            text = json.dumps(_build_capabilities_payload(st), ensure_ascii=False, sort_keys=True)
+            for marker in markers:
+                self.assertNotIn(marker, text, f"{marker!r} leaked in capabilities payload")
 
 
 class _FakeServer:

@@ -23,6 +23,7 @@ from werewolf_eval.observer_protocol import (
     build_artifact_registry,
     build_run_detail,
     build_run_summary,
+    build_runtime_capabilities,
     build_snapshot_registry,
     event_visible_to_perspective,
     filter_events_for_perspective,
@@ -118,6 +119,28 @@ def _check_live_profile_shape(
             "live launch requires a single shared deepseek model",
         )
     return None
+
+
+def _build_capabilities_payload(state: ObserverServerState) -> dict[str, object]:
+    """Derive the read-only ``g3.runtime_capabilities.v1`` payload from the live
+    capability gate.
+
+    Posture comes ONLY from ``_check_live_capability(state, "live")`` (None ⇒
+    available; tuple ⇒ the launch-time ``(status, reason_code, message)``), so
+    the capabilities ``reason_code`` is identical to the launch-time 403 code.
+    Read-only: no writes, no provider call, and never a secret."""
+    reject = _check_live_capability(state, "live")
+    if reject is None:
+        return build_runtime_capabilities(
+            live_enabled=state.live_enabled, deepseek_available=True
+        )
+    _status, reason_code, message = reject
+    return build_runtime_capabilities(
+        live_enabled=state.live_enabled,
+        deepseek_available=False,
+        reason_code=reason_code,
+        message=message,
+    )
 
 
 def _map_launcher_exit_reason(code: int) -> str:
@@ -230,6 +253,13 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
         try:
             if segments == ["health"]:
                 self._send_json(200, {"status": "ok", "service": "werewolf-observer"})
+                return
+
+            # G3-2 read-only live posture — no writes, no provider call, no
+            # secret; reuses the G3-1 capability gate so reason_code == the
+            # launch-time 403 code.
+            if segments == ["api", "runtime", "capabilities"]:
+                self._send_json(200, _build_capabilities_payload(self._get_state()))
                 return
 
             if segments == ["api", "runs"]:
