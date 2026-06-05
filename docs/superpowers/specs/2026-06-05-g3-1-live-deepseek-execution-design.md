@@ -72,9 +72,21 @@ HTTP POST /api/runs {profile, mode:"live"}
 
 **Defaulted (open to spec-review adjustment):**
 - **Key source:** server process **env only**, var named by `--api-key-env` (default `DEEPSEEK_API_KEY`). Never via HTTP/profile/CLI value.
-- **Guardrails:** reuse `DeepSeekProvider` hard `max_requests` budget (conservative server default, **not caller-adjustable**) + `timeout_seconds=30`, **no retry**, fail the run on first `ProviderActionError`. Cost knobs are server-config-only.
+- **Guardrails:** `max_requests=32` server default — overridable **only** by an explicit server-side option/env/CLI flag, **never per-request**; `timeout_seconds=30`; **no retry**; fail the run on first `ProviderActionError`. When the budget is reached the run **fails closed** with `budget_exhausted`. (Rationale: 6/8 risks truncating a real game before it completes; 100+ risks runaway spend in a v1. If the gated smoke shows 32 is too low, raise to 48/64 in a later evidence-based commit — do not start higher.)
 - **Engine mode:** `g1f_provider_consensus` only (it is the mode that writes the runtime spine the observer needs).
-- **Failure surface:** distinct machine-readable reasons — `live_api_disabled` (403), `mixed_models`/`not_deepseek` (400) at request time; run status `failed` with a key-free reason (`key_missing`, `budget_exceeded`, `provider_failure`) for launch-time failures.
+- **Failure surface (canonical codes):** request-time — `live_api_disabled` (403, server not started with `--allow-live-api`), `missing_api_key` (403, flag set but no env key), `unsupported_live_provider` (400, a seat resolves to a non-deepseek provider), `mixed_models` (400, deepseek seats select >1 model). Run-time — status `failed` with a key-free reason (`budget_exhausted`, `provider_failure`).
+
+**Gate order in `_handle_profile_launch` (canonical — tested branch-by-branch, all rejects BEFORE `run_dir` creation):**
+```
+1. mode omitted / mode=="fake"          -> fake launcher (default)
+2. mode=="live" + not --allow-live-api  -> 403 live_api_disabled
+3. mode=="live" + flag on + no env key  -> 403 missing_api_key
+4. mode=="live" + any seat not deepseek -> 400 unsupported_live_provider
+5. mode=="live" + deepseek seats, >1 model -> 400 mixed_models
+6. mode=="live" + single-model deepseek profile -> live launcher
+(template launch + mode=="live" -> 400 rejected: live is profile-only)
+```
+Server-capability checks (2,3) precede profile-shape checks (4,5) so an un-provisioned server never inspects the profile.
 - **Determinism:** live runs are **non-deterministic but fully auditable** (provider-trace, `source_label` provenance, hashed prompt-manifest, `resolved-profile.json=live`). No byte-identical replay promised.
 
 ---
@@ -96,7 +108,8 @@ tests/test_deepseek_launcher.py               (new)
 tests/test_observer_server.py
 tests/test_observer_protocol.py
 tests/test_profile_config.py
-scripts/ or tests/  live smoke (gated)         (new)
+scripts/dev/run_deepseek_live_smoke.py         (new, gated, not in default suite)
+tests/test_deepseek_live_smoke.py              (new, skipUnless wrapper)
 docs/superpowers/specs/2026-06-05-g3-1-live-deepseek-execution-design.md
 docs/harness/plans/2026-06-05--g3-1-...-plan.md
 ```
@@ -121,7 +134,13 @@ docs/harness/plans/2026-06-05--g3-1-...-plan.md
 3. **Gate (subprocess)** (mirror `test_deepseek_provider_game.py`): start `run_observer_server --allow-live-api --api-key-env DOES_NOT_EXIST_XXXX`; a live request fails with key-missing surface and writes nothing; without `--allow-live-api`, `mode=live` is rejected. No real env var read.
 4. **Secret-scan + contract:** rglob the (faked) live output dir against `['Authorization','Bearer ','api_key','DEEPSEEK_API_KEY','sk-']`; extend `ObserverServerSecretScanTests` over the live-launch response; assert a fake `sk-test-key` never appears in any error/artifact; assert the live file set == fake file set (only markers differ).
 
-**Gated manual smoke (NOT in default suite):** a script / env-gated test (e.g. requires `WEREWOLF_LIVE_SMOKE=1` + `--allow-live-api` + a real key) that launches one real game and asserts **structural** success only (run completes, spine + bundle exist, `live_api=used`, no secret leak) — never specific text. Documented as a pre-merge manual step; cost-bounded by `max_requests`.
+**Gated manual smoke (NOT in the default suite, NOT an acceptance gate):** primary entry `scripts/dev/run_deepseek_live_smoke.py`; an optional `unittest` wrapper uses `skipUnless`. Hard boundaries:
+- Default unittest/CI **MUST NOT** make real network calls.
+- The smoke runs **only** when `RUN_DEEPSEEK_LIVE_SMOKE=1` **and** `DEEPSEEK_API_KEY` is present.
+- It validates **request/response integration only** (run completes, spine + bundle exist, `live_api=used`); it **must not** assert exact model text.
+- It **must not** print the API key, the `Authorization` header, or the full raw request.
+
+Cost-bounded by `max_requests=32`. Run once before merge; record the text-free result in the review packet.
 
 ---
 
@@ -129,17 +148,18 @@ docs/harness/plans/2026-06-05--g3-1-...-plan.md
 
 - **T1** — `observer_protocol.py`: add `"live"` to `ALLOWED_MODES`; reject template+live. Parser/handler tests.
 - **T2** — `observer_server.py`: `ObserverServerState.live_launcher` + `create_observer_server(live_launcher=)`; `_handle_profile_launch` dispatch + `403 live_api_disabled` early-reject + `400 mixed_models`/`not_deepseek`. Injected-fake-launcher server tests.
-- **T3** — `deepseek_launcher.py`: `build_deepseek_launcher` delegating to the consensus runner; launcher artifact tests (fake transport/provider factory).
+- **T3** — `deepseek_launcher.py`: `build_deepseek_launcher` (default `max_requests=32`, server-override-only) delegating to the consensus runner; launcher artifact tests (fake transport/provider factory) + a budget-exhaustion test (faked provider raising the budget error → exit nonzero → run status `failed`/`budget_exhausted`).
 - **T4** — `profile_config.py`: parameterize `build_resolved_profile_artifact`; fix prompt-manifest model on the live path. Artifact-marker tests.
 - **T5** — `run_observer_server.py`: `--allow-live-api` / `--api-key-env`; build + inject the live launcher from env. Subprocess gate tests (`DOES_NOT_EXIST_XXXX`).
 - **T6** — Secret-scan + artifact-contract regression tests; review packet.
-- **T7** — Gated manual real-DeepSeek smoke script/test + docs; run it once before merge and record the (text-free) result.
+- **T7** — `scripts/dev/run_deepseek_live_smoke.py` (primary) + `tests/test_deepseek_live_smoke.py` (`skipUnless(RUN_DEEPSEEK_LIVE_SMOKE=1 and key present)`); enforces the §7 boundaries (no real net by default; structure-only asserts; no key/Authorization/raw-request printed). Run once before merge; record the text-free result in the packet.
 
 ---
 
 ## 9. Acceptance criteria
 
-- **A1** `mode=live` accepted only for profile launches when live-enabled; template+live and not-enabled paths rejected with distinct codes; no `run_dir` on reject. *(T1/T2)*
+- **A1** The §4 **gate matrix** holds branch-by-branch (omitted/fake→fake; live+no-flag→403 `live_api_disabled`; live+flag+no-key→403 `missing_api_key`; live+non-deepseek→400 `unsupported_live_provider`; live+mixed-models→400 `mixed_models`; live+valid→live launcher; template+live→400); **no `run_dir` on any reject**. *(T1/T2)*
+- **A7** `max_requests=32` default, overridable only server-side; reaching it **fails closed** with `budget_exhausted`; timeout 30s, no retry. *(T3)*
 - **A2** Live profile launch runs via `DeepSeekProvider` (server-side env key) and writes the full spine + bundle the observer consumes. *(T3, injected fake)*
 - **A3** `resolved-profile.json` honest (`execution_mode=live`,`live_api=used`,`secrets_redacted=true`); prompt-manifest model = resolved real model. *(T4)*
 - **A4** Fake stays the unconditional default; quadruple gate (flag+key+mode+deepseek) enforced; mixed models → 400. *(T2/T5)*
@@ -148,7 +168,7 @@ docs/harness/plans/2026-06-05--g3-1-...-plan.md
 
 ---
 
-## 10. Open items for spec review
-- Server-side `max_requests` default value (proposed conservative; confirm number).
-- Smoke harness form: standalone `scripts/live_smoke_*.py` vs an `unittest` `skipUnless(env)` test (proposed: a script + a skipUnless test wrapper).
-- Distinct run-status reason strings surfaced to the UI (proposed set in §4).
+## 10. Resolved (spec review, 2026-06-05)
+- **`max_requests=32`** default; server-side override only (option/env/CLI), never per-request; budget reached → **fail closed `budget_exhausted`**. Re-tune to 48/64 later only on smoke evidence.
+- **Smoke harness:** `scripts/dev/run_deepseek_live_smoke.py` (primary) + a default-skip `skipUnless` `unittest` wrapper; **never** a default acceptance gate; boundaries per §7.
+- **Canonical error codes** (§4 gate order): `live_api_disabled` / `missing_api_key` (403), `unsupported_live_provider` / `mixed_models` (400) request-time; `budget_exhausted` / `provider_failure` run-time.
