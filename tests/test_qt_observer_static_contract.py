@@ -45,7 +45,8 @@ REQUIRED_OBJECT_NAMES = {
     "Main.qml": ["werewolfObserverMainWindow", "appShellLoader"],
     "qml/AppShell.qml": ["appShell", "appShellStack"],
     "qml/HomeView.qml": ["homeView", "startNewMatchButton", "historyButton", "serverStatusBadge", "recentRunsList"],
-    "qml/MatchSetupView.qml": ["matchSetupView", "setupRoleCards", "setupContinueButton"],
+    "qml/MatchSetupView.qml": ["matchSetupView", "setupRoleCards", "setupContinueButton",
+                               "setupProfilePicker", "setupValidateButton", "setupExecutionBanner"],
     "qml/PreflightView.qml": ["preflightView", "preflightServerStatus", "preflightTemplateSummary", "preflightVisibilitySummary", "startMatchButton"],
     "qml/LiveCockpitView.qml": ["liveCockpitView", "runStatusBadge", "playerPanelGrid", "eventTimeline", "perspectiveSwitcher", "auditLinksPanel", "providerFailureSummary"],
     "qml/HistoryView.qml": ["historyView", "historyRunsList", "historyRefreshButton"],
@@ -103,12 +104,18 @@ class QtObserverStaticContractTests(unittest.TestCase):
 
 
 class QtObserverSetupContractTests(unittest.TestCase):
-    def test_setup_contains_default_six_player_roles(self) -> None:
+    def test_setup_is_profile_driven(self) -> None:
         content = (QT / "qml/MatchSetupView.qml").read_text(encoding="utf-8")
-        for seat in ["p1", "p2", "p3", "p4", "p5", "p6"]:
-            self.assertIn(seat, content, f"Missing seat {seat}")
-        for role in ["Werewolf", "Seer", "Witch", "Villager"]:
-            self.assertIn(role, content, f"Missing role {role}")
+        for token in ["ObserverClient.profileItems", "ObserverClient.loadedProfile",
+                      "launchFromProfile", "validateProfile", "profileSchema"]:
+            self.assertIn(token, content)
+        # options must come from the schema, not a hardcoded provider list
+        self.assertNotIn('"deepseek-chat"', content)
+        # launch is 202-gated: the view navigates only from the launchSucceeded
+        # signal handler, never optimistically on click.
+        self.assertIn("onLaunchSucceeded", content)
+        # declared-vs-executed trust banner is present
+        self.assertIn("Deterministic Mock", content)
 
     def test_preflight_mentions_visibility_boundary_and_default_template(self) -> None:
         content = (QT / "qml/PreflightView.qml").read_text(encoding="utf-8")
@@ -297,7 +304,7 @@ class QtObserverReadmeTests(unittest.TestCase):
     def test_readme_documents_mvp_status_and_non_goals(self) -> None:
         content = (QT / "README.md").read_text(encoding="utf-8")
         self.assertIn("G2b Observer Cockpit MVP", content)
-        self.assertIn("no full prompt/profile editor", content)
+        self.assertIn("profile setup editor", content)
         self.assertIn("no Web observer client", content)
         self.assertIn("no direct Python runtime binding", content)
         self.assertIn("no local artifact file reads", content)
