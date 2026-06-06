@@ -46,6 +46,13 @@ void ObserverApiClient::setCurrentPerspective(const QString &perspective)
     if (m_currentPerspective != perspective) {
         m_currentPerspective = perspective;
         emit currentPerspectiveChanged();
+        // P2-C-1 stale-data guard (P1-C/P2-F): drop the prior perspective's enriched
+        // projection BEFORE re-streaming/re-projecting, so Seat Lens never shows stale
+        // god data while the new projection is in flight.
+        if (!m_projectionEvents.isEmpty()) {
+            m_projectionEvents.clear();
+            emit projectionEventsChanged();
+        }
         if (m_connected && !m_currentRunId.isEmpty()) {
             startStreamRequest();
             refreshProjection();
@@ -64,6 +71,7 @@ QVariantMap ObserverApiClient::projectionProof() const { return m_projectionProo
 int ObserverApiClient::hiddenEventCount() const { return m_hiddenEventCount; }
 int ObserverApiClient::hiddenSnapshotCount() const { return m_hiddenSnapshotCount; }
 QString ObserverApiClient::visibilityContractVersion() const { return m_visibilityContractVersion; }
+QVariantList ObserverApiClient::projectionEvents() const { return m_projectionEvents; }
 
 // G2d-2 profile setup getters
 QVariantList ObserverApiClient::profileItems() const { return m_profileItems; }
@@ -105,6 +113,12 @@ void ObserverApiClient::setCurrentRunId(const QString &runId)
         return;
     m_currentRunId = runId;
     emit currentRunChanged();
+    // P2-C-1 stale-data guard (P2-F): a new run must not inherit the prior run's
+    // enriched projection events.
+    if (!m_projectionEvents.isEmpty()) {
+        m_projectionEvents.clear();
+        emit projectionEventsChanged();
+    }
     // C1-bis: a new run must never inherit the prior run's executed truth — the
     // HUD chip falls back to SYS: SIMULATION until run detail returns a mode.
     resetExecutionMode();
@@ -430,8 +444,16 @@ void ObserverApiClient::refreshProjection()
         m_playerItems = players;
         m_projectionProof = obj.value(QStringLiteral("proof")).toObject().toVariantMap();
 
+        // P2-C-1: enriched per-perspective events (data.summary + target), recursively
+        // preserved as nested QVariantMaps for the QML EventPresentationQueue.
+        QVariantList projEvents;
+        for (const QJsonValue &v : obj.value(QStringLiteral("events")).toArray())
+            projEvents.append(v.toObject().toVariantMap());
+        m_projectionEvents = projEvents;
+
         emit playerItemsChanged();
         emit projectionProofChanged();
+        emit projectionEventsChanged();
         emit projectionChanged();
     });
 }

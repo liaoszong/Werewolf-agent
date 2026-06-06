@@ -261,6 +261,28 @@ class QtObserverProjectionClientTests(unittest.TestCase):
         content = (QT / "src/ObserverApiClient.cpp").read_text(encoding="utf-8")
         self.assertIn("/projection?perspective=", content)
 
+    def test_client_exposes_projection_events(self) -> None:
+        # P2-C-1: enriched per-perspective events exposed to QML, parsed from the
+        # same /projection response under the existing latest-wins guard.
+        h = (QT / "src/ObserverApiClient.h").read_text(encoding="utf-8")
+        cpp = (QT / "src/ObserverApiClient.cpp").read_text(encoding="utf-8")
+        self.assertIn("projectionEvents", h)
+        self.assertIn('value(QStringLiteral("events"))', cpp)
+
+    def test_stale_guard_in_both_setters_before_requests(self) -> None:
+        # Edit 2/7 + P2-F: clear+notify in BOTH setters, BEFORE the new stream/projection request.
+        cpp = (QT / "src/ObserverApiClient.cpp").read_text(encoding="utf-8")
+        for setter in ["ObserverApiClient::setCurrentPerspective", "ObserverApiClient::setCurrentRunId"]:
+            start = cpp.find(setter)
+            self.assertNotEqual(start, -1, f"{setter} not found")
+            body = cpp[start:start + 1200]            # setter body window
+            self.assertIn("m_projectionEvents.clear()", body, f"{setter} must clear projectionEvents")
+            self.assertIn("projectionEventsChanged", body, f"{setter} must emit projectionEventsChanged")
+            clr = body.index("m_projectionEvents.clear()")
+            for req in ["startStreamRequest", "refreshProjection"]:
+                if req in body:
+                    self.assertLess(clr, body.index(req), f"{setter}: clear must precede {req}")
+
 
 class QtObserverProfileClientTests(unittest.TestCase):
     def test_client_exposes_profile_properties(self) -> None:

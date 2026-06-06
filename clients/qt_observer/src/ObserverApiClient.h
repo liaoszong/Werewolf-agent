@@ -27,6 +27,8 @@ class ObserverApiClient : public QObject {
     Q_PROPERTY(int hiddenEventCount READ hiddenEventCount NOTIFY projectionChanged)
     Q_PROPERTY(int hiddenSnapshotCount READ hiddenSnapshotCount NOTIFY projectionChanged)
     Q_PROPERTY(QString visibilityContractVersion READ visibilityContractVersion NOTIFY projectionChanged)
+    // P2-C-1: per-perspective enriched projection events (data.summary + target)
+    Q_PROPERTY(QVariantList projectionEvents READ projectionEvents NOTIFY projectionEventsChanged)
     // G2d-2 profile setup properties
     Q_PROPERTY(QVariantList profileItems READ profileItems NOTIFY profileItemsChanged)
     Q_PROPERTY(QVariantMap profileSchema READ profileSchema NOTIFY profileSchemaChanged)
@@ -66,6 +68,7 @@ public:
     int hiddenEventCount() const;
     int hiddenSnapshotCount() const;
     QString visibilityContractVersion() const;
+    QVariantList projectionEvents() const;
     // G2d-2 profile setup accessors
     QVariantList profileItems() const;
     QVariantMap profileSchema() const;
@@ -111,6 +114,7 @@ signals:
     void playerItemsChanged();
     void projectionProofChanged();
     void projectionChanged();
+    void projectionEventsChanged();
     // G2d-2 profile setup signals
     void profileItemsChanged();
     void profileSchemaChanged();
@@ -153,6 +157,7 @@ private:
     int m_hiddenSnapshotCount = 0;
     QString m_visibilityContractVersion;
     quint64 m_projectionRequestSerial = 0;
+    QVariantList m_projectionEvents;
     // G2d-2 profile setup state
     QVariantList m_profileItems;
     QVariantMap m_profileSchema;
