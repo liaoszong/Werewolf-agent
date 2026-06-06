@@ -649,6 +649,7 @@ class QtObserverTheaterViewTests(unittest.TestCase):
         self.assertIn("resumeAfterTransition", t)             # D5 yield-gate wired
         self.assertIn("state: eventQueue.layoutPhase", t)     # P2-D declarative layout binding
         self.assertNotIn("ring.perspective =", t)             # P1-C: no handler writing the bound perspective
+        self.assertIn("navigateHome", t)                      # theater must have a back/exit affordance
 
     def test_evidence_console_rehomes_honesty_chain(self) -> None:
         # P2-C-1 Edit 5: EvidenceConsole.qml ITSELF must instantiate the honesty chain

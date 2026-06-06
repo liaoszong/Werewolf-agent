@@ -28,6 +28,7 @@ QtObject {
     readonly property var current: _currentRaw ? _present(_currentRaw) : ({})
     property string layoutPhase: "day"  // "night" | "day" | "voting"
     property bool waiting: false
+    readonly property bool atEnd: _cursor >= _ordered.length   // drained (all received events consumed)
     property bool playing: true
     property real speed: 1.0
     property bool instant: false
@@ -108,6 +109,15 @@ QtObject {
         repeat: true
         running: queue.playing
         onTriggered: queue._pump()
+    }
+
+    // Safety watchdog: if a layout transition's onStopped is ever missed, never stay gated
+    // forever — force a resume after the transition's worst-case duration.
+    property Timer _gateWatchdog: Timer {
+        interval: 1600
+        repeat: false
+        running: queue._gated
+        onTriggered: queue.resumeAfterTransition()
     }
 
     function _pump() {

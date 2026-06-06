@@ -27,6 +27,16 @@ Item {
                 return i
         return -1
     }
+    function _roleLabel(role) {
+        var m = ({
+            werewolf: I18n.t("狼人", "Werewolf"),
+            seer: I18n.t("预言家", "Seer"),
+            witch: I18n.t("女巫", "Witch"),
+            villager: I18n.t("村民", "Villager"),
+            unknown: I18n.t("未知", "Unknown")
+        })
+        return m[role] || role
+    }
 
     // Faint stage ring guide.
     Rectangle {
@@ -143,7 +153,7 @@ Item {
                 anchors.top: avatar.bottom
                 anchors.topMargin: 4
                 anchors.horizontalCenter: avatar.horizontalCenter
-                text: seat.isUnknown ? "████" : Theme.humanizeRole(modelData.display_role)
+                text: seat.isUnknown ? "████" : root._roleLabel(modelData.display_role)
                 color: seat.isUnknown ? Theme.color.textMuted : seat.accent
                 font.family: seat.isUnknown ? Theme.font.mono : Theme.font.family
                 font.pixelSize: Theme.size.micro

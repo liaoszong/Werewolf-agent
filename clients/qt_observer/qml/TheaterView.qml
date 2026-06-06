@@ -21,6 +21,14 @@ Item {
         }
     }
 
+    // Stage status — never leave the user guessing whether it is waiting or ended.
+    readonly property bool _runOver: ObserverClient.currentStatus === "completed" || ObserverClient.currentStatus === "failed"
+    readonly property string _statusText: {
+        if (ObserverClient.currentRunId === "" || !eventQueue.atEnd)
+            return ""
+        return _runOver ? I18n.t("对局结束", "Game over") : I18n.t("等待 AI 行动…", "Waiting for the next AI move…")
+    }
+
     // Re-fetch the (enriched) projection as new events arrive, throttled — summaries
     // back-fill live; the C++ latest-wins guard drops out-of-order responses.
     Connections {
@@ -62,6 +70,15 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             spacing: Theme.space.md
 
+            AppButton {
+                anchors.verticalCenter: parent.verticalCenter
+                text: I18n.t("← 返回", "← Back")
+                variant: "ghost"
+                onClicked: {
+                    ObserverClient.disconnectStream()
+                    theaterRoot.StackView.view.parent.navigateHome()
+                }
+            }
             Text {
                 anchors.verticalCenter: parent.verticalCenter
                 text: I18n.t("剧场观战", "Theater")
@@ -126,6 +143,38 @@ Item {
             width: stage.width - stage.smallRing - Theme.space.xxl
             height: stage.height
             onOpenInConsole: evidence.mode = 2
+        }
+
+        // Stage status pill (waiting for the next move / game over).
+        Rectangle {
+            visible: theaterRoot._statusText !== ""
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.top: parent.top
+            anchors.topMargin: Theme.space.md
+            implicitWidth: statusRow.implicitWidth + Theme.space.lg * 2
+            implicitHeight: statusRow.implicitHeight + Theme.space.sm * 2
+            radius: Theme.radius.pill
+            color: Theme.color.surfaceInset
+            border.width: 1
+            border.color: Theme.color.border
+            Row {
+                id: statusRow
+                anchors.centerIn: parent
+                spacing: Theme.space.sm
+                GlowDot {
+                    anchors.verticalCenter: parent.verticalCenter
+                    diameter: 8
+                    pulse: !theaterRoot._runOver
+                    color: theaterRoot._runOver ? Theme.color.completed : Theme.color.info
+                }
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: theaterRoot._statusText
+                    color: Theme.color.textSecondary
+                    font.family: Theme.font.family
+                    font.pixelSize: Theme.size.caption
+                }
+            }
         }
     }
 
