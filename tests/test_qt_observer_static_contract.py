@@ -612,6 +612,22 @@ class QtObserverTheaterViewTests(unittest.TestCase):
         for forbidden in ["XMLHttpRequest", '"/api/runs"', "ObserverClient.post"]:
             self.assertNotIn(forbidden, c)
 
+    def test_seek_respects_phase_gate(self) -> None:
+        # Review P1: seek must route through the gated phase-aware consumer; it may not
+        # bypass _gated or cross a phase boundary without raising the transition gate (D5/A2).
+        c = (QT / "qml/EventPresentationQueue.qml").read_text(encoding="utf-8")
+        self.assertIn("_consumeCurrentPhaseFast", c)   # shared gated consumer
+        self.assertIn("_ffToEnd", c)                   # cross-phase seek continues only after each transition
+        i = c.find("function _consumeCurrentPhaseFast")
+        self.assertNotEqual(i, -1)
+        body = c[i:i + 800]
+        self.assertIn("if (_gated)", body)             # respects an in-flight transition
+        self.assertIn("phaseBoundary", body)           # raises the gate at a boundary
+        for fn in ["function seekNextPhase", "function seekQueueEnd"]:
+            j = c.find(fn)
+            self.assertNotEqual(j, -1)
+            self.assertIn("_consumeCurrentPhaseFast", c[j:j + 200])
+
     def test_stage_components_read_presentation_event(self) -> None:
         # Edit 1: stage components read the normalized PresentationEvent (current.*),
         # never raw runtime .payload.

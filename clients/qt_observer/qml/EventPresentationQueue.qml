@@ -101,6 +101,7 @@ QtObject {
 
     property int _cursor: 0
     property bool _gated: false
+    property bool _ffToEnd: false   // seekQueueEnd in progress: keep crossing phases after each gated transition
 
     property Timer _tick: Timer {
         interval: 200
@@ -143,6 +144,7 @@ QtObject {
         waiting = false
         consumedSeq = 0
         layoutPhase = "day"
+        _ffToEnd = false
         _tick.interval = 200
     }
     property int _lastSourceLen: 0
@@ -162,21 +164,45 @@ QtObject {
     function pause() { playing = false }      // live: UI only; backend keeps generating
     function setSpeed(x) { instant = false; speed = x; _tick.interval = 200 }
     function setInstant() { instant = true; _tick.interval = 16 }
-    function resumeAfterTransition() { _gated = false; _tick.interval = 200 }   // TheaterView onStopped
-    function seekNextPhase() {
-        while (_cursor < _ordered.length && _phaseOf(_ordered[_cursor]) === layoutPhase) {
-            _currentRaw = _ordered[_cursor]
-            consumedSeq = _seq(_ordered[_cursor])
-            _cursor += 1
-        }
-        _tick.interval = 16
+    function resumeAfterTransition() {            // TheaterView onStopped (gate released)
+        _gated = false
+        _tick.interval = 200
+        if (_ffToEnd && _consumeCurrentPhaseFast())   // keep crossing phases, gated each time
+            _ffToEnd = false
     }
-    function seekQueueEnd() {
+
+    // Instantly consume the rest of the CURRENT layoutPhase; at a phase boundary raise the
+    // gate exactly like _pump (set layoutPhase + _gated + emit phaseBoundary) and STOP, so the
+    // layout transition still runs and consumption stays gated (D5). Respects _gated (no-op while
+    // a transition is in flight). Returns true ONLY when it reaches the end of received events.
+    function _consumeCurrentPhaseFast() {
+        if (_gated)
+            return false
         while (_cursor < _ordered.length) {
-            _currentRaw = _ordered[_cursor]
-            consumedSeq = _seq(_ordered[_cursor])
+            var raw = _ordered[_cursor]
+            if (_seq(raw) < consumedSeq) {            // sequence regression = new generation
+                reset()
+                return false
+            }
+            if (_phaseOf(raw) !== layoutPhase) {      // boundary -> raise gate, emit marker, STOP
+                layoutPhase = _phaseOf(raw)
+                _gated = true
+                phaseBoundary(layoutPhase, raw.round || 0)
+                return false
+            }
+            _currentRaw = raw
+            consumedSeq = _seq(raw)
             _cursor += 1
         }
         waiting = (ObserverClient.currentStatus === "running")
+        return true
+    }
+
+    function seekNextPhase() {                    // skip the rest of this phase -> next phase (gated)
+        _ffToEnd = false
+        _consumeCurrentPhaseFast()
+    }
+    function seekQueueEnd() {                      // catch up to the latest received event, gating each transition
+        _ffToEnd = !_consumeCurrentPhaseFast()
     }
 }
