@@ -24,11 +24,13 @@ QtObject {
         readonly property color borderStrong: "#52525B" // zinc-600
         readonly property color hairline: Qt.rgba(1, 1, 1, 0.04)
 
-        // Text
-        readonly property color text: "#FAFAFA"        // zinc-50
-        readonly property color textSecondary: "#A1A1AA" // zinc-400
-        readonly property color textMuted: "#71717A"   // zinc-500
-        readonly property color textDisabled: "#52525B"
+        // Text — brightened slate ramp for legibility on the near-black stage.
+        // Each tier stays >= 4.5:1 against the charcoal surfaces; the faintest tier
+        // (textMuted) is deliberately lifted off "死黑" so it survives cheap panels.
+        readonly property color text: "#F8FAFC"          // slate-50  (primary content)
+        readonly property color textSecondary: "#CBD5E1" // slate-300 (names, labels)
+        readonly property color textMuted: "#94A3B8"     // slate-400 (timestamps, tags)
+        readonly property color textDisabled: "#64748B"  // slate-500 (floor — disabled only)
 
         // Brand / primary action — moonlight silver (light surface, dark label)
         readonly property color primary: "#FFFFFF"

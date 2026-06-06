@@ -141,6 +141,11 @@ Item {
             width: stage.width - stage.smallRing - Theme.space.xxl
             height: stage.height
             onOpenInConsole: evidence.mode = 2
+            // Hovering a waterfall row re-arms that past line on the ring.
+            onHoverEvent: (actor, target, type) => {
+                ring.hoverActor = actor; ring.hoverTarget = target; ring.hoverType = type
+            }
+            onClearHover: { ring.hoverActor = ""; ring.hoverTarget = ""; ring.hoverType = "" }
         }
 
         // Stage status pill (waiting for the next move / game over).

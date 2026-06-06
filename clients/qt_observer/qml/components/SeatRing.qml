@@ -15,6 +15,12 @@ Item {
     property string layoutPhase: "day"
     property string perspective: "god"
 
+    // Hover-replay overlay (set by the waterfall when a history row is hovered): re-arms a
+    // past actor->target line on the ring even though it is no longer the current event.
+    property string hoverActor: ""
+    property string hoverTarget: ""
+    property string hoverType: ""
+
     property real seatSize: 58
     readonly property real ringRadius: Math.max(40, Math.min(width, height) * 0.36)
 
@@ -54,40 +60,36 @@ Item {
         id: connectors
         anchors.fill: parent
         property var ev: root.current
+        property string hActor: root.hoverActor
+        property string hTarget: root.hoverTarget
         onEvChanged: requestPaint()
+        onHActorChanged: requestPaint()
+        onHTargetChanged: requestPaint()
         onWidthChanged: requestPaint()
         onHeightChanged: requestPaint()
 
-        onPaint: {
-            var ctx = getContext("2d")
-            ctx.reset()
-            if (width <= 0 || height <= 0 || root.players.length === 0)
-                return
-            var ev = root.current
-            if (!ev)
-                return
-            var t = ev.type || ""
-            if (t !== "werewolf_kill" && t !== "seer_check" && t !== "player_vote")
-                return
-            var ai = root._indexOf(ev.actor)
-            var ti = root._indexOf(ev.target)
+        function _lineColor(t) {
+            return t === "werewolf_kill" ? Theme.color.werewolf
+                 : t === "seer_check" ? Theme.color.seer
+                 : t === "player_vote" ? Theme.color.textSecondary
+                 : Theme.color.textMuted
+        }
+        // Draw one actor->target arrow at the given alpha. ai/ti must already resolve to seats.
+        function _arrow(ctx, t, ai, ti, alpha) {
             if (ai < 0 || ti < 0)        // P1-B: no resolvable target (e.g. live) -> no line
                 return
-            var color = t === "werewolf_kill" ? Theme.color.werewolf
-                      : t === "seer_check" ? Theme.color.seer
-                      : Theme.color.textMuted
+            var color = _lineColor(t)
             ctx.strokeStyle = color
-            ctx.globalAlpha = 0.75
+            ctx.globalAlpha = alpha
             ctx.lineWidth = 2
             ctx.beginPath()
             ctx.moveTo(root.seatX(ai), root.seatY(ai))
             ctx.lineTo(root.seatX(ti), root.seatY(ti))
             ctx.stroke()
-            // arrowhead at target
             var a = Math.atan2(root.seatY(ti) - root.seatY(ai), root.seatX(ti) - root.seatX(ai))
             var hx = root.seatX(ti) - Math.cos(a) * (root.seatSize / 2 + 6)
             var hy = root.seatY(ti) - Math.sin(a) * (root.seatSize / 2 + 6)
-            ctx.globalAlpha = 0.9
+            ctx.globalAlpha = Math.min(1, alpha + 0.15)
             ctx.beginPath()
             ctx.moveTo(hx, hy)
             ctx.lineTo(hx - Math.cos(a - 0.4) * 10, hy - Math.sin(a - 0.4) * 10)
@@ -95,6 +97,24 @@ Item {
             ctx.closePath()
             ctx.fillStyle = color
             ctx.fill()
+        }
+
+        onPaint: {
+            var ctx = getContext("2d")
+            ctx.reset()
+            if (width <= 0 || height <= 0 || root.players.length === 0)
+                return
+            // Live line for the current event (directional only when target resolves).
+            var ev = root.current
+            if (ev) {
+                var t = ev.type || ""
+                if (t === "werewolf_kill" || t === "seer_check" || t === "player_vote")
+                    _arrow(ctx, t, root._indexOf(ev.actor), root._indexOf(ev.target), 0.75)
+            }
+            // Hover-replay line from the waterfall (brighter, drawn on top).
+            if (root.hoverActor !== "" && root.hoverTarget !== "")
+                _arrow(ctx, root.hoverType,
+                       root._indexOf(root.hoverActor), root._indexOf(root.hoverTarget), 0.95)
         }
     }
 
