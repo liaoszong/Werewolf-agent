@@ -52,6 +52,7 @@ from werewolf_eval.profile_config import (
     validate_profile,
 )
 from werewolf_eval.run_g1h_fake_runtime import run_fake_runtime
+from werewolf_eval.settlement_bundle import build_settlement_response
 from werewolf_eval.runtime_events import (
     RuntimeEventError,
     read_events_jsonl,
@@ -398,6 +399,16 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
                 if sub_path == ["artifacts"]:
                     registry = build_artifact_registry(run_dir)
                     self._send_json(200, {"artifacts": registry})
+                    return
+
+                # /api/runs/{run_id}/settlement  (P2-D §6.2)
+                if sub_path == ["settlement"]:
+                    status = str(
+                        self._run_detail_with_reason(run_id, run_dir).get("status", "")
+                    )
+                    self._send_json(
+                        200, build_settlement_response(run_dir, status, run_id)
+                    )
                     return
 
                 # /api/runs/{run_id}/artifacts/{name}
