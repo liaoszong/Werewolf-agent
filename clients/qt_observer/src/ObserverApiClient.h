@@ -29,6 +29,8 @@ class ObserverApiClient : public QObject {
     Q_PROPERTY(QString visibilityContractVersion READ visibilityContractVersion NOTIFY projectionChanged)
     // P2-C-1: per-perspective enriched projection events (data.summary + target)
     Q_PROPERTY(QVariantList projectionEvents READ projectionEvents NOTIFY projectionEventsChanged)
+    // P2-D: eval-ready settlement bundle (read-only; fetched lazily on game completion).
+    Q_PROPERTY(QVariantMap settlementBundle READ settlementBundle NOTIFY settlementBundleChanged)
     // G2d-2 profile setup properties
     Q_PROPERTY(QVariantList profileItems READ profileItems NOTIFY profileItemsChanged)
     Q_PROPERTY(QVariantMap profileSchema READ profileSchema NOTIFY profileSchemaChanged)
@@ -71,6 +73,8 @@ public:
     int hiddenSnapshotCount() const;
     QString visibilityContractVersion() const;
     QVariantList projectionEvents() const;
+    // P2-D settlement accessor
+    QVariantMap settlementBundle() const;
     // G2d-2 profile setup accessors
     QVariantList profileItems() const;
     QVariantMap profileSchema() const;
@@ -94,6 +98,8 @@ public slots:
     Q_INVOKABLE void disconnectStream();
     Q_INVOKABLE void refreshAuditLinks();
     Q_INVOKABLE void refreshProjection();
+    // P2-D: lazily fetch the settlement bundle for a completed run (latest-wins).
+    Q_INVOKABLE void fetchSettlement(const QString &runId);
     // G2d-2 profile setup invokables
     Q_INVOKABLE void refreshProfiles();
     Q_INVOKABLE void refreshProfileSchema();
@@ -119,6 +125,8 @@ signals:
     void projectionProofChanged();
     void projectionChanged();
     void projectionEventsChanged();
+    // P2-D settlement signal
+    void settlementBundleChanged();
     // G2d-2 profile setup signals
     void profileItemsChanged();
     void profileSchemaChanged();
@@ -162,6 +170,9 @@ private:
     QString m_visibilityContractVersion;
     quint64 m_projectionRequestSerial = 0;
     QVariantList m_projectionEvents;
+    // P2-D settlement state
+    QVariantMap m_settlementBundle;
+    int m_settlementRequestSerial = 0;
     // G2d-2 profile setup state
     QVariantList m_profileItems;
     QVariantMap m_profileSchema;

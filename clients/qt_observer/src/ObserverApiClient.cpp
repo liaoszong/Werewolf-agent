@@ -73,6 +73,9 @@ int ObserverApiClient::hiddenSnapshotCount() const { return m_hiddenSnapshotCoun
 QString ObserverApiClient::visibilityContractVersion() const { return m_visibilityContractVersion; }
 QVariantList ObserverApiClient::projectionEvents() const { return m_projectionEvents; }
 
+// P2-D settlement getter
+QVariantMap ObserverApiClient::settlementBundle() const { return m_settlementBundle; }
+
 // G2d-2 profile setup getters
 QVariantList ObserverApiClient::profileItems() const { return m_profileItems; }
 QVariantMap ObserverApiClient::profileSchema() const { return m_profileSchema; }
@@ -120,6 +123,12 @@ void ObserverApiClient::setCurrentRunId(const QString &runId)
     if (!m_projectionEvents.isEmpty()) {
         m_projectionEvents.clear();
         emit projectionEventsChanged();
+    }
+    // P2-D stale guard: a new run must not inherit the prior run's settlement
+    // bundle (clear + notify BEFORE any new request is issued).
+    if (!m_settlementBundle.isEmpty()) {
+        m_settlementBundle.clear();
+        emit settlementBundleChanged();
     }
     // C1-bis: a new run must never inherit the prior run's executed truth — the
     // HUD chip falls back to SYS: SIMULATION until run detail returns a mode.
@@ -457,6 +466,41 @@ void ObserverApiClient::refreshProjection()
         emit projectionProofChanged();
         emit projectionEventsChanged();
         emit projectionChanged();
+    });
+}
+
+void ObserverApiClient::fetchSettlement(const QString &runId)
+{
+    if (runId.isEmpty())
+        return;
+
+    // Latest-wins guard, mirroring refreshProjection: only the newest request for
+    // the still-current run is allowed to write m_settlementBundle.
+    const int requestSerial = ++m_settlementRequestSerial;
+    const QString requestedRunId = runId;
+
+    QNetworkReply *reply =
+        get(QStringLiteral("/api/runs/") + requestedRunId + QStringLiteral("/settlement"));
+    connect(reply, &QNetworkReply::finished, this, [this, reply, requestSerial, requestedRunId]() {
+        reply->deleteLater();
+        if (requestSerial != m_settlementRequestSerial || requestedRunId != m_currentRunId)
+            return;
+        if (reply->error() != QNetworkReply::NoError) {
+            setError(reply->errorString());
+            return;
+        }
+        QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+        if (!doc.isObject()) {
+            setError(QStringLiteral("Invalid settlement response"));
+            return;
+        }
+        const QJsonObject obj = doc.object();
+        // Envelope: {"available": bool, "bundle": {...}} | {"available": false, "reason": ...}.
+        // A non-available envelope clears the bundle (no settlement to render).
+        m_settlementBundle = obj.value(QStringLiteral("available")).toBool()
+            ? obj.value(QStringLiteral("bundle")).toObject().toVariantMap()
+            : QVariantMap{};
+        emit settlementBundleChanged();
     });
 }
 

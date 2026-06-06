@@ -281,6 +281,19 @@ class QtObserverProjectionClientTests(unittest.TestCase):
         self.assertIn("projectionEvents", h)
         self.assertIn('value(QStringLiteral("events"))', cpp)
 
+    def test_client_exposes_settlement(self) -> None:
+        # P2-D §7.6: settlementBundle Q_PROPERTY + fetchSettlement invokable,
+        # mirroring refreshProjection's latest-wins guard; the only new endpoint.
+        h = (QT / "src/ObserverApiClient.h").read_text(encoding="utf-8")
+        cpp = (QT / "src/ObserverApiClient.cpp").read_text(encoding="utf-8")
+        self.assertIn("settlementBundle", h)
+        self.assertIn("fetchSettlement", h)
+        self.assertIn("/settlement", cpp)
+        # stale guard: run change clears the bundle
+        start = cpp.find("ObserverApiClient::setCurrentRunId")
+        self.assertNotEqual(start, -1)
+        self.assertIn("m_settlementBundle", cpp[start:start + 1200])
+
     def test_stale_guard_in_both_setters_before_requests(self) -> None:
         # Edit 2/7 + P2-F: clear+notify in BOTH setters, BEFORE the new stream/projection request.
         cpp = (QT / "src/ObserverApiClient.cpp").read_text(encoding="utf-8")
