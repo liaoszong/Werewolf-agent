@@ -10,10 +10,15 @@ Item {
     objectName: "phaseTimeline"
 
     property var phases: []          // queue.phaseTimeline — [{round, phase}]
-    property string phase: "day"     // current major phase (night|day)
+    property string phase: "day"     // fallback only (see _curPhase)
     property string action: ""       // queue.currentAction (wolf|seer|witch|speech|vote)
 
     implicitHeight: 54
+
+    // Current major phase derived from the LAST timeline entry (cursor-based), NOT layoutPhase —
+    // the gate pre-advances layoutPhase to the next phase while the night event is still on stage,
+    // which would wrongly show day actions during the night.
+    readonly property string _curPhase: phases.length > 0 ? phases[phases.length - 1].phase : phase
 
     // Fixed-width slots make the sliding capsule trivial (x = index * pitch).
     readonly property int _slotW: 78
@@ -21,7 +26,7 @@ Item {
     readonly property int _gap: Theme.space.sm
     readonly property int _pitch: _slotW + _gap
 
-    readonly property var _subs: phase === "night"
+    readonly property var _subs: _curPhase === "night"
         ? [{ key: "wolf", label: I18n.t("狼人", "Wolves") },
            { key: "seer", label: I18n.t("预言家", "Seer") },
            { key: "witch", label: I18n.t("女巫", "Witch") }]
@@ -79,7 +84,7 @@ Item {
                             height: width
                             radius: width / 2
                             color: node.isCurrent
-                                   ? (root.phase === "night" ? Theme.color.info : Theme.color.seer)
+                                   ? (node.modelData.phase === "night" ? Theme.color.info : Theme.color.seer)
                                    : Theme.color.borderStrong
                         }
                         Text {

@@ -46,6 +46,7 @@ qt_add_qml_module(appqt_observer
         qml/components/RoleCard.qml
         qml/components/SeatRing.qml
         qml/components/SpeechTheater.qml
+        qml/components/PhaseTimeline.qml
         qml/components/EvidenceConsole.qml
         qml/components/PlaybackControls.qml
         qml/components/EventTimeline.qml
