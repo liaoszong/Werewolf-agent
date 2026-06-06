@@ -55,15 +55,17 @@ def main() -> None:
     qt_env = dict(env)
     qt_env["PATH"] = QT_BIN + os.pathsep + MINGW_BIN + os.pathsep + qt_env.get("PATH", "")
 
-    # Build the client once if it isn't there yet.
+    # Always (incrementally) rebuild so the latest code is used — fast when up to date.
+    cache = os.path.join(".tmp", "qt-observer-build", "CMakeCache.txt")
+    if not os.path.exists(cache):
+        print("[*] 首次配置构建目录…")
+        subprocess.run([CMAKE, "-S", "clients/qt_observer", "-B", ".tmp/qt-observer-build",
+                        "-DCMAKE_BUILD_TYPE=Debug"], env=qt_env)
+    print("[*] 构建/更新客户端（确保用上最新代码，已是最新则很快）…")
+    subprocess.run([CMAKE, "--build", ".tmp/qt-observer-build", "--target", "appqt_observer"],
+                   env=qt_env)
     if not os.path.exists(EXE):
-        print("[*] 首次构建客户端（较慢，请稍候）…")
-        subprocess.run([CMAKE, "--build", ".tmp/qt-observer-build", "--target", "appqt_observer"],
-                       env=qt_env)
-    if not os.path.exists(EXE):
-        print("!! 找不到客户端可执行文件，请先成功构建一次：")
-        print("   cmake -S clients/qt_observer -B .tmp/qt-observer-build -DCMAKE_BUILD_TYPE=Debug")
-        print("   cmake --build .tmp/qt-observer-build")
+        print("!! 客户端构建失败，请检查脚本顶部的 Qt 工具链路径（QT_BIN / CMAKE）。")
         input("按回车退出…")
         return
 
