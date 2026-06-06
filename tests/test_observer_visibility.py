@@ -766,5 +766,80 @@ class VisibilityCrossRoleEventTests(unittest.TestCase):
         self.assertEqual(result["hidden_event_count"], 3)
 
 
+# ---------------------------------------------------------------------------
+# P2-C-1 §7: visibility-safe projection summary enrichment (post-filter join)
+# ---------------------------------------------------------------------------
+
+
+class ProjectionSummaryEnrichmentTests(unittest.TestCase):
+    """god/role projections back-fill summary+target from game-log.json AFTER the
+    visibility filter, so hidden summaries never leak (P2-C-1 spec §7, D6)."""
+
+    def _run_dir(self, td: str) -> Path:
+        # Seer = p3, werewolf = p1 (so role:p1 must NOT see the seer_check).
+        run_dir = _make_run_dir(Path(td), "r1", [
+            _make_role_snapshot("role-p1-r1.json", "p1", "werewolf", "werewolf"),
+            _make_role_snapshot("role-p3-r1.json", "p3", "seer", "villager"),
+        ])
+        # game-log.json: a public speech (visible to all) + a seer-only check.
+        (run_dir / "game-log.json").write_text(json.dumps({"events": [
+            {"event_id": "g_e01", "type": "player_speech", "actor": "p3", "target": "none",
+             "visibility": "public", "data": {"summary": "p3: I think p1 is suspicious."}},
+            {"event_id": "g_e02", "type": "seer_check", "actor": "p3", "target": "p1",
+             "visibility": "seer", "data": {"summary": "Seer p3 checks p1, result: werewolf."}},
+        ]}, ensure_ascii=False), encoding="utf-8")
+        return run_dir
+
+    def _runtime_events(self) -> list[dict]:
+        # Thin runtime events as written to events.jsonl: payload.event_id == game-log event_id.
+        return [
+            {"event_id": "rt1", "seq": 1, "kind": "game_event_emitted", "round": 1, "phase": "day",
+             "actor": "p3", "visibility": "public", "payload": {"event_id": "g_e01", "type": "player_speech"}},
+            {"event_id": "rt2", "seq": 2, "kind": "game_event_emitted", "round": 1, "phase": "night",
+             "actor": "p3", "visibility": "seer", "payload": {"event_id": "g_e02", "type": "seer_check"}},
+        ]
+
+    def test_god_gets_all_summaries(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            env = build_projection_envelope(run_dir=self._run_dir(td), run_id="r1",
+                                            perspective="god", events=self._runtime_events())
+            by = {e["payload"]["event_id"]: e for e in env["events"]}
+            self.assertEqual(by["g_e01"]["data"]["summary"], "p3: I think p1 is suspicious.")
+            self.assertEqual(by["g_e02"]["data"]["summary"], "Seer p3 checks p1, result: werewolf.")
+            self.assertEqual(by["g_e02"]["target"], "p1")
+
+    def test_role_visible_enriched_but_hidden_summary_never_leaks(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            # p1 (werewolf): MUST get the enriched summary for events it can see, and MUST
+            # NOT receive the seer_check event (or its summary) at all. (P2-E)
+            env = build_projection_envelope(run_dir=self._run_dir(td), run_id="r1",
+                                            perspective="role:p1", events=self._runtime_events())
+            by = {e["payload"]["event_id"]: e for e in env["events"]}
+            self.assertIn("g_e01", by)              # public speech visible to p1
+            self.assertEqual(by["g_e01"]["data"]["summary"],
+                             "p3: I think p1 is suspicious.")   # role-visible IS enriched (not god-only)
+            self.assertNotIn("g_e02", by)           # seer-only event filtered out entirely
+            blob = json.dumps(env, ensure_ascii=False)
+            self.assertNotIn("result: werewolf", blob)   # hidden summary did not leak
+
+    def test_missing_game_log_is_thin_not_error(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            run_dir = _make_run_dir(Path(td), "r1", [
+                _make_role_snapshot("role-p3-r1.json", "p3", "seer", "villager"),
+            ])  # no game-log.json
+            env = build_projection_envelope(run_dir=run_dir, run_id="r1",
+                                            perspective="god", events=self._runtime_events())
+            self.assertEqual(len(env["events"]), 2)
+            self.assertNotIn("data", env["events"][0])       # thin (no data.summary), no crash
+
+    def test_no_reason_summary_or_secret_in_envelope(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            env = build_projection_envelope(run_dir=self._run_dir(td), run_id="r1",
+                                            perspective="god", events=self._runtime_events())
+            blob = json.dumps(env, ensure_ascii=False)
+            for forbidden in ["reason_summary", "prompt", "api_key", "Bearer", "sk-"]:
+                self.assertNotIn(forbidden, blob)
+
+
 if __name__ == "__main__":
     unittest.main()

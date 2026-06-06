@@ -694,6 +694,36 @@ def _build_detail_endpoint(
 # ---------------------------------------------------------------------------
 
 
+def _load_game_log_summaries(run_dir: Path) -> dict[str, dict[str, str]]:
+    """Return ``{game_log_event_id: {"summary", "target"}}`` from ``game-log.json``,
+    or ``{}`` when absent/malformed.  Never raises.
+
+    Summaries are public/role-visible game narration (NOT prompt/provider secrets);
+    the visibility filter in :func:`project_events` decides which events reach the
+    client BEFORE this lookup is joined in :func:`build_projection_envelope`, so
+    attaching summaries to already-visible events cannot leak hidden facts (P2-C-1 §7).
+    """
+    path = run_dir / "game-log.json"
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    out: dict[str, dict[str, str]] = {}
+    for event in data.get("events", []):
+        if not isinstance(event, dict):
+            continue
+        eid = str(event.get("event_id", ""))
+        if not eid:
+            continue
+        event_data = event.get("data", {})
+        summary = str(event_data.get("summary", "")) if isinstance(event_data, dict) else ""
+        target = event.get("target", "")
+        out[eid] = {"summary": summary, "target": "" if target is None else str(target)}
+    return out
+
+
 def build_projection_envelope(
     *,
     run_dir: Path,
@@ -713,8 +743,24 @@ def build_projection_envelope(
     seat_index = build_seat_role_index(run_dir)
     players = build_player_projection(seat_index, perspective)
 
-    # Project events
+    # Project events (visibility filter first), then back-fill summary/target from
+    # game-log.json onto ALREADY-VISIBLE events only (P2-C-1 §7, D6) — post-filter, no leak.
     event_projection = project_events(events, perspective, seat_index)
+    summaries = _load_game_log_summaries(run_dir)
+    enriched_events: list[dict[str, object]] = []
+    for ev in event_projection["events"]:
+        payload = ev.get("payload")
+        gid = str(payload.get("event_id", "")) if isinstance(payload, dict) else ""
+        match = summaries.get(gid)
+        if match is not None:
+            ev = dict(ev)
+            # Canonical shape (spec §7): data.summary nested + target top-level.
+            data = dict(ev.get("data") or {})
+            data["summary"] = match["summary"]
+            ev["data"] = data
+            if match.get("target"):
+                ev["target"] = match["target"]
+        enriched_events.append(ev)
 
     # Project snapshots (metadata only)
     snapshot_projection = project_snapshots(run_dir, perspective)
@@ -728,7 +774,7 @@ def build_projection_envelope(
         "perspective": perspective,
         "view_kind": kind,
         "players": players,
-        "events": event_projection["events"],
+        "events": enriched_events,
         "hidden_event_count": event_projection["hidden_event_count"],
         "snapshots": snapshot_projection["snapshots"],
         "hidden_snapshot_count": snapshot_projection["hidden_snapshot_count"],
