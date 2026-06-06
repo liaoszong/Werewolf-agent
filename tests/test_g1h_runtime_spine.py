@@ -138,8 +138,8 @@ class ProviderLifecycleEventTests(TestCase):
         """An action not in allowed_actions must emit provider_action_invalid."""
         with TemporaryDirectory() as tmp:
             writer = RuntimeEventWriter("test", Path(tmp), clock=lambda: "T")
-            # A seer cannot "witch_kill".
-            provider = _FakeProvider(raw_content=_valid_action_json(action="witch_kill"))
+            # A seer cannot "witch_poison" (a real witch action, illegal for the seer role).
+            provider = _FakeProvider(raw_content=_valid_action_json(action="witch_poison"))
             agent = ProviderAgent("p1", provider, runtime_events=writer)
 
             with self.assertRaises(ProviderActionError):

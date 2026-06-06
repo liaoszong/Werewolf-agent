@@ -40,9 +40,9 @@ SPEECH_MAX_CHARS = 200
 SPEECH_EMPTY_PLACEHOLDER = "（发言无效）"
 
 WITCH_SAVE = "witch_save"
-WITCH_KILL = "witch_kill"
+WITCH_POISON = "witch_poison"  # eval-contract vocabulary (scoring/attribution, gold-game g001)
 WITCH_PASS = "witch_pass"
-WITCH_ACTIONS = (WITCH_SAVE, WITCH_KILL, WITCH_PASS)
+WITCH_ACTIONS = (WITCH_SAVE, WITCH_POISON, WITCH_PASS)
 
 FALLBACK_DECISION_TYPE = "default"
 
@@ -606,10 +606,10 @@ class EmergentGameEngine:
                 self._record_failure(rnd, "night", witch, "invalid_action", f"{witch} invalid witch_save target={target}", target)
                 self._downgrade_turn(turn, f"invalid witch_save target={target}")
                 action_name = WITCH_PASS
-        elif action_name == WITCH_KILL:
+        elif action_name == WITCH_POISON:
             if poison_used or target not in self._alive or target == witch:
-                self._record_failure(rnd, "night", witch, "invalid_action", f"{witch} invalid witch_kill target={target}", target)
-                self._downgrade_turn(turn, f"invalid witch_kill target={target}")
+                self._record_failure(rnd, "night", witch, "invalid_action", f"{witch} invalid witch_poison target={target}", target)
+                self._downgrade_turn(turn, f"invalid witch_poison target={target}")
                 action_name = WITCH_PASS
         elif action_name != WITCH_PASS:
             self._record_failure(rnd, "night", witch, "invalid_action", f"{witch} unknown witch action {action_name}")
@@ -620,9 +620,9 @@ class EmergentGameEngine:
             self._decision(witch, "single", "night", WITCH_SAVE, victim, "inference_based", f"witch saves {victim}")
             self._emit("night", rnd, WITCH_SAVE, witch, victim, "witch", f"Witch {witch} saves {victim}.")
             return True, None, True, poison_used
-        if action_name == WITCH_KILL:
-            self._decision(witch, "single", "night", WITCH_KILL, target, "retaliatory", f"witch poisons {target}")
-            self._emit("night", rnd, WITCH_KILL, witch, target, "witch", f"Witch {witch} poisons {target}.")
+        if action_name == WITCH_POISON:
+            self._decision(witch, "single", "night", WITCH_POISON, target, "retaliatory", f"witch poisons {target}")
+            self._emit("night", rnd, WITCH_POISON, witch, target, "witch", f"Witch {witch} poisons {target}.")
             return False, target, save_used, True
         # pass
         self._decision(witch, "single", "night", WITCH_PASS, "none", FALLBACK_DECISION_TYPE, f"{witch} uses no potion")

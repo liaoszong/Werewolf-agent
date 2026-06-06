@@ -57,7 +57,7 @@ def build_villager_win_script() -> dict[tuple, str]:
     # ---- round 2 night (p1 eliminated): p2 kills p3, witch poisons p2 -> villager win ----
     s[("p2", "night", 2)] = _act("werewolf_kill", "p3", "team_coordinated", "p2 kills p3")
     s[("p3", "night", 2)] = _act("seer_check", "p2", "inference_based", "p3 checks p2")
-    s[("p4", "night", 2)] = _act("witch_kill", "p2", "retaliatory", "p4 poisons p2")
+    s[("p4", "night", 2)] = _act("witch_poison", "p2", "retaliatory", "p4 poisons p2")
     return s
 
 
