@@ -4,7 +4,7 @@
 
 **Goal:** When a game **completes** (status `completed` + `game-log.json` present), replace P2-C-1's silent "对局结束" pill with a **ceremonial settlement → deep battle report** that arrives via a **one-shot Z-axis morph** (freeze+spotlight → dock the theater ring → unfold the report), never a StackView page swap. The long right-side report and the docked left "live sandbox" sync through a **single source-of-truth `cursorIndex`**. The report data = a **server-computed, eval-ready `settlement-bundle.json`** (curtain layer always available from game-log; battle-report layer from `score_game`+`summarize_metrics`+`attribute_game`, degrading gracefully). The bundle contract is the P3 anti-rework asset: P3 adds fields, never rewrites.
 
-**Architecture:** One new pure-Python module `settlement_bundle.py` (`build_settlement_bundle(game, decision_log) -> dict`) + one additive observer-server read route `GET /api/runs/{id}/settlement` (lazy compute-or-cache `settlement-bundle.json`; added to `ALLOWED_ARTIFACTS`). `ObserverApiClient` gains one read-only `settlementBundle` Q_PROPERTY + one `fetchSettlement(runId)` invokable (same latest-wins guard pattern as `refreshProjection`). Four new QML files (`SettlementView`, `WinnerBanner`, `SettlementSpine`, `SettlementReport`) + one **presentational** MODIFY to `SeatRing` (gains `layoutMode`/`morphProgress`/`boardState` — no bundle/cursor knowledge). `TheaterView` activates the `SettlementView` overlay on `completed`+game-log (never on `failed`). `HistoryView` adds a thin "查看战报" entry = `openRun()` + `navigateCockpit()` + entry mode `report`. Pure-Python bundle tests gate the backend (server routes are localhost-blocked here); the static contract gates the C++/QML surface; Qt build + 4-scenario `grabToImage` verify the UI.
+**Architecture:** One new pure-Python module `settlement_bundle.py` (`build_settlement_bundle(game, decision_log) -> dict`) + one additive observer-server read route `GET /api/runs/{id}/settlement` (lazy compute-or-cache `settlement-bundle.json`; added to `ALLOWED_ARTIFACTS`). `ObserverApiClient` gains one read-only `settlementBundle` Q_PROPERTY + one `fetchSettlement(runId)` invokable (same latest-wins guard pattern as `refreshProjection`). Four new QML files (`SettlementView`, `WinnerBanner`, `SettlementSpine`, `SettlementReport`) + one **presentational** MODIFY to `SeatRing` (gains `layoutMode`/`morphProgress`/`boardState` — no bundle/cursor knowledge). `TheaterView` activates the `SettlementView` overlay on `completed`+game-log (never on `failed`). `HistoryView` adds a thin "查看战报" entry = `openRun()` + `navigateCockpit()` + entry mode `report`. Pure-Python tests gate the backend — `build_settlement_bundle` (shape/degrade/secret-free/determinism) **and** the offline `build_settlement_response` (route branches: completed-gate / no-game-log / decision-log-status / cache), since real HTTP routes are localhost-blocked here; the static contract gates the C++/QML surface; Qt build + 4-scenario `grabToImage` verify the UI.
 
 **Tech Stack:** Python stdlib (extends P1-A `scoring`/`attribution`, P1-D `observer_server`), Qt 6.10 Quick/Quick Controls, C++17, QML, CMake. No new third-party deps, no engine changes, no scoring-formula changes, no client local file I/O, no provider secrets.
 
@@ -32,7 +32,7 @@ export PATH="/f/Qt/6.10.0/mingw_64/bin:/f/Qt/Tools/mingw1310_64/bin:$PATH"
 "F:/Qt/Tools/CMake_64/bin/cmake.exe" --build .tmp/qt-observer-build --target appqt_observer   # exit 0 = QML AOT-valid
 ctest --test-dir .tmp/qt-observer-build
 ```
-Pure-Python bundle tests run here. **P2-D adds no server-route tests** (localhost HTTP env-blocked, memory `werewolf-env-network-test-limits`) — the route is a thin wrapper over `build_settlement_bundle`, fully covered by pure tests.
+Pure-Python bundle + route-logic tests run here (`test_settlement_bundle`, `test_settlement_response`). **No HTTP server-route tests** (`test_observer_server.py` starts a real server → localhost env-blocked, memory `werewolf-env-network-test-limits`) — the route handler is a 2-line wrapper over the offline-tested `build_settlement_response`, which covers the completed-gate / no-game-log / decision-log-status / cache branches.
 
 ---
 
@@ -54,6 +54,7 @@ clients/qt_observer/qml/HistoryView.qml                  (MODIFY: 查看战报 =
 clients/qt_observer/CMakeLists.txt
 clients/qt_observer/README.md
 tests/test_settlement_bundle.py
+tests/test_settlement_response.py
 tests/test_qt_observer_static_contract.py
 docs/superpowers/specs/2026-06-06-p2-d-settlement-screen-design.md
 docs/harness/plans/2026-06-06--p2-d-settlement-screen-plan.md
@@ -82,8 +83,10 @@ class TestBuildSettlementBundle(unittest.TestCase):
     score_game+summarize_metrics+attribute_game; degrade with reason CODE (no raw exc)."""
 
     def test_full_bundle_shape(self):
-        bundle = build_settlement_bundle(self._game(), self._decision_log())
+        bundle = build_settlement_bundle(self._game(), self._decision_log(), run_id="r1")
         self.assertEqual(bundle["bundle_version"], "p2d.settlement.v1")
+        self.assertEqual(bundle["run_id"], "r1")          # P1 fix: run_id is a v1 contract field
+        self.assertEqual(bundle["game_id"], self._game().game_id)
         self.assertFalse(bundle["degraded"])
         # curtain layer
         self.assertEqual(bundle["result"]["winner"], "villager")
@@ -108,9 +111,25 @@ class TestBuildSettlementBundle(unittest.TestCase):
         self.assertEqual(set(bundle["board_timeline"][-1]["alive_player_ids"]),
                          set(self._game().result.survivors))   # final alive == survivors
 
+    def test_degrade_missing_decision_log_is_curtain_only(self):
+        # BLOCK fix: absent decision-log must NOT silently pass via score_game(game, None).
+        # decision_log_status drives the degrade — battle report is decision-aware (spec §6.1).
+        bundle = build_settlement_bundle(self._game(), None, run_id="r1", decision_log_status="absent")
+        self.assertTrue(bundle["degraded"])
+        self.assertEqual(bundle["degraded_reason"], "missing_decision_log")
+        self.assertEqual(bundle["turning_points"], [])           # curtain-only
+        self.assertEqual(bundle["result"]["winner"], "villager") # curtain intact
+        self.assertTrue(len(bundle["board_timeline"]) >= 1)
+
+    def test_degrade_invalid_decision_log(self):
+        bundle = build_settlement_bundle(self._game(), None, run_id="r1", decision_log_status="invalid")
+        self.assertTrue(bundle["degraded"])
+        self.assertEqual(bundle["degraded_reason"], "invalid_decision_log")
+
     def test_degrade_on_scoring_error_keeps_curtain(self):
         # a game whose events trip the scorer (e.g. vocabulary mismatch) → degraded, curtain intact
-        bundle = build_settlement_bundle(self._broken_for_scoring_game(), self._decision_log())
+        bundle = build_settlement_bundle(self._broken_for_scoring_game(), self._decision_log(),
+                                         run_id="r1", decision_log_status="present")
         self.assertTrue(bundle["degraded"])
         self.assertEqual(bundle["degraded_reason"], "scoring_failed")
         self.assertEqual(bundle["turning_points"], [])
@@ -120,11 +139,12 @@ class TestBuildSettlementBundle(unittest.TestCase):
         self.assertTrue(len(bundle["board_timeline"]) >= 1)             # board_timeline still there
 
     def test_degraded_reason_is_code_not_raw_exception(self):
-        bundle = build_settlement_bundle(self._broken_for_scoring_game(), self._decision_log())
+        bundle = build_settlement_bundle(self._broken_for_scoring_game(), self._decision_log(),
+                                         run_id="r1", decision_log_status="present")
         self.assertIn(bundle["degraded_reason"],
                       {"missing_decision_log", "invalid_decision_log", "scoring_failed"})
-        blob = json.dumps(bundle, ensure_ascii=False)
-        for forbidden in ["Traceback", "File \"", ".py\", line", "/", "\\"]:   # no paths/stack
+        # reason is a bare code — no path/stack/exception text
+        for forbidden in ["Traceback", ".py", "/", "\\", " "]:
             self.assertNotIn(forbidden, str(bundle["degraded_reason"] or ""))
 
     def test_secret_free(self):
@@ -175,10 +195,11 @@ def _board_timeline(game: GameLog) -> list[dict]:
         cur["alive_player_ids"] = sorted(alive)
     return nodes
 
-def _curtain(game: GameLog, board: list[dict]) -> dict:
+def _curtain(game: GameLog, board: list[dict], run_id: str | None) -> dict:
     survivors = set(game.result.survivors)
     return {
         "bundle_version": BUNDLE_VERSION,
+        "run_id": run_id,                  # P1 fix: v1 contract field (spec §5)
         "game_id": game.game_id,
         "degraded": False, "degraded_reason": None,
         "result": {"winner": game.result.winner, "end_round": game.result.end_round,
@@ -210,9 +231,20 @@ def _cursor_for(tp, game: GameLog, board: list[dict]) -> int:
     cand = [n for n in board if n["round"] <= rp[0]]
     return (cand[-1] if cand else board[-1])["cursor_index"]
 
-def build_settlement_bundle(game: GameLog, decision_log: DecisionLog | None) -> dict:
+_DECISION_DEGRADE = {"absent": "missing_decision_log", "invalid": "invalid_decision_log"}
+
+def build_settlement_bundle(game: GameLog, decision_log: DecisionLog | None, *,
+                            run_id: str | None = None,
+                            decision_log_status: str = "present") -> dict:
     board = _board_timeline(game)
-    bundle = _curtain(game, board)
+    bundle = _curtain(game, board, run_id)
+    # BLOCK fix: missing/invalid decision-log degrades EXPLICITLY (do NOT rely on
+    # score_game(game, None) — that is a valid path and would not degrade). Battle
+    # report is decision-aware (spec §6.1); curtain-only when decision-log unusable.
+    if decision_log_status != "present":
+        bundle["degraded"] = True
+        bundle["degraded_reason"] = _DECISION_DEGRADE.get(decision_log_status, "missing_decision_log")
+        return bundle
     try:
         score_log = score_game(game, decision_log)
         metrics = summarize_metrics(game, score_log)
@@ -221,22 +253,22 @@ def build_settlement_bundle(game: GameLog, decision_log: DecisionLog | None) -> 
         bundle["degraded"] = True
         bundle["degraded_reason"] = "scoring_failed"
         return bundle
-    # battle-report layer
-    outcome = metrics.score_summary.get("player_outcome_scores", {}) if isinstance(metrics.score_summary, dict) else {}
-    integ = metrics.score_summary.get("player_rule_integrity_scores", {})
-    decq = metrics.score_summary.get("player_decision_quality_scores", {})
+    # battle-report layer — metrics.* are DATACLASSES (ResultMetrics/ScoreSummary), NOT dicts
+    ss = metrics.score_summary           # ScoreSummary dataclass
+    rm = metrics.result_metrics          # ResultMetrics dataclass
     for p in bundle["players"]:
-        p["outcome_score"] = outcome.get(p["player_id"], 0)
-        p["rule_integrity_score"] = integ.get(p["player_id"], 0)
-        p["decision_quality_score"] = decq.get(p["player_id"], 0)
-    rm = metrics.result_metrics
-    bundle["result"]["margin"] = rm.get("margin")
+        pid = p["player_id"]
+        p["outcome_score"] = ss.player_outcome_scores.get(pid, 0)
+        p["rule_integrity_score"] = ss.player_rule_integrity_scores.get(pid, 0)
+        p["decision_quality_score"] = ss.player_decision_quality_scores.get(pid, 0)
+    bundle["result"]["margin"] = rm.margin
     mvp = max(bundle["players"], key=lambda p: p["outcome_score"])["player_id"] if bundle["players"] else None
-    bundle["core_metrics"] = {"game_length": rm.get("game_length"), "margin": rm.get("margin"),
-        "mvp_player_id": mvp, "villager_survival_rate": rm.get("villager_survival_rate"),
-        "werewolf_survival_rate": rm.get("werewolf_survival_rate")}
-    bundle["top_attribution"] = {"turn_point_id": attribution.top_attribution.turn_point_id,
-        "description": attribution.top_attribution.description_template} if attribution.top_attribution else None
+    bundle["core_metrics"] = {"game_length": rm.game_length, "margin": rm.margin, "mvp_player_id": mvp,
+        "villager_survival_rate": rm.villager_survival_rate,
+        "werewolf_survival_rate": rm.werewolf_survival_rate}
+    top = attribution.top_attribution
+    bundle["top_attribution"] = {"turn_point_id": top.turn_point_id,
+        "description": top.description_template} if top else None
     bundle["turning_points"] = [{"turn_point_id": tp.turn_point_id, "round": tp.round,
         "phase": next((n["phase"] for n in board if n["cursor_index"] == _cursor_for(tp, game, board)), "day"),
         "title": (tp.description_template or "")[:40], "description": tp.description_template,
@@ -246,7 +278,7 @@ def build_settlement_bundle(game: GameLog, decision_log: DecisionLog | None) -> 
     return bundle
 ```
 
-> Adjust attribute access to the real dataclass surfaces (`metrics.score_summary`/`result_metrics` dict vs attribute; `attribution.top_attribution`/`turn_points`) — verify against `scoring.py`/`attribution.py` while implementing; the test pins the output shape. **`degraded_reason` is always a code string; the `missing_decision_log`/`invalid_decision_log` codes are set by the server (Task 2) when it can't load decision-log before calling the builder.**
+> **Verify the exact dataclass field names** of `ResultMetrics`/`ScoreSummary` (`scoring.py:~60-90`) and `AttributionResult.top_attribution`/`turn_points` (`attribution.py:19-78`) while implementing — the test pins the output shape. The skeleton uses attribute access (correct for dataclasses); do **not** use `.get()` on `metrics.*`. The three `degraded_reason` codes are all produced here: `missing_decision_log`/`invalid_decision_log` via the `decision_log_status` pre-check (server passes the status, Task 2), `scoring_failed` via the except.
 
 - [ ] **Step 4: Run → pass + full module + compileall**
 ```bash
@@ -258,50 +290,103 @@ python -m compileall src/werewolf_eval/settlement_bundle.py
 
 ---
 
-## Task 2: Observer-server `/settlement` route (lazy compute-or-cache) + ALLOWED_ARTIFACTS
+## Task 2: `build_settlement_response` (offline-testable) + `/settlement` route + ALLOWED_ARTIFACTS
 
-**Files:** `src/werewolf_eval/observer_server.py`, `src/werewolf_eval/observer_protocol.py`
-**Spec:** §6.2, D2/D3. No new server-route test (env-blocked); covered by Task 1 + manual `_build_or_load_settlement` helper kept pure.
+**Files:** `src/werewolf_eval/settlement_bundle.py`, `src/werewolf_eval/observer_server.py`, `src/werewolf_eval/observer_protocol.py`, `tests/test_settlement_response.py` (new)
+**Spec:** §6.2, D2/D3. **The route owns real behavior (completed gate, no-game-log, decision-log status, cache, available envelope) — factor it into a pure function and TEST it offline** (`test_observer_server.py:50` starts a real HTTP server → localhost env-blocked here, memory `werewolf-env-network-test-limits`, so the HTTP route itself isn't tested here; the logic is).
 
-- [ ] **Step 1: Add artifact name** — append `"settlement-bundle.json"` to `ALLOWED_ARTIFACTS` (`observer_protocol.py:31-40`) so the cache file is fetchable/auditable.
+- [ ] **Step 1: Offline branch tests (test-first), `tests/test_settlement_response.py`**
 
-- [ ] **Step 2: Add the route branch** — in `observer_server.py` run-sub-path handler (next to `:404` artifacts branch), add:
+```python
+class TestBuildSettlementResponse(unittest.TestCase):
+    def _run_dir(self, td, *, game=True, decision="valid"):
+        d = Path(td)
+        if game: (d / "game-log.json").write_text(_GAME_JSON, encoding="utf-8")
+        if decision == "valid":   (d / "decision-log.json").write_text(_DECISION_JSON, encoding="utf-8")
+        elif decision == "broken": (d / "decision-log.json").write_text("{ not json", encoding="utf-8")
+        # decision == "absent": no file
+        return d
+
+    def test_not_completed(self):
+        with tempfile.TemporaryDirectory() as td:
+            r = build_settlement_response(self._run_dir(td), run_status="running", run_id="r1")
+            self.assertEqual(r, {"available": False, "reason": "not_completed"})
+
+    def test_no_game_log(self):
+        with tempfile.TemporaryDirectory() as td:
+            r = build_settlement_response(self._run_dir(td, game=False), run_status="completed", run_id="r1")
+            self.assertEqual(r["available"], False); self.assertEqual(r["reason"], "no_game_log")
+
+    def test_completed_full_bundle(self):
+        with tempfile.TemporaryDirectory() as td:
+            r = build_settlement_response(self._run_dir(td), run_status="completed", run_id="r1")
+            self.assertTrue(r["available"]); self.assertEqual(r["bundle"]["run_id"], "r1")
+            self.assertFalse(r["bundle"]["degraded"])
+
+    def test_absent_decision_log_degrades(self):
+        with tempfile.TemporaryDirectory() as td:
+            r = build_settlement_response(self._run_dir(td, decision="absent"), run_status="completed", run_id="r1")
+            self.assertEqual(r["bundle"]["degraded_reason"], "missing_decision_log")
+
+    def test_invalid_decision_log_degrades(self):
+        with tempfile.TemporaryDirectory() as td:
+            r = build_settlement_response(self._run_dir(td, decision="broken"), run_status="completed", run_id="r1")
+            self.assertEqual(r["bundle"]["degraded_reason"], "invalid_decision_log")
+
+    def test_cache_write_then_read(self):
+        with tempfile.TemporaryDirectory() as td:
+            d = self._run_dir(td)
+            build_settlement_response(d, run_status="completed", run_id="r1")
+            self.assertTrue((d / "settlement-bundle.json").exists())       # cached
+            # second call reads cache (mutate cache → response reflects it, proving no recompute)
+            (d / "settlement-bundle.json").write_text('{"bundle_version":"cached_marker"}', encoding="utf-8")
+            r2 = build_settlement_response(d, run_status="completed", run_id="r1")
+            self.assertEqual(r2["bundle"]["bundle_version"], "cached_marker")
+```
+Run → fail.
+
+- [ ] **Step 2: Implement `build_settlement_response` in `settlement_bundle.py`** (filesystem only, no socket):
+```python
+def build_settlement_response(run_dir: Path, run_status: str, run_id: str | None) -> dict:
+    game_log_path = run_dir / "game-log.json"
+    if run_status != "completed":
+        return {"available": False, "reason": "not_completed"}
+    if not game_log_path.exists():
+        return {"available": False, "reason": "no_game_log"}
+    cache = run_dir / "settlement-bundle.json"
+    if cache.exists():
+        return {"available": True, "bundle": json.loads(cache.read_text(encoding="utf-8"))}
+    game = load_game_log(game_log_path)
+    dpath = run_dir / "decision-log.json"
+    decision_log, status = None, "absent"
+    if dpath.exists():
+        try:
+            decision_log = load_decision_log(dpath, game); status = "present"
+        except Exception:
+            decision_log, status = None, "invalid"
+    bundle = build_settlement_bundle(game, decision_log, run_id=run_id, decision_log_status=status)
+    cache.write_text(json.dumps(bundle, ensure_ascii=False), encoding="utf-8")
+    return {"available": True, "bundle": bundle}
+```
+Import `load_game_log`/`load_decision_log` at top of `settlement_bundle.py`. (Verify exact loader names/signatures.) Run → pass.
+
+- [ ] **Step 3: Add artifact name** — append `"settlement-bundle.json"` to `ALLOWED_ARTIFACTS` (`observer_protocol.py:31-40`).
+
+- [ ] **Step 4: Wire the route (2-line wrapper)** — in `observer_server.py` run-sub-path handler (next to `:404`), resolve the run status via the existing detail helper and delegate:
 ```python
                 # /api/runs/{run_id}/settlement  (P2-D §6.2)
                 if sub_path == ["settlement"]:
-                    self._send_json(200, self._settlement_payload(run_id, run_dir))
+                    status = self._run_detail_with_reason(run_id, run_dir).get("status", "")
+                    self._send_json(200, build_settlement_response(run_dir, status, run_id))
                     return
 ```
-- [ ] **Step 3: Implement `_settlement_payload`** (thin; the heavy lift is the pure builder + loaders):
-```python
-    def _settlement_payload(self, run_id: str, run_dir: Path) -> dict:
-        detail = self._run_detail_with_reason(run_id, run_dir)
-        game_log_path = run_dir / "game-log.json"
-        if detail.get("status") != "completed" or not game_log_path.exists():
-            return {"available": False,
-                    "reason": "no_game_log" if not game_log_path.exists() else "not_completed"}
-        cache = run_dir / "settlement-bundle.json"
-        if cache.exists():
-            return {"available": True, "bundle": json.loads(cache.read_text(encoding="utf-8"))}
-        game = load_game_log(game_log_path)
-        decision_log = None
-        dpath = run_dir / "decision-log.json"
-        if dpath.exists():
-            try:
-                decision_log = load_decision_log(dpath, game)
-            except Exception:
-                decision_log = None     # invalid → builder proceeds; bundle may degrade
-        bundle = build_settlement_bundle(game, decision_log)
-        cache.write_text(json.dumps(bundle, ensure_ascii=False), encoding="utf-8")
-        return {"available": True, "bundle": bundle}
-```
-Import `build_settlement_bundle`, `load_game_log`, `load_decision_log` at top. **`failed` runs (no game-log) → `{available: false, reason}`, non-blocking (spec §2.5).** Lazy + cached → idempotent for just-finished and historical runs.
+Import `build_settlement_response` at top.
 
-- [ ] **Step 4: Sanity + commit**
+- [ ] **Step 5: Run + sanity + commit**
 ```bash
-PYTHONPATH=src python -m unittest tests.test_settlement_bundle -v   # builder still green
-python -m compileall src/werewolf_eval/observer_server.py src/werewolf_eval/observer_protocol.py
-git commit -m "feat(p2-d): GET /api/runs/{id}/settlement (lazy compute-or-cache) + settlement-bundle artifact"
+PYTHONPATH=src python -m unittest tests.test_settlement_bundle tests.test_settlement_response -v
+python -m compileall src/werewolf_eval/settlement_bundle.py src/werewolf_eval/observer_server.py src/werewolf_eval/observer_protocol.py
+git commit -m "feat(p2-d): build_settlement_response (offline-tested route logic) + /settlement route + artifact"
 ```
 
 ---
@@ -481,18 +566,27 @@ Expected: build exit 0; ctest 100%; qmllint no `Error:` lines (ignore `[unqualif
 
 - [ ] **Step 2: 4-scenario visual capture (grabToImage → PNG → Read) — TEMPORARY, NEVER committed**
 
-Harness seeds a mock `settlementBundle` (real contract shape: ≥3 `board_timeline` nodes across rounds + ≥2 `turning_points` with valid `cursor_index`) on a mock `ObserverClient`; localhost blocked → no real fetch. Behind a `// TEMP VISUAL ONLY` marker; revert before any commit.
+Harness seeds a mock `settlementBundle` (real contract shape: ≥3 `board_timeline` nodes across rounds + ≥2 `turning_points` with valid `cursor_index`) on a mock `ObserverClient`; localhost blocked → no real fetch. **Prefer a standalone untracked harness file under `.tmp/`** (e.g. a tiny `.tmp/p2d_visual_main.qml` loading the components with mock data) so NO production QML is edited. If a production QML edit is unavoidable, mark it `// TEMP VISUAL ONLY` and patch the **minimum** lines.
 1. **morph** — drive `freeze` → `docking` → `report`; capture `p2d_freeze.png` (WinnerBanner + ring spotlight), `p2d_dock.png` (ring scaled/flown into 28% column), `p2d_report.png` (spine + report unfolded).
 2. **scroll-sync** — programmatically scroll `SettlementReport` to a turning-point section → capture `p2d_sync.png` showing docked SeatRing alive/dead at that `cursor_index` + spine cursor on that node (and assert no double-jump: setting cursor via spine click does not re-trigger scroll-spy back-write).
 3. **history-direct** — `entryMode:1` → capture `p2d_history.png`: initial `report` state, docked sandbox, **no freeze beat**.
 4. **degraded** — bundle `degraded:true` → capture `p2d_degraded.png`: WinnerBanner + sandbox normal, battle regions EmptyState.
 Save under `G:/Werewolf-agent/.tmp/`. **Read** each PNG; confirm charcoal palette, faction accents, 28/72 + center spine, sticky left full-height (no collapse).
 
-- [ ] **Step 3: Revert harness + prove clean**
+- [ ] **Step 3: Revert harness precisely + prove clean (P2 fix — never blanket-checkout)**
+
+Do **NOT** `git checkout -- clients/qt_observer/qml/` (would nuke uncommitted real fixes). Instead: delete the `.tmp/` harness file; and **iff** a production QML had a `// TEMP VISUAL ONLY` patch, verify its diff contains ONLY those marked lines, then revert just that file:
 ```bash
-git checkout -- clients/qt_observer/qml/   # revert any TEMP VISUAL edits
+rm -f .tmp/p2d_visual_main.qml
+# only if a production QML was touched for the harness — confirm diff is ONLY the marked temp patch:
+for f in $(git diff --name-only -- clients/qt_observer/qml); do
+  git diff -- "$f" | grep -q "TEMP VISUAL ONLY" || { echo "REFUSE: $f has non-temp changes — do not revert blindly"; exit 1; }
+  added=$(git diff -- "$f" | grep -c '^+[^+]'); marked=$(git diff -- "$f" | grep -c 'TEMP VISUAL ONLY')
+  [ "$marked" -ge 1 ] && git checkout -- "$f"
+done
 git diff --quiet -- clients/qt_observer/qml || { echo "harness edits remain"; exit 1; }
 ```
+(Production QML edits from Tasks 4 & 8 are already committed before this task, so a clean tree here means only harness residue was removed.)
 
 - [ ] **Step 4: Full Python suite + compileall**
 ```bash
@@ -525,8 +619,8 @@ git diff main...HEAD -- clients | python -c "import sys,re; d=sys.stdin.read(); 
 - **A2.** `SeatRing.layoutMode` ring↔docked seat-position interpolation; `theater` mode unchanged (P2-C-1 regression); `docked` renders parent-passed `boardState` (SeatRing touches no bundle/cursor). *(test_seatring_layoutmode_presentational; visual morph)*
 - **A3.** Single `cursorIndex` source of truth in `SettlementView`; report scroll-spy + spine click both write via signals; sandbox/spine/highlight read by binding; programmatic scroll guarded (no feedback loop / double-jump). *(test_report_has_scrollspy_and_guard; test_spine_reads_cursor_via_binding; visual sync)*
 - **A4.** Bundle contract v1 complete (`result/players/core_metrics/top_attribution/turning_points/board_timeline`); `turning_points[*].cursor_index` resolves into `board_timeline`; `mvp_player_id` = max `outcome_score`. *(test_full_bundle_shape)*
-- **A5.** Graceful degrade (completed+game-log, scoring chain raises): `degraded=true` + `degraded_reason` ∈ {`missing_decision_log`,`invalid_decision_log`,`scoring_failed`} (**no raw exception/path/stack**); curtain (winner/reveal/survivors/board_timeline) intact, battle regions EmptyState. *(test_degrade_on_scoring_error_keeps_curtain; test_degraded_reason_is_code_not_raw_exception; visual degraded)*
-- **A6.** Lazy compute-or-cache: first GET builds + writes `settlement-bundle.json`, second reads cache; deterministic; non-`completed`/no-game-log (incl. `failed`) → `{available:false, reason}`, non-blocking. *(builder determinism test; route audited by code)*
+- **A5.** Graceful degrade with **all three codes explicitly produced** (never via silent `score_game(game,None)`): `decision_log_status` absent→`missing_decision_log` / invalid→`invalid_decision_log`; scoring chain raise→`scoring_failed`; each `degraded=true`, bare code (**no raw exception/path/stack**), curtain (winner/reveal/survivors/board_timeline) intact, battle regions EmptyState. *(test_degrade_missing_decision_log_is_curtain_only; test_degrade_invalid_decision_log; test_degrade_on_scoring_error_keeps_curtain; test_degraded_reason_is_code_not_raw_exception; visual degraded)*
+- **A6.** Route logic = offline-testable `build_settlement_response`: not-completed/no-game-log → `{available:false, reason}` (incl. `failed`); completed+game-log → builds, writes `settlement-bundle.json`, sets `run_id`; second call reads cache (no recompute); decision-log absent/invalid → degraded code. *(tests/test_settlement_response.py — runs here; no HTTP)*
 - **A7.** History entry: finished-run "查看战报" → `openRun`+`navigateCockpit` + `entryMode:1` → initial `report`, docked sandbox, no freeze. *(visual history-direct)*
 - **A8.** Settlement = god full reveal, no per-seat fog; bundle secret-free (no prompt/provider/path/`reason_summary`). *(test_secret_free)*
 - **A9.** C++ `settlementBundle` + `fetchSettlement` exposed (latest-wins); `setCurrentRunId` clears bundle + notifies. *(test_client_exposes_settlement; build)*
@@ -567,5 +661,5 @@ Title: `feat: P2-D settlement / battle-report screen (一镜到底 morph + spine
 
 ## Execution Handoff
 
-Order: (1) backend `build_settlement_bundle` + pure tests [keystone, runs here], (2) observer-server `/settlement` route + artifact name, (3) C++ `settlementBundle`/`fetchSettlement` + stale clear, (4) SeatRing `layoutMode`/`boardState` [presentational], (5) SettlementSpine, (6) SettlementReport [scroll-spy + anti-loop guard], (7) WinnerBanner, (8) SettlementView morph + single cursor + theater/history entries, (9) build/lint/4-scenario visual, (10) packet. Each task commits. **Hard rules:** curtain layer never depends on scoring (board_timeline/result/reveal from game-log only); `degraded_reason` is always a CODE (never raw exception/path/stack); settlement triggers ONLY on `completed`+game-log (never `failed`); `SettlementView` owns the one writable `cursorIndex` and is overlay-only (never AppShell nav); `SeatRing` stays presentational (no bundle/cursor/report knowledge, theater path zero drift); single-cursor anti-loop guard (`_programmaticScroll`) on report scroll-to-anchor; never touch the engine / scoring formula / shared `Theme` tokens; **P2-D adds no server-route tests**; bundle existing keys are frozen for P3.
+Order: (1) backend `build_settlement_bundle` + pure tests [keystone, runs here], (2) `build_settlement_response` (offline-tested route logic) + `/settlement` route + artifact name, (3) C++ `settlementBundle`/`fetchSettlement` + stale clear, (4) SeatRing `layoutMode`/`boardState` [presentational], (5) SettlementSpine, (6) SettlementReport [scroll-spy + anti-loop guard], (7) WinnerBanner, (8) SettlementView morph + single cursor + theater/history entries, (9) build/lint/4-scenario visual, (10) packet. Each task commits. **Hard rules:** curtain layer never depends on scoring (board_timeline/result/reveal from game-log only); **all three `degraded_reason` codes are produced explicitly** — missing/invalid decision-log via the `decision_log_status` pre-check (NEVER via silent `score_game(game,None)`), `scoring_failed` via except; `degraded_reason` is always a bare CODE (never raw exception/path/stack); bundle carries `run_id`+`game_id`; `metrics.*` are dataclasses (attribute access, not `.get()`); settlement triggers ONLY on `completed`+game-log (never `failed`); `SettlementView` owns the one writable `cursorIndex` and is overlay-only (never AppShell nav); `SeatRing` stays presentational (no bundle/cursor/report knowledge, theater path zero drift); single-cursor anti-loop guard (`_programmaticScroll`) on report scroll-to-anchor; visual harness prefers a `.tmp/` untracked file, never blanket `git checkout` of `clients/qt_observer/qml/`; never touch the engine / scoring formula / shared `Theme` tokens; **route logic is covered by offline `test_settlement_response` (no HTTP server-route tests — those are env-blocked)**; bundle existing keys frozen for P3.
 ```

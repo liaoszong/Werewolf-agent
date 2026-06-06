@@ -219,23 +219,26 @@ SettlementReport(右滚动)              SettlementSpine(中轴)        Settleme
 
 ### 6.1 settlement bundle builder(纯函数,新)
 
-- 新 `src/werewolf_eval/settlement_bundle.py`:`build_settlement_bundle(game: GameLog, decision_log: DecisionLog | None) -> dict`。
-  1. 恒先建谢幕层(`result` + `players` 翻牌 + `board_timeline`)—— 只用 `game`。
-  2. 评分链(**核实自 `scoring.py:651` / `scoring.py:850` / `attribution.py:266`,三步显式**):
+- 新 `src/werewolf_eval/settlement_bundle.py`:`build_settlement_bundle(game: GameLog, decision_log: DecisionLog | None, *, run_id: str | None = None, decision_log_status: str = "present") -> dict`。
+  1. 恒先建谢幕层(`run_id` + `game_id` + `result` + `players` 翻牌 + `board_timeline`)—— 只用 `game`。
+  2. **降级前置检查(关键 — 不走 `score_game(game, None)`,因其是合法路径不会自然降级):** `decision_log_status != "present"` → **直接** `degraded=true` + code(`absent`→`missing_decision_log` / `invalid`→`invalid_decision_log`),**curtain-only**,不调评分链。**战报本切片定义为 decision-aware**:缺/坏 decision-log = 战报层不可用(现役 launcher 恒与 game-log 同写 decision-log,§2.5,故此分支实际罕见,仅防腐)。
+  3. `decision_log_status == "present"` → 评分链(**核实自 `scoring.py:651` / `scoring.py:850` / `attribution.py:266`,三步显式**):
      ```python
-     # decision_log 缺失 → degraded("missing_decision_log");解析非法 → degraded("invalid_decision_log")
      score_log = score_game(game, decision_log)              # -> ScoreLog
      metrics   = summarize_metrics(game, score_log)          # -> MetricsSummary(显式,score_game 不返回 metrics)
      attribution = attribute_game(game, score_log, metrics)  # -> AttributionResult
      # 填 core_metrics / top_attribution / turning_points / players[].*_score
+     # ⚠ metrics.result_metrics / score_summary 是 dataclass(ResultMetrics/ScoreSummary),非 dict —— 用属性访问
      ```
-  3. `except`(评分/归因抛错,如事件词汇 mismatch §15):`degraded=true` + `degraded_reason`= **reason code**(`scoring_failed`,可选 sanitized message,**绝不放 raw exception / 路径 / 栈**),战报层留空,**返回仍有效的谢幕 bundle**。
-- **reason code 枚举(secret 边界):** `missing_decision_log`(无 decision-log)/ `invalid_decision_log`(decision-log 解析/校验失败)/ `scoring_failed`(score/metrics/attribution 抛错)。沿用仓库"never raw exception text"惯例(`observer_server.py:448-450`)。
+  4. `except`(评分/归因抛错,如事件词汇 mismatch §15):`degraded=true` + `degraded_reason="scoring_failed"`,**curtain-only**,返回仍有效的谢幕 bundle。
+- **reason code 枚举(secret 边界):** `missing_decision_log`(无 decision-log)/ `invalid_decision_log`(decision-log 解析/校验失败)/ `scoring_failed`(score/metrics/attribution 抛错)。**三者都由 builder 显式产出**(前两者经 `decision_log_status` 前置检查,后者经 except);沿用仓库"never raw exception text"惯例(`observer_server.py:448-450`)—— 绝不放 raw exception / 路径 / 栈。`decision_log_status` 由 server 判定(文件不存在→`absent`、存在但解析失败→`invalid`、成功→`present`)。
 - **纯函数 ⇒ 本环境可单测**(对照 server 路由的 localhost 限制,memory `werewolf-env-network-test-limits`)。
 
 ### 6.2 端点 + 缓存(observer_server / observer_protocol)
 
-- `GET /api/runs/{run_id}/settlement`:`status==completed` 且 `game-log.json` 存在时,有 `settlement-bundle.json` 缓存 → 读返回;无 → 读 `game-log.json`(+`decision-log.json`)→ `build_settlement_bundle` → **落盘 `settlement-bundle.json`** → 返回。**懒、幂等、确定性。**
+- **路由逻辑抽成离线可测纯函数 `build_settlement_response(run_dir, run_status, run_id) -> dict`**(只碰文件系统,不开 socket)——**因 `test_observer_server.py` 起真实 HTTP server,本环境 localhost 被封(memory `werewolf-env-network-test-limits`),故路由分支由该纯函数离线单测覆盖,route handler 是 2 行包装。**
+- `GET /api/runs/{run_id}/settlement` 行为(= `build_settlement_response`):
+  - `status==completed` 且 `game-log.json` 存在:有 `settlement-bundle.json` 缓存 → 读返回 `{available:true, bundle}`;无 → 判定 `decision_log_status`(文件无→`absent`、解析失败→`invalid`、成功→`present`)→ `build_settlement_bundle(game, decision_log, run_id=run_id, decision_log_status=...)` → **落盘缓存** → 返回。**懒、幂等、确定性。**
   - 未 `completed` / 无 game-log(含 `failed` run,§2.5)→ `{available:false, reason:"not_completed"|"no_game_log"}`(client 不渲染结算,维持失败 HUD)。non-blocking,不报错。
 - `settlement-bundle.json` 加入 `ALLOWED_ARTIFACTS`(`observer_protocol.py:31-40`)⇒ 也可经 artifact 路由取/审计。
 - **不改 SSE / `/events` / `/projection` / 引擎 / scoring 公式 / validators。** 唯一新增 = 1 路由 + 1 builder 模块 + 1 artifact 名。
@@ -349,7 +352,8 @@ clients/qt_observer/qml/HistoryView.qml              (MODIFY: 「查看战报」
 # AppShell.qml 不改(结算仅 TheaterView 内 overlay,无独立导航,§7.7/§14.1)
 clients/qt_observer/CMakeLists.txt                   (注册新 QML)
 clients/qt_observer/README.md                        (非目标更新)
-tests/test_settlement_bundle.py                      (new: builder 纯单元 + 降级 + secret-free)
+tests/test_settlement_bundle.py                      (new: builder 纯单元 + 三降级码 + secret-free + 确定性)
+tests/test_settlement_response.py                    (new: 离线路由分支 — completed gate/no-game-log/缺坏 decision-log/缓存)
 tests/test_qt_observer_static_contract.py            (新文件/objectName/契约)
 docs/superpowers/specs/2026-06-06-p2-d-settlement-screen-design.md
 docs/harness/plans/2026-06-06--p2-d-settlement-screen-plan.md
@@ -361,18 +365,19 @@ docs/harness/plans/2026-06-06--p2-d-settlement-screen-plan.md
 
 **后端(纯单元,本环境可跑;对照 server 路由 localhost 限制):**
 - `tests/test_settlement_bundle.py`(NEW),断言:
-  - (a) 正常 run(game-log + decision-log)→ bundle 含 `result/players(翻牌+核心分)/core_metrics/top_attribution/turning_points/board_timeline`;`mvp_player_id` = 最高 `outcome_score`;`turning_points[*].cursor_index` 命中合法 `board_timeline` 项。
-  - (b) **降级**:decision-log 缺失 / 评分抛错 → `degraded=true` + `degraded_reason`,但 `result/players(翻牌)/board_timeline` 仍齐(谢幕层不塌)。
-  - (c) **board_timeline 只靠 game-log 可算**:无 decision-log 也产出完整 round-phase 序列 + alive/dead。
+  - (a) 正常 run(game-log + decision-log,`decision_log_status="present"`)→ bundle 含 `run_id` + `game_id` + `result/players(翻牌+核心分)/core_metrics/top_attribution/turning_points/board_timeline`;`mvp_player_id` = 最高 `outcome_score`;`turning_points[*].cursor_index` 命中合法 `board_timeline` 项。
+  - (b) **降级三码各一例**:`decision_log_status="absent"` → `missing_decision_log`;`="invalid"` → `invalid_decision_log`;评分链抛错 → `scoring_failed`;三者均 `degraded=true` 且 `result/players(翻牌)/board_timeline` 仍齐(curtain 不塌)。
+  - (c) **board_timeline 只靠 game-log 可算**:无 decision-log 也产出完整 round-phase 序列 + alive/dead;末节点 `alive_player_ids == result.survivors`。
   - (d) **确定性**:同输入两次产出逐字节一致。
-  - (e) **secret-free**:bundle 不含 prompt / provider 秘密 / 绝对路径 / `reason_summary`。
-- **不新增 server-route 测试**(localhost HTTP env-blocked,memory `werewolf-env-network-test-limits`):路由是 builder 的薄包装,由 builder 纯单测覆盖。
+  - (e) **secret-free**:bundle(含 `degraded_reason`)不含 prompt / provider 秘密 / 绝对路径 / 栈 / `reason_summary`。
+- `tests/test_settlement_response.py`(NEW,**离线、本环境可跑**):测纯函数 `build_settlement_response(run_dir, run_status, run_id)` 的路由分支 —— `not_completed` / `no_game_log` → `{available:false, reason}`;`completed`+game-log → `{available:true, bundle}` 带 `run_id`;缺/坏 decision-log → bundle `degraded` + 对应 code;**缓存:首次写 `settlement-bundle.json`、二次读缓存且不重算**。只碰文件系统,不开 socket。
+- **不新增 HTTP server-route 测试**(`test_observer_server.py` 起真实 server,localhost env-blocked,memory `werewolf-env-network-test-limits`):路由分支由上面离线纯函数测试覆盖;route handler 是 2 行包装。
 
 **Qt 静态契约(`tests/test_qt_observer_static_contract.py`,MODIFY):**
 - `REQUIRED_QML_VIEWS` / 注册:加 `SettlementView`、`WinnerBanner`、`SettlementSpine`、`SettlementReport`;`SeatRing` 仍在。
 - `REQUIRED_OBJECT_NAMES`:`settlementView` / `winnerBanner` / `settlementSpine` / `settlementReport`(+ `seatRing` 保留)。
 - **单一 cursor 真值源契约:** 断言 `cursorIndex` 的可写定义只在 `SettlementView.qml`;`SettlementSpine`/`SeatRing`(docked)/`SettlementReport` 对 cursor 的渲染**经 binding 读**;`SettlementReport` 含 scroll-spy 写路径 + `_programmaticScroll` 闸标识(防环)。
-- **SeatRing 回归 + 模式契约:** 断言 `SeatRing.qml` 含 `layoutMode`;`theater` 路径仍读 `eventQueue.current`、`docked` 路径读 `settlementBundle.board_timeline`。
+- **SeatRing 回归 + presentational 契约:** 断言 `SeatRing.qml` 含 `layoutMode`/`boardState`;`theater` 路径仍读 `eventQueue.current`、`docked` 路径读传入的 `boardState`;**不含 `settlementBundle` / `fetchSettlement` / `cursorIndex`**(§14.2)。
 - **client 契约:** `ObserverApiClient` 暴露 `settlementBundle` + `fetchSettlement`;`setCurrentRunId` 清空 `m_settlementBundle` 并 notify。
 - 禁词扫描绿:新组件**不得**含 `events.jsonl`/`snapshots/`/`QFile`/`QDir`/`file://`/`werewolf_eval`/secret 标记;无本地文件 I/O。
 - README 断言随非目标更新同步。
