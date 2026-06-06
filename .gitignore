@@ -32,3 +32,6 @@ clients/qt_observer/build/
 .worktrees/
 
 .omo/
+
+# brainstorming visual companion mockups
+.superpowers/
