@@ -32,6 +32,7 @@ REQUIRED_QML_VIEWS = [
     "qml/MatchSetupView.qml",
     "qml/PreflightView.qml",
     "qml/LiveCockpitView.qml",
+    "qml/TheaterView.qml",
     "qml/HistoryView.qml",
     "qml/EventPresentationQueue.qml",
     "qml/components/RoleCard.qml",
@@ -56,6 +57,7 @@ REQUIRED_OBJECT_NAMES = {
                                "setupProfilePicker", "setupValidateButton", "setupModeControl"],
     "qml/PreflightView.qml": ["preflightView", "preflightServerStatus", "preflightTemplateSummary", "preflightVisibilitySummary", "startMatchButton"],
     "qml/LiveCockpitView.qml": ["liveCockpitView", "runStatusBadge", "playerPanelGrid", "eventTimeline", "perspectiveSwitcher", "auditLinksPanel", "providerFailureSummary"],
+    "qml/TheaterView.qml": ["theaterView"],
     "qml/HistoryView.qml": ["historyView", "historyRunsList", "historyRefreshButton"],
     "qml/EventPresentationQueue.qml": ["eventQueue"],
     "qml/components/RoleCard.qml": ["roleCard"],
@@ -619,6 +621,18 @@ class QtObserverTheaterViewTests(unittest.TestCase):
             "qml/components/PlaybackControls.qml",
         ]:
             self.assertNotIn(".payload", (QT / f).read_text(encoding="utf-8"))
+
+    def test_cockpit_nav_targets_theater_view(self) -> None:
+        # P2-C-1 D1/P2-D/P1-C: navigateCockpit loads TheaterView; layout binds layoutPhase
+        # (so reset re-syncs); SeatRing.perspective is never handler-assigned.
+        a = (QT / "qml/AppShell.qml").read_text(encoding="utf-8")
+        self.assertIn("TheaterView", a)                       # cockpitComponent loads TheaterView
+        t = (QT / "qml/TheaterView.qml").read_text(encoding="utf-8")
+        self.assertIn("EventPresentationQueue", t)            # hosts the queue
+        self.assertIn("id: eventQueue", t)
+        self.assertIn("resumeAfterTransition", t)             # D5 yield-gate wired
+        self.assertIn("state: eventQueue.layoutPhase", t)     # P2-D declarative layout binding
+        self.assertNotIn("ring.perspective =", t)             # P1-C: no handler writing the bound perspective
 
     def test_evidence_console_rehomes_honesty_chain(self) -> None:
         # P2-C-1 Edit 5: EvidenceConsole.qml ITSELF must instantiate the honesty chain

@@ -14,8 +14,8 @@ Status: G2b Observer Cockpit MVP
 
 - `ObserverApiClient` — QML-facing singleton that communicates with the G2a observer server via REST and SSE.
 - `ObserverSseParser` — SSE frame parser that handles `runtime_event` and `run_status` event types.
-- QML views: Home, Match Setup, Preflight, Live Cockpit, History.
-- QML components: RoleCard, EventTimeline, PerspectiveSwitcher, AuditLinksPanel, StatusBadge, ModeControl, DataSourceChip.
+- QML views: Home, Match Setup, Preflight, **Theater** (P2-C-1 default spectator surface), History. The legacy Live Cockpit is retired from navigation; its honesty chain (trust boundary, projection proof, perspective lens, event timeline, audit links) is re-homed into the Theater's bottom Evidence Console.
+- QML components: RoleCard, EventTimeline, PerspectiveSwitcher, AuditLinksPanel, StatusBadge, ModeControl, DataSourceChip; P2-C-1 theater: SeatRing, SpeechTheater, EvidenceConsole, PlaybackControls, EventPresentationQueue.
 
 ## Live / fake execution toggle (G3-2)
 

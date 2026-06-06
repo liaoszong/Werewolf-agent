@@ -177,7 +177,7 @@ Item {
     Component { id: homeComponent; HomeView { objectName: "homeView" } }
     Component { id: setupComponent; MatchSetupView { objectName: "matchSetupView" } }
     Component { id: preflightComponent; PreflightView { objectName: "preflightView" } }
-    Component { id: cockpitComponent; LiveCockpitView { objectName: "liveCockpitView" } }
+    Component { id: cockpitComponent; TheaterView { objectName: "theaterView" } }
     Component { id: historyComponent; HistoryView { objectName: "historyView" } }
 
     function navigateHome() {
