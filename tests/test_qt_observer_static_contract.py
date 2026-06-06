@@ -33,6 +33,7 @@ REQUIRED_QML_VIEWS = [
     "qml/PreflightView.qml",
     "qml/LiveCockpitView.qml",
     "qml/HistoryView.qml",
+    "qml/EventPresentationQueue.qml",
     "qml/components/RoleCard.qml",
     "qml/components/EventTimeline.qml",
     "qml/components/PerspectiveSwitcher.qml",
@@ -52,6 +53,7 @@ REQUIRED_OBJECT_NAMES = {
     "qml/PreflightView.qml": ["preflightView", "preflightServerStatus", "preflightTemplateSummary", "preflightVisibilitySummary", "startMatchButton"],
     "qml/LiveCockpitView.qml": ["liveCockpitView", "runStatusBadge", "playerPanelGrid", "eventTimeline", "perspectiveSwitcher", "auditLinksPanel", "providerFailureSummary"],
     "qml/HistoryView.qml": ["historyView", "historyRunsList", "historyRefreshButton"],
+    "qml/EventPresentationQueue.qml": ["eventQueue"],
     "qml/components/RoleCard.qml": ["roleCard"],
     "qml/components/SeatEditorPanel.qml": [
         "seatEditorPanel", "seatEditorProvider", "seatEditorModel",
@@ -583,6 +585,22 @@ class QtObserverPerspectiveSwitcherTrustTests(unittest.TestCase):
         # Should use generic seat labels like "Seat p1" not "Role: p1 (Werewolf)"
         self.assertIn("Seat p1", content)
         self.assertIn("Seat p6", content)
+
+
+class QtObserverTheaterViewTests(unittest.TestCase):
+    """P2-C-1 theater view: queue invariants, PresentationEvent reads, re-home, bindings."""
+
+    def test_event_queue_is_presentation_only(self) -> None:
+        c = (QT / "qml/EventPresentationQueue.qml").read_text(encoding="utf-8")
+        self.assertIn('objectName: "eventQueue"', c)
+        self.assertIn("resumeAfterTransition", c)            # D5 yield-gate API
+        self.assertIn("function reset", c)                   # run/perspective/source-gen reset
+        self.assertIn("_present", c)                         # PresentationEvent normalization
+        self.assertIn("readonly property var current", c)    # P1-A: current is a computed binding...
+        self.assertNotIn("current = _present", c)            # ...never assigned imperatively
+        self.assertNotIn(".sort(", c)                        # append-order consume, never reorder
+        for forbidden in ["XMLHttpRequest", '"/api/runs"', "ObserverClient.post"]:
+            self.assertNotIn(forbidden, c)
 
 
 if __name__ == "__main__":
