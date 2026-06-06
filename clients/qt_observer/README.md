@@ -36,6 +36,8 @@ Fake-deterministic execution stays the **unconditional default**. The API key is
 - no direct Python runtime binding,
 - no local artifact file reads from the Qt client.
 
+> **P2-D settlement / battle report.** On a `completed` run the theater morphs into an in-theater settlement overlay (freeze → dock the ring → unfold a scrolling battle report), synced through a single source-of-truth cursor. It is an overlay only (no separate AppShell navigation), reads a server-computed `settlement-bundle.json` via `GET /api/runs/{id}/settlement`, and still does no Web client, no Python binding, no local artifact file reads, and carries no provider secrets. `failed` runs keep the existing failure HUD — they never enter settlement.
+
 ## Running locally
 
 ### 1. Start the G2a observer server

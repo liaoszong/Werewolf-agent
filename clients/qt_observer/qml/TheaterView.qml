@@ -15,6 +15,9 @@ Item {
     state: eventQueue.layoutPhase
 
     Component.onCompleted: {
+        // Latch whether the run was already terminal-completed at load (history-direct
+        // open) so the settlement overlay can skip the freeze ceremony (entryMode 1).
+        theaterRoot._completedAtLoad = ObserverClient.currentStatus === "completed"
         if (ObserverClient.currentRunId !== "") {
             ObserverClient.refreshProjection()
             // Only tail the live stream for an active run; a completed run's events were
@@ -236,6 +239,33 @@ Item {
         anchors.right: parent.right
         anchors.bottom: parent.bottom
         perspective: ObserverClient.currentPerspective
+    }
+
+    // ------------------------------------------------- P2-D settlement overlay (§7.7)
+    // Same-view overlay (NOT a StackView page swap, NOT an AppShell nav target, §14.1).
+    // Activates ONLY when the run is `completed` (never `failed`, §2.5) AND its
+    // game-log is present (projection players loaded) AND the event queue has drained.
+    // `failed` runs keep the existing P2-C-1 failure pill untouched.
+    readonly property bool _settlementReady:
+        ObserverClient.currentStatus === "completed"
+        && ObserverClient.playerItems.length > 0
+        && eventQueue.atEnd
+    // entryMode discriminator (§3.3): a run that is ALREADY `completed` the moment the
+    // theater loads = a history-direct open (HistoryView 查看战报) → straight to `report`,
+    // no freeze. A run that reaches `completed` later via the live stream = watched live →
+    // the `freeze` ceremony. _completedAtLoad is latched once in Component.onCompleted.
+    property bool _completedAtLoad: false
+    readonly property int settlementEntryMode: _completedAtLoad ? 1 : 0
+
+    Loader {
+        id: settlementLoader
+        anchors.fill: parent
+        active: theaterRoot._settlementReady
+        visible: active
+        sourceComponent: SettlementView {
+            objectName: "settlementView"
+            entryMode: theaterRoot.settlementEntryMode
+        }
     }
 
     // ----------------------------------------------- Breathing layout (P2-D / D5)

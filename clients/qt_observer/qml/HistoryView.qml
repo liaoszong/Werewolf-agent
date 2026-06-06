@@ -196,7 +196,7 @@ Item {
                                 anchors.leftMargin: Theme.space.lg
                                 anchors.verticalCenter: parent.verticalCenter
                                 width: Math.max(120, parent.width
-                                    - statusBadge.width - openButton.width - Theme.space.xl * 3)
+                                    - statusBadge.width - reportButton.width - openButton.width - Theme.space.xl * 4)
                                 elide: Text.ElideRight
                                 text: modelData.run_id || I18n.t("(未命名对局)", "(unnamed run)")
                                 color: Theme.color.text
@@ -206,10 +206,29 @@ Item {
 
                             StatusBadge {
                                 id: statusBadge
-                                anchors.right: openButton.left
+                                anchors.right: reportButton.left
                                 anchors.rightMargin: Theme.space.lg
                                 anchors.verticalCenter: parent.verticalCenter
                                 status: modelData.status || ""
+                            }
+
+                            // P2-D §7.7 — thin "查看战报" entry for finished runs. Reuses the
+                            // same openRun + navigateCockpit path; the theater's settlement
+                            // overlay then activates straight to `report` (history-direct,
+                            // entryMode 1) because the run is already `completed` at load.
+                            AppButton {
+                                id: reportButton
+                                objectName: "openSettlementButton"
+                                anchors.right: openButton.left
+                                anchors.rightMargin: Theme.space.sm
+                                anchors.verticalCenter: parent.verticalCenter
+                                visible: (modelData.status || "") === "completed"
+                                text: I18n.t("查看战报", "View report")
+                                variant: "secondary"
+                                onClicked: {
+                                    ObserverClient.openRun(modelData.run_id)
+                                    root.StackView.view.parent.navigateCockpit()
+                                }
                             }
 
                             AppButton {

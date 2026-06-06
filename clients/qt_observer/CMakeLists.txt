@@ -41,6 +41,7 @@ qt_add_qml_module(appqt_observer
         qml/PreflightView.qml
         qml/LiveCockpitView.qml
         qml/TheaterView.qml
+        qml/SettlementView.qml
         qml/HistoryView.qml
         qml/EventPresentationQueue.qml
         qml/components/RoleCard.qml

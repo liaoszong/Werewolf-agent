@@ -29,6 +29,7 @@ REQUIRED_QML_VIEWS = [
     "Main.qml",
     "qml/AppShell.qml",
     "qml/HomeView.qml",
+    "qml/SettlementView.qml",
     "qml/MatchSetupView.qml",
     "qml/PreflightView.qml",
     "qml/LiveCockpitView.qml",
@@ -61,6 +62,7 @@ REQUIRED_OBJECT_NAMES = {
     "qml/PreflightView.qml": ["preflightView", "preflightServerStatus", "preflightTemplateSummary", "preflightVisibilitySummary", "startMatchButton"],
     "qml/LiveCockpitView.qml": ["liveCockpitView", "runStatusBadge", "playerPanelGrid", "eventTimeline", "perspectiveSwitcher", "auditLinksPanel", "providerFailureSummary"],
     "qml/TheaterView.qml": ["theaterView"],
+    "qml/SettlementView.qml": ["settlementView"],
     "qml/HistoryView.qml": ["historyView", "historyRunsList", "historyRefreshButton"],
     "qml/EventPresentationQueue.qml": ["eventQueue"],
     "qml/components/RoleCard.qml": ["roleCard"],
@@ -706,6 +708,21 @@ class QtObserverSettlementViewTests(unittest.TestCase):
         self.assertIn("_programmaticScroll", c)          # anti-feedback-loop flag (D6)
         self.assertIn("cursorRequested", c)              # writes cursor via signal to parent only
         self.assertNotIn("property int cursorIndex", c)  # does not own the cursor
+
+    def test_settlement_view_owns_cursor_and_is_overlay(self) -> None:
+        s = (QT / "qml/SettlementView.qml").read_text(encoding="utf-8")
+        self.assertIn('objectName: "settlementView"', s)
+        self.assertIn("property int cursorIndex", s)     # the ONE writable source of truth
+        self.assertIn("fetchSettlement", s)              # owns the fetch (SeatRing must not)
+        self.assertIn("boardState", s)                   # resolves board_timeline node -> SeatRing
+        # morph states present
+        for st in ['"freeze"', '"docking"', '"report"']:
+            self.assertIn(st, s)
+        a = (QT / "qml/AppShell.qml").read_text(encoding="utf-8")
+        self.assertNotIn("SettlementView", a)            # overlay-only: NOT an AppShell nav target (§14.1)
+        t = (QT / "qml/TheaterView.qml").read_text(encoding="utf-8")
+        self.assertIn("SettlementView", t)               # hosted inside TheaterView
+        self.assertIn('currentStatus === "completed"', t)  # failed → not activated (§2.5)
 
 
 if __name__ == "__main__":
