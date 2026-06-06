@@ -38,6 +38,7 @@ REQUIRED_QML_VIEWS = [
     "qml/components/SeatRing.qml",
     "qml/components/SpeechTheater.qml",
     "qml/components/EvidenceConsole.qml",
+    "qml/components/PlaybackControls.qml",
     "qml/components/EventTimeline.qml",
     "qml/components/PerspectiveSwitcher.qml",
     "qml/components/AuditLinksPanel.qml",
@@ -61,6 +62,7 @@ REQUIRED_OBJECT_NAMES = {
     "qml/components/SeatRing.qml": ["seatRing"],
     "qml/components/SpeechTheater.qml": ["speechTheater"],
     "qml/components/EvidenceConsole.qml": ["evidenceConsole", "eventTimeline", "perspectiveSwitcher", "auditLinksPanel", "providerFailureSummary"],
+    "qml/components/PlaybackControls.qml": ["playbackControls"],
     "qml/components/SeatEditorPanel.qml": [
         "seatEditorPanel", "seatEditorProvider", "seatEditorModel",
         "seatEditorStrategy", "seatEditorPrompt",
@@ -614,6 +616,7 @@ class QtObserverTheaterViewTests(unittest.TestCase):
         for f in [
             "qml/components/SeatRing.qml",
             "qml/components/SpeechTheater.qml",
+            "qml/components/PlaybackControls.qml",
         ]:
             self.assertNotIn(".payload", (QT / f).read_text(encoding="utf-8"))
 
