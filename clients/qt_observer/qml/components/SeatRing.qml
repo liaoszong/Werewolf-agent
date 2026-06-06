@@ -86,13 +86,15 @@ Item {
         return m[role] || role
     }
 
-    // Faint stage ring guide.
+    // Faint stage ring guide — theater scaffolding only. In docked mode the seats
+    // fly into a compact grid, so the circular guide must NOT linger behind them.
     Rectangle {
         anchors.centerIn: parent
         width: root.ringRadius * 2
         height: width
         radius: width / 2
         color: "transparent"
+        visible: root.layoutMode !== "docked"
         border.width: 1
         border.color: Theme.withAlpha(Theme.color.border, 0.5)
     }
