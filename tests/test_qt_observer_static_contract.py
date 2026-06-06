@@ -664,6 +664,17 @@ class QtObserverTheaterViewTests(unittest.TestCase):
         self.assertNotIn("ring.perspective =", t)             # P1-C: no handler writing the bound perspective
         self.assertIn("navigateHome", t)                      # theater must have a back/exit affordance
 
+    def test_seatring_layoutmode_presentational(self) -> None:
+        # P2-D §7.3/§14.2: SeatRing gains layoutMode/morphProgress/boardState but
+        # stays PRESENTATIONAL — it must not read the bundle, fetch, or own the cursor.
+        c = (QT / "qml/components/SeatRing.qml").read_text(encoding="utf-8")
+        self.assertIn("layoutMode", c)
+        self.assertIn("morphProgress", c)
+        self.assertIn("boardState", c)
+        self.assertNotIn("settlementBundle", c)   # SeatRing must NOT read the bundle
+        self.assertNotIn("fetchSettlement", c)
+        self.assertNotIn("cursorIndex", c)        # does not own/read the cursor
+
     def test_evidence_console_rehomes_honesty_chain(self) -> None:
         # P2-C-1 Edit 5: EvidenceConsole.qml ITSELF must instantiate the honesty chain
         # (a retained LiveCockpitView.qml cannot satisfy the re-home requirement).

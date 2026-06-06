@@ -16,6 +16,16 @@ Item {
     property string layoutPhase: "day"
     property string perspective: "god"
 
+    // P2-D presentational morph inputs (§7.3/§14.2). SeatRing stays a pure view:
+    //   layoutMode    "theater" (default, zero behavior drift) | "docked"
+    //   morphProgress 0 = ring positions, 1 = docked compact-grid positions (interpolated)
+    //   boardState    docked-mode input from the parent = a resolved board_timeline node
+    //                 ({ alive_player_ids, changed, highlight }); SeatRing NEVER touches the
+    //                 bundle or the cursor — the parent resolves them and hands the node in.
+    property string layoutMode: "theater"
+    property real morphProgress: 0
+    property var boardState: ({})
+
     // Hover-replay overlay (set by the waterfall when a history row is hovered): re-arms a
     // past actor->target line on the ring even though it is no longer the current event.
     property string hoverActor: ""
@@ -28,6 +38,37 @@ Item {
     function _angle(i) { return (-90 + i * 60) * Math.PI / 180 }
     function seatX(i) { return width / 2 + ringRadius * Math.cos(_angle(i)) }
     function seatY(i) { return height / 2 + ringRadius * Math.sin(_angle(i)) }
+
+    // Docked compact grid (3 columns x 2 rows for 6 seats). Used only when the
+    // parent morphs the ring into the 28% left "live sandbox" column (§7.3/D7).
+    readonly property int _dockCols: 3
+    function _dockX(i) {
+        var cell = width / _dockCols
+        return cell * (i % _dockCols) + cell / 2
+    }
+    function _dockY(i) {
+        var rows = Math.ceil(Math.max(1, players.length) / _dockCols)
+        var cell = height / rows
+        return cell * Math.floor(i / _dockCols) + cell / 2
+    }
+    // morphProgress-interpolated seat center: ring position -> docked grid position.
+    function morphX(i) { return seatX(i) + (_dockX(i) - seatX(i)) * morphProgress }
+    function morphY(i) { return seatY(i) + (_dockY(i) - seatY(i)) * morphProgress }
+
+    // Docked-mode liveness/highlight read from the parent-passed boardState (a
+    // board_timeline node). A seat is dead if its id is NOT in alive_player_ids.
+    function _dockedDead(pid) {
+        var alive = boardState && boardState.alive_player_ids ? boardState.alive_player_ids : null
+        if (!alive)
+            return false
+        return alive.indexOf(pid) < 0
+    }
+    function _dockedActive(pid) {
+        var hl = boardState && boardState.highlight ? boardState.highlight : null
+        if (!hl)
+            return false
+        return hl.actor === pid || hl.target === pid
+    }
     function _indexOf(pid) {
         for (var i = 0; i < players.length; i++)
             if (players[i] && players[i].player_id === pid)
@@ -57,9 +98,12 @@ Item {
     }
 
     // Connector layer (actor -> target). Repaints when the current event or size changes.
+    // Theater-only: docked mode shows alive/dead + cursor highlight, no directional lines
+    // (vote-line / poison micro-anim is deferred polish, §7.3).
     Canvas {
         id: connectors
         anchors.fill: parent
+        visible: root.layoutMode !== "docked"
         property var ev: root.current
         property string hActor: root.hoverActor
         property string hTarget: root.hoverTarget
@@ -125,19 +169,29 @@ Item {
             id: seat
             width: root.seatSize
             height: root.seatSize + 22
-            x: root.seatX(index) - width / 2
-            y: root.seatY(index) - root.seatSize / 2
+            // theater: ring position (morphProgress 0 -> identical to before). docked:
+            // the parent drives morphProgress 0->1 to fly seats into the compact grid.
+            x: root.morphX(index) - width / 2
+            y: root.morphY(index) - root.seatSize / 2
 
             property bool isUnknown: !modelData.display_role || modelData.display_role === "unknown"
-            // Dead ONLY once the death event has been reached in playback (not the final
-            // projection's alive flag) — otherwise every eventual death shows from frame 0.
-            property bool isDead: root.deadIds.indexOf(modelData.player_id) >= 0
-            property bool isActive: root.current && root.current.actor === modelData.player_id
+            // theater: dead ONLY once the death event has been reached in playback (not the
+            // final projection's alive flag). docked: dead from the parent-passed boardState
+            // (its alive_player_ids list) — SeatRing reads no bundle and no cursor.
+            property bool isDead: root.layoutMode === "docked"
+                ? root._dockedDead(modelData.player_id)
+                : root.deadIds.indexOf(modelData.player_id) >= 0
+            property bool isActive: root.layoutMode === "docked"
+                ? root._dockedActive(modelData.player_id)
+                : (root.current && root.current.actor === modelData.player_id)
             property color accent: isUnknown ? Theme.color.border : Theme.roleAccent(modelData.display_role)
 
             // Dead seats recede: smaller (退场 depth) + dimmed + desaturated (gray, faction color dropped).
             scale: isDead ? 0.82 : 1.0
             Behavior on scale { NumberAnimation { duration: Theme.motion.slow; easing.type: Easing.OutCubic } }
+            // Smooth ring<->docked seat travel (the one-shot morph reads continuous x/y).
+            Behavior on x { NumberAnimation { duration: Theme.motion.slow; easing.type: Easing.InOutCubic } }
+            Behavior on y { NumberAnimation { duration: Theme.motion.slow; easing.type: Easing.InOutCubic } }
 
             GlowDot {
                 anchors.horizontalCenter: avatar.horizontalCenter
