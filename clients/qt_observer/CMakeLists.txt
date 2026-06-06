@@ -47,6 +47,7 @@ qt_add_qml_module(appqt_observer
         qml/components/SeatRing.qml
         qml/components/SettlementSpine.qml
         qml/components/SettlementReport.qml
+        qml/components/WinnerBanner.qml
         qml/components/SpeechTheater.qml
         qml/components/PhaseTimeline.qml
         qml/components/EvidenceConsole.qml
