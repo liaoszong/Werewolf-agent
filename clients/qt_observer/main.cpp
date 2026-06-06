@@ -13,6 +13,15 @@ static QString observerBaseUrlFromArgs(const QStringList &args)
     return QStringLiteral("http://127.0.0.1:8765");
 }
 
+static QString openRunFromArgs(const QStringList &args)
+{
+    const int index = args.indexOf("--open-run");
+    if (index >= 0 && index + 1 < args.size()) {
+        return args.at(index + 1);
+    }
+    return QString();
+}
+
 int main(int argc, char *argv[])
 {
     QGuiApplication app(argc, argv);
@@ -23,6 +32,7 @@ int main(int argc, char *argv[])
 
     ObserverApiClient observerClient;
     observerClient.setBaseUrl(observerBaseUrlFromArgs(app.arguments()));
+    observerClient.setInitialRunId(openRunFromArgs(app.arguments()));
     qmlRegisterSingletonInstance("qt_observer", 1, 0, "ObserverClient", &observerClient);
 
     QQmlApplicationEngine engine;

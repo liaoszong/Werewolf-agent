@@ -10,6 +10,27 @@ Item {
 
     property string currentView: "home"
 
+    // CLI --open-run: auto-open a run straight into the theater (mirrors Preflight's
+    // poll-then-navigate so currentRunId is set before the cockpit loads).
+    Component.onCompleted: {
+        if (ObserverClient.initialRunId !== "") {
+            ObserverClient.openRun(ObserverClient.initialRunId)
+            autoOpenPoller.start()
+        }
+    }
+    Timer {
+        id: autoOpenPoller
+        interval: 150
+        repeat: true
+        running: false
+        onTriggered: {
+            if (ObserverClient.currentRunId !== "") {
+                stop()
+                navigateCockpit()
+            }
+        }
+    }
+
     // Ambient night backdrop behind everything
     AppBackground {
         anchors.fill: parent

@@ -44,6 +44,8 @@ class ObserverApiClient : public QObject {
     Q_PROPERTY(QString liveReasonMessage READ liveReasonMessage NOTIFY capabilitiesChanged)
     Q_PROPERTY(QString defaultMode READ defaultMode NOTIFY capabilitiesChanged)
     Q_PROPERTY(QString currentExecutionMode READ currentExecutionMode NOTIFY currentExecutionModeChanged)
+    // Startup convenience: a run id to auto-open into the cockpit (CLI --open-run).
+    Q_PROPERTY(QString initialRunId READ initialRunId CONSTANT)
 
 public:
     explicit ObserverApiClient(QObject *parent = nullptr);
@@ -80,6 +82,8 @@ public:
     QString liveReasonMessage() const;
     QString defaultMode() const;
     QString currentExecutionMode() const;
+    QString initialRunId() const;
+    void setInitialRunId(const QString &id);
 
 public slots:
     Q_INVOKABLE void checkHealth();
@@ -171,6 +175,7 @@ private:
     QString m_liveReasonMessage;
     QString m_defaultMode = QStringLiteral("fake");
     QString m_currentExecutionMode;
+    QString m_initialRunId;
 
     QNetworkAccessManager *m_network;
     QNetworkReply *m_streamReply;

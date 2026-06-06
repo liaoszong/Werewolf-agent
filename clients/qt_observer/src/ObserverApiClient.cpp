@@ -85,6 +85,8 @@ QString ObserverApiClient::liveReasonCode() const { return m_liveReasonCode; }
 QString ObserverApiClient::liveReasonMessage() const { return m_liveReasonMessage; }
 QString ObserverApiClient::defaultMode() const { return m_defaultMode; }
 QString ObserverApiClient::currentExecutionMode() const { return m_currentExecutionMode; }
+QString ObserverApiClient::initialRunId() const { return m_initialRunId; }
+void ObserverApiClient::setInitialRunId(const QString &id) { m_initialRunId = id; }
 
 QNetworkReply *ObserverApiClient::get(const QString &path)
 {
