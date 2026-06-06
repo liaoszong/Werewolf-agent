@@ -20,7 +20,9 @@ Item {
     readonly property real fullHeight: parent ? parent.height : 640
     property real _userHeight: 0   // drag-to-resize override (0 = use the mode preset)
     onModeChanged: _userHeight = 0
-    height: mode === 0 ? 46
+    // Collapsed = a single quiet status line that blends into the stage; only a real
+    // expansion raises the panel. Keeps the main theater the visual focus.
+    height: mode === 0 ? 40
           : _userHeight > 0 ? _userHeight
           : mode === 1 ? Math.round(fullHeight * 0.32)
           : Math.round(fullHeight * 0.66)
@@ -92,11 +94,17 @@ Item {
         return out
     }
 
-    // Backdrop + top hairline.
+    // Backdrop + top hairline. Collapsed: transparent (the bar dissolves into the stage);
+    // expanded: the raised surface so the log/audit content has a panel to sit on.
     Rectangle {
         anchors.fill: parent
-        color: Theme.color.surface
-        Rectangle { anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; height: 1; color: Theme.color.border }
+        color: root.mode === 0 ? "transparent" : Theme.color.surface
+        Behavior on color { ColorAnimation { duration: Theme.motion.base } }
+        Rectangle {
+            anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top
+            height: 1
+            color: root.mode === 0 ? Theme.withAlpha(Theme.color.border, 0.5) : Theme.color.border
+        }
     }
 
     // Drag-to-resize handle on the top border (desktop affordance).
@@ -125,7 +133,7 @@ Item {
         anchors.top: parent.top
         anchors.leftMargin: Theme.space.lg
         anchors.rightMargin: Theme.space.lg
-        height: 46
+        height: root.mode === 0 ? 40 : 46
 
         Row {
             anchors.left: parent.left
@@ -134,10 +142,10 @@ Item {
             Text {
                 anchors.verticalCenter: parent.verticalCenter
                 text: I18n.t("证据", "Evidence")
-                color: Theme.color.text
+                color: root.mode === 0 ? Theme.color.textMuted : Theme.color.text
                 font.family: Theme.font.family
                 font.pixelSize: Theme.size.body
-                font.weight: Theme.weight.semibold
+                font.weight: root.mode === 0 ? Theme.weight.medium : Theme.weight.semibold
             }
             Text {
                 anchors.verticalCenter: parent.verticalCenter

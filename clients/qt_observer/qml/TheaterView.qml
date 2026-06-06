@@ -117,7 +117,7 @@ Item {
         anchors.right: parent.right
         anchors.bottom: parent.bottom
         anchors.margins: Theme.space.xl
-        anchors.bottomMargin: 46 + Theme.space.lg   // reserve the closed evidence strip
+        anchors.bottomMargin: 40 + Theme.space.md   // reserve the (now quiet) collapsed evidence line
 
         // LEFT — ring stage (fixed ~56% of the width). The ring only resizes WITHIN here.
         Item {
