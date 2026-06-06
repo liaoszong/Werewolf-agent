@@ -37,6 +37,7 @@ REQUIRED_QML_VIEWS = [
     "qml/components/RoleCard.qml",
     "qml/components/SeatRing.qml",
     "qml/components/SpeechTheater.qml",
+    "qml/components/EvidenceConsole.qml",
     "qml/components/EventTimeline.qml",
     "qml/components/PerspectiveSwitcher.qml",
     "qml/components/AuditLinksPanel.qml",
@@ -59,6 +60,7 @@ REQUIRED_OBJECT_NAMES = {
     "qml/components/RoleCard.qml": ["roleCard"],
     "qml/components/SeatRing.qml": ["seatRing"],
     "qml/components/SpeechTheater.qml": ["speechTheater"],
+    "qml/components/EvidenceConsole.qml": ["evidenceConsole", "eventTimeline", "perspectiveSwitcher", "auditLinksPanel", "providerFailureSummary"],
     "qml/components/SeatEditorPanel.qml": [
         "seatEditorPanel", "seatEditorProvider", "seatEditorModel",
         "seatEditorStrategy", "seatEditorPrompt",
@@ -614,6 +616,15 @@ class QtObserverTheaterViewTests(unittest.TestCase):
             "qml/components/SpeechTheater.qml",
         ]:
             self.assertNotIn(".payload", (QT / f).read_text(encoding="utf-8"))
+
+    def test_evidence_console_rehomes_honesty_chain(self) -> None:
+        # P2-C-1 Edit 5: EvidenceConsole.qml ITSELF must instantiate the honesty chain
+        # (a retained LiveCockpitView.qml cannot satisfy the re-home requirement).
+        c = (QT / "qml/components/EvidenceConsole.qml").read_text(encoding="utf-8")
+        for comp in ["ViewBoundaryBadge", "ProjectionProofPanel", "PerspectiveSwitcher",
+                     "EventTimeline", "AuditLinksPanel"]:
+            self.assertIn(comp, c)
+        self.assertIn('objectName: "providerFailureSummary"', c)
 
 
 if __name__ == "__main__":
