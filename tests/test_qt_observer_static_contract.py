@@ -37,6 +37,7 @@ REQUIRED_QML_VIEWS = [
     "qml/EventPresentationQueue.qml",
     "qml/components/RoleCard.qml",
     "qml/components/SeatRing.qml",
+    "qml/components/SettlementSpine.qml",
     "qml/components/SpeechTheater.qml",
     "qml/components/EvidenceConsole.qml",
     "qml/components/PlaybackControls.qml",
@@ -62,6 +63,7 @@ REQUIRED_OBJECT_NAMES = {
     "qml/EventPresentationQueue.qml": ["eventQueue"],
     "qml/components/RoleCard.qml": ["roleCard"],
     "qml/components/SeatRing.qml": ["seatRing"],
+    "qml/components/SettlementSpine.qml": ["settlementSpine"],
     "qml/components/SpeechTheater.qml": ["speechTheater"],
     "qml/components/EvidenceConsole.qml": ["evidenceConsole", "eventTimeline", "perspectiveSwitcher", "auditLinksPanel", "providerFailureSummary"],
     "qml/components/PlaybackControls.qml": ["playbackControls"],
@@ -683,6 +685,16 @@ class QtObserverTheaterViewTests(unittest.TestCase):
                      "EventTimeline", "AuditLinksPanel"]:
             self.assertIn(comp, c)
         self.assertIn('objectName: "providerFailureSummary"', c)
+
+
+class QtObserverSettlementViewTests(unittest.TestCase):
+    """P2-D settlement / battle-report surface: single cursor, presentational
+    SeatRing, overlay-only activation, scroll-spy anti-loop guard."""
+
+    def test_spine_reads_cursor_via_binding(self) -> None:
+        c = (QT / "qml/components/SettlementSpine.qml").read_text(encoding="utf-8")
+        self.assertIn('objectName: "settlementSpine"', c)
+        self.assertNotIn("property int cursorIndex", c)   # owned by SettlementView, not here
 
 
 if __name__ == "__main__":
