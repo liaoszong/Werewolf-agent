@@ -15,10 +15,11 @@
 
 **Success criteria**
 
-- 对局到达终态(`status==completed|failed` 且事件队列放完)→ 自动进入结算的「定格高光」拍;点「查看深度战报」→ morph 到「推演台展开」态。**全程同一视图内的状态机过渡,绝非 StackView 整页切换。**
+- 对局**正常结束**(`status==completed` 且 `game-log.json` 存在,事件队列放完)→ 自动进入结算的「定格高光」拍;点「查看深度战报」→ morph 到「推演台展开」态。**全程同一视图内的状态机过渡,绝非 StackView 整页切换。**
+- **`failed` run 不进结算**(已核实 `run_g1h_fake_runtime.py:132-148`:provider 失败时只写 `provider-trace`/`failure-audit`、`return 2`,**不写 game-log/decision-log**)→ 维持 P2-C-1 既有失败 HUD + failure-audit 入口,**不进胜负结算**(D3 边界,§2.5)。把 bundle 契约扩成 `failed_no_game_log` 会扩大切片,本切片不做。
 - 右侧战报随滚动驱动单一 `cursorIndex`;左侧停靠沙盘 + 中轴脊椎是纯 Observer(property binding),cursor 一变即联动到对应 round-phase 的盘面/节点。
 - 结算数据 = **server 端按 run 产出的 `game-log.json` + `decision-log.json` 跑 `score_game` + `attribute_game` 生成的"评测就绪 settlement bundle"**;懒计算 + 落盘缓存(`settlement-bundle.json`),对刚跑完与历史 run 一致可用。
-- **优雅降级:** 谢幕层(胜负/翻牌/存活/残局沙盘)只依赖 `game-log.json`,恒可用;战报层(转折点/核心分)若评分失败 → `degraded` 标记 + 战报面板显"数据不可用",**绝不阻断、绝不报错**。
+- **优雅降级(仅限 `completed` 且有 game-log 的 run):** 谢幕层(胜负/翻牌/存活/残局沙盘)只依赖 `game-log.json`,恒可用;战报层(转折点/核心分)若评分链失败 → `degraded` 标记 + **reason code**(`missing_decision_log`/`invalid_decision_log`/`scoring_failed`,非 raw exception)+ 战报面板显"数据不可用",**绝不阻断、绝不报错**。
 - 结算 = 上帝全揭(game over → 全部真相),bundle 仍 secret-free(无 prompt/provider 文本/路径)。
 - P2-D 只建到战报深度;逐人记分卡全表、过程指标全表、逐人行为/理由长分析、胜率曲线、AI 复盘侧栏 = **P3 在同一 bundle 加字段、同一滚动联动加锚点段**(§11)。
 - Qt 静态契约测试更新且绿;Qt 构建 exit 0;`ctest` 绿;视觉抓图确认三拍 morph + 滚动联动 + 历史直入。
@@ -69,7 +70,13 @@
 - `SeatRing.qml`:呼吸式 6 座环,每座真角色(`Theme.roleAccent`)/alive-dead/active 高亮/连线层;读 `playerItems` + `eventQueue.current`。**P2-D 给它加 `layoutMode`(§5.3)实现 ring↔docked 无缝形变。**
 - `EventPresentationQueue.qml`:`atEnd` = cursor 到尾;已有 seek 能力(`seek respects the phase gate` 提交、HistoryView 回放)。**结算不复用 live 队列**(队列是 live 播放节奏器);结算是 post-game 静态、滚动驱动,board 状态走 bundle 的 `board_timeline`(§5,D10),与队列解耦。
 - `Theme.qml`:faction tokens(狼 #EF4444 / 预言家 #FBBF24 / 女巫 #A855F7 / 村民 #60A5FA / 猎人 #34D399)、`statusColor("completed")` #60A5FA、`space/radius/font/motion/layout` token、`AppCard/StatusBadge/AppButton/GlowDot/AppBackground` 等可复用组件。
-- C++ `ObserverApiClient`:`currentRunId/currentStatus/currentPerspective/playerItems/...` + invokables `openRun/connectStream/refreshProjection/...`。**P2-D 加 1 属性 `settlementBundle` + 1 invokable `fetchSettlement`(§5.7)。**
+- C++ `ObserverApiClient`:`currentRunId/currentStatus/currentPerspective/playerItems/...` + invokables `openRun/connectStream/refreshProjection/...`。**P2-D 加 1 属性 `settlementBundle` + 1 invokable `fetchSettlement`(§7.6)。**
+
+### 2.5 失败 run 路径(决定结算触发边界)
+
+- **`failed` run 可能没有 game-log/decision-log(已核实):** `run_g1h_fake_runtime.py:130-148` 在 `ProviderActionError` 时**只**写 `provider-trace.json` + `failure-audit.json`、`return 2`,**不写** game-log/decision-log;G1c live(`run_deepseek_consensus_game.py:114` 一带)同理。`observer_server.py:454-462`:launcher 抛错 → `provider_failure`;ret≠0 → `_map_launcher_exit_reason`;均置 `status="failed"`,且**reason 永远是 canonical code,非 raw exception**(`:448-450` 注释)。
+- **⇒ 结算触发边界(锁):** P2-D 自动结算**仅**针对 `status==completed` 且 `game-log.json` 存在的 run。**`failed` run 维持 P2-C-1 既有失败 HUD + failure-audit 入口,不进胜负结算**(扩 `failed_no_game_log` 契约 = 扩切片,§9 out-of-scope)。
+- **优雅降级 ≠ 失败 run:** 降级(§6.1)只发生在**已 `completed`、game-log 存在、但评分链失败**(如 decision-log 缺/非法)的情形 —— 谢幕层仍齐全,只战报层空。两者不可混。
 
 ---
 
@@ -94,7 +101,7 @@ TheaterView.qml(P2-C-1,MODIFY:加结算 overlay 层 + SeatRing.layoutMode 驱动
 ### 3.2 数据流(单一 cursor 真值源)
 
 ```
-run terminal(completed/failed)+ eventQueue.atEnd
+run completed（且 game-log.json 存在）+ eventQueue.atEnd        // failed run 不进结算(§2.5)
    │
    ▼  SettlementView 激活
 ObserverClient.fetchSettlement(runId) ──► GET /api/runs/{id}/settlement
@@ -104,10 +111,10 @@ ObserverClient.fetchSettlement(runId) ──► GET /api/runs/{id}/settlement
                                               │  result / players[] / turning_points[] / top_attribution / core_metrics / board_timeline[]
         ┌──────────────────────────────────────┼──────────────────────────────────────┐
         ▼                                       ▼                                      ▼
-SettlementReport(右滚动)              SettlementSpine(中轴)                SeatRing layoutMode=docked(左)
-  各段挂 cursor_index 锚点              节点 = board_timeline round-phase         渲染 board_timeline[cursorIndex]
-  Flickable.contentY → 命中可见段       cursor 指示器 obs cursorIndex            (alive/dead/highlight)
-  ──写──► cursorIndex                  点节点 ──写──► cursorIndex                 ── obs cursorIndex(纯 binding)
+SettlementReport(右滚动)              SettlementSpine(中轴)        SettlementView 解析 board_timeline[cursorIndex]
+  各段挂 cursor_index 锚点              节点 = board_timeline round-phase    → boardState ──prop──► SeatRing(layoutMode=docked,左)
+  Flickable.contentY → 命中可见段       cursor 指示器 obs cursorIndex            渲染 boardState(alive/dead/highlight)
+  ──写──► cursorIndex                  点节点 ──写──► cursorIndex                 SeatRing 不碰 bundle/cursor(§7.3)
         └──────────────► cursorIndex(SettlementView 唯一可写 state)◄──────────────┘
 ```
 
@@ -119,7 +126,7 @@ SettlementReport(右滚动)              SettlementSpine(中轴)                
 
 | 拍 | 状态 | 舞台 | 战报区 | 说明 |
 |---|---|---|---|---|
-| **第一拍 定格高光** | `freeze` | 剧场环压暗,聚光打在胜方座位,`WinnerBanner` 砸下 | 隐 | 保住谢幕仪式感;自动触发(run over) |
+| **第一拍 定格高光** | `freeze` | 剧场环压暗,聚光打在胜方座位,`WinnerBanner` 砸下 | 隐 | 保住谢幕仪式感;自动触发(`completed` + game-log,§2.5) |
 | **第二拍 Z 轴拉远** | `docking` | `SeatRing.layoutMode: ring→docked`,座位从环位**飞向** 28% 左列紧凑排布(`morphProgress` 0→1 插值),整体 scale 缩小 | 淡入开始 | 点「查看深度战报」触发;一镜到底 |
 | **第三拍 推演台展开** | `report` | docked 沙盘钉死满高(状态指示器) | 脊椎 + 长战报滑出,scroll-sync 全激活 | 终态;可滚动/点节点/回看/去历史 |
 
@@ -135,8 +142,8 @@ SettlementReport(右滚动)              SettlementSpine(中轴)                
 |---|---|---|---|
 | D1 | 结算深度 | **B·战报**(胜负+翻牌+转折点+核心分);**否 C 复盘台全表** | B 有评测内核又不越界;C 是 P3 的活,且 `decision_quality` 未真接。P2-D 定契约,P3 加深同一面。 |
 | D2 | 结算数据谁算/何时 | **server 端懒算-或-缓存** `settlement-bundle.json`,由 `game-log + decision-log` 跑 `score_game`+`attribute_game` | Python owns engine/eval 地基;单一数据源;懒算幂等 → 刚跑完与历史 run 一致可用;Qt 只读。 |
-| D3 | 失败处理 | **优雅降级**:谢幕层只靠 game-log 恒可用;战报层评分失败 → `degraded` 标记,面板显"不可用",不阻断 | live/涌现 mismatch(§15)不能让整屏炸;谢幕仪式永远在。 |
-| D4 | 登场形态 | **一镜到底 morph**(三拍,同视图状态机);**否 StackView 整页切换** | 整页切换是 morph 的返工陷阱(必须同面状态过渡才能形变);原生客户端渲染优势,上下文不丢失。 |
+| D3 | 失败处理 | **`failed` run 不进结算**(无 game-log,§2.5),维持失败 HUD;**优雅降级仅限 `completed`+game-log+评分链失败**:谢幕层恒可用、战报层 `degraded` + **reason code**(非 raw exception),不阻断 | failed 无 game-log 不能造胜负;completed 内评分 mismatch(§15)不能让屏炸;谢幕仪式永远在;reason code 守 secret 边界。 |
+| D4 | 登场形态 | **一镜到底 morph**(三拍,同视图状态机);**否 StackView 整页切换**;`SettlementView` **仅** TheaterView 内 overlay,**不入 AppShell 独立导航**(§14.1 锁) | 整页切换是 morph 的返工陷阱(必须同面状态过渡才能形变);独立可导航视图会制造第二套入口语义。 |
 | D5 | 空间切分 | **28% sticky 左指示器 + 中轴竖脊椎 + 72% 滚动战报** | 左侧只是状态指示器,认知重心在右;sticky 满高消灭"短侧栏塌陷";脊椎与右侧瀑布同轴。 |
 | D6 | 联动机制 | **单一 `cursorIndex` 真值源**;scroll-spy + 脊椎点选写,沙盘/脊椎/高亮纯 binding 读;程序化滚动闸防环 | 地道 QML 响应式;三者解耦无回环。 |
 | D7 | morph 实现 | **SeatRing `layoutMode` ring↔docked,座位位置插值**(真形变);blur/glow polish 推迟 | 一镜到底用同元件位置插值,非 cross-fade;polish 是叠加层,防过度工程。 |
@@ -155,7 +162,10 @@ SettlementReport(右滚动)              SettlementSpine(中轴)                
 {
   "bundle_version": "p2d.settlement.v1",
   "run_id": "...", "game_id": "...",
-  "degraded": false, "degraded_reason": null,   // 评分失败时 true + 原因;此时下面 scoring 派生字段为空/null
+  "degraded": false,
+  "degraded_reason": null,   // 评分链失败时 true + reason CODE(枚举,非 raw exception):
+                             //   "missing_decision_log" | "invalid_decision_log" | "scoring_failed"
+                             //   (可选附 sanitized message,绝不含路径/内部栈/secret);此时下面 scoring 派生字段为空/null
 
   // —— 谢幕层(只靠 game-log,恒可用,degraded 时仍齐全)——
   "result": {
@@ -211,13 +221,22 @@ SettlementReport(右滚动)              SettlementSpine(中轴)                
 
 - 新 `src/werewolf_eval/settlement_bundle.py`:`build_settlement_bundle(game: GameLog, decision_log: DecisionLog | None) -> dict`。
   1. 恒先建谢幕层(`result` + `players` 翻牌 + `board_timeline`)—— 只用 `game`。
-  2. `try`: `score_log = score_game(game, decision_log)` → metrics → `attribute_game(...)` → 填 `core_metrics` / `top_attribution` / `turning_points` / `players[].*_score`。
-  3. `except`(评分/归因抛错,如 decision-log 缺失、事件词汇 mismatch §15):`degraded=true` + `degraded_reason`,战报层留空,**返回仍有效的谢幕 bundle**。
+  2. 评分链(**核实自 `scoring.py:651` / `scoring.py:850` / `attribution.py:266`,三步显式**):
+     ```python
+     # decision_log 缺失 → degraded("missing_decision_log");解析非法 → degraded("invalid_decision_log")
+     score_log = score_game(game, decision_log)              # -> ScoreLog
+     metrics   = summarize_metrics(game, score_log)          # -> MetricsSummary(显式,score_game 不返回 metrics)
+     attribution = attribute_game(game, score_log, metrics)  # -> AttributionResult
+     # 填 core_metrics / top_attribution / turning_points / players[].*_score
+     ```
+  3. `except`(评分/归因抛错,如事件词汇 mismatch §15):`degraded=true` + `degraded_reason`= **reason code**(`scoring_failed`,可选 sanitized message,**绝不放 raw exception / 路径 / 栈**),战报层留空,**返回仍有效的谢幕 bundle**。
+- **reason code 枚举(secret 边界):** `missing_decision_log`(无 decision-log)/ `invalid_decision_log`(decision-log 解析/校验失败)/ `scoring_failed`(score/metrics/attribution 抛错)。沿用仓库"never raw exception text"惯例(`observer_server.py:448-450`)。
 - **纯函数 ⇒ 本环境可单测**(对照 server 路由的 localhost 限制,memory `werewolf-env-network-test-limits`)。
 
 ### 6.2 端点 + 缓存(observer_server / observer_protocol)
 
-- `GET /api/runs/{run_id}/settlement`:run 终态时,有 `settlement-bundle.json` 缓存 → 读返回;无 → 读 `game-log.json`(+`decision-log.json`)→ `build_settlement_bundle` → **落盘 `settlement-bundle.json`** → 返回。**懒、幂等、确定性。** 非终态 run → 409/`{pending:true}`(client 不渲染战报)。
+- `GET /api/runs/{run_id}/settlement`:`status==completed` 且 `game-log.json` 存在时,有 `settlement-bundle.json` 缓存 → 读返回;无 → 读 `game-log.json`(+`decision-log.json`)→ `build_settlement_bundle` → **落盘 `settlement-bundle.json`** → 返回。**懒、幂等、确定性。**
+  - 未 `completed` / 无 game-log(含 `failed` run,§2.5)→ `{available:false, reason:"not_completed"|"no_game_log"}`(client 不渲染结算,维持失败 HUD)。non-blocking,不报错。
 - `settlement-bundle.json` 加入 `ALLOWED_ARTIFACTS`(`observer_protocol.py:31-40`)⇒ 也可经 artifact 路由取/审计。
 - **不改 SSE / `/events` / `/projection` / 引擎 / scoring 公式 / validators。** 唯一新增 = 1 路由 + 1 builder 模块 + 1 artifact 名。
 
@@ -231,7 +250,7 @@ SettlementReport(右滚动)              SettlementSpine(中轴)                
 
 - morph 三拍状态机宿主;持有 `cursorIndex`(唯一可写真值源)、`state ∈ {freeze, docking, report}`。
 - `Component.onCompleted` / 激活:`ObserverClient.fetchSettlement(currentRunId)`;`settlementBundle` 到达后构建 spine 节点 / report 段 / docked 沙盘数据。
-- live 入口:由 `TheaterView` 在 `_runOver && eventQueue.atEnd` 时挂起激活,初始 `state="freeze"`。历史入口:初始 `state="report"`(§3.3)。
+- live 入口:由 `TheaterView` 在 `currentStatus==="completed" && game-log 存在 && eventQueue.atEnd` 时激活,初始 `state="freeze"`(**`failed` 不激活**,§2.5)。历史入口:初始 `state="report"`(§3.3)。
 - 三拍过渡 `Transition`/`SequentialAnimation`(`Theme.motion` 预算)。
 - `degraded` 时:谢幕层(banner/沙盘/存活)正常;战报面板(转折点/核心指标)渲染 `EmptyState`「战报数据生成失败 · 仅显示对局结果」。
 
@@ -239,10 +258,11 @@ SettlementReport(右滚动)              SettlementSpine(中轴)                
 
 - 第一拍横幅:`result.winner` 阵营色大字 + `end_round` + `margin` + `source_label`(诚实链)。`Theme.statusColor`/`roleAccent`。docking 后缩为战报头(或交给 `SettlementReport` 头部,二选一由 writing-plans 定)。
 
-### 7.3 `qml/components/SeatRing.qml`(MODIFY,P2-C-1 既有)— + `layoutMode`
+### 7.3 `qml/components/SeatRing.qml`(MODIFY,P2-C-1 既有)— + `layoutMode`,保持 presentational(§14.2 锁)
 
-- 新增 `property string layoutMode: "theater"`(`theater` | `docked`)+ 可动画 `property real morphProgress`。座位 `Repeater` 项 `x/y` = `layoutMode/morphProgress` 插值(环坐标 ↔ docked 紧凑网格坐标);整体 `scale` 随 morph 缩小。
-- **docked 模式数据源切换:** `layoutMode==="docked"` 时,座位 alive/dead/highlight **读 `settlementBundle.board_timeline[cursorIndex]`**(纯 binding,Observer),**不读** live `eventQueue.current`。`theater` 模式行为不变(P2-C-1 回归保护)。
+- **约束(user 2026-06-06 锁):** SeatRing 仍是**纯 presentational** —— **不 fetch bundle、不拥有 cursor、不知道 report 结构**;只接收渲染输入 `layoutMode` / `morphProgress` / `boardState`。`theater` 默认路径**零行为漂移**。
+- 新增 `property string layoutMode: "theater"`(`theater` | `docked`)+ 可动画 `property real morphProgress` + `property var boardState`(docked 时由父 `SettlementView` 传入 = 已解析的 `board_timeline[cursorIndex]`,内含 `alive_player_ids`/`changed`/`highlight`)。座位 `Repeater` 项 `x/y` = `layoutMode/morphProgress` 插值(环坐标 ↔ docked 紧凑网格坐标);整体 `scale` 随 morph 缩小。
+- **docked 模式数据源切换:** `layoutMode==="docked"` 时,座位 alive/dead/highlight **读传入的 `boardState`**(纯 prop,**SeatRing 不碰 `settlementBundle`/`cursorIndex`**);`theater` 模式仍读 `eventQueue.current`,行为不变(P2-C-1 回归保护)。**解析 `board_timeline[cursorIndex]→boardState` 的归属在 `SettlementView`,不在 SeatRing。**
 - 复用既有 `Theme.roleAccent` / alive-dead 压暗 / active 高亮。docked 紧凑排布(3×2 量级,6 座);**有向连线(vote line / 中毒特效)= 二期 polish**,本切片 docked 只显 alive/dead + cursor 命中座位高亮。
 
 ### 7.4 `qml/components/SettlementSpine.qml`(NEW)— objectName `settlementSpine`
@@ -265,11 +285,12 @@ SettlementReport(右滚动)              SettlementSpine(中轴)                
 - **run 切换清空:** `setCurrentRunId` / 离开结算 → 清 `m_settlementBundle` 并 notify(防 stale)。
 - 无本地文件 I/O;无 secret;无新依赖。
 
-### 7.7 `qml/TheaterView.qml`(MODIFY)/ `AppShell.qml` / `HistoryView.qml`
+### 7.7 `qml/TheaterView.qml`(MODIFY)/ `HistoryView.qml`(MODIFY)— overlay-only(§14.1 锁)
 
-- `TheaterView`:`_runOver && eventQueue.atEnd` → 激活 `SettlementView` overlay(同视图内,**非 navigateXxx 切页**);SeatRing 交给 SettlementView 驱动 `layoutMode`。
-- `HistoryView`:已结束 run 加「查看战报」affordance → 打开 `SettlementView`(初始 `report` 态)。**薄**:复用同一 `fetchSettlement`,不做历史列表深化(P3-B)。
-- `AppShell`:若 `SettlementView` 作为独立可导航视图(vs TheaterView 内 overlay)由 writing-plans 定;**默认 overlay-in-theater 以保 morph 同面**(§17)。
+- **唯一实现路径(user 2026-06-06 锁):** `SettlementView` **只**作为 `TheaterView` 内的 overlay 层渲染;**不在 `AppShell` 注册为独立可导航视图**(避免第二套入口语义 + StackView 返工门)。
+- `TheaterView`:`currentStatus==="completed" && game-log 存在 && eventQueue.atEnd` → 激活 `SettlementView` overlay(同视图内,**非 navigateXxx 切页**);SeatRing 交给 SettlementView 驱动 `layoutMode`/`boardState`。`failed` → 不激活,维持失败 HUD(§2.5)。
+- `HistoryView`:已结束 run 加「查看战报」affordance → **`openRun(runId)` 后 `navigateCockpit()` 进 Theater,并带 entry mode 让 `SettlementView` 直接落 `report` 态**(不另起独立入口)。**薄**:复用同一 `fetchSettlement`,不做历史列表深化(P3-B)。
+- **`AppShell` 不新增结算导航**(只有 TheaterView 内 overlay)。
 
 ### 7.8 `CMakeLists.txt` / `README.md`(MODIFY)
 
@@ -322,10 +343,10 @@ clients/qt_observer/qml/SettlementView.qml           (new)
 clients/qt_observer/qml/components/WinnerBanner.qml   (new)
 clients/qt_observer/qml/components/SettlementSpine.qml (new)
 clients/qt_observer/qml/components/SettlementReport.qml (new)
-clients/qt_observer/qml/components/SeatRing.qml       (MODIFY: + layoutMode/morphProgress + docked board_timeline 渲染)
-clients/qt_observer/qml/TheaterView.qml              (MODIFY: run-over 激活 SettlementView overlay)
-clients/qt_observer/qml/HistoryView.qml              (MODIFY: 「查看战报」薄入口)
-clients/qt_observer/qml/AppShell.qml                 (按 §17 决定:overlay vs 可导航)
+clients/qt_observer/qml/components/SeatRing.qml       (MODIFY: + layoutMode/morphProgress/boardState; 保持 presentational §7.3)
+clients/qt_observer/qml/TheaterView.qml              (MODIFY: completed+game-log 激活 SettlementView overlay;failed 不激活)
+clients/qt_observer/qml/HistoryView.qml              (MODIFY: 「查看战报」= openRun + navigateCockpit + entry mode=report)
+# AppShell.qml 不改(结算仅 TheaterView 内 overlay,无独立导航,§7.7/§14.1)
 clients/qt_observer/CMakeLists.txt                   (注册新 QML)
 clients/qt_observer/README.md                        (非目标更新)
 tests/test_settlement_bundle.py                      (new: builder 纯单元 + 降级 + secret-free)
@@ -370,12 +391,12 @@ docs/harness/plans/2026-06-06--p2-d-settlement-screen-plan.md
 
 ## 12. Acceptance criteria
 
-- **A1.** run 终态 + `eventQueue.atEnd` → 自动入 `freeze` 拍(`WinnerBanner` + 聚光);点「查看深度战报」→ `docking`→`report`,**全程同视图状态机,无 StackView 切页**(harness 断言无 `navigateXxx` 调用)。
-- **A2.** `SeatRing.layoutMode` ring↔docked 座位位置插值形变;`theater` 模式行为不变(P2-C-1 回归);`docked` 模式座位渲染 `board_timeline[cursorIndex]`。
+- **A1.** `status==completed` 且 game-log 存在 + `eventQueue.atEnd` → 自动入 `freeze` 拍(`WinnerBanner` + 聚光);**`failed` run 不激活结算,维持失败 HUD**(§2.5);点「查看深度战报」→ `docking`→`report`,**全程同视图状态机 overlay,无 StackView 切页 / 无 AppShell 独立结算入口**(harness 断言无 `navigateXxx` 切页)。
+- **A2.** `SeatRing.layoutMode` ring↔docked 座位位置插值形变;`theater` 模式行为不变(P2-C-1 回归);`docked` 模式座位渲染**父传入的 `boardState`**(SeatRing presentational,不碰 bundle/cursor,§7.3/§14.2)。
 - **A3.** 单一 `cursorIndex` 真值源:右侧 scroll-spy 与脊椎点选写;沙盘/脊椎/高亮纯 binding 读;程序化滚动不引发回环(harness:点脊椎节点后无抖动二次跳)。
 - **A4.** settlement bundle 契约 v1 完整(`result/players/core_metrics/top_attribution/turning_points/board_timeline`);`turning_points[*].cursor_index` 合法;`mvp_player_id` = 最高 outcome_score。
-- **A5.** **优雅降级**:评分失败 → `degraded` + 谢幕层(胜负/翻牌/存活/沙盘/board_timeline)齐全、战报面板显"不可用",**不报错不阻断**(`tests/test_settlement_bundle.py` 覆盖)。
-- **A6.** 后端懒算-或-缓存:首次 GET 算并落 `settlement-bundle.json`,二次读缓存;同输入确定性一致;非终态 run 返回 pending(client 不渲染战报)。
+- **A5.** **优雅降级**(仅 `completed`+game-log+评分链失败):`degraded=true` + `degraded_reason` ∈ {`missing_decision_log`,`invalid_decision_log`,`scoring_failed`}(**非 raw exception/路径/栈**)+ 谢幕层(胜负/翻牌/存活/沙盘/board_timeline)齐全、战报面板显"不可用",**不报错不阻断**(`tests/test_settlement_bundle.py` 覆盖)。
+- **A6.** 后端懒算-或-缓存:首次 GET 算并落 `settlement-bundle.json`,二次读缓存;同输入确定性一致;未 `completed` / 无 game-log(含 `failed`)→ `{available:false, reason}`,client 不渲染结算(non-blocking)。
 - **A7.** 历史入口:已结束 run「查看战报」→ `SettlementView` 初始 `report` 态、沙盘 docked、无 freeze。
 - **A8.** 结算 = 上帝全揭,无 per-seat 伪迷雾;bundle secret-free(无 prompt/provider/路径/`reason_summary`)。
 - **A9.** C++ `settlementBundle` 暴露 + `fetchSettlement`;run 切换清空并 notify(无 stale)。
@@ -401,10 +422,10 @@ docs/harness/plans/2026-06-06--p2-d-settlement-screen-plan.md
 
 ---
 
-## 14. Decisions surfaced during spec-writing(请 user review)
+## 14. Decisions surfaced during spec-writing(user review 2026-06-06 已拍板)
 
-1. **morph 同面要求 → 结算挂 `TheaterView` overlay(非独立 StackView 视图)。** 一镜到底需同视图状态过渡;若作独立可导航视图则无法形变。默认 overlay-in-theater;`AppShell` 是否另给独立入口由 writing-plans 定(§17)。**待 user 确认默认 overlay 取向。**
-2. **`SeatRing` 增 `layoutMode` = 给 live 组件加结算职责。** 为真·一镜到底(座位位置插值)选择扩展既有 SeatRing 而非新建沙盘 cross-fade。代价:SeatRing 责任变重。回退:若插值形变成本高,降级为 docked 独立 `SettlementSandbox` + cross-fade(§17 风险)。**待 user 认可"扩 SeatRing"取向。**
+1. **✅ 锁定(升级为唯一路径):** `SettlementView` **只**作为 `TheaterView` 内 overlay 渲染,**不入 AppShell 独立导航**。一镜到底 morph 需同视图状态过渡;独立可导航视图只会制造第二套入口语义 + StackView 返工门。History「查看战报」= `openRun()` + `navigateCockpit()` + entry mode 直落 `report`(§7.7)。
+2. **✅ 接受(带约束):** 扩 `SeatRing.layoutMode`,**不**新建沙盘 cross-fade。**约束(锁):SeatRing 保持 presentational —— 不 fetch bundle、不拥有 cursor、不知 report 结构;只收 `layoutMode/morphProgress/boardState` 渲染输入;`theater` 默认路径零行为漂移(§7.3)。** 回退(若位置插值成本高):docked 独立 `SettlementSandbox` + cross-fade(§15 风险)。
 3. **`decision_quality_score` 现状恒 0(无 S5 saved 标签)。** bundle 带此契约字段,但 P2-D UI 不 headline。P3 接入 live 语义标注才有正向分。**记录,无需拍板。**
 4. **结算独立于 live `EventPresentationQueue`(D10):** board 状态走 bundle `board_timeline`(server 预算),不挂 live 队列 cursor。更稳更简单,但意味着"两套 board 状态来源"(live=队列、结算=board_timeline)。两者都最终源自 game-log 事件,语义一致。**记录。**
 5. **历史入口深度:** P2-D 只给「查看战报」薄 affordance 复用 `fetchSettlement`;历史列表深化属 P3-B。**记录。**
@@ -414,8 +435,8 @@ docs/harness/plans/2026-06-06--p2-d-settlement-screen-plan.md
 ## 15. Open risks / writing-plans 细化项
 
 - **`witch_kill` vs `witch_poison` 词汇 mismatch(探查报告):** `emergent_engine.py` 发 `witch_kill`,`scoring.py` 期望 `witch_poison`。**当前 observer 未接涌现引擎**(§2.3),现役 G1h/G1c launcher 的事件词汇需 writing-plans 核对;若 mismatch 触发评分失败 → §6.1 降级兜底已覆盖(不炸),但战报层会空。修词汇属 P2-A,不在本切片。**writing-plans 核对现役 launcher 实际事件词汇 vs scorer 期望。**
-- **`metrics-summary` builder 入口:** §2.1 经探查为 `score_game` 流程内构建;`build_settlement_bundle` 需确认调用面(直接函数 vs 经 `score_game` 返回)。**writing-plans 核对 `scoring.py` 实际导出面。**
-- **座位 ring→docked 位置插值:** `Repeater` 项坐标如何同时支持环排布与紧凑网格并平滑插值;`morphProgress` 驱动两套坐标 lerp。可能需 `Behavior on x/y` + 显式坐标函数。**writing-plans 定状态机。**
+- **~~`metrics-summary` builder 入口~~(已核实,user review 2026-06-06):** 链路 = `score_game(game, decision_log) -> ScoreLog`(`scoring.py:651`)→ **`summarize_metrics(game, score_log) -> MetricsSummary`(`scoring.py:850`,显式独立函数,`score_game` 不返回 metrics)** → `attribute_game(game, score_log, metrics)`(`attribution.py:266`)。§6.1 伪代码已据此修正。
+- **座位 ring→docked 位置插值:** `Repeater` 项坐标如何同时支持环排布与紧凑网格并平滑插值;`morphProgress` 驱动两套坐标 lerp。可能需 `Behavior on x/y` + 显式坐标函数。**writing-plans 定状态机。回退(§14.2):若位置插值成本/复杂度过高,降级为独立 `SettlementSandbox`(docked 紧凑沙盘)+ ring cross-fade —— 仍保 SeatRing presentational 约束,只是放弃"同元件一镜到底"。**
 - **scroll-spy 防环细节:** `positionViewAtIndex` 触发的 `contentY` 变化与用户滚动区分;`_programmaticScroll` 闸的清除时机(动画 `onStopped`)。
 - **board_timeline 粒度:** round-phase 节点是否够细(一个 night 多个动作合一节点 vs 拆细)?默认每 (round,phase) 一节点,`highlight` 取代表性动作;若需逐动作 scrub 留 P3。**writing-plans 定粒度。**
 - **bundle 缓存失效:** run artifact 理论不变(终态),`settlement-bundle.json` 落盘后恒缓存;若 builder 逻辑迭代,旧缓存需带 `bundle_version` 校验/重算。
