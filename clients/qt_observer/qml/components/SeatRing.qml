@@ -11,6 +11,7 @@ Item {
     objectName: "seatRing"
 
     property var players: []            // ObserverClient.playerItems
+    property var deadIds: []            // queue.deadPlayers — who has died UP TO the playback cursor
     property var current: ({})          // eventQueue.current (PresentationEvent)
     property string layoutPhase: "day"
     property string perspective: "god"
@@ -128,7 +129,9 @@ Item {
             y: root.seatY(index) - root.seatSize / 2
 
             property bool isUnknown: !modelData.display_role || modelData.display_role === "unknown"
-            property bool isDead: modelData.alive === false
+            // Dead ONLY once the death event has been reached in playback (not the final
+            // projection's alive flag) — otherwise every eventual death shows from frame 0.
+            property bool isDead: root.deadIds.indexOf(modelData.player_id) >= 0
             property bool isActive: root.current && root.current.actor === modelData.player_id
             property color accent: isUnknown ? Theme.color.border : Theme.roleAccent(modelData.display_role)
 

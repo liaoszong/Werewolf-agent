@@ -106,6 +106,10 @@ Item {
     }
 
     // ------------------------------------------------------------------- Stage
+    // Two ABSOLUTELY SEPARATED, fixed containers — the ring stage (left) and the event feed
+    // (right). The containers NEVER move; only their contents breathe per phase (the ring
+    // scales/centers inside its own box, the feed dims). This keeps the waterfall — and its
+    // console link / jump pill — pinned to the right like a game kill-feed (no fly-around).
     Item {
         id: stage
         anchors.top: topBar.bottom
@@ -115,43 +119,58 @@ Item {
         anchors.margins: Theme.space.xl
         anchors.bottomMargin: 46 + Theme.space.lg   // reserve the closed evidence strip
 
-        readonly property real smallRing: Math.min(stage.width * 0.40, stage.height * 0.72)
-        readonly property real bigRing: Math.min(stage.width * 0.92, stage.height * 0.92)
-        readonly property real voteRing: Math.min(stage.width * 0.72, stage.height * 0.78)
+        // LEFT — ring stage (fixed ~56% of the width). The ring only resizes WITHIN here.
+        Item {
+            id: ringStage
+            anchors.left: parent.left
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            width: parent.width * 0.56
+            readonly property real maxRing: Math.min(width, height)
 
-        SeatRing {
-            id: ring
-            players: ObserverClient.playerItems
-            current: eventQueue.current
-            layoutPhase: eventQueue.layoutPhase
-            perspective: ObserverClient.currentPerspective   // single source; never handler-assigned (P1-C)
-            // base geometry (overridden by states/transitions)
-            x: 0
-            y: 0
-            width: stage.smallRing
-            height: stage.smallRing
-        }
-
-        SpeechTheater {
-            id: speech
-            current: eventQueue.current
-            players: ObserverClient.playerItems
-            x: stage.smallRing + Theme.space.xxl
-            y: 0
-            width: stage.width - stage.smallRing - Theme.space.xxl
-            height: stage.height
-            onOpenInConsole: evidence.mode = 2
-            // Hovering a waterfall row re-arms that past line on the ring.
-            onHoverEvent: (actor, target, type) => {
-                ring.hoverActor = actor; ring.hoverTarget = target; ring.hoverType = type
+            SeatRing {
+                id: ring
+                players: ObserverClient.playerItems
+                deadIds: eventQueue.deadPlayers   // who has died up to the playback cursor
+                current: eventQueue.current
+                layoutPhase: eventQueue.layoutPhase
+                perspective: ObserverClient.currentPerspective   // single source; never handler-assigned (P1-C)
+                // Base geometry: centered in ringStage; states override only the size, so x/y
+                // (bound to width/height) keep it centered while it breathes.
+                width: ringStage.maxRing * 0.62
+                height: width
+                x: (ringStage.width - width) / 2
+                y: (ringStage.height - height) / 2
             }
-            onClearHover: { ring.hoverActor = ""; ring.hoverTarget = ""; ring.hoverType = "" }
         }
 
-        // Stage status pill (waiting for the next move / game over).
+        // RIGHT — event feed (fixed, pinned to the right edge). Only opacity breathes.
+        Item {
+            id: feedPanel
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            anchors.left: ringStage.right
+            anchors.leftMargin: Theme.space.xxl
+
+            SpeechTheater {
+                id: speech
+                anchors.fill: parent
+                current: eventQueue.current
+                players: ObserverClient.playerItems
+                onOpenInConsole: evidence.mode = 2
+                // Hovering a waterfall row re-arms that past line on the ring.
+                onHoverEvent: (actor, target, type) => {
+                    ring.hoverActor = actor; ring.hoverTarget = target; ring.hoverType = type
+                }
+                onClearHover: { ring.hoverActor = ""; ring.hoverTarget = ""; ring.hoverType = "" }
+            }
+        }
+
+        // Stage status pill (waiting for the next move / game over) — centered over the ring.
         Rectangle {
             visible: theaterRoot._statusText !== ""
-            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.horizontalCenter: ringStage.horizontalCenter
             anchors.top: parent.top
             anchors.topMargin: Theme.space.md
             implicitWidth: statusRow.implicitWidth + Theme.space.lg * 2
@@ -191,60 +210,23 @@ Item {
     }
 
     // ----------------------------------------------- Breathing layout (P2-D / D5)
+    // Only the ring's SIZE and the feed's OPACITY change — never container positions. The
+    // ring's x/y are bound to its (animating) size so it stays centered as it breathes.
     states: [
         State {
-            name: "night"
-            PropertyChanges {
-                target: ring
-                x: (stage.width - stage.bigRing) / 2
-                y: (stage.height - stage.bigRing) / 2
-                width: stage.bigRing
-                height: stage.bigRing
-            }
-            PropertyChanges {
-                target: speech
-                opacity: 0.0
-                x: stage.width * 0.2
-                y: stage.height * 0.82
-                width: stage.width * 0.6
-                height: stage.height * 0.18
-            }
+            name: "night"   // ring takes the spotlight; feed recedes
+            PropertyChanges { target: ring; width: ringStage.maxRing * 0.92 }
+            PropertyChanges { target: feedPanel; opacity: 0.22 }
         },
         State {
-            name: "day"
-            PropertyChanges {
-                target: ring
-                x: 0
-                y: (stage.height - stage.smallRing) / 2
-                width: stage.smallRing
-                height: stage.smallRing
-            }
-            PropertyChanges {
-                target: speech
-                opacity: 1.0
-                x: stage.smallRing + Theme.space.xxl
-                y: 0
-                width: stage.width - stage.smallRing - Theme.space.xxl
-                height: stage.height
-            }
+            name: "day"     // ring steps back; feed at full brightness
+            PropertyChanges { target: ring; width: ringStage.maxRing * 0.60 }
+            PropertyChanges { target: feedPanel; opacity: 1.0 }
         },
         State {
-            name: "voting"
-            PropertyChanges {
-                target: ring
-                x: (stage.width - stage.voteRing) / 2
-                y: 0
-                width: stage.voteRing
-                height: stage.voteRing
-            }
-            PropertyChanges {
-                target: speech
-                opacity: 1.0
-                x: stage.width * 0.12
-                y: stage.height * 0.80
-                width: stage.width * 0.76
-                height: stage.height * 0.20
-            }
+            name: "voting"  // ring mid-size (tally is on the ring); feed bright
+            PropertyChanges { target: ring; width: ringStage.maxRing * 0.80 }
+            PropertyChanges { target: feedPanel; opacity: 1.0 }
         }
     ]
 
@@ -252,9 +234,15 @@ Item {
         ParallelAnimation {
             id: phaseAnim
             NumberAnimation {
-                targets: [ring, speech]
-                properties: "x,y,width,height,opacity"
-                duration: 700
+                target: ring
+                property: "width"
+                duration: 600
+                easing.type: Easing.OutCubic
+            }
+            NumberAnimation {
+                target: feedPanel
+                property: "opacity"
+                duration: 500
                 easing.type: Easing.OutCubic
             }
             // D5: the queue stays gated until the layout settles, then resumes consuming.

@@ -29,6 +29,27 @@ QtObject {
     property string layoutPhase: "day"  // "night" | "day" | "voting"
     property bool waiting: false
     readonly property bool atEnd: _cursor >= _ordered.length   // drained (all received events consumed)
+
+    // Players who have DIED up to the current playback position — a death only "lands" when
+    // its event is consumed, so a replayed/seeked game shows seats die over time instead of
+    // all-dead from frame 0. Scans consumed events (indices 0.._cursor-1) for death markers.
+    readonly property var deadPlayers: {
+        var dead = []
+        var n = Math.min(_cursor, _ordered.length)
+        for (var i = 0; i < n; i++) {
+            var raw = _ordered[i]
+            var t = (raw && raw.payload) ? raw.payload.type : (raw ? raw.type : "")
+            if (t !== "player_died" && t !== "player_eliminated")
+                continue
+            var gid = (raw && raw.payload) ? raw.payload.event_id : (raw ? raw.event_id : "")
+            var enr = (gid && _enrichedById[gid]) ? _enrichedById[gid] : null
+            var tgt = (enr && enr.target && enr.target !== "none") ? enr.target
+                    : ((raw && raw.target) ? raw.target : "")
+            if (tgt && dead.indexOf(tgt) < 0)
+                dead.push(tgt)
+        }
+        return dead
+    }
     property bool playing: true
     property real speed: 1.0
     property bool instant: false
