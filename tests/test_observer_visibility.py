@@ -210,6 +210,38 @@ class VisibilitySeatIndexTests(unittest.TestCase):
             index = build_seat_role_index(run_dir)
             self.assertEqual(index, {})
 
+    def test_latest_god_snapshot_is_authoritative_for_alive(self) -> None:
+        # Regression: the setup snapshot lists everyone alive; a later snapshot
+        # records deaths. "alive in any snapshot" wrongly reported everyone alive
+        # (P2-C-1 dead-state never rendered). The LATEST god snapshot must win.
+        with tempfile.TemporaryDirectory() as td:
+            run_dir = _make_run_dir(Path(td), "run-1", [
+                _make_god_snapshot("god-setup.json", round=0, phase="setup",
+                    alive_players=["p1", "p2", "p3", "p4"]),
+                _make_god_snapshot("god-final.json", round=2, phase="game_end",
+                    alive_players=["p3", "p4"]),
+            ])
+            index = build_seat_role_index(run_dir)
+            self.assertFalse(index["p1"]["alive"])  # dead despite setup listing it
+            self.assertFalse(index["p2"]["alive"])
+            self.assertTrue(index["p3"]["alive"])
+            self.assertTrue(index["p4"]["alive"])
+
+    def test_latest_god_overrides_stale_role_snapshot_alive(self) -> None:
+        # A player's own role snapshot stops at their death and is stale-alive;
+        # the public (god) death record must override it.
+        with tempfile.TemporaryDirectory() as td:
+            run_dir = _make_run_dir(Path(td), "run-1", [
+                _make_role_snapshot("role-p1-r1.json", "p1", "seer", "villager",
+                    round=1, phase="day", alive_players=["p1", "p2"]),
+                _make_god_snapshot("god-final.json", round=2, phase="game_end",
+                    players=[{"player_id": "p1", "role": "seer", "team": "villager"}],
+                    alive_players=["p2"]),
+            ])
+            index = build_seat_role_index(run_dir)
+            self.assertFalse(index["p1"]["alive"])  # god says p1 died after its snapshot
+            self.assertEqual(index["p1"]["alive_source"], "god_snapshot")
+
 
 # ---------------------------------------------------------------------------
 # Step 3: Player projection builder

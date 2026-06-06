@@ -94,6 +94,29 @@ def unknown_player(
 # ---------------------------------------------------------------------------
 
 
+# Phase ordering within a round, so "latest snapshot" means newest *game time*
+# (not alphabetical filename). game_end/result come last; setup first.
+_PHASE_RANK: dict[str, int] = {
+    "setup": 0,
+    "night": 1,
+    "day": 2,
+    "vote": 3,
+    "voting": 3,
+    "game_end": 4,
+    "result": 4,
+}
+
+
+def _snap_order(data: dict[str, object]) -> tuple[int, int]:
+    """Sortable (round, phase_rank) key for a snapshot — higher == later."""
+    try:
+        rnd = int(data.get("round", 0))  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        rnd = 0
+    phase = str(data.get("phase", ""))
+    return (rnd, _PHASE_RANK.get(phase, 1))
+
+
 def build_seat_role_index(run_dir: Path) -> dict[str, dict[str, object]]:
     """Read all role-projection and god snapshots from *run_dir* and build a
     seat-index whose entries carry source-trust metadata.
@@ -147,7 +170,11 @@ def build_seat_role_index(run_dir: Path) -> dict[str, dict[str, object]]:
         if stype == "role_projection":
             pid = str(data.get("player_id", ""))
             if pid:
-                role_snaps[pid] = data
+                # Keep each player's LATEST own snapshot (alive state evolves per
+                # round); alphabetical glob order would wrongly pick e.g. n1 over d2.
+                prev = role_snaps.get(pid)
+                if prev is None or _snap_order(data) >= _snap_order(prev):
+                    role_snaps[pid] = data
         elif stype == "god":
             god_snaps.append(data)
 
@@ -170,6 +197,20 @@ def build_seat_role_index(run_dir: Path) -> dict[str, dict[str, object]]:
     # If we have no player IDs at all, return empty.
     if not all_player_ids:
         return index
+
+    # The LATEST god snapshot carrying an alive_players list is the authority for
+    # current alive/dead state. Earlier snapshots (e.g. setup) list everyone alive,
+    # so "alive in any snapshot" would never report a death (P2-C-1 dead-state bug).
+    latest_god_alive: set[str] | None = None
+    _latest_god_order: tuple[int, int] | None = None
+    for gs in god_snaps:
+        ga = gs.get("alive_players")
+        if not isinstance(ga, list):
+            continue
+        order = _snap_order(gs)
+        if _latest_god_order is None or order >= _latest_god_order:
+            _latest_god_order = order
+            latest_god_alive = {str(x) for x in ga}
 
     for pid in sorted(all_player_ids):
         entry: dict[str, object] = {"player_id": pid}
@@ -204,22 +245,20 @@ def build_seat_role_index(run_dir: Path) -> dict[str, dict[str, object]]:
                 entry["team_source"] = "unknown"
 
         # -- alive --
+        # Deaths are PUBLIC (announced each day), so the LATEST god snapshot is the
+        # authority. A player's own role snapshot can be stale-alive because it
+        # predates their death (a dead player stops producing snapshots).
         alive: bool | None = None
-        if role_snap is not None:
+        if latest_god_alive is not None:
+            alive = pid in latest_god_alive  # present -> alive; absent -> dead
+            entry["alive"] = alive
+            entry["alive_source"] = "god_snapshot"
+        elif role_snap is not None:
             alive_players = role_snap.get("alive_players", [])
             if isinstance(alive_players, list):
                 alive = pid in [str(x) for x in alive_players]
-            if alive is not None:
                 entry["alive"] = alive
                 entry["alive_source"] = "role_projection_snapshot"
-        if alive is None:
-            for gs in god_snaps:
-                god_alive = gs.get("alive_players", [])
-                if isinstance(god_alive, list) and pid in [str(x) for x in god_alive]:
-                    entry["alive"] = True
-                    entry["alive_source"] = "god_snapshot"
-                    alive = True
-                    break
         if alive is None:
             # Fallback: unknown alive status.
             entry["alive"] = True
