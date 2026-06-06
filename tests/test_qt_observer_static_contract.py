@@ -38,6 +38,7 @@ REQUIRED_QML_VIEWS = [
     "qml/components/RoleCard.qml",
     "qml/components/SeatRing.qml",
     "qml/components/SettlementSpine.qml",
+    "qml/components/SettlementReport.qml",
     "qml/components/SpeechTheater.qml",
     "qml/components/EvidenceConsole.qml",
     "qml/components/PlaybackControls.qml",
@@ -64,6 +65,7 @@ REQUIRED_OBJECT_NAMES = {
     "qml/components/RoleCard.qml": ["roleCard"],
     "qml/components/SeatRing.qml": ["seatRing"],
     "qml/components/SettlementSpine.qml": ["settlementSpine"],
+    "qml/components/SettlementReport.qml": ["settlementReport"],
     "qml/components/SpeechTheater.qml": ["speechTheater"],
     "qml/components/EvidenceConsole.qml": ["evidenceConsole", "eventTimeline", "perspectiveSwitcher", "auditLinksPanel", "providerFailureSummary"],
     "qml/components/PlaybackControls.qml": ["playbackControls"],
@@ -695,6 +697,13 @@ class QtObserverSettlementViewTests(unittest.TestCase):
         c = (QT / "qml/components/SettlementSpine.qml").read_text(encoding="utf-8")
         self.assertIn('objectName: "settlementSpine"', c)
         self.assertNotIn("property int cursorIndex", c)   # owned by SettlementView, not here
+
+    def test_report_has_scrollspy_and_guard(self) -> None:
+        c = (QT / "qml/components/SettlementReport.qml").read_text(encoding="utf-8")
+        self.assertIn('objectName: "settlementReport"', c)
+        self.assertIn("_programmaticScroll", c)          # anti-feedback-loop flag (D6)
+        self.assertIn("cursorRequested", c)              # writes cursor via signal to parent only
+        self.assertNotIn("property int cursorIndex", c)  # does not own the cursor
 
 
 if __name__ == "__main__":
