@@ -35,6 +35,7 @@ REQUIRED_QML_VIEWS = [
     "qml/HistoryView.qml",
     "qml/EventPresentationQueue.qml",
     "qml/components/RoleCard.qml",
+    "qml/components/SeatRing.qml",
     "qml/components/EventTimeline.qml",
     "qml/components/PerspectiveSwitcher.qml",
     "qml/components/AuditLinksPanel.qml",
@@ -55,6 +56,7 @@ REQUIRED_OBJECT_NAMES = {
     "qml/HistoryView.qml": ["historyView", "historyRunsList", "historyRefreshButton"],
     "qml/EventPresentationQueue.qml": ["eventQueue"],
     "qml/components/RoleCard.qml": ["roleCard"],
+    "qml/components/SeatRing.qml": ["seatRing"],
     "qml/components/SeatEditorPanel.qml": [
         "seatEditorPanel", "seatEditorProvider", "seatEditorModel",
         "seatEditorStrategy", "seatEditorPrompt",
@@ -601,6 +603,14 @@ class QtObserverTheaterViewTests(unittest.TestCase):
         self.assertNotIn(".sort(", c)                        # append-order consume, never reorder
         for forbidden in ["XMLHttpRequest", '"/api/runs"', "ObserverClient.post"]:
             self.assertNotIn(forbidden, c)
+
+    def test_stage_components_read_presentation_event(self) -> None:
+        # Edit 1: stage components read the normalized PresentationEvent (current.*),
+        # never raw runtime .payload.
+        for f in [
+            "qml/components/SeatRing.qml",
+        ]:
+            self.assertNotIn(".payload", (QT / f).read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

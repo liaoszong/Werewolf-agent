@@ -43,6 +43,7 @@ qt_add_qml_module(appqt_observer
         qml/HistoryView.qml
         qml/EventPresentationQueue.qml
         qml/components/RoleCard.qml
+        qml/components/SeatRing.qml
         qml/components/EventTimeline.qml
         qml/components/PerspectiveSwitcher.qml
         qml/components/AuditLinksPanel.qml
