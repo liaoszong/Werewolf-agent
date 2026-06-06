@@ -105,6 +105,22 @@ Item {
         }
     }
 
+    // -------------------------------------------------------- Top phase progress axis
+    // Sits between the app bar and the stage (its own band, never overlapping the buttons).
+    PhaseTimeline {
+        id: phaseAxis
+        anchors.top: topBar.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.topMargin: Theme.space.xs
+        anchors.leftMargin: Theme.space.xl
+        anchors.rightMargin: Theme.space.xl
+        phases: eventQueue.phaseTimeline
+        phase: eventQueue.layoutPhase === "night" ? "night" : "day"
+        action: eventQueue.currentAction
+        visible: eventQueue.phaseTimeline.length > 0
+    }
+
     // ------------------------------------------------------------------- Stage
     // Two ABSOLUTELY SEPARATED, fixed containers — the ring stage (left) and the event feed
     // (right). The containers NEVER move; only their contents breathe per phase (the ring
@@ -112,11 +128,12 @@ Item {
     // console link / jump pill — pinned to the right like a game kill-feed (no fly-around).
     Item {
         id: stage
-        anchors.top: topBar.bottom
+        anchors.top: phaseAxis.visible ? phaseAxis.bottom : topBar.bottom
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
         anchors.margins: Theme.space.xl
+        anchors.topMargin: Theme.space.md
         anchors.bottomMargin: 40 + Theme.space.md   // reserve the (now quiet) collapsed evidence line
 
         // LEFT — ring stage (fixed ~56% of the width). The ring only resizes WITHIN here.

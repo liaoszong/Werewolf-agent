@@ -30,6 +30,37 @@ QtObject {
     property bool waiting: false
     readonly property bool atEnd: _cursor >= _ordered.length   // drained (all received events consumed)
 
+    // Major phase timeline up to the cursor: ordered unique (round, night|day) pairs. Drives
+    // the top progress axis; the LAST entry is the current major phase. (voting is part of day.)
+    readonly property var phaseTimeline: {
+        var out = []
+        var seen = ({})
+        var n = Math.min(_cursor, _ordered.length)
+        for (var i = 0; i < n; i++) {
+            var raw = _ordered[i]
+            var r = (raw && raw.round !== undefined && raw.round !== null) ? raw.round : 0
+            var ph = (raw && raw.phase === "night") ? "night" : "day"
+            var key = r + ":" + ph
+            if (seen[key])
+                continue
+            seen[key] = true
+            out.push({ round: r, phase: ph })
+        }
+        return out
+    }
+
+    // Current micro-action (which role/step is acting now) derived from the on-stage event —
+    // drives the sub-round highlight slider on the timeline.
+    readonly property string currentAction: {
+        var t = current ? current.type : ""
+        if (t === "werewolf_kill") return "wolf"
+        if (t === "seer_check") return "seer"
+        if (t === "witch_save" || t === "witch_kill" || t === "witch_pass") return "witch"
+        if (t === "player_speech") return "speech"
+        if (t === "player_vote" || t === "player_eliminated") return "vote"
+        return ""
+    }
+
     // Players who have DIED up to the current playback position — a death only "lands" when
     // its event is consumed, so a replayed/seeked game shows seats die over time instead of
     // all-dead from frame 0. Scans consumed events (indices 0.._cursor-1) for death markers.
