@@ -135,6 +135,7 @@ Item {
         SpeechTheater {
             id: speech
             current: eventQueue.current
+            players: ObserverClient.playerItems
             x: stage.smallRing + Theme.space.xxl
             y: 0
             width: stage.width - stage.smallRing - Theme.space.xxl

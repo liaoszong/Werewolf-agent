@@ -11,6 +11,7 @@ Item {
     objectName: "speechTheater"
 
     property var current: ({})          // eventQueue.current (PresentationEvent)
+    property var players: []             // ObserverClient.playerItems (for faction coloring)
     signal openInConsole()
 
     readonly property string _full: _narrate(current)
@@ -73,6 +74,17 @@ Item {
         default:                  return _evSummary(ev) || _typeLabel(t)
         }
     }
+    function _factionColor(pid) {
+        for (var i = 0; i < players.length; i++)
+            if (players[i] && players[i].player_id === pid && players[i].display_role && players[i].display_role !== "unknown")
+                return Theme.roleAccent(players[i].display_role)
+        return Theme.color.textMuted
+    }
+    function _richIds(text) {
+        return text.replace(/p[1-6]/g, function (m) {
+            return '<font color="' + _factionColor(m) + '">' + m + '</font>'
+        })
+    }
 
     Column {
         anchors.left: parent.left
@@ -103,7 +115,7 @@ Item {
             Text {
                 anchors.verticalCenter: parent.verticalCenter
                 text: root._actor
-                color: Theme.color.textMuted
+                color: root._factionColor(root._actor)
                 font.family: Theme.font.mono
                 font.pixelSize: Theme.size.caption
             }
@@ -117,7 +129,8 @@ Item {
             Text {
                 width: parent.width - cursor.width - 2
                 wrapMode: Text.WordWrap
-                text: root._full.substring(0, root._shown)
+                textFormat: Text.RichText
+                text: root._richIds(root._full.substring(0, root._shown))
                 color: Theme.color.text
                 font.family: Theme.font.display
                 font.pixelSize: Theme.size.h2

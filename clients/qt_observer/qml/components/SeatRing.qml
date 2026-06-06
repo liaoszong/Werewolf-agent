@@ -112,6 +112,10 @@ Item {
             property bool isActive: root.current && root.current.actor === modelData.player_id
             property color accent: isUnknown ? Theme.color.border : Theme.roleAccent(modelData.display_role)
 
+            // Dead seats recede: smaller (退场 depth) + dimmed + desaturated (gray, faction color dropped).
+            scale: isDead ? 0.82 : 1.0
+            Behavior on scale { NumberAnimation { duration: Theme.motion.slow; easing.type: Easing.OutCubic } }
+
             GlowDot {
                 anchors.horizontalCenter: avatar.horizontalCenter
                 anchors.verticalCenter: avatar.verticalCenter
@@ -126,37 +130,62 @@ Item {
                 width: root.seatSize
                 height: root.seatSize
                 radius: width / 2
-                color: seat.isUnknown ? Theme.color.surfaceInset : Theme.roleTint(modelData.display_role)
-                border.width: seat.isActive ? 2 : 1
-                border.color: seat.accent
-                opacity: seat.isDead ? 0.4 : 1.0
+                color: seat.isDead ? Theme.color.surfaceInset
+                     : (seat.isUnknown ? Theme.color.surfaceInset : Theme.roleTint(modelData.display_role))
+                border.width: seat.isActive && !seat.isDead ? 2 : 1
+                border.color: seat.isDead ? Theme.color.borderStrong : seat.accent
+                opacity: seat.isDead ? 0.5 : 1.0
+                Behavior on opacity { NumberAnimation { duration: Theme.motion.base } }
 
                 Text {
                     anchors.centerIn: parent
                     text: modelData.player_id
-                    color: Theme.color.text
+                    color: seat.isDead ? Theme.color.textMuted : Theme.color.text
                     font.family: Theme.font.display
                     font.pixelSize: Theme.size.h2
                     font.weight: Theme.weight.bold
                 }
 
-                // Dead strike-through.
+                // Dead strike-through (dark red, bold).
                 Rectangle {
                     visible: seat.isDead
                     anchors.centerIn: parent
-                    width: parent.width * 1.1
-                    height: 2
+                    width: parent.width * 1.15
+                    height: 3
+                    radius: 1.5
                     rotation: -45
-                    color: Theme.color.textMuted
+                    color: Theme.color.danger
+                    opacity: 0.9
+                }
+            }
+
+            // 出局 / OUT badge — crisp (full opacity even though the avatar is dimmed).
+            Rectangle {
+                visible: seat.isDead
+                anchors.horizontalCenter: avatar.horizontalCenter
+                anchors.verticalCenter: avatar.bottom
+                width: outText.implicitWidth + Theme.space.sm
+                height: outText.implicitHeight + 3
+                radius: Theme.radius.sm
+                color: Theme.withAlpha(Theme.color.danger, 0.92)
+                Text {
+                    id: outText
+                    anchors.centerIn: parent
+                    text: I18n.t("出局", "OUT")
+                    color: Theme.color.text
+                    font.family: Theme.font.family
+                    font.pixelSize: Theme.size.micro
+                    font.weight: Theme.weight.bold
                 }
             }
 
             Text {
                 anchors.top: avatar.bottom
-                anchors.topMargin: 4
+                anchors.topMargin: seat.isDead ? 13 : 4
                 anchors.horizontalCenter: avatar.horizontalCenter
                 text: seat.isUnknown ? "████" : root._roleLabel(modelData.display_role)
-                color: seat.isUnknown ? Theme.color.textMuted : seat.accent
+                color: seat.isDead ? Theme.color.textMuted
+                     : (seat.isUnknown ? Theme.color.textMuted : seat.accent)
                 font.family: seat.isUnknown ? Theme.font.mono : Theme.font.family
                 font.pixelSize: Theme.size.micro
             }

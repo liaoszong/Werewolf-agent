@@ -18,10 +18,13 @@ Item {
     property string perspective: "god"
 
     readonly property real fullHeight: parent ? parent.height : 640
+    property real _userHeight: 0   // drag-to-resize override (0 = use the mode preset)
+    onModeChanged: _userHeight = 0
     height: mode === 0 ? 46
+          : _userHeight > 0 ? _userHeight
           : mode === 1 ? Math.round(fullHeight * 0.32)
           : Math.round(fullHeight * 0.66)
-    Behavior on height { NumberAnimation { duration: Theme.motion.base; easing.type: Easing.OutCubic } }
+    Behavior on height { enabled: !resizeHandle.pressed; NumberAnimation { duration: Theme.motion.base; easing.type: Easing.OutCubic } }
 
     // ---- localized narration helpers (shared shape: PresentationEvent OR enriched projection event) ----
     function _evType(ev) { return (ev && ev.type !== undefined && ev.type !== "") ? ev.type : ((ev && ev.payload) ? ev.payload.type : "") }
@@ -56,12 +59,62 @@ Item {
         default:                  return _evSummary(ev) || _typeLabel(t)
         }
     }
+    function _phaseLabel(ev) {
+        var t = _evType(ev)
+        if (t === "player_vote" || t === "player_eliminated") return I18n.t("投票", "Vote")
+        return (ev && ev.phase === "night") ? I18n.t("夜", "Night") : I18n.t("昼", "Day")
+    }
+    function _factionColor(pid) {
+        var ps = ObserverClient.playerItems
+        for (var i = 0; i < ps.length; i++)
+            if (ps[i] && ps[i].player_id === pid && ps[i].display_role && ps[i].display_role !== "unknown")
+                return Theme.roleAccent(ps[i].display_role)
+        return Theme.color.textSecondary
+    }
+    function _richIds(text) {
+        return text.replace(/p[1-6]/g, function (m) {
+            return '<font color="' + _factionColor(m) + '">' + m + '</font>'
+        })
+    }
+    // Only render events that carry real content (skips empty / undefined runtime ticks).
+    readonly property var _logEvents: {
+        var out = []
+        var evs = ObserverClient.projectionEvents
+        for (var i = 0; i < evs.length; i++) {
+            var e = evs[i]
+            if (!_evType(e))
+                continue
+            var n = _narrate(e)
+            if (!n || n === "")
+                continue
+            out.push(e)
+        }
+        return out
+    }
 
     // Backdrop + top hairline.
     Rectangle {
         anchors.fill: parent
         color: Theme.color.surface
         Rectangle { anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; height: 1; color: Theme.color.border }
+    }
+
+    // Drag-to-resize handle on the top border (desktop affordance).
+    MouseArea {
+        id: resizeHandle
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        height: 7
+        visible: root.mode !== 0
+        cursorShape: Qt.SizeVerCursor
+        property real _h0: 0
+        property real _gy0: 0
+        onPressed: (mouse) => { root._userHeight = root.height; _h0 = root.height; _gy0 = mapToItem(null, mouse.x, mouse.y).y }
+        onPositionChanged: (mouse) => {
+            var gy = mapToItem(null, mouse.x, mouse.y).y
+            root._userHeight = Math.max(120, Math.min(root.fullHeight, _h0 + (_gy0 - gy)))
+        }
     }
 
     // ---- Top bar ----
@@ -154,8 +207,9 @@ Item {
             anchors.bottom: parent.bottom
             anchors.topMargin: Theme.space.sm
             clip: true
-            model: ObserverClient.projectionEvents
+            model: root._logEvents
             ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+            onCountChanged: Qt.callLater(positionViewAtEnd)   // keep the newest entry in view
 
             delegate: Item {
                 width: logList.width
@@ -176,7 +230,7 @@ Item {
                     Text {
                         id: chipText
                         anchors.centerIn: parent
-                        text: "R" + (modelData.round !== undefined ? modelData.round : 0) + " · " + root._typeLabel(root._evType(modelData))
+                        text: "R" + (modelData.round !== undefined ? modelData.round : 0) + " · " + root._phaseLabel(modelData) + " · " + root._typeLabel(root._evType(modelData))
                         color: Theme.color.textMuted
                         font.family: Theme.font.mono
                         font.pixelSize: Theme.size.micro
@@ -189,7 +243,8 @@ Item {
                     anchors.right: parent.right
                     anchors.top: parent.top
                     wrapMode: Text.WordWrap
-                    text: root._narrate(modelData)
+                    textFormat: Text.RichText
+                    text: root._richIds(root._narrate(modelData))
                     color: parent.isSpeech ? Theme.color.text : Theme.color.textSecondary
                     font.family: Theme.font.family
                     font.pixelSize: Theme.size.small
