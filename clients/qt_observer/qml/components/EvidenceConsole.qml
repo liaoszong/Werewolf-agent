@@ -31,6 +31,9 @@ Item {
     // ---- localized narration helpers (shared shape: PresentationEvent OR enriched projection event) ----
     function _evType(ev) { return (ev && ev.type !== undefined && ev.type !== "") ? ev.type : ((ev && ev.payload) ? ev.payload.type : "") }
     function _evSummary(ev) { return (ev && ev.summary !== undefined) ? ev.summary : ((ev && ev.data) ? (ev.data.summary || "") : "") }
+    // AI Trace — the deciding model's reasoning. Already perspective-gated server-side
+    // (god/own only); the client just renders whatever arrived.
+    function _evReason(ev) { return (ev && ev.data && ev.data.reason_summary) ? ev.data.reason_summary : "" }
     function _evActor(ev) { return (ev && ev.actor) ? ev.actor : "" }
     function _evTarget(ev) { return (ev && ev.target && ev.target !== "none") ? ev.target : "" }
     function _typeLabel(t) {
@@ -221,8 +224,9 @@ Item {
 
             delegate: Item {
                 width: logList.width
-                height: Math.max(narText.implicitHeight, 18) + Theme.space.md
+                height: textCol.implicitHeight + Theme.space.md
                 readonly property bool isSpeech: root._evType(modelData) === "player_speech"
+                readonly property string reason: root._evReason(modelData)
 
                 Rectangle {
                     id: chip
@@ -244,19 +248,41 @@ Item {
                         font.pixelSize: Theme.size.micro
                     }
                 }
-                Text {
-                    id: narText
+                Column {
+                    id: textCol
                     anchors.left: chip.right
                     anchors.leftMargin: Theme.space.md
                     anchors.right: parent.right
                     anchors.top: parent.top
-                    wrapMode: Text.WordWrap
-                    textFormat: Text.RichText
-                    text: root._richIds(root._narrate(modelData))
-                    color: parent.isSpeech ? Theme.color.text : Theme.color.textSecondary
-                    font.family: Theme.font.family
-                    font.pixelSize: Theme.size.small
-                    lineHeight: 1.3
+                    spacing: 3
+                    Text {
+                        width: parent.width
+                        wrapMode: Text.WordWrap
+                        textFormat: Text.RichText
+                        text: root._richIds(root._narrate(modelData))
+                        color: isSpeech ? Theme.color.text : Theme.color.textSecondary
+                        font.family: Theme.font.family
+                        font.pixelSize: Theme.size.small
+                        lineHeight: 1.3
+                    }
+                    // AI Trace — model reasoning, monospace, set apart by a left rule.
+                    Row {
+                        width: parent.width
+                        visible: reason !== ""
+                        spacing: Theme.space.sm
+                        Rectangle { width: 2; height: traceText.implicitHeight; radius: 1; color: Theme.withAlpha(Theme.color.info, 0.5) }
+                        Text {
+                            id: traceText
+                            width: parent.width - Theme.space.sm - 2
+                            wrapMode: Text.WordWrap
+                            text: "AI · " + reason
+                            color: Theme.color.textMuted
+                            font.family: Theme.font.mono
+                            font.pixelSize: Theme.size.micro
+                            lineHeight: 1.25
+                            renderType: Text.NativeRendering
+                        }
+                    }
                 }
             }
 

@@ -623,6 +623,69 @@ class VisibilityEnvelopeTests(unittest.TestCase):
             for key in required_keys:
                 self.assertIn(key, envelope, f"Missing required envelope key: {key}")
 
+    def _make_reason_run(self, td: str) -> "Path":
+        # Two PUBLIC vote events (visible to everyone) so the variable under test is the
+        # reasoning gate, not event visibility. p3 votes p1; p4 votes p2.
+        run_dir = _make_run_dir(Path(td), "run-1", [
+            _make_god_snapshot("god.json", round=1, phase="day",
+                players=[{"player_id": p, "role": "villager", "team": "villager"}
+                         for p in ("p1", "p2", "p3", "p4")],
+                alive_players=["p1", "p2", "p3", "p4"]),
+        ])
+        (run_dir / "game-log.json").write_text(json.dumps({"events": [
+            {"event_id": "g_e1", "type": "player_vote", "actor": "p3", "target": "p1",
+             "data": {"summary": "p3 votes p1"}},
+            {"event_id": "g_e2", "type": "player_vote", "actor": "p4", "target": "p2",
+             "data": {"summary": "p4 votes p2"}},
+        ]}), encoding="utf-8")
+        (run_dir / "decision-log.json").write_text(json.dumps({"decisions": [
+            {"actor": "p3", "action": "player_vote", "target": "p1", "reason_summary": "R-P3-secret"},
+            {"actor": "p4", "action": "player_vote", "target": "p2", "reason_summary": "R-P4-secret"},
+        ]}), encoding="utf-8")
+        return run_dir
+
+    def _reasons_by_actor(self, envelope: dict) -> dict:
+        out = {}
+        for ev in envelope["events"]:
+            data = ev.get("data") or {}
+            if "reason_summary" in data:
+                out[ev.get("actor")] = data["reason_summary"]
+        return out
+
+    def _rt_votes(self) -> list:
+        return [
+            {"actor": "p3", "event_id": "u1", "kind": "game_event_emitted",
+             "payload": {"event_id": "g_e1", "type": "player_vote"},
+             "phase": "day", "round": 1, "seq": 1, "visibility": "public"},
+            {"actor": "p4", "event_id": "u2", "kind": "game_event_emitted",
+             "payload": {"event_id": "g_e2", "type": "player_vote"},
+             "phase": "day", "round": 1, "seq": 2, "visibility": "public"},
+        ]
+
+    def test_god_sees_all_reason_summaries(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            run_dir = self._make_reason_run(td)
+            env = build_projection_envelope(run_dir=run_dir, run_id="run-1",
+                                            perspective="god", events=self._rt_votes())
+            self.assertEqual(self._reasons_by_actor(env),
+                             {"p3": "R-P3-secret", "p4": "R-P4-secret"})
+
+    def test_role_sees_only_own_reason_summary(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            run_dir = self._make_reason_run(td)
+            env = build_projection_envelope(run_dir=run_dir, run_id="run-1",
+                                            perspective="role:p3", events=self._rt_votes())
+            reasons = self._reasons_by_actor(env)
+            self.assertEqual(reasons.get("p3"), "R-P3-secret")
+            self.assertNotIn("p4", reasons)  # MUST NOT leak another player's reasoning
+
+    def test_public_sees_no_reason_summary(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            run_dir = self._make_reason_run(td)
+            env = build_projection_envelope(run_dir=run_dir, run_id="run-1",
+                                            perspective="public", events=self._rt_votes())
+            self.assertEqual(self._reasons_by_actor(env), {})
+
     def test_role_projection_envelope_includes_self_proof(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             run_dir = _make_run_dir(Path(td), "run-1", [
@@ -864,12 +927,15 @@ class ProjectionSummaryEnrichmentTests(unittest.TestCase):
             self.assertEqual(len(env["events"]), 2)
             self.assertNotIn("data", env["events"][0])       # thin (no data.summary), no crash
 
-    def test_no_reason_summary_or_secret_in_envelope(self) -> None:
+    def test_no_provider_secret_in_envelope(self) -> None:
+        # Provider/prompt secrets must NEVER appear. (reason_summary is now an authorized
+        # field — god may carry it; its per-actor gating is covered by the
+        # VisibilityEnvelopeTests reason-gating tests.)
         with tempfile.TemporaryDirectory() as td:
             env = build_projection_envelope(run_dir=self._run_dir(td), run_id="r1",
                                             perspective="god", events=self._runtime_events())
             blob = json.dumps(env, ensure_ascii=False)
-            for forbidden in ["reason_summary", "prompt", "api_key", "Bearer", "sk-"]:
+            for forbidden in ["prompt", "api_key", "Bearer", "sk-"]:
                 self.assertNotIn(forbidden, blob)
 
 
