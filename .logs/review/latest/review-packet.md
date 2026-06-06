@@ -1,154 +1,86 @@
-# Review Packet — G3-2 Qt Live/Fake Toggle (capabilities endpoint, honest HUD)
+# Review Packet — P2-C-1 Theater View + Bottom Evidence Console
 
 ## Metadata
-- **Branch:** `feat/g3-2-qt-live-toggle`  •  **Base:** `main`
-- **Date:** 2026-06-05  •  **Author:** liaoszong
-- **Spec:** `docs/superpowers/specs/2026-06-05-g3-2-qt-live-toggle-design.md`
-- **Plan:** `docs/harness/plans/2026-06-05--g3-2-qt-live-toggle-plan.md`
-- **Scope:** bring G3-1's server-side live capability onto the Qt cockpit user path —
-  read-only `GET /api/runtime/capabilities`, a `mode=live` profile launch, an honest HUD
-  data-source chip driven by run-detail `execution_mode`, verbatim gate-error surfacing.
-  Fake stays the unconditional default; the Qt client never holds/handles a key.
-- **Implementation commits (TDD, one per task):**
-  - `f3ea636` feat(g3-2): build_runtime_capabilities protocol helper (g3.runtime_capabilities.v1)
-  - `3c4cbc9` feat(g3-2): GET /api/runtime/capabilities (read-only live posture)
-  - `877e961` feat(g3-2): surface execution_mode in run detail (API-mediated HUD truth)
-  - `289615c` feat(g3-2): ObserverApiClient mode param + runtime capabilities + execution-mode
-  - `2de1651` feat(g3-2): ModeControl arming FSM + DataSourceChip HUD + MatchSetup/AppShell wiring
-  - `f6ece92` docs(g3-2): README live toggle + boundary reaffirmation; secret/boundary regression green
-  - `8c9eb91` test(g3-2): pin C1-bis reset per-trigger + C2 resolvedMode + C3 disarm wiring (review)
-- Docs (already on branch): `1f50571` spec, `6b5ef3c` plan, `c3be5c9` plan-review round 1.
+- **Branch:** `p2-c-1-theater-view` (base `main`)
+- **Spec:** `docs/superpowers/specs/2026-06-06-p2-c-1-theater-view-design.md` (approved, 3 review rounds: 4 spec edits + 7 plan invariants + 6 correctness fixes)
+- **Plan:** `docs/harness/plans/2026-06-06--p2-c-1-theater-view-plan.md` (10 tasks, all complete)
+- **Scope:** Replace the data-dashboard cockpit with a theater-style default spectator UI: breathing night/day/voting stage driven by a QML EventPresentationQueue; honesty chain demoted into a 3-state bottom Evidence Console with a reversible Seat Lens; visibility-safe projection summary enrichment (only backend change).
 
-## Changed files & diff stat (`main...HEAD`, implementation only)
+## Commits (9)
 ```
- src/werewolf_eval/observer_protocol.py             |  36 +   (build_runtime_capabilities + schema ver)
- src/werewolf_eval/observer_server.py               |  61 +-  (capabilities route + _read_execution_mode)
- tests/test_observer_protocol.py                    |  96 +
- tests/test_observer_server.py                      | 144 +
- clients/qt_observer/src/ObserverApiClient.h        |  33 +-
- clients/qt_observer/src/ObserverApiClient.cpp      |  92 +-
- clients/qt_observer/qml/MatchSetupView.qml         |  57 +-  (banner -> ModeControl + wiring)
- clients/qt_observer/qml/AppShell.qml               |   9 +   (DataSourceChip in top bar)
- clients/qt_observer/qml/components/ModeControl.qml | 151 +   (new)
- clients/qt_observer/qml/components/DataSourceChip.qml | 51 + (new)
- clients/qt_observer/CMakeLists.txt                 |   2 +   (register both components)
- clients/qt_observer/README.md                      |  11 +   (live toggle + boundary reaffirmation)
- tests/test_qt_observer_static_contract.py          | 144 +-  (+ review hardening)
+2e11cd8 docs(p2-c-1): design spec + implementation plan
+aaa2893 feat(p2-c-1): visibility-safe projection summary enrichment (post-filter game-log join)
+505c9c1 feat(p2-c-1): expose enriched projectionEvents to QML + stale-guard
+2fbb3f7 feat(p2-c-1): EventPresentationQueue controller
+62d0c18 feat(p2-c-1): SeatRing breathing player ring + connector layer
+1fe8562 feat(p2-c-1): SpeechTheater typewriter + inline 3-layer AI trace
+5d0d578 feat(p2-c-1): EvidenceConsole 3-state forensic console (honesty chain re-homed + Seat Lens)
+33b271e feat(p2-c-1): thin PlaybackControls (no scrub)
+18f51fc feat(p2-c-1): TheaterView compose + breathing layout + queue yield-gate; retarget navigateCockpit
 ```
-`compileall src tests` → clean.
 
-## Allowlist conformance
-- Every changed file is in the plan Allowlist. **PASS**
-- **Forbidden scope untouched** (`git diff --name-only main...HEAD`): no edits to G3-1 gate
-  logic (`_check_live_capability`/`_check_live_profile_shape` reused verbatim), no
-  `deepseek_provider.py` / `provider_agent.py` / consensus runner / `game_engine.py`; no API-key
-  UI; no new artifact-read endpoint; no `docs/ROADMAP|TASKS|adr`; no new deps; no Web client. **PASS**
+## Changed files (16) — all within the spec §12 allowlist
+```
+src/werewolf_eval/observer_visibility.py              (+ _load_game_log_summaries, post-filter enrichment)
+clients/qt_observer/src/ObserverApiClient.h/.cpp      (+ projectionEvents Q_PROPERTY + stale-guard)
+clients/qt_observer/qml/EventPresentationQueue.qml    (new, non-visual controller)
+clients/qt_observer/qml/TheaterView.qml               (new, composition + breathing states)
+clients/qt_observer/qml/components/SeatRing.qml       (new)
+clients/qt_observer/qml/components/SpeechTheater.qml  (new)
+clients/qt_observer/qml/components/EvidenceConsole.qml(new)
+clients/qt_observer/qml/components/PlaybackControls.qml(new)
+clients/qt_observer/qml/AppShell.qml                  (navigateCockpit -> TheaterView)
+clients/qt_observer/CMakeLists.txt                    (register 6 new QML)
+clients/qt_observer/README.md                         (Theater = default surface)
+tests/test_observer_visibility.py                     (+ ProjectionSummaryEnrichmentTests)
+tests/test_qt_observer_static_contract.py             (+ theater contract tests)
+docs/.../2026-06-06-p2-c-1-theater-view-design.md     (spec)
+docs/.../2026-06-06--p2-c-1-theater-view-plan.md      (plan)
+```
+**Diff stat:** 16 files changed, ~2350 insertions, 5 deletions. **`.gitignore`** (pre-existing unrelated edit) intentionally NOT committed.
 
-## A1 — `GET /api/runtime/capabilities` (read-only; reuses `_check_live_capability`)
-Localhost HTTP is env-blocked (`RemoteDisconnected`), so the read-only endpoint is proven
-**offline** by feeding a real `ObserverServerState` through the pure derivation helper
-`_build_capabilities_payload`, exactly as the G3-1 gate matrix is proven via `_check_live_capability`.
-The live-socket GET variant is env-blocked and intentionally not exercised.
+## Diff check / forbidden scan
+- `git diff --check main...HEAD`: clean (one trailing-whitespace nit in the plan doc fixed).
+- Forbidden/secret scan on added client lines (`QFile`/`QDir`/`file://`/`events.jsonl`/`snapshots/`/`sk-…`/`Authorization:`/`Bearer`): **0 hits**.
+- No engine files touched; no new endpoint; no new deps; no client file I/O; no provider secrets.
 
-| Posture | `enabled` | `available` | `reason_code` | == launch-time 403 code | Test |
-|---|---|---|---|---|---|
-| flag off | false | false | `live_api_disabled` | yes | `RuntimeCapabilitiesEndpointTests.test_disabled_posture_reason_matches_launch_403` |
-| flag on, no key | true | false | `missing_api_key` | yes | `...test_flag_on_no_key_posture_reason_matches_launch_403` |
-| flag on + launcher | true | true | (omitted) | gate proceeds | `...test_available_posture_proceeds_with_no_reason` |
+## Test summary
+- **Backend enrichment (pure, runs here):** `tests.test_observer_visibility` — **53/53 OK** incl. 4 new `ProjectionSummaryEnrichmentTests` (god gets summaries; role:pN enriched-but-no-leak; missing game-log → thin/no-error; no `reason_summary`/secret). TDD: both enrichment tests red (`KeyError: 'data'`) → green.
+- **Qt static contract:** `tests.test_qt_observer_static_contract` — **56/56 OK** (6 new QML files + objectNames + CMake registration; queue presentation-only/`_present`/no-`.sort`/reactive `current`; stage components no `.payload`; EvidenceConsole strong re-home; nav→TheaterView + `state: eventQueue.layoutPhase` + no `ring.perspective =`; stale-guard in both setters before requests).
+- **Qt build:** `cmake --build … appqt_observer` — **exit 0** (qmlcachegen AOT-compiles every QML = validity gate).
+- **ctest:** 100% (1/1, SSE parser).
+- **qmllint** on all 6 new QML: **0 `Error:` lines** (`[unqualified]` ObserverClient noise ignored per project convention).
+- **Full suite:** `Ran 576 tests … FAILED (failures=1, errors=47, skipped=1)` — **identical to baseline**: 47 errors are all `test_observer_server` `RemoteDisconnected` (documented localhost-HTTP block, memory `werewolf-env-network-test-limits`); 1 failure is the pre-existing `test_context_budget` AGENTS.md doc test (fails identically on `main`). **Zero new regressions.** `compileall` OK. **P2-C-1 adds no server-route tests.**
+- **Visual (grabToImage → PNG → Read; harness reverted, tree nets to zero):** 6 frames confirmed in `.tmp/p2c1_*.png`:
+  - `night` — ring centered, faction-colored seats, p1 active+glow, red `p1→p4` kill connector + arrowhead, p4 dimmed/dead.
+  - `day` — ring shrunk left, SpeechTheater expanded right, p3(seer) active, "发言 · p3" + fully-typed summary + L3 link.
+  - `voting` — ring re-emphasized, p5 active, `p5→p1` vote connector, bottom "投票" strip.
+  - `console` — Expanded (~66%), re-homed Seat Lens (上帝视角) + ViewBoundaryBadge + ProjectionProof + EventTimeline.
+  - `backfill_before` — event present (发言 · p2), summary empty → "· 等待文本 ·" placeholder.
+  - `backfill_after` — SAME p2 event back-fills its text reactively (no re-pump) — P1-A confirmed.
 
-- Posture derives ONLY from `_check_live_capability(state,"live")` (None ⇒ available; tuple ⇒
-  `(status, reason_code, message)`), so the capabilities `reason_code` is identical to the
-  launch-time 403 code. `default_mode` is hard-coded `"fake"`. Read-only: no writes, no provider call.
-- Pure helper unit tests: `RuntimeCapabilitiesTests` (available / disabled / flag-on-no-key /
-  available-ignores-stray-reason / no-secret).
-- **No secret:** every posture's JSON contains none of `Authorization`/`Bearer `/`DEEPSEEK_API_KEY`/`sk-`
-  (`RuntimeCapabilitiesTests.test_no_secret_markers_in_any_posture`,
-  `RuntimeCapabilitiesEndpointTests.test_payload_carries_no_secret_in_any_posture`). The key-free
-  canonical reason `missing_api_key` legitimately appears (it must equal the 403 code) — the
-  `api_key` substring ban is a *client-source* contract, not a payload contract (mirrors the
-  existing `ObserverServerSecretScanTests` markers).
+## Key hunks
+- **Enrichment (`observer_visibility.py`):** `_load_game_log_summaries(run_dir)` builds `{game_log_event_id: {summary, target}}` (never raises); `build_projection_envelope` joins it onto each **already-visibility-filtered** event → `data.summary` nested + `target` top-level. Post-filter ⇒ god sees all, `role:pN` only its own; thin when game-log absent.
+- **C++ (`ObserverApiClient`):** `projectionEvents` parsed from the same `/projection` response under the existing latest-wins guard; `setCurrentPerspective`/`setCurrentRunId` clear `m_projectionEvents` + notify **before** the new stream/projection request (stale guard).
+- **Queue (`EventPresentationQueue.qml`):** append-order de-dup (no sort); `_present` PresentationEvent (`type` from `payload.type`, `summary`/`target` from enriched); **reactive computed `current`** (`_present(_currentRaw)`); `reset()` on run/perspective/source-gen; `resumeAfterTransition` yield-gate.
+- **TheaterView:** `state: eventQueue.layoutPhase` (declarative, P2-D); single terminal `ParallelAnimation.onStopped → resumeAfterTransition`; `SeatRing.perspective` single-bound to `currentPerspective` (P1-C).
+- **EvidenceConsole:** 3-state dock; Seat Lens sets `currentPerspective` only (no `ring.perspective` write); Back-to-God restores it.
 
-## A2 — `execution_mode` in run detail (server reads its OWN artifact; Qt does zero file I/O)
-- `_run_detail_with_reason` attaches `execution_mode` via `_read_execution_mode(run_dir)`, which
-  reads the run's own `resolved-profile.json` (guards JSON/OS errors; returns None on missing/corrupt/
-  non-string → chip falls back to `SYS: SIMULATION`). Never raises, never exposes a path.
-- Tests `RunDetailExecutionModeTests`: live→`"live"`, fake→`"fake"`, no-artifact→omitted,
-  non-string(123)→omitted, corrupt-JSON→tolerated+detail still builds, coexists-with-reason.
-- **Qt reads no artifact files:** `QtObserverBoundaryTests` + `test_qt_client_does_not_use_local_snapshot_or_event_paths`
-  confirm no `QFile`/`QDir`/`file://`/`resolved-profile.json`/`events.jsonl`/`snapshots/` in any
-  client `.cpp/.h/.qml`. Direct grep over `clients/qt_observer/src|qml` → **NONE**.
+## Evidence Map (acceptance A1–A14)
+- A1 nav→TheaterView, LiveCockpit retired, honesty chain in console — *test_cockpit_nav_targets_theater_view; build; visual console*
+- A2 breathing ≤ ~0.7s, queue gated during transition — *queue `_gated`; visual 3 states; onStopped wired*
+- A3 queue append-order/de-dup, playback works, no future fast-forward — *test_event_queue_is_presentation_only; visual playback bar*
+- A4 god ring all roles + connectors; Seat Lens fog + reversible — *visual night/day/voting; EvidenceConsole binding*
+- A5 typewriter `current.summary` (full just-finished; placeholder live) — *visual day + backfill_before/after*
+- A6 enrichment canonical `data.summary`+`target`, no leak, thin when absent, no new server-route tests — *ProjectionSummaryEnrichmentTests*
+- A7 `projectionEvents` latest-wins + stale clear — *test_client_exposes_projection_events; build*
+- A8 static contract green; build exit 0; ctest; qmllint clean — *all above*
+- A9 no engine change/endpoint/deps/file-I/O; SSE thin unchanged — *diff/forbidden scan*
+- A10 presentation-only: append-order/no-sort/no-synthetic; PresentationEvent; components no `.payload` — *contract*
+- A11 existing `Theme.roleAccent` tokens (no Theme change) — *diff has no Theme.qml; visual faction colors*
+- A12 run/perspective clears projectionEvents + queue reset (clear precedes request, both setters) — *test_stale_guard_in_both_setters_before_requests*
+- A13 reactive back-fill (computed `current`); live directional connector needs target (spotlight only) — *visual backfill_before/after; SeatRing connector guard*
+- A14 reset re-syncs layout via `state: eventQueue.layoutPhase`; perspective never handler-assigned — *test_cockpit_nav_targets_theater_view*
 
-## C1–C4 hard-constraint evidence
-| # | Constraint | Implementation | Pinning test |
-|---|---|---|---|
-| **C1** | `currentExecutionMode` set ONLY from run-detail `execution_mode` (never intent/202 echo) | `openRun` parses `execution_mode` (isString && !empty); `launchFromProfile` never touches it | `test_current_execution_mode_parsed_from_run_detail`, `test_launch_handler_never_sets_execution_mode` (slices launchFromProfile body) |
-| **C1-bis** | reset to `""` on run change / missing-string field / detail+capabilities error | `setCurrentRunId` (run change) + `openRun` (error/malformed/else) + `refreshCapabilities` (error) all call `resetExecutionMode()` (`m_currentExecutionMode.clear()`) | `test_stale_guard_reset_wired_to_every_c1bis_trigger` (per-site, mutation-verified: deleting the setCurrentRunId reset turns it red) |
-| **C2** | QML passes explicit mode; `live` only in `live_confirmed`; no C++ default arg | `launchFromProfile(profile, mode)` no default; `body["mode"]=mode`; `resolvedMode = state==="live_confirmed" ? "live" : "fake"`; view passes `setupModeControl.resolvedMode` | `test_launch_from_profile_takes_mode_and_writes_body_mode`, `test_mode_control_resolved_mode_maps_only_confirmed_to_live`, `test_setup_is_profile_driven` (regex `launchFromProfile(..., \w+.resolvedMode)`) |
-| **C3** | `resetToFake()` single disarm; parent calls it on profile/loadedProfile/seat change + `liveAvailable→false`; never mutates FSM state | `ModeControl.resetToFake()`; MatchSetupView calls it from `onSelectedSeatIdChanged`, `onLoadedProfileChanged`, `onActivated`, `onCapabilitiesChanged`(!liveAvailable). FSM tokens `fake`/`live_armed`/`live_confirmed` | `test_mode_control_declares_canonical_fsm_tokens`, `test_setup_is_profile_driven` (4 disarm sites pinned) |
-| **C4** | `unreachable` is the ONLY client-owned code; server codes data-driven (verbatim) | capabilities error → `liveReasonCode="unreachable"`; success reads `reason_code`/`message` from JSON; ModeControl renders `liveReasonCode` as a property ref | `test_no_server_reason_codes_are_client_literals` (.h+.cpp), `test_mode_control_renders_reason_code_data_driven`, `test_capabilities_error_uses_client_only_unreachable_code` |
-
-Direct grep: server reason codes (`live_api_disabled`/`missing_api_key`/`unsupported_live_provider`/
-`mixed_models`/`provider_failure`/`budget_exhausted`) in client `src|qml` → **NONE** (C4). `unreachable`
-present only in `ObserverApiClient.cpp` (1 literal + comments).
-
-## A3–A6 — toggle behavior, HUD, gate errors
-- **A3 (launch mode rule):** `mode="live"` sent only in `live_confirmed`; `fake`/`live_armed` → fake;
-  omitted ⇒ fake server-side; template launches stay fake (parser rejects `template`+`live`).
-- **A4 (arming FSM):** two-click `fake → live_armed → live_confirmed`; LIVE disabled +
-  `UNAVAIL · <reason_code>` when `!liveAvailable`; pulsing GlowDot at `live_confirmed`. Fake default.
-- **A5 (HUD truth):** `DataSourceChip` shows `SYS: LIVE_API` iff `mode==="live"` (from
-  `currentExecutionMode`), else conservative `SYS: SIMULATION`; resets so a prior live run can't
-  leave a stale LIVE (C1-bis). Amber "Deterministic Mock" banner removed.
-- **A6 (gate errors verbatim):** unavailable + gate errors render server `reason_code`/`message`
-  verbatim; `unreachable` is the only client-owned code.
-
-## A7 — Secret/boundary + offline suite
-- **Secret-scan:** `QtObserverSecretBoundaryTests` (no `Authorization:`/`Bearer `/`DEEPSEEK_API_KEY=`/
-  `sk-`/`api_key`/`api-key` in any `.cpp/.h/.qml`) green; the `api_key`-bearing reason
-  (`missing_api_key`) lives only in server payloads, never a client literal (C4).
-- **No file I/O / no key UI:** boundary + no-snapshot/event-path tests green; no API-key input or
-  displayed string anywhere.
-- **Full offline suite** `python -m unittest discover -s tests -p "test_*.py"`:
-  **516 ran, 1 failure, 47 errors, 1 skipped.**
-  - 47 errors = ALL `test_observer_server` **HTTP-socket** classes (env-blocked `RemoteDisconnected`);
-    the new G3-2 offline classes (`RuntimeCapabilitiesEndpointTests`, `RunDetailExecutionModeTests`)
-    are NOT among them.
-  - 1 failure = pre-existing unrelated `test_context_budget.ContextBudgetGateDocsTests` (AGENTS.md docs gate).
-  - 1 skipped = G3-1 gated live smoke (never reads the key).
-  - +27 tests vs. G3-1's 489 baseline (5+4+6+8+4 new), all green.
-
-## Qt build / ctest / runtime (on F:, Qt 6.10.0 mingw)
-- `cmake -S clients/qt_observer -B .tmp/qt-observer-build` → configure OK (both new QML files registered).
-- `cmake --build ... --target appqt_observer` → **exit 0**; `ModeControl_qml`/`DataSourceChip_qml`
-  AOT-compiled by `qmlcachegen` (⇒ all QML syntactically valid, incl. the `state`-property FSM); the
-  C++ `ObserverApiClient` changes compiled and linked.
-- `ctest --test-dir .tmp/qt-observer-build` → **1/1 passed** (SSE parser).
-- `qmllint` on the changed QML → no `Error:` lines (only ignorable `[unqualified]`/`[missing-property]`).
-- **Runtime:** ran the GUI (exit 0) with a temp screenshot harness (since removed): the top-bar
-  `DataSourceChip` renders `环境：离线模拟` (SYS: SIMULATION) and the `ModeControl` renders the
-  segmented `[确定性 | 禁用·]` with DETERMINISTIC selected and LIVE disabled (no server →
-  `liveAvailable=false`, reason data-driven). Amber banner gone; layout balanced, on-palette.
-
-## Adversarial review (workflow `wf_29a74582-f04`)
-5 review dimensions (constraints / correctness / security / reuse-plan / tests), each finding
-independently verified by a refute-by-default agent (11 agents, ~580k tokens, 172 tool uses).
-**6 findings, 1 confirmed, 5 refuted.**
-- **Confirmed (fixed, `8c9eb91`):** the C1-bis stale-guard test was a single global-OR over the whole
-  `.cpp` — it proved a reset literal existed somewhere but not that the reset is wired to each trigger;
-  a regression dropping `resetExecutionMode()` from `setCurrentRunId` (the spec's worst-case
-  live→fake stale-LIVE flash) would have stayed green. Hardened to per-site pins (+C2 ternary, +C3
-  4-trigger wiring) and **mutation-verified**. Production code unchanged (it was already correct).
-- **Refuted (5):** all test-hardening suggestions where production code is correct and the constraint
-  is pinned elsewhere or structurally guaranteed (e.g. cross-run reset via `setCurrentRunId`; non-string
-  `execution_mode` → `""` → SIMULATION; run detail carries only `execution_mode`, not the 202 `mode`
-  echo). Two of these (C2/C3 presence-only) overlapped the confirmed theme and were folded into the fix.
-
-## Env-deferred (not blockers)
-- **Optional QtTest** `tst_observer_api_client_mode.cpp` (plan T4 Step 3) not added: the Qt toolchain
-  builds on F: but adding an uncompilable-in-session C++ test risks the owner's ctest; the offline
-  static-contract suite + the successful F: build/ctest are the authoritative gates this slice.
-
-## Acceptance summary
-A1 ✅ · A2 ✅ · A3 ✅ · A4 ✅ · A5 ✅ · A6 ✅ · A7 ✅ — all met offline; Qt validated on F: (build exit 0,
-ctest 1/1, qmllint clean, runtime render confirmed). Default suite stays offline; the Qt client never
-holds a key.
+## Review trigger result
+All gates green; zero new regressions; visual verification confirms the breathing theater, connectors, typewriter, reactive back-fill, and 3-state console. Ready for review.

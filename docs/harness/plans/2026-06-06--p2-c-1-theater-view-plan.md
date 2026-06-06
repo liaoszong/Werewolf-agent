@@ -622,7 +622,7 @@ git commit -m "feat(p2-c-1): EventPresentationQueue (presentation-only, de-dup/n
   - Dark theater backdrop (deepen `AppBackground`); faction accents via `Theme.roleAccent` (D10 — existing tokens; indigo/fluo-green deferred per §16).
 
 - [ ] **Step 3: Retarget nav + retire LiveCockpitView**
-  - `AppShell.qml`: change `cockpitComponent` to `TheaterView { objectName: "theaterView" }` (keep `navigateCockpit()` name + the StackView wiring). 
+  - `AppShell.qml`: change `cockpitComponent` to `TheaterView { objectName: "theaterView" }` (keep `navigateCockpit()` name + the StackView wiring).
   - `LiveCockpitView.qml`: **leave the file in place, unreferenced** (retire-not-delete). It stays registered in CMake + contract while present. (A follow-up may delete it once the console fully subsumes it and all gates are green — out of this task's required path.)
   - `README.md`: update non-goals — default spectator surface is now the Theater View; still no Web client, no Python binding, no local artifact reads, no provider secrets. Keep the substrings the README contract asserts.
 

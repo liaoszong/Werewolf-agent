@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 246
+- Entries: 268
 
 ```text
 ./
@@ -47,6 +47,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   └── research.md
 │   ├── codex-review-comment.md
 │   └── writing-plan.md
+├── .grill/
+│   └── p2-a-2-live-smoke-and-byo-key-direction.md
 ├── .logs/
 │   └── review/
 │       └── latest/
@@ -62,22 +64,28 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       │   │   ├── DataSourceChip.qml
 │       │   │   ├── EmptyState.qml
 │       │   │   ├── EventTimeline.qml
+│       │   │   ├── EvidenceConsole.qml
 │       │   │   ├── GlowDot.qml
 │       │   │   ├── ModeControl.qml
 │       │   │   ├── PerspectiveSwitcher.qml
+│       │   │   ├── PlaybackControls.qml
 │       │   │   ├── ProjectionProofPanel.qml
 │       │   │   ├── RoleCard.qml
 │       │   │   ├── SeatEditorPanel.qml
+│       │   │   ├── SeatRing.qml
 │       │   │   ├── SectionHeader.qml
+│       │   │   ├── SpeechTheater.qml
 │       │   │   ├── StatusBadge.qml
 │       │   │   └── ViewBoundaryBadge.qml
 │       │   ├── AppShell.qml
+│       │   ├── EventPresentationQueue.qml
 │       │   ├── HistoryView.qml
 │       │   ├── HomeView.qml
 │       │   ├── I18n.qml
 │       │   ├── LiveCockpitView.qml
 │       │   ├── MatchSetupView.qml
 │       │   ├── PreflightView.qml
+│       │   ├── TheaterView.qml
 │       │   └── Theme.qml
 │       ├── src/
 │       │   ├── ObserverApiClient.cpp
@@ -181,7 +189,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   │   ├── 2026-06-04--g2d-2-qt-setup-ui-plan.md
 │   │   │   ├── 2026-06-04--g2d-prompt-configuration-mvp-plan.md
 │   │   │   ├── 2026-06-05--g3-1-live-deepseek-execution-plan.md
-│   │   │   └── 2026-06-05--g3-2-qt-live-toggle-plan.md
+│   │   │   ├── 2026-06-05--g3-2-qt-live-toggle-plan.md
+│   │   │   └── 2026-06-06--p2-c-1-theater-view-plan.md
 │   │   └── reviews/
 │   │       ├── 2026-06-01--g1c-project-healthcheck-final.md
 │   │       ├── 2026-06-01--g1c-project-healthcheck.md
@@ -203,11 +212,15 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │       ├── 2026-06-04-g2d-2-qt-setup-ui-design.md
 │   │       ├── 2026-06-04-g2d-prompt-configuration-design.md
 │   │       ├── 2026-06-05-g3-1-live-deepseek-execution-design.md
-│   │       └── 2026-06-05-g3-2-qt-live-toggle-design.md
+│   │       ├── 2026-06-05-g3-2-qt-live-toggle-design.md
+│   │       ├── 2026-06-05-p2-a-1-emergent-engine-design.md
+│   │       ├── 2026-06-05-p2-a-2-live-deepseek-emergent-smoke-design.md
+│   │       └── 2026-06-06-p2-c-1-theater-view-design.md
 │   ├── CHECKPOINT_TEMPLATE.md
 │   ├── EVALUATION_RUBRIC.md
 │   ├── GOLD_DEMO.md
 │   ├── PRODUCT_ONE_PAGER.md
+│   ├── PROJECT_MAP.md
 │   ├── ROADMAP.md
 │   ├── SPIKES.md
 │   └── TASKS.md
@@ -230,6 +243,9 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       ├── decision_log.py
 │       ├── deepseek_launcher.py
 │       ├── deepseek_provider.py
+│       ├── emergent_engine.py
+│       ├── emergent_fake_script.py
+│       ├── emergent_smoke_check.py
 │       ├── failure_audit.py
 │       ├── fake_provider.py
 │       ├── game_engine.py
@@ -245,6 +261,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       ├── render_provider_replay.py
 │       ├── run_deepseek_consensus_game.py
 │       ├── run_deepseek_provider_game.py
+│       ├── run_emergent_deepseek_game.py
+│       ├── run_emergent_game.py
 │       ├── run_fake_provider_game.py
 │       ├── run_g1h_fake_runtime.py
 │       ├── run_mock_game.py
@@ -273,6 +291,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── test_deepseek_live_smoke.py
 │   ├── test_deepseek_provider_game.py
 │   ├── test_deepseek_provider.py
+│   ├── test_emergent_engine.py
+│   ├── test_emergent_smoke_check.py
 │   ├── test_failure_audit.py
 │   ├── test_fake_provider_game.py
 │   ├── test_fake_provider.py
@@ -283,11 +303,14 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── test_observer_protocol.py
 │   ├── test_observer_server.py
 │   ├── test_observer_visibility.py
+│   ├── test_p2a2_live_path.py
 │   ├── test_profile_config.py
 │   ├── test_provider_contract.py
 │   ├── test_qt_observer_static_contract.py
 │   ├── test_render_demo.py
 │   ├── test_render_provider_replay.py
+│   ├── test_run_emergent_deepseek_game.py
+│   ├── test_run_emergent_game.py
 │   ├── test_runtime_events.py
 │   ├── test_scoring.py
 │   ├── test_scripted_game_runner.py
