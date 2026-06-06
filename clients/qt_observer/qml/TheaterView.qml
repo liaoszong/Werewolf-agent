@@ -121,6 +121,18 @@ Item {
         visible: eventQueue.phaseTimeline.length > 0
     }
 
+    // Z-axis separator — a hair-thin, very dim line so the control rail floats above the
+    // stage instead of sharing its plane.
+    Rectangle {
+        anchors.top: phaseAxis.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.topMargin: Theme.space.sm
+        height: 1
+        visible: phaseAxis.visible
+        color: Theme.withAlpha(Theme.color.text, 0.08)
+    }
+
     // ------------------------------------------------------------------- Stage
     // Two ABSOLUTELY SEPARATED, fixed containers — the ring stage (left) and the event feed
     // (right). The containers NEVER move; only their contents breathe per phase (the ring
@@ -231,17 +243,20 @@ Item {
     // ring's x/y are bound to its (animating) size so it stays centered as it breathes.
     states: [
         State {
-            name: "night"   // ring takes the spotlight; feed recedes
-            PropertyChanges { target: ring; width: ringStage.maxRing * 0.92 }
-            PropertyChanges { target: feedPanel; opacity: 0.22 }
+            name: "night"   // ring takes the WHOLE stage; feed fades fully out
+            PropertyChanges { target: ringStage; width: stage.width }
+            PropertyChanges { target: ring; width: ringStage.maxRing * 0.86 }
+            PropertyChanges { target: feedPanel; opacity: 0.0 }
         },
         State {
-            name: "day"     // ring steps back; feed at full brightness
+            name: "day"     // ring at ~56%; feed at full brightness
+            PropertyChanges { target: ringStage; width: stage.width * 0.56 }
             PropertyChanges { target: ring; width: ringStage.maxRing * 0.60 }
             PropertyChanges { target: feedPanel; opacity: 1.0 }
         },
         State {
-            name: "voting"  // ring mid-size (tally is on the ring); feed bright
+            name: "voting"  // ring mid-size (tally on the ring); feed bright
+            PropertyChanges { target: ringStage; width: stage.width * 0.56 }
             PropertyChanges { target: ring; width: ringStage.maxRing * 0.80 }
             PropertyChanges { target: feedPanel; opacity: 1.0 }
         }
@@ -250,16 +265,24 @@ Item {
     transitions: Transition {
         ParallelAnimation {
             id: phaseAnim
+            // The ring stage container expands/contracts; the ring rescales within it; the
+            // feed dissolves. x/y stay bound so the ring keeps centred throughout.
+            NumberAnimation {
+                target: ringStage
+                property: "width"
+                duration: 700
+                easing.type: Easing.InOutCubic
+            }
             NumberAnimation {
                 target: ring
                 property: "width"
-                duration: 600
+                duration: 700
                 easing.type: Easing.OutCubic
             }
             NumberAnimation {
                 target: feedPanel
                 property: "opacity"
-                duration: 500
+                duration: 600
                 easing.type: Easing.OutCubic
             }
             // D5: the queue stays gated until the layout settles, then resumes consuming.
