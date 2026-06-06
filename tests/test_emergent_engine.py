@@ -54,6 +54,30 @@ class VillagerWinTests(unittest.TestCase):
         self.assertEqual(outcome.failure_audit["game_id"], "p2a1_test")
         self.assertIsInstance(outcome.failure_audit["failures"], list)
 
+    def test_witch_poison_uses_eval_vocabulary_and_is_scored(self) -> None:
+        # Regression (P2-A): the witch's poison must use the eval-contract vocabulary
+        # "witch_poison" (the string scoring/attribution and gold-game g001 expect),
+        # NOT "witch_kill". A mismatch makes score_game silently SKIP the poison event
+        # AND its decision (scoring.py filters both on SCORE_RELEVANT_*), under-scoring
+        # the witch. Mirror the witch_save pattern: one string across action/decision/event.
+        from werewolf_eval.scoring import score_game
+
+        outcome = _run(build_villager_win_script())
+        game = parse_game_log(outcome.game_log)
+        # 1) game-log event vocabulary
+        poison_events = [e for e in game.events if e.type == "witch_poison"]
+        self.assertEqual(len(poison_events), 1)
+        self.assertEqual((poison_events[0].actor, poison_events[0].target), ("p4", "p2"))
+        self.assertNotIn("witch_kill", [e.type for e in game.events])
+        # 2) decision-log action vocabulary
+        decision_log = parse_decision_log(outcome.decision_log, game)
+        self.assertEqual(len([d for d in decision_log.decisions if d.action == "witch_poison"]), 1)
+        self.assertNotIn("witch_kill", [d.action for d in decision_log.decisions])
+        # 3) end-to-end: the poison is now actually scored (was silently dropped before)
+        score_log = score_game(game, decision_log)
+        witch_poison_records = [r for r in score_log.records if r.actor == "p4" and r.action_type == "witch_poison"]
+        self.assertEqual(len(witch_poison_records), 1)
+
     def test_deterministic_same_seed_byte_identical(self) -> None:
         a = _run(build_villager_win_script())
         b = _run(build_villager_win_script())
@@ -146,9 +170,9 @@ class RobustnessTests(unittest.TestCase):
 
     def test_witch_cannot_poison_twice(self) -> None:
         # Focused unit test of the resolver's once-only poison constraint: with
-        # poison already used, a witch_kill must be rejected and apply no poison.
+        # poison already used, a witch_poison must be rejected and apply no poison.
         s = build_villager_win_script()
-        s[("p4", "night", 1)] = json.dumps({"action": "witch_kill", "target": "p6", "reason_summary": "x", "decision_type": "retaliatory", "confidence": 1.0}, ensure_ascii=False)
+        s[("p4", "night", 1)] = json.dumps({"action": "witch_poison", "target": "p6", "reason_summary": "x", "decision_type": "retaliatory", "confidence": 1.0}, ensure_ascii=False)
         engine = EmergentGameEngine(
             config=build_emergent_config(game_id="witch"),
             agents=build_emergent_fake_agents(s),

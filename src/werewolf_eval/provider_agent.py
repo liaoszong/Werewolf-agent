@@ -18,7 +18,7 @@ class ProviderActionError(ValueError):
 
 ALLOWED_ACTIONS_BY_ROLE_PHASE: dict[tuple[str, str], list[str]] = {
     ("seer", "night"): ["seer_check"],
-    ("witch", "night"): ["witch_save", "witch_kill"],
+    ("witch", "night"): ["witch_save", "witch_poison"],
     ("werewolf", "night"): ["werewolf_kill"],
     ("seer", "day"): ["player_vote"],
     ("witch", "day"): ["player_vote"],
