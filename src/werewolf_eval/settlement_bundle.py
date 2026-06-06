@@ -1,0 +1,255 @@
+"""P2-D settlement bundle builder (pure, eval-ready).
+
+`build_settlement_bundle(game, decision_log) -> dict` produces the
+`p2d.settlement.v1` bundle (spec §5/§6.1):
+
+- Curtain layer (run_id/game_id/result/players-reveal/board_timeline) depends
+  ONLY on the game-log and survives any scoring failure.
+- Battle-report layer (core_metrics/top_attribution/turning_points/per-player
+  scores) comes from score_game+summarize_metrics+attribute_game and degrades
+  gracefully with one of three bare reason CODES — never raw exception text.
+
+`build_settlement_response(run_dir, run_status, run_id) -> dict` (Task 2) is the
+filesystem-only route logic (lazy compute-or-cache settlement-bundle.json).
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+from werewolf_eval.attribution import attribute_game
+from werewolf_eval.decision_log import DecisionLog, load_decision_log
+from werewolf_eval.game_log import GameLog, load_game_log
+from werewolf_eval.scoring import score_game, summarize_metrics
+
+BUNDLE_VERSION = "p2d.settlement.v1"
+
+# Death events that remove a player from the alive set (verified vs the gold
+# game-log §13: night/poison kills surface as `player_died`, day votes as
+# `player_eliminated`). `werewolf_kill` etc. are intents, not deaths.
+_DEATH_TYPES = {"player_died", "player_eliminated"}
+_PHASE_LABEL = {"setup": "开局", "night": "夜晚", "day": "白天", "game_end": "终局"}
+
+_DECISION_DEGRADE = {
+    "absent": "missing_decision_log",
+    "invalid": "invalid_decision_log",
+}
+
+
+def _board_timeline(game: GameLog) -> list[dict]:
+    """One node per (round, phase) group, in sequence order. Only needs the
+    game-log; never raises. `alive_player_ids` is the state AFTER applying that
+    group's deaths, so the last node's alive set == game.result.survivors."""
+    alive = {p.player_id for p in game.players}
+    nodes: list[dict] = []
+    cur_key = None
+    cur: dict | None = None
+    for ev in sorted(game.events, key=lambda e: e.sequence):
+        key = (ev.round, ev.phase)
+        if key != cur_key:
+            cur = {
+                "cursor_index": len(nodes),
+                "round": ev.round,
+                "phase": ev.phase,
+                "label": f"第{ev.round}{_PHASE_LABEL.get(ev.phase, ev.phase)}",
+                "changed": [],
+                "highlight": None,
+                "alive_player_ids": sorted(alive),
+            }
+            nodes.append(cur)
+            cur_key = key
+        if ev.type in _DEATH_TYPES and ev.target in alive:
+            alive.discard(ev.target)
+            cur["changed"].append({"player_id": ev.target, "change": ev.type})
+        if cur["highlight"] is None and ev.target and ev.target != "none":
+            cur["highlight"] = {"actor": ev.actor, "target": ev.target, "kind": ev.type}
+        cur["alive_player_ids"] = sorted(alive)
+    return nodes
+
+
+def _curtain(game: GameLog, board: list[dict], run_id: str | None) -> dict:
+    survivors = set(game.result.survivors)
+    return {
+        "bundle_version": BUNDLE_VERSION,
+        "run_id": run_id,
+        "game_id": game.game_id,
+        "degraded": False,
+        "degraded_reason": None,
+        "result": {
+            "winner": game.result.winner,
+            "end_round": game.result.end_round,
+            "end_condition": game.result.end_condition,
+            "survivors": sorted(survivors),
+            "margin": None,
+            "source_label": game.source_label,
+        },
+        "players": [
+            {
+                "player_id": p.player_id,
+                "role": p.role,
+                "team": p.team,
+                "alive": p.player_id in survivors,
+                "outcome_score": 0,
+                "rule_integrity_score": 0,
+                "decision_quality_score": 0,
+            }
+            for p in game.players
+        ],
+        "core_metrics": {},
+        "top_attribution": None,
+        "turning_points": [],
+        "board_timeline": board,
+    }
+
+
+def _cursor_for(tp, game: GameLog, board: list[dict]) -> int:
+    """Resolve a turn_point → board_timeline index via its evidence event's
+    (round, phase). Falls back to the nearest preceding round node, then the
+    last node. Never raises."""
+    if not board:
+        return 0
+    rp = None
+    for eid in getattr(tp, "evidence_event_ids", []) or []:
+        try:
+            ev = game.event_by_id(eid)
+            rp = (ev.round, ev.phase)
+            break
+        except Exception:
+            continue
+    if rp is None:
+        rp = (getattr(tp, "round", board[-1]["round"]), "day")
+    for n in board:
+        if (n["round"], n["phase"]) == rp:
+            return n["cursor_index"]
+    cand = [n for n in board if n["round"] <= rp[0]]
+    return (cand[-1] if cand else board[-1])["cursor_index"]
+
+
+def build_settlement_bundle(
+    game: GameLog,
+    decision_log: DecisionLog | None,
+    *,
+    run_id: str | None = None,
+    decision_log_status: str = "present",
+) -> dict:
+    board = _board_timeline(game)
+    bundle = _curtain(game, board, run_id)
+
+    # Missing/invalid decision-log degrades EXPLICITLY via the status pre-check.
+    # We do NOT rely on score_game(game, None): that is a valid path and would
+    # not degrade. The battle report is decision-aware (spec §6.1), so a
+    # missing/unusable decision-log => curtain-only.
+    if decision_log_status != "present":
+        bundle["degraded"] = True
+        bundle["degraded_reason"] = _DECISION_DEGRADE.get(
+            decision_log_status, "missing_decision_log"
+        )
+        return bundle
+
+    try:
+        score_log = score_game(game, decision_log)
+        metrics = summarize_metrics(game, score_log)
+        attribution = attribute_game(game, score_log, metrics)
+    except Exception:  # reason CODE only — never raw text/path/stack
+        bundle["degraded"] = True
+        bundle["degraded_reason"] = "scoring_failed"
+        return bundle
+
+    # metrics.* are dataclasses (ResultMetrics / ScoreSummary) — attribute access.
+    ss = metrics.score_summary
+    rm = metrics.result_metrics
+    for p in bundle["players"]:
+        pid = p["player_id"]
+        p["outcome_score"] = ss.player_outcome_scores.get(pid, 0)
+        p["rule_integrity_score"] = ss.player_rule_integrity_scores.get(pid, 0)
+        p["decision_quality_score"] = ss.player_decision_quality_scores.get(pid, 0)
+
+    bundle["result"]["margin"] = rm.margin
+    mvp = (
+        max(bundle["players"], key=lambda p: p["outcome_score"])["player_id"]
+        if bundle["players"]
+        else None
+    )
+    bundle["core_metrics"] = {
+        "game_length": rm.game_length,
+        "margin": rm.margin,
+        "mvp_player_id": mvp,
+        "villager_survival_rate": rm.villager_survival_rate,
+        "werewolf_survival_rate": rm.werewolf_survival_rate,
+    }
+
+    top = attribution.top_attribution
+    bundle["top_attribution"] = (
+        {"turn_point_id": top.turn_point_id, "description": top.description_template}
+        if top
+        else None
+    )
+    bundle["turning_points"] = [
+        {
+            "turn_point_id": tp.turn_point_id,
+            "round": tp.round,
+            "phase": next(
+                (
+                    n["phase"]
+                    for n in board
+                    if n["cursor_index"] == _cursor_for(tp, game, board)
+                ),
+                "day",
+            ),
+            "title": (tp.description_template or "")[:40],
+            "description": tp.description_template,
+            "impact_score": tp.impact_score,
+            "impact_sign": tp.impact_sign,
+            "evidence_event_ids": list(tp.evidence_event_ids or []),
+            "cursor_index": _cursor_for(tp, game, board),
+        }
+        for tp in attribution.turn_points
+    ]
+    return bundle
+
+
+def build_settlement_response(
+    run_dir: Path, run_status: str, run_id: str | None
+) -> dict:
+    """Filesystem-only route logic for GET /api/runs/{id}/settlement (no socket).
+
+    - not completed                  -> {"available": False, "reason": "not_completed"}
+    - completed but no game-log      -> {"available": False, "reason": "no_game_log"}
+    - completed + game-log           -> lazy compute-or-cache settlement-bundle.json,
+                                        return {"available": True, "bundle": ...}
+
+    Decision-log status is judged here (absent / invalid / present) and passed to
+    the builder, which maps it to the missing_/invalid_decision_log degrade code.
+    """
+    run_dir = Path(run_dir)
+    game_log_path = run_dir / "game-log.json"
+    if run_status != "completed":
+        return {"available": False, "reason": "not_completed"}
+    if not game_log_path.exists():
+        return {"available": False, "reason": "no_game_log"}
+
+    cache = run_dir / "settlement-bundle.json"
+    if cache.exists():
+        return {
+            "available": True,
+            "bundle": json.loads(cache.read_text(encoding="utf-8")),
+        }
+
+    game = load_game_log(game_log_path)
+    dpath = run_dir / "decision-log.json"
+    decision_log: DecisionLog | None = None
+    status = "absent"
+    if dpath.exists():
+        try:
+            decision_log = load_decision_log(dpath, game)
+            status = "present"
+        except Exception:
+            decision_log = None
+            status = "invalid"
+
+    bundle = build_settlement_bundle(
+        game, decision_log, run_id=run_id, decision_log_status=status
+    )
+    cache.write_text(json.dumps(bundle, ensure_ascii=False), encoding="utf-8")
+    return {"available": True, "bundle": bundle}
