@@ -16,8 +16,13 @@ Item {
 
     Component.onCompleted: {
         if (ObserverClient.currentRunId !== "") {
-            ObserverClient.connectStream()
             ObserverClient.refreshProjection()
+            // Only tail the live stream for an active run; a completed run's events were
+            // already loaded by openRun (avoids a redundant SSE replay storm on re-open).
+            if (!ObserverClient.connected
+                    && ObserverClient.currentStatus !== "completed"
+                    && ObserverClient.currentStatus !== "failed")
+                ObserverClient.connectStream()
         }
     }
 
@@ -86,14 +91,6 @@ Item {
                 font.family: Theme.font.display
                 font.pixelSize: Theme.size.h1
                 font.weight: Theme.weight.bold
-            }
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                text: I18n.t("对局 ", "Run ") + ObserverClient.currentRunId
-                color: Theme.color.textMuted
-                font.family: Theme.font.mono
-                font.pixelSize: Theme.size.small
-                visible: ObserverClient.currentRunId !== ""
             }
             StatusBadge {
                 anchors.verticalCenter: parent.verticalCenter

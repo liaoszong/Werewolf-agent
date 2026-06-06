@@ -3,38 +3,68 @@ import QtQuick.Controls
 import qt_observer
 import "."
 
-// P2-C-1 bottom evidence console. Three states (Closed / Peek / Expanded) that re-home the
-// demoted honesty chain: trust boundary, projection proof, Seat Lens, event timeline and
-// audit links. The Seat Lens drives ObserverClient.currentPerspective ONLY — the stage
-// re-fogs via its own binding; this console never writes ring.perspective (P1-C). Exiting
-// the lens restores the god view.
+// P2-C-1 bottom evidence console. Four states:
+//   收起 Closed · 预览 Peek · 展开 Expand   -> human-readable localized match log + Seat Lens
+//   审计 Audit                              -> the raw/technical honesty chain (trust boundary,
+//                                              projection proof, raw event table, audit links).
+// 预览/展开 deliberately show only what a spectator can read; the数据化 backend layer is one
+// extra click away under 审计.  The Seat Lens drives ObserverClient.currentPerspective ONLY
+// (P1-C); exiting it restores god.
 Item {
     id: root
     objectName: "evidenceConsole"
 
-    property int mode: 0                 // 0 Closed, 1 Peek, 2 Expanded
+    property int mode: 0                 // 0 Closed, 1 Peek, 2 Expand, 3 Audit
     property string perspective: "god"
 
     readonly property real fullHeight: parent ? parent.height : 640
     height: mode === 0 ? 46
-          : mode === 1 ? Math.round(fullHeight * 0.30)
+          : mode === 1 ? Math.round(fullHeight * 0.32)
           : Math.round(fullHeight * 0.66)
     Behavior on height { NumberAnimation { duration: Theme.motion.base; easing.type: Easing.OutCubic } }
+
+    // ---- localized narration helpers (shared shape: PresentationEvent OR enriched projection event) ----
+    function _evType(ev) { return (ev && ev.type !== undefined && ev.type !== "") ? ev.type : ((ev && ev.payload) ? ev.payload.type : "") }
+    function _evSummary(ev) { return (ev && ev.summary !== undefined) ? ev.summary : ((ev && ev.data) ? (ev.data.summary || "") : "") }
+    function _evActor(ev) { return (ev && ev.actor) ? ev.actor : "" }
+    function _evTarget(ev) { return (ev && ev.target && ev.target !== "none") ? ev.target : "" }
+    function _typeLabel(t) {
+        var m = ({
+            player_speech: I18n.t("发言", "Speech"), player_vote: I18n.t("投票", "Vote"),
+            seer_check: I18n.t("查验", "Check"), werewolf_kill: I18n.t("狼刀", "Kill"),
+            witch_save: I18n.t("解药", "Save"), witch_kill: I18n.t("毒药", "Poison"),
+            witch_pass: I18n.t("弃药", "Pass"), player_died: I18n.t("死亡", "Death"),
+            player_eliminated: I18n.t("出局", "Out"), role_revealed: I18n.t("亮牌", "Reveal"),
+            role_assignment: I18n.t("分配", "Setup"), day_announcement: I18n.t("公告", "Notice"),
+            game_over: I18n.t("终局", "End")
+        })
+        return m[t] || t
+    }
+    function _narrate(ev) {
+        var t = _evType(ev), a = _evActor(ev), tg = _evTarget(ev)
+        switch (t) {
+        case "player_speech":     return _evSummary(ev)
+        case "player_vote":       return tg ? I18n.t(a + " 投票给 " + tg, a + " votes for " + tg) : _evSummary(ev)
+        case "werewolf_kill":     return tg ? I18n.t("狼队袭击了 " + tg, "Werewolves attack " + tg) : _evSummary(ev)
+        case "seer_check":        return tg ? I18n.t("预言家 " + a + " 查验了 " + tg, "Seer " + a + " checks " + tg) : _evSummary(ev)
+        case "witch_save":        return tg ? I18n.t("女巫 " + a + " 用解药救了 " + tg, "Witch " + a + " saves " + tg) : _evSummary(ev)
+        case "witch_kill":        return tg ? I18n.t("女巫 " + a + " 用毒药毒了 " + tg, "Witch " + a + " poisons " + tg) : _evSummary(ev)
+        case "witch_pass":        return I18n.t("女巫 " + a + " 没有用药", "Witch " + a + " uses no potion")
+        case "player_died":       return tg ? I18n.t(tg + " 在夜里死亡", tg + " died in the night") : _evSummary(ev)
+        case "player_eliminated": return tg ? I18n.t(tg + " 被投票出局", tg + " was voted out") : _evSummary(ev)
+        case "role_assignment":   return I18n.t("身份已分配给所有玩家", "Roles assigned to all players")
+        default:                  return _evSummary(ev) || _typeLabel(t)
+        }
+    }
 
     // Backdrop + top hairline.
     Rectangle {
         anchors.fill: parent
         color: Theme.color.surface
-        Rectangle {
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.top: parent.top
-            height: 1
-            color: Theme.color.border
-        }
+        Rectangle { anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; height: 1; color: Theme.color.border }
     }
 
-    // ---- Top bar (always visible) ----
+    // ---- Top bar ----
     Item {
         id: topBar
         anchors.left: parent.left
@@ -48,7 +78,6 @@ Item {
             anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
             spacing: Theme.space.md
-
             Text {
                 anchors.verticalCenter: parent.verticalCenter
                 text: I18n.t("证据", "Evidence")
@@ -57,28 +86,10 @@ Item {
                 font.pixelSize: Theme.size.body
                 font.weight: Theme.weight.semibold
             }
-            Row {
-                anchors.verticalCenter: parent.verticalCenter
-                spacing: Theme.space.xs
-                GlowDot {
-                    anchors.verticalCenter: parent.verticalCenter
-                    diameter: 7
-                    color: Theme.color.success
-                }
-                Text {
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: ObserverClient.hiddenEventCount > 0
-                          ? (I18n.t("可见性 · 隐藏 ", "Visibility · ") + ObserverClient.hiddenEventCount + I18n.t(" 事件", " hidden"))
-                          : I18n.t("可见性 PASS", "Visibility PASS")
-                    color: Theme.color.textMuted
-                    font.family: Theme.font.mono
-                    font.pixelSize: Theme.size.micro
-                }
-            }
             Text {
                 anchors.verticalCenter: parent.verticalCenter
                 text: I18n.t("视角：", "Lens: ") + root.perspective
-                color: Theme.color.textSecondary
+                color: Theme.color.textMuted
                 font.family: Theme.font.mono
                 font.pixelSize: Theme.size.micro
             }
@@ -91,12 +102,12 @@ Item {
             AppButton { text: I18n.t("收起", "Hide"); variant: root.mode === 0 ? "secondary" : "ghost"; onClicked: root.mode = 0 }
             AppButton { text: I18n.t("预览", "Peek"); variant: root.mode === 1 ? "secondary" : "ghost"; onClicked: root.mode = 1 }
             AppButton { text: I18n.t("展开", "Expand"); variant: root.mode === 2 ? "secondary" : "ghost"; onClicked: root.mode = 2 }
+            AppButton { text: I18n.t("审计", "Audit"); variant: root.mode === 3 ? "secondary" : "ghost"; onClicked: root.mode = 3 }
         }
     }
 
-    // ---- Content (Peek / Expanded) ----
-    Flickable {
-        id: content
+    // ======================= Readable layer (预览 / 展开) =======================
+    Item {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: topBar.bottom
@@ -104,35 +115,125 @@ Item {
         anchors.leftMargin: Theme.space.lg
         anchors.rightMargin: Theme.space.lg
         anchors.bottomMargin: Theme.space.lg
-        visible: root.mode > 0
+        visible: root.mode === 1 || root.mode === 2
+
+        // Seat Lens (perspective switch) — set currentPerspective only; never write ring.perspective.
+        Row {
+            id: lensRow
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            spacing: Theme.space.md
+            PerspectiveSwitcher {
+                id: perspectiveSwitcher
+                objectName: "perspectiveSwitcher"
+            }
+            AppButton {
+                text: I18n.t("回到上帝视角", "Back to God")
+                variant: "ghost"
+                visible: root.perspective !== "god"
+                onClicked: ObserverClient.currentPerspective = "god"
+            }
+        }
+
+        SectionHeader {
+            id: logHeader
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: lensRow.bottom
+            anchors.topMargin: Theme.space.md
+            title: I18n.t("对局记录", "Match log")
+            caption: I18n.t("当前视角下，每个角色说了什么、做了什么决定。", "What each seat said and decided, as visible to the current lens.")
+        }
+
+        ListView {
+            id: logList
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: logHeader.bottom
+            anchors.bottom: parent.bottom
+            anchors.topMargin: Theme.space.sm
+            clip: true
+            model: ObserverClient.projectionEvents
+            ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+
+            delegate: Item {
+                width: logList.width
+                height: Math.max(narText.implicitHeight, 18) + Theme.space.md
+                readonly property bool isSpeech: root._evType(modelData) === "player_speech"
+
+                Rectangle {
+                    id: chip
+                    anchors.left: parent.left
+                    anchors.top: parent.top
+                    anchors.topMargin: 1
+                    width: chipText.implicitWidth + Theme.space.sm * 2
+                    height: chipText.implicitHeight + Theme.space.xs
+                    radius: Theme.radius.sm
+                    color: Theme.color.surfaceInset
+                    border.width: 1
+                    border.color: Theme.color.border
+                    Text {
+                        id: chipText
+                        anchors.centerIn: parent
+                        text: "R" + (modelData.round !== undefined ? modelData.round : 0) + " · " + root._typeLabel(root._evType(modelData))
+                        color: Theme.color.textMuted
+                        font.family: Theme.font.mono
+                        font.pixelSize: Theme.size.micro
+                    }
+                }
+                Text {
+                    id: narText
+                    anchors.left: chip.right
+                    anchors.leftMargin: Theme.space.md
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    wrapMode: Text.WordWrap
+                    text: root._narrate(modelData)
+                    color: parent.isSpeech ? Theme.color.text : Theme.color.textSecondary
+                    font.family: Theme.font.family
+                    font.pixelSize: Theme.size.small
+                    lineHeight: 1.3
+                }
+            }
+
+            EmptyState {
+                anchors.centerIn: parent
+                visible: logList.count === 0
+                title: I18n.t("暂无记录", "No log yet")
+                subtitle: I18n.t("对局开始后将在此显示。", "It will appear once the match starts.")
+            }
+        }
+    }
+
+    // ======================= Audit layer (审计) — raw/technical =======================
+    Flickable {
+        id: auditFlick
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: topBar.bottom
+        anchors.bottom: parent.bottom
+        anchors.leftMargin: Theme.space.lg
+        anchors.rightMargin: Theme.space.lg
+        anchors.bottomMargin: Theme.space.lg
+        visible: root.mode === 3
         clip: true
         contentWidth: width
-        contentHeight: body.implicitHeight
+        contentHeight: auditBody.implicitHeight
         boundsBehavior: Flickable.StopAtBounds
         ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
 
         Column {
-            id: body
-            width: content.width
+            id: auditBody
+            width: auditFlick.width
             spacing: Theme.space.lg
 
-            // Seat Lens (Expanded): switch sets ObserverClient.currentPerspective; Back-to-God restores it.
-            Row {
-                spacing: Theme.space.md
-                visible: root.mode >= 2
-                PerspectiveSwitcher {
-                    id: perspectiveSwitcher
-                    objectName: "perspectiveSwitcher"
-                }
-                AppButton {
-                    text: I18n.t("回到上帝视角", "Back to God")
-                    variant: "ghost"
-                    visible: root.perspective !== "god"
-                    onClicked: ObserverClient.currentPerspective = "god"
-                }
+            Text {
+                text: I18n.t("原始数据 · 仅供核验", "Raw data · for verification")
+                color: Theme.color.textMuted
+                font.family: Theme.font.mono
+                font.pixelSize: Theme.size.micro
             }
-
-            // Trust boundary + projection proof.
             Flow {
                 width: parent.width
                 spacing: Theme.space.md
@@ -143,41 +244,33 @@ Item {
                     hiddenSnapshotCount: ObserverClient.hiddenSnapshotCount
                 }
                 ProjectionProofPanel {
-                    visible: root.mode >= 2
                     proof: ObserverClient.projectionProof
                     hiddenEventCount: ObserverClient.hiddenEventCount
                     hiddenSnapshotCount: ObserverClient.hiddenSnapshotCount
                 }
             }
-
-            // Event timeline (visible to the current lens).
             SectionHeader {
-                title: I18n.t("事件", "Events")
-                caption: I18n.t("当前视角可见事件流。", "Event stream as visible to the current lens.")
+                title: I18n.t("原始事件流", "Raw event stream")
+                caption: I18n.t("按时间顺序的运行时事件（未本地化）。", "Chronological runtime events (not localized).")
             }
             EventTimeline {
                 id: eventTimeline
                 objectName: "eventTimeline"
                 width: parent.width
-                height: root.mode >= 2 ? 220 : 120
+                height: 200
             }
-
-            // Audit links + provider failures (Expanded).
             SectionHeader {
-                visible: root.mode >= 2
                 title: I18n.t("审计链接", "Audit Links")
                 caption: I18n.t("追溯 prompt / provider / 失败到源记录。", "Trace prompt / provider / failures to source records.")
             }
             AuditLinksPanel {
                 id: auditLinksPanel
                 objectName: "auditLinksPanel"
-                visible: root.mode >= 2
                 width: parent.width
             }
             Text {
                 id: providerFailureSummary
                 objectName: "providerFailureSummary"
-                visible: root.mode >= 2
                 width: parent.width
                 text: I18n.t("模型调用失败：详见审计链接。", "Provider failures: check audit links for details.")
                 color: Theme.color.textMuted

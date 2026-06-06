@@ -97,15 +97,18 @@ QtObject {
             witch_save: 1800, witch_kill: 1800, witch_pass: 1500, player_died: 2000,
             player_speech: 6000, player_vote: 1200, day_announcement: 1000,
             player_eliminated: 2000, role_revealed: 2000, game_over: 3000 })[t] || 1200
-        return instant ? 16 : Math.max(16, base / Math.max(1, speed))
+        return base   // base hold time; speed/instant applied via _heldMs accumulation in _pump
     }
 
     property int _cursor: 0
     property bool _gated: false
     property bool _ffToEnd: false   // seekQueueEnd in progress: keep crossing phases after each gated transition
+    property real _heldMs: 0        // how long the current event has been on stage (speed-scaled)
 
+    // Fixed-cadence tick; the per-event hold is accumulated into _heldMs so speed/instant
+    // changes take effect IMMEDIATELY instead of waiting out the current event's old interval.
     property Timer _tick: Timer {
-        interval: 200
+        interval: 90
         repeat: true
         running: queue.playing
         onTriggered: queue._pump()
@@ -123,6 +126,12 @@ QtObject {
     function _pump() {
         if (_gated || !playing)
             return
+        // Hold the current event for its (speed-scaled) duration before advancing.
+        if (_currentRaw !== null) {
+            _heldMs += _tick.interval * (instant ? 1000 : Math.max(0.25, speed))
+            if (_heldMs < _durationMs(_currentRaw))
+                return
+        }
         if (_cursor >= _ordered.length) {
             waiting = (ObserverClient.currentStatus === "running")
             return
@@ -143,7 +152,7 @@ QtObject {
         _currentRaw = raw                // `current` recomputes via binding (reactive back-fill, P1-A)
         consumedSeq = _seq(raw)
         _cursor += 1
-        _tick.interval = _durationMs(raw)
+        _heldMs = 0
     }
 
     // --- Reset protocol (run / perspective / source-generation change) ---
@@ -155,7 +164,7 @@ QtObject {
         consumedSeq = 0
         layoutPhase = "day"
         _ffToEnd = false
-        _tick.interval = 200
+        _heldMs = 0
     }
     property int _lastSourceLen: 0
     onSourceChanged: {
@@ -172,11 +181,11 @@ QtObject {
     // --- queue API (PlaybackControls remote) ---
     function play() { playing = true }
     function pause() { playing = false }      // live: UI only; backend keeps generating
-    function setSpeed(x) { instant = false; speed = x; _tick.interval = 200 }
-    function setInstant() { instant = true; _tick.interval = 16 }
+    function setSpeed(x) { instant = false; speed = x }
+    function setInstant() { instant = true }
     function resumeAfterTransition() {            // TheaterView onStopped (gate released)
         _gated = false
-        _tick.interval = 200
+        _heldMs = 0
         if (_ffToEnd && _consumeCurrentPhaseFast())   // keep crossing phases, gated each time
             _ffToEnd = false
     }
@@ -203,6 +212,7 @@ QtObject {
             _currentRaw = raw
             consumedSeq = _seq(raw)
             _cursor += 1
+            _heldMs = 0
         }
         waiting = (ObserverClient.currentStatus === "running")
         return true

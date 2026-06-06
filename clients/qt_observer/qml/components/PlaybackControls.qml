@@ -49,7 +49,7 @@ Row {
         onClicked: if (root.queue) root.queue.seekNextPhase()
     }
     AppButton {
-        text: I18n.t("到队尾", "To end")
+        text: I18n.t("跳到最新", "Jump to latest")
         variant: "ghost"
         onClicked: if (root.queue) root.queue.seekQueueEnd()
     }

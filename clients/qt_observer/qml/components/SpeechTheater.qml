@@ -13,7 +13,7 @@ Item {
     property var current: ({})          // eventQueue.current (PresentationEvent)
     signal openInConsole()
 
-    readonly property string _full: (current && current.summary) ? current.summary : ""
+    readonly property string _full: _narrate(current)
     readonly property string _type: (current && current.type) ? current.type : ""
     readonly property string _actor: (current && current.actor) ? current.actor : ""
     property string _evId: ""
@@ -52,6 +52,26 @@ Item {
             game_over: I18n.t("终局", "End")
         })
         return m[t] || t
+    }
+    function _evType(ev) { return (ev && ev.type) ? ev.type : "" }
+    function _evSummary(ev) { return (ev && ev.summary) ? ev.summary : "" }
+    function _evActor(ev) { return (ev && ev.actor) ? ev.actor : "" }
+    function _evTarget(ev) { return (ev && ev.target && ev.target !== "none") ? ev.target : "" }
+    function _narrate(ev) {
+        var t = _evType(ev), a = _evActor(ev), tg = _evTarget(ev)
+        switch (t) {
+        case "player_speech":     return _evSummary(ev)
+        case "player_vote":       return tg ? I18n.t(a + " 投票给 " + tg, a + " votes for " + tg) : _evSummary(ev)
+        case "werewolf_kill":     return tg ? I18n.t("狼队袭击了 " + tg, "Werewolves attack " + tg) : _evSummary(ev)
+        case "seer_check":        return tg ? I18n.t("预言家 " + a + " 查验了 " + tg, "Seer " + a + " checks " + tg) : _evSummary(ev)
+        case "witch_save":        return tg ? I18n.t("女巫 " + a + " 用解药救了 " + tg, "Witch " + a + " saves " + tg) : _evSummary(ev)
+        case "witch_kill":        return tg ? I18n.t("女巫 " + a + " 用毒药毒了 " + tg, "Witch " + a + " poisons " + tg) : _evSummary(ev)
+        case "witch_pass":        return I18n.t("女巫 " + a + " 没有用药", "Witch " + a + " uses no potion")
+        case "player_died":       return tg ? I18n.t(tg + " 在夜里死亡", tg + " died in the night") : _evSummary(ev)
+        case "player_eliminated": return tg ? I18n.t(tg + " 被投票出局", tg + " was voted out") : _evSummary(ev)
+        case "role_assignment":   return I18n.t("身份已分配给所有玩家", "Roles assigned to all players")
+        default:                  return _evSummary(ev) || _typeLabel(t)
+        }
     }
 
     Column {

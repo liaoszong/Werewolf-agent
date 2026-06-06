@@ -61,6 +61,8 @@ Item {
         onPaint: {
             var ctx = getContext("2d")
             ctx.reset()
+            if (width <= 0 || height <= 0 || root.players.length === 0)
+                return
             var ev = root.current
             if (!ev)
                 return
