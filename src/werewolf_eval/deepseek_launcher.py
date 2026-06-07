@@ -26,11 +26,16 @@ from werewolf_eval.run_deepseek_consensus_game import (
     ProviderFactory,
     run_deepseek_consensus_game_with_provider_factory,
 )
+from werewolf_eval.run_emergent_deepseek_game import (
+    _deepseek_factory as _emergent_deepseek_factory,
+    run_emergent_deepseek_game,
+)
 
 RunLauncher = Callable[[str, Path], int]
 
 DEFAULT_MAX_LIVE_REQUESTS = 32
 DEFAULT_TIMEOUT_SECONDS = 30
+DEFAULT_MAX_DAY_ROUNDS = 3
 
 
 def build_deepseek_provider_config(
@@ -118,5 +123,78 @@ def build_deepseek_launcher(
         if code == 0:
             return 0
         return _classify_failure(rdir)
+
+    return _launcher
+
+
+# ---------------------------------------------------------------------------
+# P2 observer bridge — emergent live launcher (Adapter B)
+# ---------------------------------------------------------------------------
+
+
+def _audit_is_budget_exhausted(audit_path: Path) -> bool:
+    """Return True when the emergent failure audit records a budget-exhausted run.
+
+    The emergent engine serializes budget exhaustion as a STRUCTURED failure with
+    ``kind == "budget_exhausted"`` (the reason string reads "budget exhausted:
+    N/M requests"). We match the structured field — NOT the legacy
+    ``_classify_failure`` ``"budget exceeded"`` substring, whose wording differs
+    and would silently miss every emergent budget failure. Any read/parse error
+    is treated as not-budget (conservative → exit 2), never raised."""
+    try:
+        audit = json.loads(audit_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    if not isinstance(audit, dict):
+        return False
+    for failure in audit.get("failures", []):
+        if isinstance(failure, dict) and failure.get("kind") == "budget_exhausted":
+            return True
+    return False
+
+
+def build_emergent_deepseek_launcher(
+    *,
+    api_key: str,
+    base_url: str,
+    model: str,
+    timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS,
+    max_tokens: int,
+    max_requests: int = DEFAULT_MAX_LIVE_REQUESTS,
+    max_day_rounds: int = DEFAULT_MAX_DAY_ROUNDS,
+    provider_factory: ProviderFactory | None = None,
+) -> RunLauncher:
+    """Return a ``RunLauncher`` that drives the EmergentGameEngine over live
+    DeepSeek with the full observer spine + provider-turns evidence.
+
+    Mirrors ``build_deepseek_launcher`` but for the emergent runtime. The runner
+    fails closed with exit 2 on ANY error, so the closure re-reads the
+    ``failure-audit.json`` it caused and translates a budget-exhausted run to
+    exit 3 — the only code the observer maps to ``budget_exhausted`` (others →
+    ``provider_failure``). ``provider_factory`` is injectable so offline tests
+    pass a fake-transport factory (no network); the old scripted launcher above
+    is retained for fallback."""
+    if provider_factory is None:
+        provider_factory = _emergent_deepseek_factory(
+            api_key, base_url, model, timeout_seconds, max_tokens, max_requests
+        )
+
+    factory = provider_factory
+
+    def _launcher(run_id: str, run_dir: Path) -> int:
+        rdir = Path(run_dir)
+        code = run_emergent_deepseek_game(
+            game_id=run_id,
+            out_dir=rdir,
+            provider_factory=factory,
+            model=model,
+            max_requests_per_game=max_requests,
+            max_day_rounds=max_day_rounds,
+        )
+        if code == 0:
+            return 0
+        if _audit_is_budget_exhausted(rdir / "failure-audit.json"):
+            return 3
+        return 2
 
     return _launcher
