@@ -47,5 +47,60 @@ class CapabilityCredentialTests(unittest.TestCase):
             self.assertFalse(cap["live_api"]["enabled"])
 
 
+from werewolf_eval.observer_server import (
+    _credentials_post_result,
+    _credentials_delete_result,
+)
+
+
+class CredentialsEndpointLogicTests(unittest.TestCase):
+    def _cs(self):
+        return CredentialStore()
+
+    def test_post_stores_deepseek_and_does_not_echo_key(self):
+        cs = self._cs()
+        status, payload = _credentials_post_result(
+            cs, "application/json", {"provider": "deepseek", "api_key": "sk-test-fake-xyz"}
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(payload, {"stored": ["deepseek"]})
+        self.assertNotIn("sk-test-fake-xyz", str(payload))
+        self.assertTrue(cs.has("deepseek"))
+
+    def test_post_rejects_non_json_content_type(self):
+        cs = self._cs()
+        status, payload = _credentials_post_result(cs, "text/plain", {"provider": "deepseek", "api_key": "k"})
+        self.assertEqual(status, 415)
+        self.assertFalse(cs.has("deepseek"))
+
+    def test_post_accepts_charset_suffix(self):
+        cs = self._cs()
+        status, _ = _credentials_post_result(
+            cs, "application/json; charset=utf-8", {"provider": "deepseek", "api_key": "sk-ok"}
+        )
+        self.assertEqual(status, 200)
+
+    def test_post_rejects_empty_or_missing(self):
+        cs = self._cs()
+        for body in ({}, {"provider": "deepseek"}, {"provider": "deepseek", "api_key": ""}, {"api_key": "k"}):
+            status, _ = _credentials_post_result(cs, "application/json", body)
+            self.assertEqual(status, 400, body)
+        self.assertFalse(cs.has("deepseek"))
+
+    def test_post_rejects_non_allowlisted_provider(self):
+        cs = self._cs()
+        for prov in ("fake_deterministic", "openai", "anthropic", "weird"):
+            status, _ = _credentials_post_result(cs, "application/json", {"provider": prov, "api_key": "k"})
+            self.assertEqual(status, 400, prov)
+
+    def test_delete_clears_and_is_idempotent(self):
+        cs = self._cs()
+        cs.set("deepseek", "sk-x")
+        self.assertEqual(_credentials_delete_result(cs, "deepseek"), (200, {"cleared": "deepseek"}))
+        self.assertFalse(cs.has("deepseek"))
+        self.assertEqual(_credentials_delete_result(cs, "deepseek")[0], 200)   # idempotent
+        self.assertEqual(_credentials_delete_result(cs, "openai")[0], 400)     # not allowlisted
+
+
 if __name__ == "__main__":
     unittest.main()

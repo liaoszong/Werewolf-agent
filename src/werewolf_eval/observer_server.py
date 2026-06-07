@@ -162,6 +162,36 @@ def _build_capabilities_payload(state: ObserverServerState) -> dict[str, object]
     )
 
 
+# P2-B-1: credentials this slice accepts (deepseek-only; multi-provider is P2-B-3).
+_CREDENTIAL_PROVIDERS: frozenset[str] = frozenset({"deepseek"})
+
+
+def _credentials_post_result(
+    store: "CredentialStore", content_type: str, body: dict[str, object]
+) -> tuple[int, dict[str, object]]:
+    """Pure logic for POST /api/credentials. NEVER returns or logs the key."""
+    if not str(content_type or "").split(";")[0].strip() == "application/json":
+        return (415, {"error": "unsupported_media_type"})
+    provider = body.get("provider")
+    api_key = body.get("api_key")
+    if not isinstance(provider, str) or provider not in _CREDENTIAL_PROVIDERS:
+        return (400, {"error": "unsupported_provider"})
+    if not isinstance(api_key, str) or not api_key:
+        return (400, {"error": "missing_api_key"})
+    store.set(provider, api_key)
+    return (200, {"stored": [provider]})
+
+
+def _credentials_delete_result(
+    store: "CredentialStore", provider: str
+) -> tuple[int, dict[str, object]]:
+    """Pure logic for DELETE /api/credentials/{provider}. Idempotent."""
+    if provider not in _CREDENTIAL_PROVIDERS:
+        return (400, {"error": "unsupported_provider"})
+    store.clear(provider)
+    return (200, {"cleared": provider})
+
+
 def _read_execution_mode(run_dir: Path) -> str | None:
     """Read ``execution_mode`` from the run's OWN ``resolved-profile.json``.
 
@@ -244,6 +274,10 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
 
     def _get_state(self) -> ObserverServerState:
         return self.server.state  # type: ignore[attr-defined]
+
+    def _is_loopback(self) -> bool:
+        host = self.client_address[0] if self.client_address else ""
+        return host in ("127.0.0.1", "::1", "localhost")
 
     def _get_status(self, run_id: str, run_dir: Path) -> str:
         state = self._get_state()
@@ -605,9 +639,54 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
             },
         )
 
+    def do_DELETE(self) -> None:
+        segments = self._path_segments()
+        try:
+            if len(segments) == 3 and segments[:2] == ["api", "credentials"]:
+                if not self._is_loopback():
+                    self._send_error_json(403, "forbidden", "credentials endpoint is loopback-only")
+                    return
+                status, payload = _credentials_delete_result(
+                    self._get_state().credential_store, segments[2]
+                )
+                if status == 200:
+                    self._send_json(200, payload)
+                else:
+                    self._send_error_json(status, str(payload.get("error", "bad_request")), "")
+                return
+            self._send_error_json(404, "not_found", "unknown endpoint")
+        except ObserverProtocolError as exc:
+            self._send_error_json(400, "bad_request", str(exc))
+
     def do_POST(self) -> None:
         segments = self._path_segments()
         try:
+            if segments == ["api", "credentials"]:
+                if not self._is_loopback():
+                    self._send_error_json(403, "forbidden", "credentials endpoint is loopback-only")
+                    return
+                content_type = self.headers.get("Content-Type", "")
+                content_length = int(self.headers.get("Content-Length", 0))
+                if content_length > 8192:
+                    self._send_error_json(413, "payload_too_large", "credential body too large")
+                    return
+                raw = self.rfile.read(content_length) if content_length else b""
+                try:
+                    body = json.loads(raw) if raw else {}
+                    if not isinstance(body, dict):
+                        body = {}
+                except json.JSONDecodeError:
+                    self._send_error_json(400, "invalid_json", "credential body must be JSON")
+                    return
+                status, payload = _credentials_post_result(
+                    self._get_state().credential_store, content_type, body
+                )
+                if status == 200:
+                    self._send_json(200, payload)
+                else:
+                    self._send_error_json(status, str(payload.get("error", "bad_request")), "")
+                return
+
             if segments == ["api", "runs"]:
                 body = self._read_json_body()
                 if "profile" in body or "profile_name" in body:
