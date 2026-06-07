@@ -49,16 +49,29 @@ Item {
     // Parent-driven scroll-to-anchor (spine click path). Guards the spy, jumps, then
     // releases the guard once the flick settles (one-shot Timer fallback).
     function scrollTo(index) {
-        var target = -1
+        // The spine emits a board_timeline node index, but only turning-point sections
+        // have anchors. Most nodes (quiet nights, setup) have no turning point, so an
+        // exact match fails for the majority of clicks. Fall back to the NEAREST
+        // preceding turning point; if the node precedes them all, scroll to the top
+        // (winner header). Every spine click now lands somewhere meaningful (D6 fix).
         var secs = list.model
+        var target = -1
+        var bestSection = -1
+        var bestCursor = -1
         for (var i = 0; i < secs.length; i++) {
-            if (secs[i].kind === "turning_point" && secs[i].cursor_index === index) {
+            if (secs[i].kind !== "turning_point")
+                continue
+            if (secs[i].cursor_index === index) {
                 target = i
                 break
             }
+            if (secs[i].cursor_index <= index && secs[i].cursor_index > bestCursor) {
+                bestCursor = secs[i].cursor_index
+                bestSection = i
+            }
         }
         if (target < 0)
-            return
+            target = bestSection >= 0 ? bestSection : 0   // nearest preceding TP, else winner
         root._programmaticScroll = true
         list.positionViewAtIndex(target, ListView.Beginning)
         guardReleaseTimer.restart()

@@ -62,7 +62,11 @@ def _board_timeline(game: GameLog) -> list[dict]:
         if ev.type in _DEATH_TYPES and ev.target in alive:
             alive.discard(ev.target)
             cur["changed"].append({"player_id": ev.target, "change": ev.type})
-        if cur["highlight"] is None and ev.target and ev.target != "none":
+            # The death IS the spotlight for this round-phase — it always wins over
+            # an earlier non-death action (e.g. a seer_check sequenced before the
+            # night kill), so the docked sandbox highlights the kill, not the check.
+            cur["highlight"] = {"actor": ev.actor, "target": ev.target, "kind": ev.type}
+        elif cur["highlight"] is None and ev.target and ev.target != "none":
             cur["highlight"] = {"actor": ev.actor, "target": ev.target, "kind": ev.type}
         cur["alive_player_ids"] = sorted(alive)
     return nodes
@@ -179,33 +183,34 @@ def build_settlement_bundle(
         "werewolf_survival_rate": rm.werewolf_survival_rate,
     }
 
+    # attribute_game ALWAYS returns a TopAttribution — when there are no turn_points
+    # it yields a sentinel (turn_point_id == "none"). Treat that sentinel as null so
+    # consumers can branch on a missing top_attribution instead of a fake "none" one.
     top = attribution.top_attribution
     bundle["top_attribution"] = (
         {"turn_point_id": top.turn_point_id, "description": top.description_template}
-        if top
+        if top and top.turn_point_id != "none"
         else None
     )
-    bundle["turning_points"] = [
-        {
+
+    def _tp_dict(tp) -> dict:
+        cursor = _cursor_for(tp, game, board)  # resolve once (was computed twice)
+        phase = next(
+            (n["phase"] for n in board if n["cursor_index"] == cursor), "day"
+        )
+        return {
             "turn_point_id": tp.turn_point_id,
             "round": tp.round,
-            "phase": next(
-                (
-                    n["phase"]
-                    for n in board
-                    if n["cursor_index"] == _cursor_for(tp, game, board)
-                ),
-                "day",
-            ),
+            "phase": phase,
             "title": (tp.description_template or "")[:40],
             "description": tp.description_template,
             "impact_score": tp.impact_score,
             "impact_sign": tp.impact_sign,
             "evidence_event_ids": list(tp.evidence_event_ids or []),
-            "cursor_index": _cursor_for(tp, game, board),
+            "cursor_index": cursor,
         }
-        for tp in attribution.turn_points
-    ]
+
+    bundle["turning_points"] = [_tp_dict(tp) for tp in attribution.turn_points]
     return bundle
 
 
@@ -231,12 +236,18 @@ def build_settlement_response(
 
     cache = run_dir / "settlement-bundle.json"
     if cache.exists():
-        return {
-            "available": True,
-            "bundle": json.loads(cache.read_text(encoding="utf-8")),
-        }
+        try:
+            return {
+                "available": True,
+                "bundle": json.loads(cache.read_text(encoding="utf-8")),
+            }
+        except (ValueError, OSError):
+            pass  # corrupt/partial cache -> recompute below (self-heal, not 500)
 
-    game = load_game_log(game_log_path)
+    try:
+        game = load_game_log(game_log_path)
+    except Exception:
+        return {"available": False, "reason": "invalid_game_log"}
     dpath = run_dir / "decision-log.json"
     decision_log: DecisionLog | None = None
     status = "absent"
@@ -251,5 +262,10 @@ def build_settlement_response(
     bundle = build_settlement_bundle(
         game, decision_log, run_id=run_id, decision_log_status=status
     )
-    cache.write_text(json.dumps(bundle, ensure_ascii=False), encoding="utf-8")
+    # Cache ONLY a non-degraded bundle. A degraded bundle is a transient render
+    # state (missing decision-log, transient/since-fixed scoring failure), NOT a
+    # frozen artifact — caching it would serve the degraded view forever, even
+    # after the cause is resolved. Degraded paths recompute each request (cheap).
+    if not bundle.get("degraded"):
+        cache.write_text(json.dumps(bundle, ensure_ascii=False), encoding="utf-8")
     return {"available": True, "bundle": bundle}

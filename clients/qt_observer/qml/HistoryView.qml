@@ -212,10 +212,10 @@ Item {
                                 status: modelData.status || ""
                             }
 
-                            // P2-D §7.7 — thin "查看战报" entry for finished runs. Reuses the
-                            // same openRun + navigateCockpit path; the theater's settlement
-                            // overlay then activates straight to `report` (history-direct,
-                            // entryMode 1) because the run is already `completed` at load.
+                            // P2-D §7.7 — thin "查看战报" entry for finished runs. openRun's
+                            // forReport=true sets the settlement entry intent synchronously, so
+                            // the theater's settlement overlay opens straight to `report`
+                            // (history-direct), skipping the live freeze ceremony.
                             AppButton {
                                 id: reportButton
                                 objectName: "openSettlementButton"
@@ -226,7 +226,7 @@ Item {
                                 text: I18n.t("查看战报", "View report")
                                 variant: "secondary"
                                 onClicked: {
-                                    ObserverClient.openRun(modelData.run_id)
+                                    ObserverClient.openRun(modelData.run_id, true)
                                     root.StackView.view.parent.navigateCockpit()
                                 }
                             }

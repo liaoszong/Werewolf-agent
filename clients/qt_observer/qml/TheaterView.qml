@@ -15,9 +15,6 @@ Item {
     state: eventQueue.layoutPhase
 
     Component.onCompleted: {
-        // Latch whether the run was already terminal-completed at load (history-direct
-        // open) so the settlement overlay can skip the freeze ceremony (entryMode 1).
-        theaterRoot._completedAtLoad = ObserverClient.currentStatus === "completed"
         if (ObserverClient.currentRunId !== "") {
             ObserverClient.refreshProjection()
             // Only tail the live stream for an active run; a completed run's events were
@@ -250,12 +247,11 @@ Item {
         ObserverClient.currentStatus === "completed"
         && ObserverClient.playerItems.length > 0
         && eventQueue.atEnd
-    // entryMode discriminator (§3.3): a run that is ALREADY `completed` the moment the
-    // theater loads = a history-direct open (HistoryView 查看战报) → straight to `report`,
-    // no freeze. A run that reaches `completed` later via the live stream = watched live →
-    // the `freeze` ceremony. _completedAtLoad is latched once in Component.onCompleted.
-    property bool _completedAtLoad: false
-    readonly property int settlementEntryMode: _completedAtLoad ? 1 : 0
+    // entryMode discriminator (§3.3): history "查看战报" opens straight to `report`
+    // (no freeze); a live watch shows the `freeze` ceremony. The intent is set
+    // SYNCHRONOUSLY at the call site via openRun(forReport) and carried on
+    // ObserverClient.settlementEntry — reliable here, unlike the old async-status latch.
+    readonly property int settlementEntryMode: ObserverClient.settlementEntry
 
     Loader {
         id: settlementLoader

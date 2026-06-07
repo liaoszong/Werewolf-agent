@@ -75,6 +75,7 @@ QVariantList ObserverApiClient::projectionEvents() const { return m_projectionEv
 
 // P2-D settlement getter
 QVariantMap ObserverApiClient::settlementBundle() const { return m_settlementBundle; }
+int ObserverApiClient::settlementEntry() const { return m_settlementEntry; }
 
 // G2d-2 profile setup getters
 QVariantList ObserverApiClient::profileItems() const { return m_profileItems; }
@@ -226,8 +227,17 @@ void ObserverApiClient::startDefaultMatch()
     });
 }
 
-void ObserverApiClient::openRun(const QString &runId)
+void ObserverApiClient::openRun(const QString &runId, bool forReport)
 {
+    // Set the settlement entry mode SYNCHRONOUSLY here (before the async detail
+    // request and before navigation) so the theater reads a reliable value when it
+    // mounts. Latching it later off the async currentStatus was racy (history opens
+    // always fell through to the live freeze ceremony).
+    const int entry = forReport ? 1 : 0;
+    if (m_settlementEntry != entry) {
+        m_settlementEntry = entry;
+        emit settlementEntryChanged();
+    }
     QNetworkReply *reply = get(QStringLiteral("/api/runs/") + runId);
     connect(reply, &QNetworkReply::finished, this, [this, runId, reply]() {
         reply->deleteLater();

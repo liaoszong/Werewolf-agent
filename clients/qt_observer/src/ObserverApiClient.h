@@ -31,6 +31,10 @@ class ObserverApiClient : public QObject {
     Q_PROPERTY(QVariantList projectionEvents READ projectionEvents NOTIFY projectionEventsChanged)
     // P2-D: eval-ready settlement bundle (read-only; fetched lazily on game completion).
     Q_PROPERTY(QVariantMap settlementBundle READ settlementBundle NOTIFY settlementBundleChanged)
+    // P2-D: 0 = live freeze ceremony, 1 = history → straight to report. Set
+    // SYNCHRONOUSLY by openRun(forReport) so it is reliable when the theater mounts
+    // (currentStatus is async and was racy as the freeze/report discriminator).
+    Q_PROPERTY(int settlementEntry READ settlementEntry NOTIFY settlementEntryChanged)
     // G2d-2 profile setup properties
     Q_PROPERTY(QVariantList profileItems READ profileItems NOTIFY profileItemsChanged)
     Q_PROPERTY(QVariantMap profileSchema READ profileSchema NOTIFY profileSchemaChanged)
@@ -75,6 +79,7 @@ public:
     QVariantList projectionEvents() const;
     // P2-D settlement accessor
     QVariantMap settlementBundle() const;
+    int settlementEntry() const;
     // G2d-2 profile setup accessors
     QVariantList profileItems() const;
     QVariantMap profileSchema() const;
@@ -93,7 +98,9 @@ public slots:
     Q_INVOKABLE void checkHealth();
     Q_INVOKABLE void refreshRuns();
     Q_INVOKABLE void startDefaultMatch();
-    Q_INVOKABLE void openRun(const QString &runId);
+    // forReport=true (history "查看战报") makes the settlement overlay skip the freeze
+    // ceremony and open straight to the report; default false = live freeze ceremony.
+    Q_INVOKABLE void openRun(const QString &runId, bool forReport = false);
     Q_INVOKABLE void connectStream();
     Q_INVOKABLE void disconnectStream();
     Q_INVOKABLE void refreshAuditLinks();
@@ -125,8 +132,9 @@ signals:
     void projectionProofChanged();
     void projectionChanged();
     void projectionEventsChanged();
-    // P2-D settlement signal
+    // P2-D settlement signals
     void settlementBundleChanged();
+    void settlementEntryChanged();
     // G2d-2 profile setup signals
     void profileItemsChanged();
     void profileSchemaChanged();
@@ -173,6 +181,7 @@ private:
     // P2-D settlement state
     QVariantMap m_settlementBundle;
     int m_settlementRequestSerial = 0;
+    int m_settlementEntry = 0;   // 0 = freeze ceremony, 1 = history → report-direct
     // G2d-2 profile setup state
     QVariantList m_profileItems;
     QVariantMap m_profileSchema;

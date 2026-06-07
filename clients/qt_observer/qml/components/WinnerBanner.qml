@@ -37,14 +37,16 @@ Item {
         border.width: 1
         border.color: Theme.withAlpha(root._accent, 0.40)
 
-        // Drop-in for the freeze beat.
+        // Drop-in for the freeze beat. The banner's vertical position is owned by
+        // anchors.verticalCenter, so the drop is done via a Translate transform (NOT
+        // by animating `y`, which would conflict with the anchor and be ignored).
         opacity: 0
-        y: -16
+        transform: Translate { id: dropOffset; y: -16 }
         Component.onCompleted: dropIn.start()
         ParallelAnimation {
             id: dropIn
             NumberAnimation { target: banner; property: "opacity"; from: 0; to: 1; duration: Theme.motion.slow; easing.type: Easing.OutCubic }
-            NumberAnimation { target: banner; property: "y"; to: (root.height - banner.implicitHeight) / 2; duration: Theme.motion.slow; easing.type: Easing.OutBack }
+            NumberAnimation { target: dropOffset; property: "y"; from: -16; to: 0; duration: Theme.motion.slow; easing.type: Easing.OutBack }
         }
 
         Column {

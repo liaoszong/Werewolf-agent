@@ -406,9 +406,14 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
                     status = str(
                         self._run_detail_with_reason(run_id, run_dir).get("status", "")
                     )
-                    self._send_json(
-                        200, build_settlement_response(run_dir, status, run_id)
-                    )
+                    try:
+                        payload = build_settlement_response(run_dir, status, run_id)
+                    except Exception:  # reason CODE, not an opaque 500 (P2-D fix)
+                        self._send_error_json(
+                            500, "settlement_failed", "Settlement build failed"
+                        )
+                        return
+                    self._send_json(200, payload)
                     return
 
                 # /api/runs/{run_id}/artifacts/{name}

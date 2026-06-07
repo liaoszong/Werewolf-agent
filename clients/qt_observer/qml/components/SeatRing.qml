@@ -191,9 +191,12 @@ Item {
             // Dead seats recede: smaller (退场 depth) + dimmed + desaturated (gray, faction color dropped).
             scale: isDead ? 0.82 : 1.0
             Behavior on scale { NumberAnimation { duration: Theme.motion.slow; easing.type: Easing.OutCubic } }
-            // Smooth ring<->docked seat travel (the one-shot morph reads continuous x/y).
-            Behavior on x { NumberAnimation { duration: Theme.motion.slow; easing.type: Easing.InOutCubic } }
-            Behavior on y { NumberAnimation { duration: Theme.motion.slow; easing.type: Easing.InOutCubic } }
+            // Smooth ring<->docked seat travel for the one-shot morph. Gated to docked
+            // mode ONLY: in theater mode seat x/y are bound to the ring's already-animated
+            // width (breathing layout), so an extra Behavior here would double-ease and
+            // make seats rubber-band behind the ring on every phase change (P2-C-1 regress).
+            Behavior on x { enabled: root.layoutMode === "docked"; NumberAnimation { duration: Theme.motion.slow; easing.type: Easing.InOutCubic } }
+            Behavior on y { enabled: root.layoutMode === "docked"; NumberAnimation { duration: Theme.motion.slow; easing.type: Easing.InOutCubic } }
 
             GlowDot {
                 anchors.horizontalCenter: avatar.horizontalCenter

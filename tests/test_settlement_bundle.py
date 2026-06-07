@@ -12,12 +12,13 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 import unittest
 from unittest import mock
 
 from werewolf_eval.game_log import load_game_log, parse_game_log
 from werewolf_eval.decision_log import load_decision_log
-from werewolf_eval.settlement_bundle import build_settlement_bundle
+from werewolf_eval.settlement_bundle import _board_timeline, build_settlement_bundle
 
 _GOLD = Path(__file__).resolve().parent.parent / "docs" / "gold-game"
 _GAME_LOG_PATH = _GOLD / "g001-game-log.json"
@@ -148,6 +149,50 @@ class TestBuildSettlementBundle(unittest.TestCase):
         a = build_settlement_bundle(self._game(), self._decision_log())
         b = build_settlement_bundle(self._game(), self._decision_log())
         self.assertEqual(json.dumps(a, sort_keys=True), json.dumps(b, sort_keys=True))
+
+    def test_board_highlight_prefers_death_over_earlier_action(self):
+        # A night group where a seer_check (p3->p1) is sequenced BEFORE the kill that
+        # actually removes p1: the docked-sandbox highlight must be the death, not the
+        # earlier non-death action it happened to see first.
+        players = [SimpleNamespace(player_id=f"p{i}") for i in range(1, 7)]
+        events = [
+            SimpleNamespace(sequence=1, round=1, phase="night",
+                            type="seer_check", actor="p3", target="p1"),
+            SimpleNamespace(sequence=2, round=1, phase="night",
+                            type="player_died", actor="p2", target="p1"),
+        ]
+        board = _board_timeline(SimpleNamespace(players=players, events=events))
+        self.assertEqual(len(board), 1)
+        self.assertEqual(board[0]["highlight"]["kind"], "player_died")
+        self.assertEqual(board[0]["highlight"]["target"], "p1")
+
+    def test_board_highlight_falls_back_to_action_when_no_death(self):
+        # A quiet group with only a non-death action keeps that action as the highlight.
+        players = [SimpleNamespace(player_id=f"p{i}") for i in range(1, 7)]
+        events = [
+            SimpleNamespace(sequence=1, round=2, phase="day",
+                            type="seer_check", actor="p3", target="p5"),
+        ]
+        board = _board_timeline(SimpleNamespace(players=players, events=events))
+        self.assertEqual(board[0]["highlight"]["kind"], "seer_check")
+        self.assertEqual(board[0]["highlight"]["target"], "p5")
+
+    def test_top_attribution_sentinel_becomes_null(self):
+        # attribute_game returns a sentinel TopAttribution (turn_point_id == "none")
+        # when there are no turn_points; the bundle must emit null, not a fake "none".
+        sentinel = SimpleNamespace(
+            turn_point_id="none", description_template="无确定性归因转折点。"
+        )
+        fake = SimpleNamespace(top_attribution=sentinel, turn_points=[])
+        with mock.patch(
+            "werewolf_eval.settlement_bundle.attribute_game", return_value=fake
+        ):
+            bundle = build_settlement_bundle(
+                self._game(), self._decision_log(), run_id="r1"
+            )
+        self.assertFalse(bundle["degraded"])
+        self.assertIsNone(bundle["top_attribution"])
+        self.assertEqual(bundle["turning_points"], [])
 
 
 if __name__ == "__main__":

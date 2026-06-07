@@ -94,6 +94,40 @@ class TestBuildSettlementResponse(unittest.TestCase):
             r2 = build_settlement_response(d, run_status="completed", run_id="r1")
             self.assertEqual(r2["bundle"]["bundle_version"], "cached_marker")
 
+    def test_degraded_bundle_is_not_cached_and_recovers(self):
+        # A degraded bundle (missing decision-log) must NOT be persisted, so once the
+        # decision-log lands a later request recomputes the full (non-degraded) bundle
+        # instead of serving the frozen degraded one forever.
+        with tempfile.TemporaryDirectory() as td:
+            d = self._run_dir(td, decision="absent")
+            r1 = build_settlement_response(d, run_status="completed", run_id="r1")
+            self.assertTrue(r1["bundle"]["degraded"])
+            self.assertFalse((d / "settlement-bundle.json").exists())  # not cached
+            # decision-log now appears -> recompute, full bundle, then cached.
+            (d / "decision-log.json").write_text(_DECISION_JSON, encoding="utf-8")
+            r2 = build_settlement_response(d, run_status="completed", run_id="r1")
+            self.assertFalse(r2["bundle"]["degraded"])
+            self.assertTrue((d / "settlement-bundle.json").exists())
+
+    def test_corrupt_cache_self_heals(self):
+        # A truncated/partial cache file must not crash the route — it recomputes.
+        with tempfile.TemporaryDirectory() as td:
+            d = self._run_dir(td)
+            (d / "settlement-bundle.json").write_text("{ truncated", encoding="utf-8")
+            r = build_settlement_response(d, run_status="completed", run_id="r1")
+            self.assertTrue(r["available"])
+            self.assertEqual(r["bundle"]["run_id"], "r1")
+            self.assertFalse(r["bundle"]["degraded"])
+
+    def test_invalid_game_log_returns_reason(self):
+        # A malformed game-log degrades to an available:False reason, not an exception.
+        with tempfile.TemporaryDirectory() as td:
+            d = Path(td)
+            (d / "game-log.json").write_text("{ not a game log", encoding="utf-8")
+            r = build_settlement_response(d, run_status="completed", run_id="r1")
+            self.assertEqual(r["available"], False)
+            self.assertEqual(r["reason"], "invalid_game_log")
+
 
 if __name__ == "__main__":
     unittest.main()
