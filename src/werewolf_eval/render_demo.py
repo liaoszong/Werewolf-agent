@@ -20,31 +20,9 @@ from werewolf_eval.scoring import (
 )
 from werewolf_eval.semantic_labels import load_semantic_label_log
 
-ROLE_LABELS = {
-    "werewolf": "狼人",
-    "seer": "预言家",
-    "witch": "女巫",
-    "villager": "平民",
-}
-
-TEAM_LABELS = {
-    "werewolf": "狼人阵营",
-    "villager": "村民阵营",
-}
-
-TYPE_LABELS = {
-    "role_assignment": "角色分配",
-    "werewolf_kill": "狼人选刀",
-    "seer_check": "预言家查验",
-    "witch_save": "女巫救人",
-    "witch_poison": "女巫毒人",
-    "player_speech": "发言",
-    "player_vote": "投票",
-    "player_eliminated": "玩家出局",
-    "role_revealed": "身份公开",
-    "player_died": "玩家死亡",
-    "game_over": "游戏结束",
-}
+# Display labels live in one shared module (R-12) so a relabel / new event type lands
+# once across all renderers instead of drifting.
+from werewolf_eval.display_labels import ROLE_LABELS, TEAM_LABELS, TYPE_LABELS
 
 
 def _html(value: object) -> str:

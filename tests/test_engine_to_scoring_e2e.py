@@ -102,6 +102,25 @@ class EngineToScoringSeamTests(unittest.TestCase):
         self.assertIn(WITCH_SAVE, SCORE_RELEVANT_EVENT_TYPES)
         self.assertIn(WITCH_POISON, SCORE_RELEVANT_EVENT_TYPES)
 
+    def test_every_emitted_event_type_has_a_display_label(self):
+        # R-12/R-28 guard: any event type the engine can emit must have a Chinese
+        # display label, or renderers show a raw English token. Exercise both arcs so
+        # witch_pass / day_announcement etc. are all covered.
+        from werewolf_eval.display_labels import TYPE_LABELS
+        from werewolf_eval.emergent_fake_script import build_werewolf_win_script
+
+        emitted: set[str] = set()
+        for make in (build_villager_win_script, build_werewolf_win_script):
+            engine = EmergentGameEngine(
+                config=build_emergent_config(game_id="label_cov"),
+                agents=build_emergent_fake_agents(make()),
+                seed=0,
+            )
+            game = parse_game_log(engine.run().game_log)
+            emitted |= {e.type for e in game.events}
+        missing = sorted(emitted - set(TYPE_LABELS))
+        self.assertEqual(missing, [], f"emitted event types with no display label: {missing}")
+
 
 class WitchVictimVisibilityTests(unittest.TestCase):
     """R-04: the witch must be told tonight's victim (it is werewolf_team-visible and

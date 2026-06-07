@@ -75,8 +75,14 @@ def _board_timeline(game: GameLog) -> list[dict]:
     return nodes
 
 
-def _curtain(game: GameLog, board: list[dict], run_id: str | None) -> dict:
+def _curtain(
+    game: GameLog,
+    board: list[dict],
+    run_id: str | None,
+    seat_meta: dict[str, dict] | None = None,
+) -> dict:
     survivors = set(game.result.survivors)
+    seat_meta = seat_meta or {}
     return {
         "bundle_version": BUNDLE_VERSION,
         "run_id": run_id,
@@ -104,6 +110,12 @@ def _curtain(game: GameLog, board: list[dict], run_id: str | None) -> dict:
                 "outcome_score": 0,
                 "rule_integrity_score": 0,
                 "decision_quality_score": 0,
+                # R-09: per-seat model/provider/token for heterogeneous-AI fairness +
+                # cost (additive, eval-v1). Resolved by the route from prompt-manifest +
+                # provider-trace; None / {} when unavailable (fake runs report "none").
+                "model": seat_meta.get(p.player_id, {}).get("model"),
+                "provider": seat_meta.get(p.player_id, {}).get("provider"),
+                "token_usage": seat_meta.get(p.player_id, {}).get("token_usage", {}),
             }
             for p in game.players
         ],
@@ -143,9 +155,10 @@ def build_settlement_bundle(
     *,
     run_id: str | None = None,
     decision_log_status: str = "present",
+    seat_meta: dict[str, dict] | None = None,
 ) -> dict:
     board = _board_timeline(game)
-    bundle = _curtain(game, board, run_id)
+    bundle = _curtain(game, board, run_id, seat_meta)
 
     # PARTIAL DEGRADE (product decision B): a missing/unusable decision-log does NOT
     # blank the whole battle report. score_game(game, None) is a supported path that
@@ -224,6 +237,47 @@ def build_settlement_bundle(
     return bundle
 
 
+def _load_seat_meta(run_dir: Path) -> dict[str, dict]:
+    """Per-seat model/provider (prompt-manifest.json) + token rollup (provider-trace.json
+    responses, summed by actor). Both runners write these; absent/garbage -> empty.
+    Pure filesystem read, never raises (best-effort enrichment, R-09)."""
+    meta: dict[str, dict] = {}
+    mpath = run_dir / "prompt-manifest.json"
+    if mpath.exists():
+        try:
+            manifest = json.loads(mpath.read_text(encoding="utf-8"))
+            for agent in manifest.get("agents", []):
+                pid = agent.get("player_id")
+                if not pid:
+                    continue
+                entry = meta.setdefault(pid, {})
+                if agent.get("model") is not None:
+                    entry["model"] = agent["model"]
+                if agent.get("provider") is not None:
+                    entry["provider"] = agent["provider"]
+        except (ValueError, OSError, AttributeError):
+            pass
+    tpath = run_dir / "provider-trace.json"
+    if tpath.exists():
+        try:
+            trace = json.loads(tpath.read_text(encoding="utf-8"))
+            rollup: dict[str, dict] = {}
+            for resp in trace.get("responses", []):
+                actor = resp.get("actor")
+                usage = resp.get("token_usage")
+                if not actor or not isinstance(usage, dict):
+                    continue
+                acc = rollup.setdefault(actor, {})
+                for key, val in usage.items():
+                    if isinstance(val, (int, float)) and not isinstance(val, bool):
+                        acc[key] = acc.get(key, 0) + val
+            for pid, usage in rollup.items():
+                meta.setdefault(pid, {})["token_usage"] = usage
+        except (ValueError, OSError, AttributeError):
+            pass
+    return meta
+
+
 def build_settlement_response(
     run_dir: Path, run_status: str, run_id: str | None
 ) -> dict:
@@ -247,10 +301,12 @@ def build_settlement_response(
     cache = run_dir / "settlement-bundle.json"
     if cache.exists():
         try:
-            return {
-                "available": True,
-                "bundle": json.loads(cache.read_text(encoding="utf-8")),
-            }
+            cached = json.loads(cache.read_text(encoding="utf-8"))
+            # Serve the cache ONLY if it's the current schema. A missing/mismatched
+            # bundle_version (a bundle written by an older/newer build) is recomputed
+            # so P3 never silently reads a stale schema (R-08).
+            if isinstance(cached, dict) and cached.get("bundle_version") == BUNDLE_VERSION:
+                return {"available": True, "bundle": cached}
         except (ValueError, OSError):
             pass  # corrupt/partial cache -> recompute below (self-heal, not 500)
 
@@ -270,7 +326,11 @@ def build_settlement_response(
             status = "invalid"
 
     bundle = build_settlement_bundle(
-        game, decision_log, run_id=run_id, decision_log_status=status
+        game,
+        decision_log,
+        run_id=run_id,
+        decision_log_status=status,
+        seat_meta=_load_seat_meta(run_dir),
     )
     # Cache ONLY a COMPLETE bundle: not degraded AND decision-quality present. A
     # degraded bundle (scoring crash) OR a partial one (no decision-log yet) is a
@@ -278,5 +338,9 @@ def build_settlement_response(
     # or the cause is resolved. Incomplete bundles recompute each request (cheap) so
     # they auto-upgrade to the full report.
     if not bundle.get("degraded") and bundle.get("decision_quality_available"):
-        cache.write_text(json.dumps(bundle, ensure_ascii=False), encoding="utf-8")
+        # Atomic write (temp + replace) so a crash/concurrent write never leaves a
+        # torn cache file for the next reader (R-08).
+        tmp = cache.with_name(cache.name + ".tmp")
+        tmp.write_text(json.dumps(bundle, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(cache)
     return {"available": True, "bundle": bundle}
