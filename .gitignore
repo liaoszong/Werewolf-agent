@@ -13,6 +13,8 @@
 __pycache__/
 *.pyc
 .tmp/
+# local observer run output (game-log/snapshots/events) — never committed
+.runs/
 
 # Generated context-budget artifacts
 docs/generated-context/*.index.json
