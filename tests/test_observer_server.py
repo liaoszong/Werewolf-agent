@@ -1431,37 +1431,49 @@ class ObserverServerLiveOptInTests(TestCase):
             )
 
     def test_no_flag_yields_disabled(self) -> None:
-        live_enabled, launcher = self._resolve(["--runs-dir", "x"], {"DEEPSEEK_API_KEY": "sk-test-fake-unused"})
+        live_enabled, env_launcher, env_key_available, factory = self._resolve(
+            ["--runs-dir", "x"], {"DEEPSEEK_API_KEY": "sk-test-fake-unused"}
+        )
         self.assertFalse(live_enabled)
-        self.assertIsNone(launcher)
+        self.assertIsNone(env_launcher)
+        self.assertFalse(env_key_available)
+        self.assertIsNone(factory)
         # request-time effect: live → live_api_disabled
-        st = self._state(live_enabled, launcher)
+        st = self._state(live_enabled, env_launcher)
         self.assertEqual(_check_live_capability(st, "live")[1], "live_api_disabled")  # type: ignore[index]
 
-    def test_flag_on_missing_key_yields_enabled_no_launcher(self) -> None:
-        live_enabled, launcher = self._resolve(
+    def test_flag_on_missing_key_yields_enabled_no_env_launcher_but_factory(self) -> None:
+        live_enabled, env_launcher, env_key_available, factory = self._resolve(
             ["--allow-live-api", "--api-key-env", "DOES_NOT_EXIST_XXXX"], {}
         )
         self.assertTrue(live_enabled)
-        self.assertIsNone(launcher)
-        st = self._state(live_enabled, launcher)
+        self.assertIsNone(env_launcher)
+        self.assertFalse(env_key_available)
+        # factory is present because a client can supply a key
+        self.assertTrue(callable(factory))
+        # with no env key and empty credential store, capability still returns missing_api_key
+        st = self._state(live_enabled, env_launcher)
         self.assertEqual(_check_live_capability(st, "live")[1], "missing_api_key")  # type: ignore[index]
 
-    def test_flag_on_with_key_builds_launcher(self) -> None:
-        live_enabled, launcher = self._resolve(
+    def test_flag_on_with_key_builds_env_launcher_and_factory(self) -> None:
+        live_enabled, env_launcher, env_key_available, factory = self._resolve(
             ["--allow-live-api"], {"DEEPSEEK_API_KEY": "sk-test-fake-key"}
         )
         self.assertTrue(live_enabled)
-        self.assertTrue(callable(launcher))
-        st = self._state(live_enabled, launcher)
+        self.assertTrue(callable(env_launcher))
+        self.assertTrue(env_key_available)
+        self.assertTrue(callable(factory))
+        st = self._state(live_enabled, env_launcher)
         self.assertIsNone(_check_live_capability(st, "live"))  # proceeds
 
     def test_custom_api_key_env_is_honored(self) -> None:
-        live_enabled, launcher = self._resolve(
+        live_enabled, env_launcher, env_key_available, factory = self._resolve(
             ["--allow-live-api", "--api-key-env", "MY_KEY"], {"MY_KEY": "sk-test-fake-key"}
         )
         self.assertTrue(live_enabled)
-        self.assertTrue(callable(launcher))
+        self.assertTrue(callable(env_launcher))
+        self.assertTrue(env_key_available)
+        self.assertTrue(callable(factory))
 
     def test_help_lists_live_flags(self) -> None:
         import subprocess

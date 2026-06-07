@@ -862,12 +862,18 @@ def create_observer_server(
     profiles_dir: Path | None = None,
     live_enabled: bool = False,
     live_launcher: RunLauncher | None = None,
+    live_launcher_factory: Callable[[str], RunLauncher] | None = None,
+    env_key_available: bool = False,
 ) -> ThreadingHTTPServer:
     """Create and configure a threaded observer HTTP server.
 
     ``live_enabled``/``live_launcher`` wire the G3-1 opt-in live path: live is
     the only mode that consults them, and only a profile launch (not a template
-    launch) may select it.  Both default off so the server stays fake-only."""
+    launch) may select it.  Both default off so the server stays fake-only.
+
+    ``live_launcher_factory`` is the per-launch builder used with a client-supplied
+    key (P2-B-1 BYO-key path); ``env_key_available`` records whether the server
+    started with an env key (back-compat signal for capability gate)."""
     if launcher is None:
         launcher = default_fake_launcher
     runs_dir.mkdir(parents=True, exist_ok=True)
@@ -881,6 +887,8 @@ def create_observer_server(
         profiles_dir=profiles_dir,
         live_enabled=live_enabled,
         live_launcher=live_launcher,
+        live_launcher_factory=live_launcher_factory,
+        env_key_available=env_key_available,
     )
 
     class _BoundHandler(ObserverRequestHandler):
