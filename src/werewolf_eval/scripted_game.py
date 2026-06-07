@@ -1,3 +1,7 @@
+"""LEGACY (R-35): early-generation scripted runner, reachable only from its own
+tests — NOT on the canonical product path (`run_observer_server` →
+`run_g1h_fake_runtime` for fake / `deepseek_launcher` for live). Kept for its passing
+tests; do not build new features on it. See `docs/PROJECT_MAP.md` for current entries."""
 from __future__ import annotations
 
 from dataclasses import dataclass

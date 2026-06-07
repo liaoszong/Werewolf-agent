@@ -1,0 +1,24 @@
+name: tests
+
+# R-38: the docs treat "all tests pass" as an acceptance gate but nothing enforced it
+# (no CI). This runs the full stdlib unittest suite on every push/PR on a clean Linux
+# runner — where localhost loopback works, so the observer-server HTTP tests (leak /
+# traversal / secret-scan) actually execute and are verified, not just locally (R-11).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  unittest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run unittest suite
+        env:
+          PYTHONPATH: src
+        run: python -m unittest discover -s tests -p "test_*.py"
