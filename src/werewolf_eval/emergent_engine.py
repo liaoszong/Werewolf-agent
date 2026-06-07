@@ -28,7 +28,7 @@ from werewolf_eval.game_engine import (
     build_default_config,
     build_failure,
 )
-from werewolf_eval.runtime_events import build_god_snapshot
+from werewolf_eval.runtime_events import build_god_snapshot, build_role_projection_snapshot
 from werewolf_eval.provider_agent import ProviderActionError
 from werewolf_eval.provider_contract import ProviderRequest
 
@@ -339,6 +339,22 @@ class EmergentGameEngine:
             public_event_ids=self._public_refs(), private_event_ids=[],
         )
         self._runtime_events.write_snapshot(name, snap, visibility="internal", round=rnd, phase=phase, actor="system")
+
+    def _write_role_snapshot(self, player_id: str) -> None:
+        """Write one setup role_projection snapshot for a player.
+
+        role/team/known_roles are static in the current 6-player board, so setup
+        is enough for observer projection trust; alive state stays god-snapshot
+        authoritative.
+        """
+        if self._runtime_events is None:
+            return
+        obs = self._build_obs(player_id, "setup", 0)
+        snap = build_role_projection_snapshot(run_id=self._game_id, observation=obs)
+        self._runtime_events.write_snapshot(
+            f"role_view_{player_id}", snap,
+            visibility="internal", round=0, phase="setup", actor=player_id,
+        )
 
     def _build_obs(self, player_id: str, phase: str, rnd: int) -> AgentObservation:
         p = self._players_by_id[player_id]
@@ -769,6 +785,8 @@ class EmergentGameEngine:
         # setup
         self._emit("setup", 0, "role_assignment", "system", "none", "public", "Roles assigned to all 6 players.")
         self._write_god_snapshot("setup_god_view", 0, "setup")
+        for _pid in self._seat_order:
+            self._write_role_snapshot(_pid)
 
         save_used = False
         poison_used = False
@@ -792,6 +810,8 @@ class EmergentGameEngine:
                 self._alive.discard(pid)
                 self._emit("night", rnd, "player_died", "system", pid, "all", f"{pid} died during the night.")
 
+            self._write_god_snapshot(f"god_view_r{rnd}_night", rnd, "night")
+
             winner = self._win_check()
             if winner is not None:
                 end_condition = "all_werewolves_eliminated" if winner == "villager" else "werewolves_reach_parity"
@@ -812,6 +832,8 @@ class EmergentGameEngine:
                 role = self._players_by_id[eliminated].role
                 self._emit("day", rnd, "player_eliminated", "system", eliminated, "all", f"{eliminated} eliminated by vote.")
                 self._emit("day", rnd, "role_revealed", "system", eliminated, "all", f"{eliminated} revealed as {role}.")
+
+            self._write_god_snapshot(f"god_view_r{rnd}_day", rnd, "day")
 
             winner = self._win_check()
             if winner is not None:
