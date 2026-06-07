@@ -26,6 +26,10 @@ Item {
     readonly property bool _degraded: bundle && bundle.degraded === true
     readonly property var _turningPoints: (bundle && bundle.turning_points) ? bundle.turning_points : []
     readonly property var _metrics: (bundle && bundle.core_metrics) ? bundle.core_metrics : ({})
+    // Partial degrade (product decision B): result metrics are present but the
+    // decision-quality axis is unavailable (no/unusable decision-log).
+    readonly property bool _dqUnavailable: bundle && bundle.degraded !== true
+        && bundle.decision_quality_available === false
 
     // Section model: a flat list the ListView renders. Each entry carries the kind
     // and (for turning-point sections) the cursor_index anchor used by the spy.
@@ -184,19 +188,25 @@ Item {
                 Rectangle {
                     visible: section.sec.kind === "metrics"
                     width: parent.width
-                    implicitHeight: statRow.implicitHeight + Theme.space.lg * 2
+                    implicitHeight: metricsCol.implicitHeight + Theme.space.lg * 2
                     radius: Theme.radius.lg
                     color: Theme.report.card
                     border.width: 1
                     border.color: Theme.report.border
 
+                  Column {
+                    id: metricsCol
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.leftMargin: Theme.space.lg
+                    anchors.rightMargin: Theme.space.lg
+                    spacing: Theme.space.md
+
                     Row {
                         id: statRow
                         anchors.left: parent.left
                         anchors.right: parent.right
-                        anchors.verticalCenter: parent.verticalCenter
-                        anchors.leftMargin: Theme.space.lg
-                        anchors.rightMargin: Theme.space.lg
 
                         readonly property int cellW: (width - 2) / 3   // 3 cells, 2 hairline dividers
 
@@ -242,6 +252,22 @@ Item {
                             statLabel: "MVP"
                         }
                     }
+
+                    // Partial-degrade note (product decision B): result metrics shown,
+                    // but the decision-quality axis is unavailable without a decision-log.
+                    Text {
+                        visible: root._dqUnavailable
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        text: I18n.t("决策质量分不可用 · 缺少决策日志",
+                                     "Decision-quality scores unavailable · no decision log")
+                        color: Theme.report.textMuted
+                        font.family: Theme.font.family
+                        font.pixelSize: Theme.size.caption
+                        horizontalAlignment: Text.AlignHCenter
+                        wrapMode: Text.WordWrap
+                    }
+                  }
                 }
 
                 // ----- degraded: battle regions unavailable

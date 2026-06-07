@@ -63,23 +63,34 @@ class TestBuildSettlementResponse(unittest.TestCase):
             self.assertEqual(r["bundle"]["run_id"], "r1")
             self.assertFalse(r["bundle"]["degraded"])
 
-    def test_absent_decision_log_degrades(self):
+    def test_absent_decision_log_partial(self):
+        # Product decision B: missing decision-log => partial (report available),
+        # not full degrade.
         with tempfile.TemporaryDirectory() as td:
             r = build_settlement_response(
                 self._run_dir(td, decision="absent"),
                 run_status="completed",
                 run_id="r1",
             )
-            self.assertEqual(r["bundle"]["degraded_reason"], "missing_decision_log")
+            self.assertFalse(r["bundle"]["degraded"])
+            self.assertFalse(r["bundle"]["decision_quality_available"])
+            self.assertEqual(
+                r["bundle"]["decision_quality_reason"], "missing_decision_log"
+            )
+            self.assertIn("game_length", r["bundle"]["core_metrics"])
 
-    def test_invalid_decision_log_degrades(self):
+    def test_invalid_decision_log_partial(self):
         with tempfile.TemporaryDirectory() as td:
             r = build_settlement_response(
                 self._run_dir(td, decision="broken"),
                 run_status="completed",
                 run_id="r1",
             )
-            self.assertEqual(r["bundle"]["degraded_reason"], "invalid_decision_log")
+            self.assertFalse(r["bundle"]["degraded"])
+            self.assertFalse(r["bundle"]["decision_quality_available"])
+            self.assertEqual(
+                r["bundle"]["decision_quality_reason"], "invalid_decision_log"
+            )
 
     def test_cache_write_then_read(self):
         with tempfile.TemporaryDirectory() as td:
@@ -94,19 +105,20 @@ class TestBuildSettlementResponse(unittest.TestCase):
             r2 = build_settlement_response(d, run_status="completed", run_id="r1")
             self.assertEqual(r2["bundle"]["bundle_version"], "cached_marker")
 
-    def test_degraded_bundle_is_not_cached_and_recovers(self):
-        # A degraded bundle (missing decision-log) must NOT be persisted, so once the
-        # decision-log lands a later request recomputes the full (non-degraded) bundle
-        # instead of serving the frozen degraded one forever.
+    def test_partial_bundle_is_not_cached_and_recovers(self):
+        # An INCOMPLETE bundle (partial: no decision-log yet) must NOT be persisted, so
+        # once the decision-log lands a later request recomputes the COMPLETE bundle
+        # instead of serving the frozen partial one forever.
         with tempfile.TemporaryDirectory() as td:
             d = self._run_dir(td, decision="absent")
             r1 = build_settlement_response(d, run_status="completed", run_id="r1")
-            self.assertTrue(r1["bundle"]["degraded"])
-            self.assertFalse((d / "settlement-bundle.json").exists())  # not cached
-            # decision-log now appears -> recompute, full bundle, then cached.
+            self.assertFalse(r1["bundle"]["degraded"])                  # partial, not full degrade
+            self.assertFalse(r1["bundle"]["decision_quality_available"])
+            self.assertFalse((d / "settlement-bundle.json").exists())   # not cached
+            # decision-log now appears -> recompute, complete bundle, then cached.
             (d / "decision-log.json").write_text(_DECISION_JSON, encoding="utf-8")
             r2 = build_settlement_response(d, run_status="completed", run_id="r1")
-            self.assertFalse(r2["bundle"]["degraded"])
+            self.assertTrue(r2["bundle"]["decision_quality_available"])
             self.assertTrue((d / "settlement-bundle.json").exists())
 
     def test_corrupt_cache_self_heals(self):

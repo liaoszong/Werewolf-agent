@@ -50,6 +50,9 @@ class TestBuildSettlementBundle(unittest.TestCase):
         self.assertEqual(bundle["game_id"], self._game().game_id)
         self.assertFalse(bundle["degraded"])
         self.assertIsNone(bundle["degraded_reason"])
+        # decision-log present -> decision-quality axis available
+        self.assertTrue(bundle["decision_quality_available"])
+        self.assertIsNone(bundle["decision_quality_reason"])
         # curtain layer
         self.assertEqual(bundle["result"]["winner"], "villager")
         self.assertEqual(
@@ -81,23 +84,31 @@ class TestBuildSettlementBundle(unittest.TestCase):
             set(self._game().result.survivors),
         )
 
-    def test_degrade_missing_decision_log_is_curtain_only(self):
+    def test_missing_decision_log_partial_not_full_degrade(self):
+        # Product decision B: no decision-log => PARTIAL, not curtain-only. The
+        # result-type battle report (metrics/turning points) is still computed from
+        # the game-log; only the decision-quality axis is flagged unavailable.
         bundle = build_settlement_bundle(
             self._game(), None, run_id="r1", decision_log_status="absent"
         )
-        self.assertTrue(bundle["degraded"])
-        self.assertEqual(bundle["degraded_reason"], "missing_decision_log")
-        self.assertEqual(bundle["turning_points"], [])
+        self.assertFalse(bundle["degraded"])                     # report available
+        self.assertIsNone(bundle["degraded_reason"])
+        self.assertFalse(bundle["decision_quality_available"])
+        self.assertEqual(bundle["decision_quality_reason"], "missing_decision_log")
+        self.assertNotEqual(bundle["core_metrics"], {})          # result metrics present
+        self.assertIn("game_length", bundle["core_metrics"])
         self.assertEqual(bundle["result"]["winner"], "villager")
-        self.assertTrue(len(bundle["board_timeline"]) >= 1)
+        # decision-quality scores zeroed (unavailable, not real)
+        self.assertTrue(all(p["decision_quality_score"] == 0 for p in bundle["players"]))
 
-    def test_degrade_invalid_decision_log(self):
+    def test_invalid_decision_log_partial(self):
         bundle = build_settlement_bundle(
             self._game(), None, run_id="r1", decision_log_status="invalid"
         )
-        self.assertTrue(bundle["degraded"])
-        self.assertEqual(bundle["degraded_reason"], "invalid_decision_log")
-        self.assertEqual(bundle["turning_points"], [])
+        self.assertFalse(bundle["degraded"])
+        self.assertFalse(bundle["decision_quality_available"])
+        self.assertEqual(bundle["decision_quality_reason"], "invalid_decision_log")
+        self.assertIn("game_length", bundle["core_metrics"])
 
     def test_degrade_on_scoring_error_keeps_curtain(self):
         with mock.patch(
@@ -112,6 +123,7 @@ class TestBuildSettlementBundle(unittest.TestCase):
             )
         self.assertTrue(bundle["degraded"])
         self.assertEqual(bundle["degraded_reason"], "scoring_failed")
+        self.assertFalse(bundle["decision_quality_available"])  # full degrade: nothing scored
         self.assertEqual(bundle["turning_points"], [])
         self.assertIsNone(bundle["top_attribution"])
         self.assertEqual(bundle["core_metrics"], {})

@@ -6,8 +6,11 @@
 - Curtain layer (run_id/game_id/result/players-reveal/board_timeline) depends
   ONLY on the game-log and survives any scoring failure.
 - Battle-report layer (core_metrics/top_attribution/turning_points/per-player
-  scores) comes from score_game+summarize_metrics+attribute_game and degrades
-  gracefully with one of three bare reason CODES — never raw exception text.
+  scores) comes from score_game+summarize_metrics+attribute_game. A scoring crash
+  FULLY degrades (degraded + bare reason CODE, never raw text). A missing/unusable
+  decision-log only PARTIALLY degrades (product decision B): the result-type layer
+  is still computed from the game-log; `decision_quality_available=False` +
+  `decision_quality_reason` flag that only the decision-quality axis is missing.
 
 `build_settlement_response(run_dir, run_status, run_id) -> dict` (Task 2) is the
 filesystem-only route logic (lazy compute-or-cache settlement-bundle.json).
@@ -80,6 +83,10 @@ def _curtain(game: GameLog, board: list[dict], run_id: str | None) -> dict:
         "game_id": game.game_id,
         "degraded": False,
         "degraded_reason": None,
+        # Partial-degrade axis (product decision B): the battle report stays available
+        # without a decision-log; only the decision-QUALITY scores are unavailable.
+        "decision_quality_available": False,
+        "decision_quality_reason": None,
         "result": {
             "winner": game.result.winner,
             "end_round": game.result.end_round,
@@ -140,25 +147,28 @@ def build_settlement_bundle(
     board = _board_timeline(game)
     bundle = _curtain(game, board, run_id)
 
-    # Missing/invalid decision-log degrades EXPLICITLY via the status pre-check.
-    # We do NOT rely on score_game(game, None): that is a valid path and would
-    # not degrade. The battle report is decision-aware (spec §6.1), so a
-    # missing/unusable decision-log => curtain-only.
-    if decision_log_status != "present":
-        bundle["degraded"] = True
-        bundle["degraded_reason"] = _DECISION_DEGRADE.get(
-            decision_log_status, "missing_decision_log"
-        )
-        return bundle
-
+    # PARTIAL DEGRADE (product decision B): a missing/unusable decision-log does NOT
+    # blank the whole battle report. score_game(game, None) is a supported path that
+    # still yields the RESULT-type layer (outcome scores, core_metrics, turning_points,
+    # top_attribution) from the game-log alone — only the DECISION-QUALITY axis is
+    # unavailable. So we score with the decision-log when present, None otherwise, and
+    # flag decision_quality_available instead of degrading. FULL degrade stays reserved
+    # for an actual scoring crash (and, upstream, a missing game-log).
+    decision_available = decision_log_status == "present"
     try:
-        score_log = score_game(game, decision_log)
+        score_log = score_game(game, decision_log if decision_available else None)
         metrics = summarize_metrics(game, score_log)
         attribution = attribute_game(game, score_log, metrics)
     except Exception:  # reason CODE only — never raw text/path/stack
         bundle["degraded"] = True
         bundle["degraded_reason"] = "scoring_failed"
         return bundle
+
+    bundle["decision_quality_available"] = decision_available
+    if not decision_available:
+        bundle["decision_quality_reason"] = _DECISION_DEGRADE.get(
+            decision_log_status, "missing_decision_log"
+        )
 
     # metrics.* are dataclasses (ResultMetrics / ScoreSummary) — attribute access.
     ss = metrics.score_summary
@@ -262,10 +272,11 @@ def build_settlement_response(
     bundle = build_settlement_bundle(
         game, decision_log, run_id=run_id, decision_log_status=status
     )
-    # Cache ONLY a non-degraded bundle. A degraded bundle is a transient render
-    # state (missing decision-log, transient/since-fixed scoring failure), NOT a
-    # frozen artifact — caching it would serve the degraded view forever, even
-    # after the cause is resolved. Degraded paths recompute each request (cheap).
-    if not bundle.get("degraded"):
+    # Cache ONLY a COMPLETE bundle: not degraded AND decision-quality present. A
+    # degraded bundle (scoring crash) OR a partial one (no decision-log yet) is a
+    # transient state — caching it would freeze it even after the decision-log lands
+    # or the cause is resolved. Incomplete bundles recompute each request (cheap) so
+    # they auto-upgrade to the full report.
+    if not bundle.get("degraded") and bundle.get("decision_quality_available"):
         cache.write_text(json.dumps(bundle, ensure_ascii=False), encoding="utf-8")
     return {"available": True, "bundle": bundle}
