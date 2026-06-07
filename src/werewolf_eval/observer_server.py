@@ -238,6 +238,16 @@ def _map_launcher_exit_reason(code: int) -> str:
     return "provider_failure"
 
 
+def _sanitize_launcher_error(exc: BaseException) -> str:
+    """Map a launcher EXCEPTION to a key-free canonical reason. Inspects only the
+    exception CLASS and a lowercased 'is this auth?' check on the type/args — never
+    embeds the message (which could carry an Authorization header / key / url)."""
+    text = f"{type(exc).__name__} {exc}".lower()
+    if "401" in text or "unauthor" in text or "forbidden" in text or "invalid api key" in text:
+        return "provider_auth_failed"
+    return "provider_failure"
+
+
 # ---------------------------------------------------------------------------
 # Request handler
 # ---------------------------------------------------------------------------
@@ -539,8 +549,8 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
         self._set_status(run_id, "running")
         try:
             ret = launcher(run_id, run_dir)
-        except Exception:  # noqa: BLE001
-            self._set_error(run_id, "provider_failure")
+        except Exception as exc:  # noqa: BLE001
+            self._set_error(run_id, _sanitize_launcher_error(exc))
             self._set_status(run_id, "failed")
             return
         if ret == 0:

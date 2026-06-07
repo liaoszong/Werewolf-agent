@@ -164,3 +164,18 @@ class NoOrphanRunDirOnLiveRejectTests(unittest.TestCase):
                 [],
                 f"orphan dirs found in runs_dir: {subdirs}",
             )
+
+
+from werewolf_eval.observer_server import _sanitize_launcher_error
+
+
+class SanitizeLauncherErrorTests(unittest.TestCase):
+    def test_auth_error_maps_to_provider_auth_failed_without_key(self):
+        msg = "401 Unauthorized: Authorization: Bearer sk-test-fake-LEAK url=https://api.deepseek.com"
+        code = _sanitize_launcher_error(RuntimeError(msg))
+        self.assertEqual(code, "provider_auth_failed")
+        self.assertNotIn("sk-", code)
+        self.assertNotIn("Bearer", code)
+
+    def test_generic_error_maps_to_provider_failure(self):
+        self.assertEqual(_sanitize_launcher_error(RuntimeError("connection reset")), "provider_failure")
