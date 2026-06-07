@@ -7,6 +7,7 @@ temp dir, then inspect snapshots/ and events.jsonl.
 from __future__ import annotations
 
 import json
+import shutil
 import sys
 import tempfile
 import unittest
@@ -17,6 +18,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from werewolf_eval.emergent_engine import EmergentBudget, EmergentGameEngine, build_emergent_config
 from werewolf_eval.emergent_fake_script import build_emergent_fake_agents, build_villager_win_script
+from werewolf_eval.observer_visibility import build_seat_role_index
 from werewolf_eval.provider_contract import FAKE_PROVIDER_SOURCE_LABEL
 from werewolf_eval.runtime_events import RuntimeEventWriter, read_events_jsonl
 
@@ -113,6 +115,41 @@ class MidGameGodSnapshotTests(unittest.TestCase):
                 {"p1", "p2", "p3", "p4", "p5", "p6"},
             )
             self.assertNotIn("p1", snaps["god_view_r1_day"]["alive_players"])
+
+
+class AliveShrinkTests(unittest.TestCase):
+    def _subset_dir(self, src: Path, dst: Path, keep_snaps: list[str]) -> Path:
+        (dst / "snapshots").mkdir(parents=True)
+        for name in keep_snaps:
+            shutil.copy(
+                src / "snapshots" / f"{name}.json",
+                dst / "snapshots" / f"{name}.json",
+            )
+        for rv in (src / "snapshots").glob("role_view_*.json"):
+            shutil.copy(rv, dst / "snapshots" / rv.name)
+        return dst
+
+    def test_alive_shrinks_after_night_then_day(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            full = root / "full"
+            _run(full)
+
+            night_dir = self._subset_dir(
+                full, root / "night", ["setup_god_view", "god_view_r1_night"]
+            )
+            idx_night = build_seat_role_index(night_dir)
+            self.assertTrue(all(idx_night[p]["alive"] for p in _PLAYER_IDS))
+
+            day_dir = self._subset_dir(
+                full,
+                root / "day",
+                ["setup_god_view", "god_view_r1_night", "god_view_r1_day"],
+            )
+            idx_day = build_seat_role_index(day_dir)
+            self.assertFalse(idx_day["p1"]["alive"])
+            self.assertTrue(idx_day["p3"]["alive"])
+            self.assertEqual(idx_day["p1"]["alive_source"], "god_snapshot")
 
 
 if __name__ == "__main__":
