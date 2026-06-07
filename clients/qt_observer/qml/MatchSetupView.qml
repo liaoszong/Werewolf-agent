@@ -24,6 +24,26 @@ Item {
     property bool _initialLoadDone: false
     readonly property int cardWidth: 168
 
+    // Step 2: credential sync state machine
+    property bool _credSynced: false
+    property string _credSyncError: ""
+    property int _credRev: 0
+    Connections {
+        target: CredentialStore
+        function onSyncSucceeded(p) { if (p === "deepseek") { root._credSynced = true; root._credSyncError = "" } }
+        function onSyncFailed(p, reason) { if (p === "deepseek") { root._credSynced = false; root._credSyncError = reason } }
+        function onCredentialChanged(p) { if (p === "deepseek") { root._credSynced = false; root._credSyncError = ""; root._credRev++ } }
+    }
+    readonly property string _credStatus: {
+        var hasLocal = CredentialStore.hasCredential("deepseek")
+        var envAvail = ObserverClient.liveAvailable && !hasLocal   // server reports available w/o local key => env
+        if (root._credSyncError !== "") return I18n.t("本地已保存，同步失败，无法启动真实 AI", "Saved locally, sync failed — cannot run live")
+        if (hasLocal && root._credSynced) return I18n.t("已配置凭证（本地）", "Credential configured (local)")
+        if (hasLocal && !root._credSynced) return I18n.t("本地已保存，尚未同步到 server", "Saved locally, not yet synced")
+        if (envAvail) return I18n.t("使用服务器环境凭证", "Using server env credential")
+        return I18n.t("未配置", "Not configured")
+    }
+
     Component.onCompleted: {
         ObserverClient.refreshProfileSchema()
         ObserverClient.refreshProfiles()
@@ -115,6 +135,55 @@ Item {
         ModeControl {
             id: setupModeControl
             objectName: "setupModeControl"
+        }
+
+        // Step 1: Inline credential panel for DeepSeek API key
+        Column {
+            spacing: Theme.space.sm
+            width: parent.width
+
+            Row {
+                spacing: Theme.space.sm
+                width: parent.width
+
+                TextField {
+                    id: credField
+                    objectName: "setupCredentialField"
+                    echoMode: TextInput.Password
+                    width: parent.width - saveCredBtn.width - clearCredBtn.width - Theme.space.sm * 2
+                    placeholderText: (root._credRev, CredentialStore.hasCredential("deepseek"))
+                        ? I18n.t("已保存：" + CredentialStore.maskedCredential("deepseek"),
+                                 "Saved: " + CredentialStore.maskedCredential("deepseek"))
+                        : I18n.t("输入 DeepSeek API Key", "Enter DeepSeek API key")
+                }
+
+                AppButton {
+                    id: saveCredBtn
+                    objectName: "setupCredentialSave"
+                    text: I18n.t("保存", "Save")
+                    variant: "secondary"
+                    onClicked: {
+                        CredentialStore.saveCredential("deepseek", credField.text)
+                        CredentialStore.syncCredentialToServer("deepseek")
+                        credField.clear()
+                    }
+                }
+
+                AppButton {
+                    id: clearCredBtn
+                    objectName: "setupCredentialClear"
+                    text: I18n.t("清除", "Clear")
+                    variant: "ghost"
+                    onClicked: CredentialStore.clearCredential("deepseek")
+                }
+            }
+
+            Text {
+                objectName: "setupCredentialStatus"
+                text: root._credStatus
+                color: root._credSyncError !== "" ? Theme.color.danger : Theme.color.textMuted
+                font.family: Theme.font.family; font.pixelSize: Theme.size.caption
+            }
         }
 
         Text {
@@ -251,7 +320,17 @@ Item {
             // Advances to Preflight only via onLaunchSucceeded (202 + currentRunId).
             // C2: pass an EXPLICIT resolved mode ("fake"|"live") — "live" only
             // when the arming FSM is live_confirmed; never a C++ default arg.
-            onClicked: ObserverClient.launchFromProfile(root.editedProfile, setupModeControl.resolvedMode)
+            // Step 3: no-silent-env-fallback guard (spec §3.7):
+            // if a local key exists but hasn't synced, block launch; never silently fall back to server env.
+            onClicked: {
+                if (setupModeControl.resolvedMode === "live"
+                        && CredentialStore.hasCredential("deepseek")
+                        && !root._credSynced) {
+                    CredentialStore.syncCredentialToServer("deepseek")  // retry sync; status updates via signals
+                    return
+                }
+                ObserverClient.launchFromProfile(root.editedProfile, setupModeControl.resolvedMode)
+            }
         }
     }
 }

@@ -21,7 +21,7 @@ FORBIDDEN_SECRET_PATTERNS = [
     r"Bearer\s",
     r"DEEPSEEK_API_KEY=",
     r"sk-",
-    r"api_key",
+    r"""api_key['"]?\s*[=:]\s*['"]""",  # hardcoded value assignment; QStringLiteral field-name usage allowed
     r"api-key",
 ]
 
@@ -58,7 +58,9 @@ REQUIRED_OBJECT_NAMES = {
     "qml/AppShell.qml": ["appShell", "appShellStack", "dataSourceChip"],
     "qml/HomeView.qml": ["homeView", "startNewMatchButton", "historyButton", "serverStatusBadge", "recentRunsList"],
     "qml/MatchSetupView.qml": ["matchSetupView", "setupRoleCards", "setupContinueButton",
-                               "setupProfilePicker", "setupValidateButton", "setupModeControl"],
+                               "setupProfilePicker", "setupValidateButton", "setupModeControl",
+                               "setupCredentialField", "setupCredentialSave",
+                               "setupCredentialClear", "setupCredentialStatus"],
     "qml/PreflightView.qml": ["preflightView", "preflightServerStatus", "preflightTemplateSummary", "preflightVisibilitySummary", "startMatchButton"],
     "qml/LiveCockpitView.qml": ["liveCockpitView", "runStatusBadge", "playerPanelGrid", "eventTimeline", "perspectiveSwitcher", "auditLinksPanel", "providerFailureSummary"],
     "qml/TheaterView.qml": ["theaterView"],
@@ -233,6 +235,37 @@ class QtObserverSecretBoundaryTests(unittest.TestCase):
                     content, pattern,
                     f"Forbidden secret pattern '{pattern}' found in {source_file.relative_to(QT)}"
                 )
+
+    def test_api_key_pattern_targets_values_not_field_names(self) -> None:
+        # Regression: the api_key entry in FORBIDDEN_SECRET_PATTERNS must be narrow
+        # enough to allow the legitimate JSON field-name usage
+        # (body[QStringLiteral("api_key")] = raw) while still catching hardcoded
+        # literal values.  This test locks the narrowing so that a future over-
+        # broadening regression OR a real hardcoded-value regression both fail.
+        api_key_pat = r"""api_key['"]?\s*[=:]\s*['"]"""
+        # Ensure the pattern in the module list matches what we're testing.
+        self.assertIn(api_key_pat, FORBIDDEN_SECRET_PATTERNS,
+                      "FORBIDDEN_SECRET_PATTERNS must contain the narrowed api_key pattern")
+        # (1) Legitimate field-name/variable assignment: must NOT be flagged.
+        self.assertIsNone(
+            re.search(api_key_pat, 'body[QStringLiteral("api_key")] = raw;'),
+            "api_key pattern must NOT flag QStringLiteral field-name + variable assignment",
+        )
+        # (2) JSON literal value assignment: must be flagged.
+        self.assertIsNotNone(
+            re.search(api_key_pat, '"api_key":"sk-secret"'),
+            'api_key pattern must flag JSON literal: "api_key":"sk-secret"',
+        )
+        # (3) Bare Python/config-style assignment with quoted literal: must be flagged.
+        self.assertIsNotNone(
+            re.search(api_key_pat, 'api_key = "sk-abc"'),
+            'api_key pattern must flag bare assignment: api_key = "sk-abc"',
+        )
+        # (4) Server reason-code substring: must NOT be flagged.
+        self.assertIsNone(
+            re.search(api_key_pat, 'missing_api_key",'),
+            'api_key pattern must NOT flag server reason-code substring: missing_api_key",'
+        )
 
 
 class QtObserverProtocolEndpointTests(unittest.TestCase):
@@ -723,6 +756,87 @@ class QtObserverSettlementViewTests(unittest.TestCase):
         t = (QT / "qml/TheaterView.qml").read_text(encoding="utf-8")
         self.assertIn("SettlementView", t)               # hosted inside TheaterView
         self.assertIn('currentStatus === "completed"', t)  # failed → not activated (§2.5)
+
+
+class QtObserverCredentialPanelTests(unittest.TestCase):
+    """P2-B-1 BYO-key: credential panel objectNames exist and the raw key is
+    never reachable from QML (no getRawKey, no Q_INVOKABLE rawCredential)."""
+
+    def test_credential_panel_object_names_in_match_setup_view(self) -> None:
+        # (a) The four credential-panel objectNames must exist so they cannot be
+        # silently removed or renamed without the contract test catching it.
+        content = (QT / "qml/MatchSetupView.qml").read_text(encoding="utf-8")
+        for name in ["setupCredentialField", "setupCredentialSave",
+                     "setupCredentialClear", "setupCredentialStatus"]:
+            pattern = rf'objectName:\s*"{name}"'
+            self.assertRegex(
+                content, pattern,
+                f"Missing objectName '{name}' in qml/MatchSetupView.qml"
+            )
+
+    def test_credential_store_header_has_no_raw_key_exposure(self) -> None:
+        # (b) getRawKey must not be declared; rawCredential must be private and
+        # never Q_INVOKABLE so QML cannot call it.
+        # Note: the header comment mentions "getRawKey()" to document its absence;
+        # we check that no non-comment code line declares it as a function.
+        header_text = (QT / "src/CredentialStore.h").read_text(encoding="utf-8")
+        code_lines = [
+            ln for ln in header_text.splitlines()
+            if not ln.lstrip().startswith("//")
+        ]
+        code_only = "\n".join(code_lines)
+        self.assertNotIn(
+            "getRawKey", code_only,
+            "CredentialStore.h must not declare getRawKey as a function"
+        )
+        self.assertIn(
+            "rawCredential", header_text,
+            "CredentialStore.h must contain rawCredential (private helper)"
+        )
+        # Belt-and-suspenders: no Q_INVOKABLE on the same line as rawCredential
+        # in code (strip inline // comments before checking).
+        for line in header_text.splitlines():
+            if "rawCredential" in line:
+                code_part = line.split("//")[0]  # strip inline C++ comment
+                self.assertNotIn(
+                    "Q_INVOKABLE", code_part,
+                    f"rawCredential must not be Q_INVOKABLE in code (line: {line.strip()!r})"
+                )
+
+    def test_credential_store_uses_qsettings_and_carries_dev_only_marker(self) -> None:
+        # (c) QSettings is the storage backend; a dev-only marker must appear in
+        # the header or the implementation (the spec Storage invariant requires it).
+        # QSettings is declared in the header (the .cpp uses it via m_settings).
+        header_text = (QT / "src/CredentialStore.h").read_text(encoding="utf-8")
+        cpp_text = (QT / "src/CredentialStore.cpp").read_text(encoding="utf-8")
+        self.assertIn(
+            "QSettings", header_text,
+            "CredentialStore.h must declare QSettings (the storage backend)"
+        )
+        # The .cpp must actually use the QSettings member (m_settings).
+        self.assertIn(
+            "m_settings", cpp_text,
+            "CredentialStore.cpp must use m_settings (QSettings member)"
+        )
+        has_dev_only = (
+            re.search(r"dev.only", header_text, re.IGNORECASE) is not None
+            or re.search(r"dev.only", cpp_text, re.IGNORECASE) is not None
+        )
+        self.assertTrue(
+            has_dev_only,
+            "CredentialStore.h or .cpp must carry a 'dev-only' marker (Storage invariant)"
+        )
+
+    def test_qml_does_not_reference_raw_key_accessors(self) -> None:
+        # (d) Forbidden-leak guard: QML must never call getRawKey or rawCredential.
+        # These are private C++ details that must never reach the QML layer.
+        for qml_path in sorted((QT / "qml").rglob("*.qml")):
+            content = qml_path.read_text(encoding="utf-8")
+            for forbidden in ["getRawKey", "rawCredential"]:
+                self.assertNotIn(
+                    forbidden, content,
+                    f"QML must not reference '{forbidden}' (found in {qml_path.relative_to(QT)})"
+                )
 
 
 if __name__ == "__main__":

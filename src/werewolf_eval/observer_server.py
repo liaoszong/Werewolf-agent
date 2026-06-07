@@ -40,6 +40,7 @@ from werewolf_eval.observer_protocol import (
     validate_run_id,
     write_run_status,
 )
+from werewolf_eval.credential_store import CredentialStore
 from werewolf_eval.observer_visibility import (
     VisibilityProjectionError,
     build_projection_envelope,
@@ -82,6 +83,27 @@ class ObserverServerState:
     # ``live_launcher`` is wired only when an env API key was present at start.
     live_enabled: bool = False
     live_launcher: RunLauncher | None = None
+    # P2-B-1 BYO-key: in-memory client credentials + a per-launch live launcher
+    # factory (built from a key at launch). live_launcher above stays as the
+    # prebuilt ENV launcher (back-compat / fallback); env_key_available records
+    # whether the server started with an env key.
+    credential_store: CredentialStore = field(default_factory=CredentialStore)
+    live_launcher_factory: Callable[[str], RunLauncher] | None = None
+    env_key_available: bool = False
+
+
+def _resolve_live_launcher_for_launch(
+    state: ObserverServerState,
+) -> tuple[RunLauncher | None, tuple[int, str, str] | None]:
+    """Pick the live launcher for THIS launch: a fresh one built from the client's
+    in-memory key (preferred), else the prebuilt env launcher, else a 403. The key
+    flows ONLY into the launcher closure (provider Authorization), never returned."""
+    client_key = state.credential_store.get("deepseek")
+    if client_key is not None and state.live_launcher_factory is not None:
+        return state.live_launcher_factory(client_key), None
+    if state.live_launcher is not None:
+        return state.live_launcher, None
+    return None, (403, "missing_api_key", "no DeepSeek credential is available")
 
 
 def _check_live_capability(
@@ -96,8 +118,16 @@ def _check_live_capability(
         return None
     if not state.live_enabled:
         return (403, "live_api_disabled", "live API is not enabled on this server")
-    if state.live_launcher is None:
-        return (403, "missing_api_key", "live API key is not configured on this server")
+    # BYO-key: a credential is available if the client synced one OR the server
+    # started with an env key (back-compat). Prefer the legacy prebuilt launcher
+    # signal when present so existing env-only deployments are unchanged.
+    has_credential = (
+        state.credential_store.has("deepseek")
+        or state.env_key_available
+        or state.live_launcher is not None
+    )
+    if not has_credential:
+        return (403, "missing_api_key", "no DeepSeek credential is available (set one in the client)")
     return None
 
 
@@ -146,6 +176,36 @@ def _build_capabilities_payload(state: ObserverServerState) -> dict[str, object]
     )
 
 
+# P2-B-1: credentials this slice accepts (deepseek-only; multi-provider is P2-B-3).
+_CREDENTIAL_PROVIDERS: frozenset[str] = frozenset({"deepseek"})
+
+
+def _credentials_post_result(
+    store: "CredentialStore", content_type: str, body: dict[str, object]
+) -> tuple[int, dict[str, object]]:
+    """Pure logic for POST /api/credentials. NEVER returns or logs the key."""
+    if str(content_type or "").split(";")[0].strip() != "application/json":
+        return (415, {"error": "unsupported_media_type"})
+    provider = body.get("provider")
+    api_key = body.get("api_key")
+    if not isinstance(provider, str) or provider not in _CREDENTIAL_PROVIDERS:
+        return (400, {"error": "unsupported_provider"})
+    if not isinstance(api_key, str) or not api_key:
+        return (400, {"error": "missing_api_key"})
+    store.set(provider, api_key)
+    return (200, {"stored": [provider]})
+
+
+def _credentials_delete_result(
+    store: "CredentialStore", provider: str
+) -> tuple[int, dict[str, object]]:
+    """Pure logic for DELETE /api/credentials/{provider}. Idempotent."""
+    if provider not in _CREDENTIAL_PROVIDERS:
+        return (400, {"error": "unsupported_provider"})
+    store.clear(provider)
+    return (200, {"cleared": provider})
+
+
 def _read_execution_mode(run_dir: Path) -> str | None:
     """Read ``execution_mode`` from the run's OWN ``resolved-profile.json``.
 
@@ -175,6 +235,16 @@ def _map_launcher_exit_reason(code: int) -> str:
     and 2 on any other provider failure; both fail closed with no secret."""
     if code == 3:
         return "budget_exhausted"
+    return "provider_failure"
+
+
+def _sanitize_launcher_error(exc: BaseException) -> str:
+    """Map a launcher EXCEPTION to a key-free canonical reason. Inspects only the
+    exception CLASS and a lowercased 'is this auth?' check on the type/args — never
+    embeds the message (which could carry an Authorization header / key / url)."""
+    text = f"{type(exc).__name__} {exc}".lower()
+    if "401" in text or "unauthor" in text or "forbidden" in text or "invalid api key" in text:
+        return "provider_auth_failed"
     return "provider_failure"
 
 
@@ -228,6 +298,10 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
 
     def _get_state(self) -> ObserverServerState:
         return self.server.state  # type: ignore[attr-defined]
+
+    def _is_loopback(self) -> bool:
+        host = self.client_address[0] if self.client_address else ""
+        return host in ("127.0.0.1", "::1")
 
     def _get_status(self, run_id: str, run_dir: Path) -> str:
         state = self._get_state()
@@ -475,8 +549,8 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
         self._set_status(run_id, "running")
         try:
             ret = launcher(run_id, run_dir)
-        except Exception:  # noqa: BLE001
-            self._set_error(run_id, "provider_failure")
+        except Exception as exc:  # noqa: BLE001
+            self._set_error(run_id, _sanitize_launcher_error(exc))
             self._set_status(run_id, "failed")
             return
         if ret == 0:
@@ -553,10 +627,16 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
         if run_dir.exists():
             self._send_error_json(409, "conflict", f"Run already exists: {run_id}")
             return
-        run_dir.mkdir(parents=True)
 
         is_live = mode == "live"
-        base = state.live_launcher if is_live else state.launcher
+        if is_live:
+            base, live_reject = _resolve_live_launcher_for_launch(state)
+            if live_reject is not None:
+                self._send_error_json(*live_reject)
+                return
+        else:
+            base = state.launcher
+        run_dir.mkdir(parents=True)
 
         def _profile_launcher(
             rid: str,
@@ -589,9 +669,57 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
             },
         )
 
+    def do_DELETE(self) -> None:
+        segments = self._path_segments()
+        try:
+            if len(segments) == 3 and segments[:2] == ["api", "credentials"]:
+                if not self._is_loopback():
+                    self._send_error_json(403, "forbidden", "credentials endpoint is loopback-only")
+                    return
+                status, payload = _credentials_delete_result(
+                    self._get_state().credential_store, segments[2]
+                )
+                if status == 200:
+                    self._send_json(200, payload)
+                else:
+                    self._send_error_json(status, str(payload.get("error", "bad_request")), "")
+                return
+            self._send_error_json(404, "not_found", "unknown endpoint")
+        except ObserverProtocolError as exc:
+            self._send_error_json(400, "bad_request", str(exc))
+        except Exception:
+            self._send_error_json(500, "internal_error", "Internal server error")
+
     def do_POST(self) -> None:
         segments = self._path_segments()
         try:
+            if segments == ["api", "credentials"]:
+                if not self._is_loopback():
+                    self._send_error_json(403, "forbidden", "credentials endpoint is loopback-only")
+                    return
+                content_type = self.headers.get("Content-Type", "")
+                content_length = int(self.headers.get("Content-Length", 0))
+                if content_length > 8192:
+                    self._send_error_json(413, "payload_too_large", "credential body too large")
+                    return
+                raw = self.rfile.read(content_length) if content_length else b""
+                try:
+                    body = json.loads(raw) if raw else {}
+                except json.JSONDecodeError:
+                    self._send_error_json(400, "invalid_json", "credential body must be JSON")
+                    return
+                if raw and not isinstance(body, dict):
+                    self._send_error_json(400, "invalid_json", "credential body must be a JSON object")
+                    return
+                status, payload = _credentials_post_result(
+                    self._get_state().credential_store, content_type, body
+                )
+                if status == 200:
+                    self._send_json(200, payload)
+                else:
+                    self._send_error_json(status, str(payload.get("error", "bad_request")), "")
+                return
+
             if segments == ["api", "runs"]:
                 body = self._read_json_body()
                 if "profile" in body or "profile_name" in body:
@@ -734,12 +862,18 @@ def create_observer_server(
     profiles_dir: Path | None = None,
     live_enabled: bool = False,
     live_launcher: RunLauncher | None = None,
+    live_launcher_factory: Callable[[str], RunLauncher] | None = None,
+    env_key_available: bool = False,
 ) -> ThreadingHTTPServer:
     """Create and configure a threaded observer HTTP server.
 
     ``live_enabled``/``live_launcher`` wire the G3-1 opt-in live path: live is
     the only mode that consults them, and only a profile launch (not a template
-    launch) may select it.  Both default off so the server stays fake-only."""
+    launch) may select it.  Both default off so the server stays fake-only.
+
+    ``live_launcher_factory`` is the per-launch builder used with a client-supplied
+    key (P2-B-1 BYO-key path); ``env_key_available`` records whether the server
+    started with an env key (back-compat signal for capability gate)."""
     if launcher is None:
         launcher = default_fake_launcher
     runs_dir.mkdir(parents=True, exist_ok=True)
@@ -753,6 +887,8 @@ def create_observer_server(
         profiles_dir=profiles_dir,
         live_enabled=live_enabled,
         live_launcher=live_launcher,
+        live_launcher_factory=live_launcher_factory,
+        env_key_available=env_key_available,
     )
 
     class _BoundHandler(ObserverRequestHandler):

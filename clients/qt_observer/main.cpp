@@ -3,6 +3,7 @@
 #include <QQmlEngine>
 #include <QQuickStyle>
 #include "ObserverApiClient.h"
+#include "CredentialStore.h"
 
 static QString observerBaseUrlFromArgs(const QStringList &args)
 {
@@ -34,6 +35,10 @@ int main(int argc, char *argv[])
     observerClient.setBaseUrl(observerBaseUrlFromArgs(app.arguments()));
     observerClient.setInitialRunId(openRunFromArgs(app.arguments()));
     qmlRegisterSingletonInstance("qt_observer", 1, 0, "ObserverClient", &observerClient);
+
+    CredentialStore credentialStore;
+    credentialStore.setBaseUrl(observerBaseUrlFromArgs(app.arguments()));
+    qmlRegisterSingletonInstance("qt_observer", 1, 0, "CredentialStore", &credentialStore);
 
     QQmlApplicationEngine engine;
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed,

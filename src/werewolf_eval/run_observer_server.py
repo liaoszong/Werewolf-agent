@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 import os
 from pathlib import Path
-from typing import Mapping
+from typing import Callable, Mapping
 
 from werewolf_eval.deepseek_launcher import (
     DEFAULT_MAX_LIVE_REQUESTS,
@@ -37,33 +37,55 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
 def resolve_live_launcher(
     args: argparse.Namespace, environ: Mapping[str, str]
-) -> tuple[bool, RunLauncher | None]:
+) -> tuple[bool, RunLauncher | None, bool, Callable[[str], RunLauncher] | None]:
     """Pure resolver: map parsed args + an env mapping to
-    ``(live_enabled, live_launcher)`` for ``create_observer_server``.
+    ``(live_enabled, env_launcher_or_None, env_key_available, factory_or_None)``
+    for ``create_observer_server``.
 
     The API key is read **once** from ``environ`` and flows only into the
     launcher closure (provider config + Authorization header) — never logged,
-    echoed, or stored elsewhere.  Returns ``live_launcher=None`` when the flag
-    is off OR the key is absent (→ ``missing_api_key`` at request time)."""
+    echoed, or stored elsewhere.
+
+    - ``env_launcher_or_None``: prebuilt launcher from the env key (back-compat
+      fallback); ``None`` when the flag is off or no env key is present.
+    - ``env_key_available``: True iff an env key was present at startup.
+    - ``factory_or_None``: per-launch builder used with a client-supplied key;
+      ``None`` only when the flag is off (factory is always present when live is
+      enabled, even with no env key, because a client can supply a key)."""
     if not args.allow_live_api:
-        return (False, None)
+        return (False, None, False, None)
     api_key = environ.get(args.api_key_env, "")
-    if not api_key:
-        return (True, None)
-    launcher = build_emergent_deepseek_launcher(
-        api_key=api_key,
-        base_url=args.deepseek_base_url,
-        model=args.deepseek_model,
-        max_tokens=_LIVE_MAX_TOKENS,
-        max_requests=args.max_live_requests,
+    env_key_available = bool(api_key)
+    env_launcher = (
+        build_emergent_deepseek_launcher(
+            api_key=api_key,
+            base_url=args.deepseek_base_url,
+            model=args.deepseek_model,
+            max_tokens=_LIVE_MAX_TOKENS,
+            max_requests=args.max_live_requests,
+        )
+        if api_key
+        else None
     )
-    return (True, launcher)
+
+    def factory(key: str) -> RunLauncher:
+        return build_emergent_deepseek_launcher(
+            api_key=key,
+            base_url=args.deepseek_base_url,
+            model=args.deepseek_model,
+            max_tokens=_LIVE_MAX_TOKENS,
+            max_requests=args.max_live_requests,
+        )
+
+    return (True, env_launcher, env_key_available, factory)
 
 
 def main() -> int:
     args = build_arg_parser().parse_args()
 
-    live_enabled, live_launcher = resolve_live_launcher(args, os.environ)
+    live_enabled, env_launcher, env_key_available, factory = resolve_live_launcher(
+        args, os.environ
+    )
 
     server = create_observer_server(
         args.host,
@@ -71,7 +93,9 @@ def main() -> int:
         Path(args.runs_dir),
         launcher=default_emergent_fake_launcher,
         live_enabled=live_enabled,
-        live_launcher=live_launcher,
+        live_launcher=env_launcher,
+        live_launcher_factory=factory,
+        env_key_available=env_key_available,
     )
     host, port = server.server_address[:2]
     print("observer_server=started")
@@ -81,7 +105,7 @@ def main() -> int:
     # Report the live posture without ever printing the key itself.
     if not live_enabled:
         print("live_api=disabled")
-    elif live_launcher is None:
+    elif env_launcher is None:
         print("live_api=enabled_no_key")
     else:
         print("live_api=enabled")
