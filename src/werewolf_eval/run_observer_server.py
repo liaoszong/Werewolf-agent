@@ -10,9 +10,10 @@ from typing import Mapping
 from werewolf_eval.deepseek_launcher import (
     DEFAULT_MAX_LIVE_REQUESTS,
     RunLauncher,
-    build_deepseek_launcher,
+    build_emergent_deepseek_launcher,
 )
 from werewolf_eval.observer_server import create_observer_server
+from werewolf_eval.run_emergent_fake_runtime import default_emergent_fake_launcher
 
 # Fixed per-request token cap for live runs (matches the existing CLI runners).
 # Not a server flag this slice — timeout/budget are the tunable guardrails.
@@ -29,7 +30,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--api-key-env", default="DEEPSEEK_API_KEY")
     parser.add_argument("--max-live-requests", type=int, default=DEFAULT_MAX_LIVE_REQUESTS)
     parser.add_argument("--deepseek-base-url", default="https://api.deepseek.com")
-    parser.add_argument("--deepseek-model", default="deepseek-chat")
+    # Default aligns with the P2-A-2 emergent live-smoke calibration; overridable.
+    parser.add_argument("--deepseek-model", default="deepseek-v4-flash")
     return parser
 
 
@@ -48,7 +50,7 @@ def resolve_live_launcher(
     api_key = environ.get(args.api_key_env, "")
     if not api_key:
         return (True, None)
-    launcher = build_deepseek_launcher(
+    launcher = build_emergent_deepseek_launcher(
         api_key=api_key,
         base_url=args.deepseek_base_url,
         model=args.deepseek_model,
@@ -67,6 +69,7 @@ def main() -> int:
         args.host,
         args.port,
         Path(args.runs_dir),
+        launcher=default_emergent_fake_launcher,
         live_enabled=live_enabled,
         live_launcher=live_launcher,
     )
