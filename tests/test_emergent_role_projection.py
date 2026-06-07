@@ -23,6 +23,7 @@ from werewolf_eval.provider_contract import FAKE_PROVIDER_SOURCE_LABEL
 from werewolf_eval.runtime_events import RuntimeEventWriter, read_events_jsonl
 
 _PLAYER_IDS = ["p1", "p2", "p3", "p4", "p5", "p6"]
+_SECRET_MARKERS = ["sk-", "authorization", "bearer", "api_key", "http://", "https://"]
 
 
 def _run(out_dir: Path, *, script=None, max_requests=80, max_day_rounds=3, game_id="rp"):
@@ -150,6 +151,40 @@ class AliveShrinkTests(unittest.TestCase):
             self.assertFalse(idx_day["p1"]["alive"])
             self.assertTrue(idx_day["p3"]["alive"])
             self.assertEqual(idx_day["p1"]["alive_source"], "god_snapshot")
+
+
+class LeakSafetyTests(unittest.TestCase):
+    def test_non_wolf_role_view_hides_werewolf_roles(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            _run(out)
+            snaps = _load_snaps(out)
+
+            p3 = snaps["role_view_p3"]
+            self.assertEqual(p3["role"], "seer")
+            self.assertNotIn("werewolf", set(p3.get("projected_known_roles", {}).values()))
+
+            p5 = snaps["role_view_p5"]
+            self.assertNotIn("werewolf", set(p5.get("projected_known_roles", {}).values()))
+
+    def test_wolf_role_view_keeps_team_and_mates(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            _run(out)
+            snaps = _load_snaps(out)
+            p1 = snaps["role_view_p1"]
+            self.assertEqual(p1["role"], "werewolf")
+            self.assertEqual(p1["team"], "werewolf")
+            self.assertEqual(p1["projected_known_roles"].get("p2"), "werewolf")
+
+    def test_no_secrets_or_urls_in_any_snapshot(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            _run(out)
+            for path in (out / "snapshots").glob("*.json"):
+                text = path.read_text(encoding="utf-8").lower()
+                for marker in _SECRET_MARKERS:
+                    self.assertNotIn(marker, text, f"{marker!r} in {path.name}")
 
 
 if __name__ == "__main__":
