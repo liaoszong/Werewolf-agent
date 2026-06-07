@@ -27,11 +27,12 @@ Item {
     // Step 2: credential sync state machine
     property bool _credSynced: false
     property string _credSyncError: ""
+    property int _credRev: 0
     Connections {
         target: CredentialStore
         function onSyncSucceeded(p) { if (p === "deepseek") { root._credSynced = true; root._credSyncError = "" } }
         function onSyncFailed(p, reason) { if (p === "deepseek") { root._credSynced = false; root._credSyncError = reason } }
-        function onCredentialChanged(p) { if (p === "deepseek") { root._credSynced = false; root._credSyncError = "" } }
+        function onCredentialChanged(p) { if (p === "deepseek") { root._credSynced = false; root._credSyncError = ""; root._credRev++ } }
     }
     readonly property string _credStatus: {
         var hasLocal = CredentialStore.hasCredential("deepseek")
@@ -150,25 +151,10 @@ Item {
                     objectName: "setupCredentialField"
                     echoMode: TextInput.Password
                     width: parent.width - saveCredBtn.width - clearCredBtn.width - Theme.space.sm * 2
-                    placeholderText: CredentialStore.hasCredential("deepseek")
-                        ? I18n.t("已保存:" + CredentialStore.maskedCredential("deepseek"),
+                    placeholderText: (root._credRev, CredentialStore.hasCredential("deepseek"))
+                        ? I18n.t("已保存：" + CredentialStore.maskedCredential("deepseek"),
                                  "Saved: " + CredentialStore.maskedCredential("deepseek"))
                         : I18n.t("输入 DeepSeek API Key", "Enter DeepSeek API key")
-
-                    Connections {
-                        target: CredentialStore
-                        function onCredentialChanged(p) {
-                            if (p === "deepseek") {
-                                // force placeholderText binding to re-evaluate
-                                credField.placeholderText = Qt.binding(function() {
-                                    return CredentialStore.hasCredential("deepseek")
-                                        ? I18n.t("已保存:" + CredentialStore.maskedCredential("deepseek"),
-                                                 "Saved: " + CredentialStore.maskedCredential("deepseek"))
-                                        : I18n.t("输入 DeepSeek API Key", "Enter DeepSeek API key")
-                                })
-                            }
-                        }
-                    }
                 }
 
                 AppButton {
@@ -340,7 +326,8 @@ Item {
                 if (setupModeControl.resolvedMode === "live"
                         && CredentialStore.hasCredential("deepseek")
                         && !root._credSynced) {
-                    return   // local key present but not synced -> block; never silent env fallback
+                    CredentialStore.syncCredentialToServer("deepseek")  // retry sync; status updates via signals
+                    return
                 }
                 ObserverClient.launchFromProfile(root.editedProfile, setupModeControl.resolvedMode)
             }
