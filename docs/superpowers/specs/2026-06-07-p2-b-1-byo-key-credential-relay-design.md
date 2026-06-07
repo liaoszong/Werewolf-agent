@@ -73,7 +73,8 @@ launch(mode=live) → POST /api/runs(profile + mode;**body 内无 key**)
 
 ### 3.2 Server — `POST /api/credentials` + `DELETE /api/credentials/{provider}`
 - **`POST /api/credentials`**:
-  - 仅接受 `Content-Type: application/json`;非 JSON → `415`(或 `400`)。
+  - 仅接受 `Content-Type: application/json`;非 JSON → `415`(或 `400`)。**前缀匹配**(容忍
+    `application/json; charset=utf-8`),不要写成完全字符串相等。
   - body 必须是 `{"provider": "deepseek", "api_key": "<non-empty>"}`;**空 body / 缺字段 / 空 key 一律 `400`**。
   - **provider allowlist 本切片只有 `deepseek`**;`fake`、未知 provider、其它 → `400`(多供应商留 P2-B-3)。
   - 限 body 大小(如 ≤ 8 KiB)防滥用。
@@ -83,6 +84,7 @@ launch(mode=live) → POST /api/runs(profile + mode;**body 内无 key**)
   allowlist → `400`;不存在也视作成功幂等)。**清除只走 DELETE**,不接受"空 body POST 清除"(避免解析失败误清除 /
   网页简单 POST 干扰)。
 - **loopback only**:端点(连同整个 server)仅绑 `127.0.0.1`;**不开宽泛 CORS**(浏览器跨站简单请求不能干扰本地 server)。
+  若 server 支持非 `127.0.0.1` 绑定,本切片 credentials route 在非 loopback 绑定下**拒绝启用**(凭证只在 loopback 单用户场景接收)。
 
 ### 3.3 Server — capability gate 拆「server 能力」与「provider 凭证状态」
 - `deepseek_available`(喂给 `build_runtime_capabilities`)的判定从「启动时 env key 存在」改为
@@ -113,14 +115,21 @@ launch(mode=live) → POST /api/runs(profile + mode;**body 内无 key**)
 ### 3.6 Client — MatchSetupView 内联「供应商密钥」面板
 - 位置:`ModeControl` 旁。显示当前 profile 的 **live provider(本切片必为 deepseek)** 的凭证状态:
   - 打码 TextField(placeholder,不预填)+ `保存` + `清除`。
-  - 状态行:`已配置凭证(本地)` / `使用服务器环境凭证` / `未配置`。
+  - 状态行(含 save→sync 两步之间的中间态):`已配置凭证(本地)` / `本地已保存,尚未同步到 server` /
+    `本地已保存,同步失败,无法启动真实 AI` / `使用服务器环境凭证` / `未配置`。`saveCredential`(写 QSettings)与
+    `syncCredentialToServer`(POST server)是两步,中间可能失败,状态行须如实区分,避免用户看到"已配置(本地)"却
+    仍无法 arm/live。
 - `保存` → `saveCredential` + `syncCredentialToServer`;`清除` → `clearCredential`。
 
 ### 3.7 Client — arming 门控(UX 门槛,非安全门槛)
-- live arming 允许条件 = `capabilities.live_api.enabled && capabilities.providers.deepseek.available`。
+- live arming 允许条件 = `capabilities.live_api.enabled && capabilities.live_api.providers.deepseek.available`。
 - **不**硬要求"本地 QSettings 有 key":若用户没填本地 key 但 **server env 有 key**,`deepseek.available` 仍为真 →
   仍可 arm(UI 显示`使用服务器环境凭证`)。即:本地 key **或** env key 任一即可。
 - launch(live)前确保本地 key(若有)已 `syncCredentialToServer`;真正 gate 仍是 server 的 launch 校验。
+- **诚实链 — 同步失败不得静默退回 env:** 若 QSettings 存在本地 deepseek key,但 launch 前同步到 server **失败**
+  (server 未开 / 端口错 / POST 被拒 / body 超限等),本次 live launch **阻断**并显示 sync/credential 错误,
+  **不得静默改用 server env key**。env key **仅在本地完全没有 key 时**才作兜底。理由:用户填了自己的 key 就期待
+  用自己的 key;同步失败却悄悄用 env 会造成 UI 显示来源与实际执行来源不一致(违背诚实链)。
 
 ---
 
