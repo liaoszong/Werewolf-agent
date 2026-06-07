@@ -150,13 +150,19 @@ GET /projection role:p3 (seer)
 ## 5. 验收标准
 
 1. **observer 默认 fake 涌现局(`default_emergent_fake_launcher`)产物中,`role_view_p{n}` 恰好 6 张,
-   不随回合增长**;每张 `snapshot_type=role_projection`、`visibility=internal`。
+   不随回合增长**;每张 **snapshot JSON 断言 `snapshot_type=role_projection`**。注:`visibility`
+   **不**写进 snapshot JSON——`RuntimeEventWriter.write_snapshot` 只把它作为对应 `snapshot_written`
+   事件字段(及入参),`build_role_projection_snapshot` 也不产 `visibility` 字段;故 `internal` 这一点
+   **改断言对应 `snapshot_written` 事件 `visibility=internal`**(或 `write_snapshot(..., visibility="internal")`
+   被以此调用),不要去 snapshot JSON 里找 `visibility`。
 2. **`/projection role:p3` 解锁 `seer_event`、`role:p4` 解锁 `witch_event`、`role:p1` 解锁
    `werewolf_team_event`**;对应 `hidden` 计数较旧行为下降。
 3. **`role:p5`(villager)不能因他人 `role_projection` 存在而看到任何 seer/witch/狼私有事件**
    (反向不泄漏)。
 4. **`latest_god_alive` 在夜间死亡后、白天放逐后都能收缩**:中盘 `/projection` 的玩家 alive 反映
-   最近一次结算(写出 `god_view_r{rnd}_night` / `god_view_r{rnd}_day`)。
+   最近一次结算(写出 `god_view_r{rnd}_night` / `god_view_r{rnd}_day`)。**注(测试口径,见 §6):**
+   `build_seat_role_index` 永远取全目录**最新** god 快照,完整 run 结束后会被 `final_god_view` 覆盖,
+   故收缩必须用 **prefix/subset run_dir**(只放到某中盘点)来证明,不能在完整 run 上验。
 5. **早终局完整性:** 夜间直接分胜负的局,`god_view_r{rnd}_night` 与 `final_god_view` 都存在。
 6. **`team:werewolf` 借各狼 role_view 得可信狼名单**;且仍只见 `werewolf_kill`,不见 seer/witch。
 7. **`god` 视角全见、所有受限视角私有 seer/witch 事件对非匹配方两通道都不泄漏**(沿用桥接 §5.4)。
@@ -171,8 +177,9 @@ GET /projection role:p3 (seer)
 
 | 层 | 范围 | 关键断言 |
 |---|---|---|
-| **engine unit**(新 `tests/test_emergent_role_projection.py`,离线) | role 快照产物 | setup 后 `snapshots/` 含恰好 6 张 `role_view_p{1..6}`,`snapshot_type=role_projection`;再多回合也仍是 6 张(验收①) |
-| **engine unit** | 中盘 god 快照 | 每回合存在 `god_view_r{rnd}_night`(+ 进入白天的回合存在 `god_view_r{rnd}_day`);按 `_snap_order` 取最新 god 快照的 `alive_players` 随死亡/放逐收缩(验收④);夜间早终局局 `god_view_r{rnd}_night`+`final_god_view` 都在(验收⑤) |
+| **engine unit**(新 `tests/test_emergent_role_projection.py`,离线) | role 快照产物 | setup 后 `snapshots/` 含恰好 6 张 `role_view_p{1..6}`,**每张 snapshot JSON `snapshot_type=role_projection`**;`internal` 经对应 `snapshot_written` 事件 `visibility=internal` 断言(**不**在 JSON 里找 `visibility`);再多回合也仍是 6 张(验收①) |
+| **engine unit** | 中盘 god 快照(文件齐备) | 完整 run 上断言:每回合 `god_view_r{rnd}_night` 存在,进入白天的回合 `god_view_r{rnd}_day` 也存在;夜间早终局局 `god_view_r{rnd}_night`+`final_god_view` 都在(验收⑤) |
+| **engine unit** | 中盘 god 快照(alive 收缩) | **用 prefix/subset run_dir 证明**(完整 run 最新 god 恒被 `final_god_view` 覆盖,证明不了中盘点):①只放 `setup_god_view`+`god_view_r1_night` → `build_seat_role_index` 的 alive 反映夜间死亡收缩;②再加入 `god_view_r1_day` → alive 反映白天放逐进一步收缩。实现可在跑完一局后把快照文件子集复制进临时目录,或截断后建索引(验收④) |
 | **engine unit** | 防泄漏 | 全 `snapshots/*.json` secret 扫描;非狼座 `role_view` 的 `projected_known_roles` 不含 `werewolf` |
 | **projection**(更新 `tests/test_observer_emergent_bridge.py`) | **翻转 seam 测试** | 旧 `test_projection_role_private_events_downgrade_to_hidden`(钉降级)改为:role:p3 出现 `seer_event`、role:p4 出现 `witch_event`、role:p1 出现 `werewolf_team_event`;**保留反向断言** role:p5 不见 seer/witch/狼私有事件(验收②③) |
 | **projection** | 中盘 alive | 喂一局涌现 run,断言中盘 `build_seat_role_index` 的 alive 在死亡后收缩(验收④) |
