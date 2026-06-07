@@ -176,6 +176,9 @@ Item {
             x: root.morphX(index) - width / 2
             y: root.morphY(index) - root.seatSize / 2
 
+            // docked = rendered on the warm-beige report canvas (light styling: white
+            // avatars + faction-colored borders + dark text). theater = dark stage.
+            readonly property bool _docked: root.layoutMode === "docked"
             property bool isUnknown: !modelData.display_role || modelData.display_role === "unknown"
             // theater: dead ONLY once the death event has been reached in playback (not the
             // final projection's alive flag). docked: dead from the parent-passed boardState
@@ -212,17 +215,24 @@ Item {
                 width: root.seatSize
                 height: root.seatSize
                 radius: width / 2
-                color: seat.isDead ? Theme.color.surfaceInset
-                     : (seat.isUnknown ? Theme.color.surfaceInset : Theme.roleTint(modelData.display_role))
-                border.width: seat.isActive && !seat.isDead ? 2 : 1
-                border.color: seat.isDead ? Theme.color.borderStrong : seat.accent
+                color: seat._docked
+                     ? (seat.isDead ? Theme.report.cardAlt : Theme.report.card)
+                     : (seat.isDead ? Theme.color.surfaceInset
+                        : (seat.isUnknown ? Theme.color.surfaceInset : Theme.roleTint(modelData.display_role)))
+                border.width: (seat.isActive && !seat.isDead) ? 2 : (seat._docked ? 1.5 : 1)
+                border.color: seat.isDead
+                     ? (seat._docked ? Theme.report.border : Theme.color.borderStrong)
+                     : seat.accent
                 opacity: seat.isDead ? 0.5 : 1.0
+                Behavior on color { ColorAnimation { duration: Theme.motion.base } }
                 Behavior on opacity { NumberAnimation { duration: Theme.motion.base } }
 
                 Text {
                     anchors.centerIn: parent
                     text: modelData.player_id
-                    color: seat.isDead ? Theme.color.textMuted : Theme.color.text
+                    color: seat._docked
+                         ? (seat.isDead ? Theme.report.textMuted : Theme.report.text)
+                         : (seat.isDead ? Theme.color.textMuted : Theme.color.text)
                     font.family: Theme.font.display
                     font.pixelSize: Theme.size.h2
                     font.weight: Theme.weight.bold
@@ -266,8 +276,9 @@ Item {
                 anchors.topMargin: seat.isDead ? 13 : 4
                 anchors.horizontalCenter: avatar.horizontalCenter
                 text: seat.isUnknown ? "████" : root._roleLabel(modelData.display_role)
-                color: seat.isDead ? Theme.color.textMuted
-                     : (seat.isUnknown ? Theme.color.textMuted : seat.accent)
+                color: (seat.isDead || seat.isUnknown)
+                     ? (seat._docked ? Theme.report.textMuted : Theme.color.textMuted)
+                     : seat.accent
                 font.family: seat.isUnknown ? Theme.font.mono : Theme.font.family
                 font.pixelSize: Theme.size.micro
             }
