@@ -10,9 +10,14 @@
 
 ## 修复进度(更新 2026-06-07)
 
-> 报告产出后已修复的项。**全套件现真实全绿:`NO_PROXY=127.0.0.1 python -m unittest discover -s tests` → 622 tests OK**(此前 FAILED:failures=1, errors=47 —— 47 个 error 是被强制代理拦截 localhost 所致,设 `NO_PROXY` 即解,非代码问题;详见环境说明)。
+> 报告产出后已修复的项。**全套件现真实全绿:`NO_PROXY=127.0.0.1 python -m unittest discover -s tests` → 625 tests OK**(此前 FAILED:failures=1, errors=47 —— 47 个 error 是被强制代理拦截 localhost 所致,设 `NO_PROXY` 即解,非代码问题;详见环境说明)。
 
 **已修复(✅):**
+- **batch-3 eval-readiness/清理(2026-06-07):**
+  - **R-09** 无 per-seat model/token —— 趁 v1 schema 未冻,`players[]` 加性增 `model`/`provider`(prompt-manifest)+ `token_usage`(provider-trace 按 actor 汇总);`_load_seat_meta()` best-effort。
+  - **R-08 余项** —— 缓存命中校验 `bundle_version`(不符则重算,P3 永不读旧 schema)+ 原子写(temp+replace)。
+  - **R-12** render label 双份重复 —— 抽 `display_labels.py` 单源,两 renderer import。
+  - **R-28** —— 抽取时发现 `day_announcement` + `witch_pass` 发出却无 label(渲染成原始英文)→ 补全;加守卫测试断言所有 engine 发出的 event type 都有 label。
 - **batch-2 安全/BYO-key(2026-06-07):**
   - **附录·DeepSeek 异常链带 key(HIGH)** —— `raise ... from exc`→`from None` + 仅暴露异常类名,断开携带 `headers`(Bearer key)的 frame 链;强化回归。
   - **附录·review-packet 脱敏(最高价值未做项)** —— packet 原样嵌 diff hunk 且无 secret 扫描;新增 `redact_secrets()`(窄高置信 sk-/Bearer/Authorization/api_key)写出前过滤整包;端到端测试。
@@ -30,7 +35,7 @@
 - **附录·持久化(HIGH)** `status.json` 从不写 → 重启后 run 不可结算 —— `write_run_status` 落盘 + `_get_status` 重启 fallback。
 - **附录·缓存中毒(MEDIUM)** 降级件被永久缓存 —— PR #45/#49 只缓存完整件。
 
-**仍待修(主要):** R-06 完全收敛(已加守卫,未单一权威)、R-09(per-seat model/token,趁 v1 schema)、R-08 余项(bundle_version 校验+原子写)、R-11(HTTP 测试 in-process harness;NO_PROXY 下已能跑绿)、R-12(render label 抽共享)、R-16/17/18/19/21/22、附录(runtime event 非字节可复现、SSE 重读全文件)、R-25/26/37(文档路由)、R-28/29/30/34/35/36/38。
+**仍待修(主要):** R-06 完全收敛(已加守卫,未单一权威)、R-11(HTTP 测试 in-process harness;NO_PROXY 下已能跑绿)、R-16/17/18/19/21/22、附录(runtime event 非字节可复现、SSE 重读全文件)、R-25/26/37(文档路由)、R-29/30/34/35/36/38。
 
 ---
 
