@@ -39,7 +39,17 @@ Do not default-read historical material:
 - `.logs/review/latest/review-packet.md` unless explicitly doing packet review.
 - Full validation logs; read `.logs/validate/latest/summary.json` first when validation fails.
 
-Do not use Repomix, Semble, CodeGraph, or codebase-memory MCP as default context.
+## Context Budget Gate
+
+Keep the working context small and generated, not bulk-loaded:
+
+- Do not read long plan files in full. Bind the active plan through the generated
+  `docs/generated-context/current-task.ctx.md`, produced by `scripts/context/build_plan_index.py`
+  and `scripts/context/build_task_context.py`.
+- Validate a task brief with `scripts/dev/validate_brief.py` before implementation.
+- On validation failure read `.logs/validate/latest/summary.json` first, not the full logs.
+- Do not use Repomix as the default context entry.
+- Do not introduce Semble, CodeGraph, or codebase-memory MCP unless a later plan explicitly allows it.
 
 ## Work Boundaries
 
