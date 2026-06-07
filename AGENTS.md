@@ -7,11 +7,8 @@ Telegraph style. Root hard policy only. Read scoped `AGENTS.md` before subtree w
 ## Project Route
 
 - Product direction: client-agnostic live AI Werewolf experiment platform.
-- Current route: G1h = Live Runtime Event Spine.
-- G1h goal: expose real/fake provider single-game runtime as stable `events.jsonl`, runtime snapshots, prompt manifest, provider lifecycle events, and standard log bundle compatibility.
-- G2 starts observer server / Qt client. G1h does not build Qt/QML, Web observer, prompt editor UI, multi-provider arena, leaderboard, or scoring formula changes.
-- Canonical route facts: `docs/ROADMAP.md`.
-- Task status and candidate dependencies: `docs/TASKS.md`.
+- **The current module/phase is NOT hardcoded here** — read it from `docs/PROJECT_MAP.md` (phase authority). Do not assume an earlier G-track module is the front; as of this writing the active work is Phase 2 (P2-A emergent engine, P2-C theater, P2-D settlement). Qt/QML, observer server, emergent engine and settlement are IN scope.
+- Canonical route facts: `docs/PROJECT_MAP.md` (phases) + `docs/ROADMAP.md` / `docs/TASKS.md` (G-track history + task status).
 - Product entry: `README.md`.
 
 ## Default Context
