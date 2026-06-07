@@ -21,7 +21,7 @@ FORBIDDEN_SECRET_PATTERNS = [
     r"Bearer\s",
     r"DEEPSEEK_API_KEY=",
     r"sk-",
-    r"api_key",
+    r"""api_key['"]?\s*[=:]\s*['"]""",  # hardcoded value assignment; QStringLiteral field-name usage allowed
     r"api-key",
 ]
 
@@ -235,6 +235,37 @@ class QtObserverSecretBoundaryTests(unittest.TestCase):
                     content, pattern,
                     f"Forbidden secret pattern '{pattern}' found in {source_file.relative_to(QT)}"
                 )
+
+    def test_api_key_pattern_targets_values_not_field_names(self) -> None:
+        # Regression: the api_key entry in FORBIDDEN_SECRET_PATTERNS must be narrow
+        # enough to allow the legitimate JSON field-name usage
+        # (body[QStringLiteral("api_key")] = raw) while still catching hardcoded
+        # literal values.  This test locks the narrowing so that a future over-
+        # broadening regression OR a real hardcoded-value regression both fail.
+        api_key_pat = r"""api_key['"]?\s*[=:]\s*['"]"""
+        # Ensure the pattern in the module list matches what we're testing.
+        self.assertIn(api_key_pat, FORBIDDEN_SECRET_PATTERNS,
+                      "FORBIDDEN_SECRET_PATTERNS must contain the narrowed api_key pattern")
+        # (1) Legitimate field-name/variable assignment: must NOT be flagged.
+        self.assertIsNone(
+            re.search(api_key_pat, 'body[QStringLiteral("api_key")] = raw;'),
+            "api_key pattern must NOT flag QStringLiteral field-name + variable assignment",
+        )
+        # (2) JSON literal value assignment: must be flagged.
+        self.assertIsNotNone(
+            re.search(api_key_pat, '"api_key":"sk-secret"'),
+            'api_key pattern must flag JSON literal: "api_key":"sk-secret"',
+        )
+        # (3) Bare Python/config-style assignment with quoted literal: must be flagged.
+        self.assertIsNotNone(
+            re.search(api_key_pat, 'api_key = "sk-abc"'),
+            'api_key pattern must flag bare assignment: api_key = "sk-abc"',
+        )
+        # (4) Server reason-code substring: must NOT be flagged.
+        self.assertIsNone(
+            re.search(api_key_pat, 'missing_api_key",'),
+            'api_key pattern must NOT flag server reason-code substring: missing_api_key",'
+        )
 
 
 class QtObserverProtocolEndpointTests(unittest.TestCase):

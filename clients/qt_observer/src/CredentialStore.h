@@ -16,7 +16,7 @@ public:
     explicit CredentialStore(QObject *parent = nullptr);
 
     Q_INVOKABLE bool hasCredential(const QString &provider) const;
-    Q_INVOKABLE QString maskedCredential(const QString &provider) const; // "sk-••••1234" or ""
+    Q_INVOKABLE QString maskedCredential(const QString &provider) const; // masked prefix + bullets + suffix, or ""
     Q_INVOKABLE void saveCredential(const QString &provider, const QString &rawText);
     Q_INVOKABLE void clearCredential(const QString &provider);           // QSettings + server DELETE
     Q_INVOKABLE void syncCredentialToServer(const QString &provider);    // POST /api/credentials
