@@ -15,6 +15,8 @@ qt_add_executable(appqt_observer
     src/ObserverApiClient.h
     src/ObserverSseParser.cpp
     src/ObserverSseParser.h
+    src/CredentialStore.cpp
+    src/CredentialStore.h
 )
 
 target_include_directories(appqt_observer PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
