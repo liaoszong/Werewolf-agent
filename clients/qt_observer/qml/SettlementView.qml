@@ -41,10 +41,15 @@ Item {
         report.scrollTo(cursorIndex)
     }
 
-    // Dim scrim behind the morph so the theater recedes (Z-axis depth feel).
+    // The morph canvas. freeze = dark translucent (theater shows through, tense);
+    // docking/report = the OPAQUE warm-beige "明室" workbench. The ColorAnimation
+    // is the 暗室→明室 reveal as the ring docks; opaque also kills the old Z-bleed
+    // of the theater game-log through the panel (issue #2).
     Rectangle {
         anchors.fill: parent
-        color: Theme.withAlpha(Theme.color.bgBase, settle.state === "report" ? 0.96 : 0.55)
+        color: settle.state === "freeze"
+            ? Theme.withAlpha(Theme.color.bgBase, 0.55)
+            : Theme.report.canvas
         Behavior on color { ColorAnimation { duration: Theme.motion.slow } }
     }
 
@@ -61,27 +66,20 @@ Item {
 
         // Docked "live sandbox" — the SeatRing morphed from the theater ring. In the
         // freeze beat it fills the stage (morphProgress 0); docking/report dock it.
+        // The winner headline lives ONLY in the right report now (was duplicated here,
+        // issue #1a) so the left column is a clean head grid.
         SeatRing {
             id: dockedRing
             objectName: "settlementSandbox"
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: parent.top
-            height: parent.height * 0.62
+            // Upper ~58% so the 2-row grid stays compact; clean space below.
+            height: parent.height * 0.58
             players: ObserverClient.playerItems
             layoutMode: settle.state === "freeze" ? "theater" : "docked"
             morphProgress: settle.state === "freeze" ? 0 : 1
             boardState: settle.boardState        // resolved here, SeatRing reads no bundle/cursor
-        }
-
-        // Winner header docked beneath the sandbox (shrunk WinnerBanner).
-        WinnerBanner {
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.top: dockedRing.bottom
-            anchors.topMargin: Theme.space.lg
-            visible: settle.state !== "freeze"
-            result: (settle.bundle && settle.bundle.result) ? settle.bundle.result : ({})
         }
     }
 
@@ -94,7 +92,7 @@ Item {
         anchors.topMargin: Theme.space.xl
         anchors.bottomMargin: Theme.space.xl
         anchors.leftMargin: Theme.space.md
-        width: Math.max(96, parent.width * 0.10)
+        width: Math.max(150, parent.width * 0.12)
         visible: settle.state === "report"
         nodes: settle._board
         activeIndex: settle.cursorIndex                  // pure binding read

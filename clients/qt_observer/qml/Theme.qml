@@ -58,6 +58,30 @@ QtObject {
         readonly property color running: "#34D399"
     }
 
+    // -------------------------------------------- Settlement "明室" (P2-D)
+    // A warm-beige LIGHT canvas for the deep battle report. The theater stays dark;
+    // the one-shot morph crosses from the dark stage INTO this light workbench —
+    // the psychological shift from 局中人 (tense, dark) to 复盘者 (calm, bright).
+    // Coral is the single accent; rainbow faction colors are dropped here. High
+    // density via hairline dividers + soft shadow instead of heavy borders.
+    readonly property QtObject report: QtObject {
+        readonly property color canvas: "#F5F0E6"   // warm beige page
+        readonly property color card: "#FFFFFF"      // card surface
+        readonly property color cardAlt: "#FBF7F0"   // subtle alt / inset / dead seat
+        readonly property color border: Qt.rgba(0, 0, 0, 0.10)        // hairline divider
+        readonly property color borderStrong: Qt.rgba(0, 0, 0, 0.16)
+        readonly property color text: "#2A2622"       // warm near-black (primary)
+        readonly property color textSecondary: "#5C554C"
+        readonly property color textMuted: "#8A8175"
+        readonly property color accent: "#E8624A"     // coral — bars, active fill, emphasis
+        readonly property color accentGlow: "#FF7A5C" // brighter coral for the breathing glow
+        readonly property color shadow: Qt.rgba(0, 0, 0, 0.12)
+        // Light-canvas faction tints (deeper than the dark-stage reds/blues so the
+        // winner headline keeps its meaning while staying legible on beige).
+        readonly property color winVillager: "#2563EB"
+        readonly property color winWerewolf: "#DC2626"
+    }
+
     // -------------------------------------------------------------- Spacing
     // 8px rhythm (4px for fine adjustments)
     readonly property QtObject space: QtObject {

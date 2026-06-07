@@ -10,11 +10,18 @@ Item {
     objectName: "winnerBanner"
 
     property var result: ({})
+    // light = rendered on the warm-beige report canvas (deeper faction colors,
+    // white card + hairline); default false = dark freeze-beat ceremony.
+    property bool light: false
 
     readonly property string _winner: (result && result.winner) ? ("" + result.winner) : ""
-    readonly property color _accent: _winner === "werewolf"
-        ? Theme.color.teamWolf
-        : (_winner === "villager" ? Theme.color.teamGood : Theme.color.completed)
+    readonly property color _accent: light
+        ? (_winner === "werewolf"
+            ? Theme.report.winWerewolf
+            : (_winner === "villager" ? Theme.report.winVillager : Theme.report.accent))
+        : (_winner === "werewolf"
+            ? Theme.color.teamWolf
+            : (_winner === "villager" ? Theme.color.teamGood : Theme.color.completed))
 
     function _winnerLabel(w) {
         if (w === "werewolf")
@@ -33,9 +40,11 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         implicitHeight: col.implicitHeight + Theme.space.xl * 2
         radius: Theme.radius.lg
-        color: Theme.withAlpha(root._accent, 0.10)
+        color: root.light ? Theme.report.card : Theme.withAlpha(root._accent, 0.10)
         border.width: 1
-        border.color: Theme.withAlpha(root._accent, 0.40)
+        border.color: root.light
+            ? Theme.report.border
+            : Theme.withAlpha(root._accent, 0.40)
 
         // Drop-in for the freeze beat. The banner's vertical position is owned by
         // anchors.verticalCenter, so the drop is done via a Translate transform (NOT
@@ -80,7 +89,7 @@ Item {
                         parts.push("" + root.result.source_label)
                     return parts.join("  ·  ")
                 }
-                color: Theme.color.textMuted
+                color: root.light ? Theme.report.textMuted : Theme.color.textMuted
                 font.family: Theme.font.mono
                 font.pixelSize: Theme.size.caption
                 horizontalAlignment: Text.AlignHCenter

@@ -121,27 +121,46 @@ Item {
                 WinnerBanner {
                     visible: section.sec.kind === "winner"
                     width: parent.width
+                    light: true                       // on the warm-beige report canvas
                     result: (root.bundle && root.bundle.result) ? root.bundle.result : ({})
                 }
 
                 // ----- turning-point section (anchored by its cursor_index)
-                AppCard {
+                // Light card, hairline border, with a coral left accent bar — the
+                // turning point is THE thing to spot, so it gets the single accent.
+                Rectangle {
                     visible: section.sec.kind === "turning_point"
                     width: parent.width
                     implicitHeight: tpCol.implicitHeight + Theme.space.lg * 2
+                    radius: Theme.radius.lg
+                    color: Theme.report.card
+                    border.width: 1
+                    border.color: Theme.report.border
+
+                    Rectangle {   // coral accent bar
+                        anchors.left: parent.left
+                        anchors.top: parent.top
+                        anchors.bottom: parent.bottom
+                        anchors.margins: 1
+                        width: 4
+                        radius: 2
+                        color: Theme.report.accent
+                    }
 
                     Column {
                         id: tpCol
                         anchors.left: parent.left
                         anchors.right: parent.right
                         anchors.top: parent.top
-                        anchors.margins: Theme.space.lg
+                        anchors.leftMargin: Theme.space.lg + Theme.space.sm
+                        anchors.rightMargin: Theme.space.lg
+                        anchors.topMargin: Theme.space.lg
                         spacing: Theme.space.sm
 
                         Text {
                             width: parent.width
                             text: (section.sec.tp && section.sec.tp.title) ? section.sec.tp.title : ""
-                            color: Theme.color.text
+                            color: Theme.report.text
                             font.family: Theme.font.family
                             font.pixelSize: Theme.size.h2
                             font.weight: Theme.weight.semibold
@@ -150,7 +169,7 @@ Item {
                         Text {
                             width: parent.width
                             text: (section.sec.tp && section.sec.tp.description) ? section.sec.tp.description : ""
-                            color: Theme.color.textSecondary
+                            color: Theme.report.textSecondary
                             font.family: Theme.font.family
                             font.pixelSize: Theme.size.body
                             wrapMode: Text.WordWrap
@@ -158,55 +177,101 @@ Item {
                     }
                 }
 
-                // ----- core metrics card row
-                AppCard {
+                // ----- core metrics — a COMPACT horizontal stat board (issue #1b):
+                // 对局天数 [2] | 胜负差 [3] | MVP [p3] in one short row. Big value on
+                // top, muted label below; hairline dividers between. Low height frees
+                // the space below for the P3 long-text analysis.
+                Rectangle {
                     visible: section.sec.kind === "metrics"
                     width: parent.width
-                    implicitHeight: metricsCol.implicitHeight + Theme.space.lg * 2
+                    implicitHeight: statRow.implicitHeight + Theme.space.lg * 2
+                    radius: Theme.radius.lg
+                    color: Theme.report.card
+                    border.width: 1
+                    border.color: Theme.report.border
 
-                    Column {
-                        id: metricsCol
+                    Row {
+                        id: statRow
                         anchors.left: parent.left
                         anchors.right: parent.right
-                        anchors.top: parent.top
-                        anchors.margins: Theme.space.lg
-                        spacing: Theme.space.sm
+                        anchors.verticalCenter: parent.verticalCenter
+                        anchors.leftMargin: Theme.space.lg
+                        anchors.rightMargin: Theme.space.lg
 
-                        SectionHeader { title: I18n.t("核心指标", "Core metrics") }
+                        readonly property int cellW: (width - 2) / 3   // 3 cells, 2 hairline dividers
 
-                        Text {
-                            text: I18n.t("对局天数", "Game length") + ": "
-                                  + (root._metrics.game_length !== undefined ? root._metrics.game_length : "—")
-                            color: Theme.color.textSecondary
-                            font.family: Theme.font.family
-                            font.pixelSize: Theme.size.small
+                        component Stat: Column {
+                            property string statValue: "—"
+                            property string statLabel: ""
+                            width: statRow.cellW
+                            spacing: Theme.space.xs
+                            Text {
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                text: parent.statValue
+                                color: Theme.report.text
+                                font.family: Theme.font.family
+                                font.pixelSize: Theme.size.h1
+                                font.weight: Theme.weight.bold
+                            }
+                            Text {
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                text: parent.statLabel
+                                color: Theme.report.textMuted
+                                font.family: Theme.font.family
+                                font.pixelSize: Theme.size.caption
+                            }
                         }
-                        Text {
-                            text: I18n.t("胜负差", "Margin") + ": "
-                                  + (root._metrics.margin !== undefined && root._metrics.margin !== null ? root._metrics.margin : "—")
-                            color: Theme.color.textSecondary
-                            font.family: Theme.font.family
-                            font.pixelSize: Theme.size.small
+                        component Divider: Rectangle {
+                            width: 1
+                            height: Theme.size.h1 + Theme.size.caption + Theme.space.xs
+                            color: Theme.report.border
                         }
-                        Text {
-                            text: "MVP: " + (root._metrics.mvp_player_id ? root._metrics.mvp_player_id : "—")
-                            color: Theme.color.textSecondary
-                            font.family: Theme.font.family
-                            font.pixelSize: Theme.size.small
+
+                        Stat {
+                            statValue: root._metrics.game_length !== undefined ? ("" + root._metrics.game_length) : "—"
+                            statLabel: I18n.t("对局天数", "Days")
+                        }
+                        Divider {}
+                        Stat {
+                            statValue: (root._metrics.margin !== undefined && root._metrics.margin !== null) ? ("" + root._metrics.margin) : "—"
+                            statLabel: I18n.t("胜负差", "Margin")
+                        }
+                        Divider {}
+                        Stat {
+                            statValue: root._metrics.mvp_player_id ? ("" + root._metrics.mvp_player_id) : "—"
+                            statLabel: "MVP"
                         }
                     }
                 }
 
                 // ----- degraded: battle regions unavailable
-                AppCard {
+                Rectangle {
                     visible: section.sec.kind === "degraded"
                     width: parent.width
                     implicitHeight: 160
+                    radius: Theme.radius.lg
+                    color: Theme.report.card
+                    border.width: 1
+                    border.color: Theme.report.border
 
-                    EmptyState {
+                    Column {
                         anchors.centerIn: parent
-                        title: I18n.t("战报数据不可用", "Battle report unavailable")
-                        subtitle: I18n.t("仅显示对局结果", "Showing the match result only")
+                        spacing: Theme.space.sm
+                        Text {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            text: I18n.t("战报数据不可用", "Battle report unavailable")
+                            color: Theme.report.textSecondary
+                            font.family: Theme.font.family
+                            font.pixelSize: Theme.size.body
+                            font.weight: Theme.weight.medium
+                        }
+                        Text {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            text: I18n.t("仅显示对局结果", "Showing the match result only")
+                            color: Theme.report.textMuted
+                            font.family: Theme.font.family
+                            font.pixelSize: Theme.size.caption
+                        }
                     }
                 }
 
@@ -220,7 +285,7 @@ Item {
                         id: p3Text
                         anchors.centerIn: parent
                         text: I18n.t("P3 加挂位 · 逐人复盘 / 全过程指标", "P3 slot · per-player review / full metrics")
-                        color: Theme.color.textMuted
+                        color: Theme.report.textMuted
                         font.family: Theme.font.family
                         font.pixelSize: Theme.size.caption
                     }
