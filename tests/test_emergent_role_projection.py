@@ -81,5 +81,39 @@ class RoleProjectionSnapshotTests(unittest.TestCase):
                 self.assertEqual(ev["visibility"], "internal")
 
 
+class MidGameGodSnapshotTests(unittest.TestCase):
+    def test_per_round_night_and_day_god_snapshots_exist(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            _run(out)
+            snaps = _load_snaps(out)
+            self.assertIn("setup_god_view", snaps)
+            self.assertIn("god_view_r1_night", snaps)
+            self.assertIn("god_view_r1_day", snaps)
+            self.assertIn("god_view_r2_night", snaps)
+            self.assertIn("final_god_view", snaps)
+            self.assertNotIn("god_view_r2_day", snaps)
+
+    def test_night_ending_game_still_writes_night_then_final(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            outcome, _ = _run(out)
+            self.assertTrue(outcome.completed)
+            snaps = _load_snaps(out)
+            self.assertIn("god_view_r2_night", snaps)
+            self.assertIn("final_god_view", snaps)
+
+    def test_god_snapshots_carry_correct_alive_players(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            _run(out)
+            snaps = _load_snaps(out)
+            self.assertEqual(
+                set(snaps["god_view_r1_night"]["alive_players"]),
+                {"p1", "p2", "p3", "p4", "p5", "p6"},
+            )
+            self.assertNotIn("p1", snaps["god_view_r1_day"]["alive_players"])
+
+
 if __name__ == "__main__":
     unittest.main()

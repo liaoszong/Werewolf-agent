@@ -810,6 +810,8 @@ class EmergentGameEngine:
                 self._alive.discard(pid)
                 self._emit("night", rnd, "player_died", "system", pid, "all", f"{pid} died during the night.")
 
+            self._write_god_snapshot(f"god_view_r{rnd}_night", rnd, "night")
+
             winner = self._win_check()
             if winner is not None:
                 end_condition = "all_werewolves_eliminated" if winner == "villager" else "werewolves_reach_parity"
@@ -830,6 +832,8 @@ class EmergentGameEngine:
                 role = self._players_by_id[eliminated].role
                 self._emit("day", rnd, "player_eliminated", "system", eliminated, "all", f"{eliminated} eliminated by vote.")
                 self._emit("day", rnd, "role_revealed", "system", eliminated, "all", f"{eliminated} revealed as {role}.")
+
+            self._write_god_snapshot(f"god_view_r{rnd}_day", rnd, "day")
 
             winner = self._win_check()
             if winner is not None:
