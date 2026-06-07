@@ -238,6 +238,32 @@ Item {
         perspective: ObserverClient.currentPerspective
     }
 
+    // ------------------------------------------------- P2-D settlement overlay (§7.7)
+    // Same-view overlay (NOT a StackView page swap, NOT an AppShell nav target, §14.1).
+    // Activates ONLY when the run is `completed` (never `failed`, §2.5) AND its
+    // game-log is present (projection players loaded) AND the event queue has drained.
+    // `failed` runs keep the existing P2-C-1 failure pill untouched.
+    readonly property bool _settlementReady:
+        ObserverClient.currentStatus === "completed"
+        && ObserverClient.playerItems.length > 0
+        && eventQueue.atEnd
+    // entryMode discriminator (§3.3): history "查看战报" opens straight to `report`
+    // (no freeze); a live watch shows the `freeze` ceremony. The intent is set
+    // SYNCHRONOUSLY at the call site via openRun(forReport) and carried on
+    // ObserverClient.settlementEntry — reliable here, unlike the old async-status latch.
+    readonly property int settlementEntryMode: ObserverClient.settlementEntry
+
+    Loader {
+        id: settlementLoader
+        anchors.fill: parent
+        active: theaterRoot._settlementReady
+        visible: active
+        sourceComponent: SettlementView {
+            objectName: "settlementView"
+            entryMode: theaterRoot.settlementEntryMode
+        }
+    }
+
     // ----------------------------------------------- Breathing layout (P2-D / D5)
     // Only the ring's SIZE and the feed's OPACITY change — never container positions. The
     // ring's x/y are bound to its (animating) size so it stays centered as it breathes.

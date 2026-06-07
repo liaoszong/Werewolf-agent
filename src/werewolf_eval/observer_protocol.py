@@ -37,6 +37,7 @@ ALLOWED_ARTIFACTS: tuple[str, ...] = (
     "provider-trace.json",
     "failure-audit.json",
     "resolved-profile.json",
+    "settlement-bundle.json",
 )
 
 ALLOWED_PERSPECTIVES: tuple[str, ...] = (

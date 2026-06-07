@@ -29,6 +29,7 @@ REQUIRED_QML_VIEWS = [
     "Main.qml",
     "qml/AppShell.qml",
     "qml/HomeView.qml",
+    "qml/SettlementView.qml",
     "qml/MatchSetupView.qml",
     "qml/PreflightView.qml",
     "qml/LiveCockpitView.qml",
@@ -37,6 +38,9 @@ REQUIRED_QML_VIEWS = [
     "qml/EventPresentationQueue.qml",
     "qml/components/RoleCard.qml",
     "qml/components/SeatRing.qml",
+    "qml/components/SettlementSpine.qml",
+    "qml/components/SettlementReport.qml",
+    "qml/components/WinnerBanner.qml",
     "qml/components/SpeechTheater.qml",
     "qml/components/EvidenceConsole.qml",
     "qml/components/PlaybackControls.qml",
@@ -58,10 +62,14 @@ REQUIRED_OBJECT_NAMES = {
     "qml/PreflightView.qml": ["preflightView", "preflightServerStatus", "preflightTemplateSummary", "preflightVisibilitySummary", "startMatchButton"],
     "qml/LiveCockpitView.qml": ["liveCockpitView", "runStatusBadge", "playerPanelGrid", "eventTimeline", "perspectiveSwitcher", "auditLinksPanel", "providerFailureSummary"],
     "qml/TheaterView.qml": ["theaterView"],
+    "qml/SettlementView.qml": ["settlementView"],
     "qml/HistoryView.qml": ["historyView", "historyRunsList", "historyRefreshButton"],
     "qml/EventPresentationQueue.qml": ["eventQueue"],
     "qml/components/RoleCard.qml": ["roleCard"],
     "qml/components/SeatRing.qml": ["seatRing"],
+    "qml/components/SettlementSpine.qml": ["settlementSpine"],
+    "qml/components/SettlementReport.qml": ["settlementReport"],
+    "qml/components/WinnerBanner.qml": ["winnerBanner"],
     "qml/components/SpeechTheater.qml": ["speechTheater"],
     "qml/components/EvidenceConsole.qml": ["evidenceConsole", "eventTimeline", "perspectiveSwitcher", "auditLinksPanel", "providerFailureSummary"],
     "qml/components/PlaybackControls.qml": ["playbackControls"],
@@ -280,6 +288,19 @@ class QtObserverProjectionClientTests(unittest.TestCase):
         cpp = (QT / "src/ObserverApiClient.cpp").read_text(encoding="utf-8")
         self.assertIn("projectionEvents", h)
         self.assertIn('value(QStringLiteral("events"))', cpp)
+
+    def test_client_exposes_settlement(self) -> None:
+        # P2-D §7.6: settlementBundle Q_PROPERTY + fetchSettlement invokable,
+        # mirroring refreshProjection's latest-wins guard; the only new endpoint.
+        h = (QT / "src/ObserverApiClient.h").read_text(encoding="utf-8")
+        cpp = (QT / "src/ObserverApiClient.cpp").read_text(encoding="utf-8")
+        self.assertIn("settlementBundle", h)
+        self.assertIn("fetchSettlement", h)
+        self.assertIn("/settlement", cpp)
+        # stale guard: run change clears the bundle
+        start = cpp.find("ObserverApiClient::setCurrentRunId")
+        self.assertNotEqual(start, -1)
+        self.assertIn("m_settlementBundle", cpp[start:start + 1200])
 
     def test_stale_guard_in_both_setters_before_requests(self) -> None:
         # Edit 2/7 + P2-F: clear+notify in BOTH setters, BEFORE the new stream/projection request.
@@ -651,6 +672,17 @@ class QtObserverTheaterViewTests(unittest.TestCase):
         self.assertNotIn("ring.perspective =", t)             # P1-C: no handler writing the bound perspective
         self.assertIn("navigateHome", t)                      # theater must have a back/exit affordance
 
+    def test_seatring_layoutmode_presentational(self) -> None:
+        # P2-D §7.3/§14.2: SeatRing gains layoutMode/morphProgress/boardState but
+        # stays PRESENTATIONAL — it must not read the bundle, fetch, or own the cursor.
+        c = (QT / "qml/components/SeatRing.qml").read_text(encoding="utf-8")
+        self.assertIn("layoutMode", c)
+        self.assertIn("morphProgress", c)
+        self.assertIn("boardState", c)
+        self.assertNotIn("settlementBundle", c)   # SeatRing must NOT read the bundle
+        self.assertNotIn("fetchSettlement", c)
+        self.assertNotIn("cursorIndex", c)        # does not own/read the cursor
+
     def test_evidence_console_rehomes_honesty_chain(self) -> None:
         # P2-C-1 Edit 5: EvidenceConsole.qml ITSELF must instantiate the honesty chain
         # (a retained LiveCockpitView.qml cannot satisfy the re-home requirement).
@@ -659,6 +691,38 @@ class QtObserverTheaterViewTests(unittest.TestCase):
                      "EventTimeline", "AuditLinksPanel"]:
             self.assertIn(comp, c)
         self.assertIn('objectName: "providerFailureSummary"', c)
+
+
+class QtObserverSettlementViewTests(unittest.TestCase):
+    """P2-D settlement / battle-report surface: single cursor, presentational
+    SeatRing, overlay-only activation, scroll-spy anti-loop guard."""
+
+    def test_spine_reads_cursor_via_binding(self) -> None:
+        c = (QT / "qml/components/SettlementSpine.qml").read_text(encoding="utf-8")
+        self.assertIn('objectName: "settlementSpine"', c)
+        self.assertNotIn("property int cursorIndex", c)   # owned by SettlementView, not here
+
+    def test_report_has_scrollspy_and_guard(self) -> None:
+        c = (QT / "qml/components/SettlementReport.qml").read_text(encoding="utf-8")
+        self.assertIn('objectName: "settlementReport"', c)
+        self.assertIn("_programmaticScroll", c)          # anti-feedback-loop flag (D6)
+        self.assertIn("cursorRequested", c)              # writes cursor via signal to parent only
+        self.assertNotIn("property int cursorIndex", c)  # does not own the cursor
+
+    def test_settlement_view_owns_cursor_and_is_overlay(self) -> None:
+        s = (QT / "qml/SettlementView.qml").read_text(encoding="utf-8")
+        self.assertIn('objectName: "settlementView"', s)
+        self.assertIn("property int cursorIndex", s)     # the ONE writable source of truth
+        self.assertIn("fetchSettlement", s)              # owns the fetch (SeatRing must not)
+        self.assertIn("boardState", s)                   # resolves board_timeline node -> SeatRing
+        # morph states present
+        for st in ['"freeze"', '"docking"', '"report"']:
+            self.assertIn(st, s)
+        a = (QT / "qml/AppShell.qml").read_text(encoding="utf-8")
+        self.assertNotIn("SettlementView", a)            # overlay-only: NOT an AppShell nav target (§14.1)
+        t = (QT / "qml/TheaterView.qml").read_text(encoding="utf-8")
+        self.assertIn("SettlementView", t)               # hosted inside TheaterView
+        self.assertIn('currentStatus === "completed"', t)  # failed → not activated (§2.5)
 
 
 if __name__ == "__main__":

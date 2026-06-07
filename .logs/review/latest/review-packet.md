@@ -1,86 +1,87 @@
-# Review Packet — P2-C-1 Theater View + Bottom Evidence Console
+# Review Packet — P2-D Settlement / Battle-Report Screen
 
 ## Metadata
-- **Branch:** `p2-c-1-theater-view` (base `main`)
-- **Spec:** `docs/superpowers/specs/2026-06-06-p2-c-1-theater-view-design.md` (approved, 3 review rounds: 4 spec edits + 7 plan invariants + 6 correctness fixes)
-- **Plan:** `docs/harness/plans/2026-06-06--p2-c-1-theater-view-plan.md` (10 tasks, all complete)
-- **Scope:** Replace the data-dashboard cockpit with a theater-style default spectator UI: breathing night/day/voting stage driven by a QML EventPresentationQueue; honesty chain demoted into a 3-state bottom Evidence Console with a reversible Seat Lens; visibility-safe projection summary enrichment (only backend change).
+- **Branch:** `p2-d-settlement-screen` (base `main`, branch-point `5f41d04`)
+- **Spec:** `docs/superpowers/specs/2026-06-06-p2-d-settlement-screen-design.md`
+- **Plan:** `docs/harness/plans/2026-06-06--p2-d-settlement-screen-plan.md`
+- **Scope:** server-computed eval-ready settlement bundle + Qt one-shot-morph battle-report screen (28/72 + center spine, single-cursor scroll-sync). Curtain layer from game-log (always); battle-report layer from `score_game`+`summarize_metrics`+`attribute_game` (graceful degrade). Settlement = entry shell for P3 evaluation/review; bundle contract v1 is the P3 anti-rework asset.
 
-## Commits (9)
+## Commits (10 tasks, TDD, per-task)
 ```
-2e11cd8 docs(p2-c-1): design spec + implementation plan
-aaa2893 feat(p2-c-1): visibility-safe projection summary enrichment (post-filter game-log join)
-505c9c1 feat(p2-c-1): expose enriched projectionEvents to QML + stale-guard
-2fbb3f7 feat(p2-c-1): EventPresentationQueue controller
-62d0c18 feat(p2-c-1): SeatRing breathing player ring + connector layer
-1fe8562 feat(p2-c-1): SpeechTheater typewriter + inline 3-layer AI trace
-5d0d578 feat(p2-c-1): EvidenceConsole 3-state forensic console (honesty chain re-homed + Seat Lens)
-33b271e feat(p2-c-1): thin PlaybackControls (no scrub)
-18f51fc feat(p2-c-1): TheaterView compose + breathing layout + queue yield-gate; retarget navigateCockpit
+450f8ec feat(p2-d): build_settlement_bundle (eval-ready bundle, curtain always, graceful degrade)        [T1]
+c850efe feat(p2-d): build_settlement_response (offline-tested route logic) + /settlement route + artifact [T2]
+7b4b21f feat(p2-d): expose settlementBundle + fetchSettlement (latest-wins, no new endpoint shape)        [T3]
+63e6076 feat(p2-d): SeatRing layoutMode (ring↔docked morph, presentational boardState input)             [T4]
+4936052 feat(p2-d): SettlementSpine vertical timeline scrubber                                            [T5]
+d8cc53b feat(p2-d): SettlementReport scrolling battle report + scroll-spy (anti-loop guarded)             [T6]
+d23df64 feat(p2-d): WinnerBanner freeze-beat ceremony                                                     [T7]
+1f90c30 feat(p2-d): SettlementView morph (freeze→dock→report) + single cursor; theater/history entries    [T8]
+78f2952 fix(p2-d): hide theater ring guide in docked SeatRing (stray circle behind sandbox grid)          [T9 visual fix]
+```
+(Plus doc commits for spec/plan: `0fa9c0c`, `c4c8789`, `a267462`, `3b36084`.)
+
+## Changed Files (17 code/test, within allowlist) — `+1329 / −9`
+```
+src/werewolf_eval/settlement_bundle.py                 | 255 +  (build_settlement_bundle + build_settlement_response)
+src/werewolf_eval/observer_server.py                   |  11 +  (GET /settlement route, 2-line wrapper)
+src/werewolf_eval/observer_protocol.py                 |   1 +  (settlement-bundle.json in ALLOWED_ARTIFACTS)
+clients/qt_observer/src/ObserverApiClient.h            |  11 +  (settlementBundle Q_PROPERTY + fetchSettlement)
+clients/qt_observer/src/ObserverApiClient.cpp          |  44 +  (fetch + latest-wins guard + stale clear)
+clients/qt_observer/qml/SettlementView.qml             | 163 +  (NEW: morph 3-beat + single cursorIndex)
+clients/qt_observer/qml/components/SettlementReport.qml | 220 + (NEW: scroll-spy + _programmaticScroll guard)
+clients/qt_observer/qml/components/SettlementSpine.qml  |  98 + (NEW: vertical scrubber)
+clients/qt_observer/qml/components/WinnerBanner.qml     |  89 + (NEW: freeze-beat ceremony)
+clients/qt_observer/qml/components/SeatRing.qml         |  70 +  (MODIFY: layoutMode/morphProgress/boardState; presentational)
+clients/qt_observer/qml/TheaterView.qml                |  30 +  (MODIFY: overlay activation, completed-only)
+clients/qt_observer/qml/HistoryView.qml                |  23 +  (MODIFY: 查看战报 entry)
+clients/qt_observer/CMakeLists.txt                     |   4 +  (register 4 new QML)
+clients/qt_observer/README.md                          |   2 +  (non-goal note)
+tests/test_settlement_bundle.py                        | 154 +  (NEW: 8 tests)
+tests/test_settlement_response.py                      |  99 +  (NEW: 7 tests)
+tests/test_qt_observer_static_contract.py              |  64 +  (new views/objectNames/invariant asserts)
 ```
 
-## Changed files (16) — all within the spec §12 allowlist
-```
-src/werewolf_eval/observer_visibility.py              (+ _load_game_log_summaries, post-filter enrichment)
-clients/qt_observer/src/ObserverApiClient.h/.cpp      (+ projectionEvents Q_PROPERTY + stale-guard)
-clients/qt_observer/qml/EventPresentationQueue.qml    (new, non-visual controller)
-clients/qt_observer/qml/TheaterView.qml               (new, composition + breathing states)
-clients/qt_observer/qml/components/SeatRing.qml       (new)
-clients/qt_observer/qml/components/SpeechTheater.qml  (new)
-clients/qt_observer/qml/components/EvidenceConsole.qml(new)
-clients/qt_observer/qml/components/PlaybackControls.qml(new)
-clients/qt_observer/qml/AppShell.qml                  (navigateCockpit -> TheaterView)
-clients/qt_observer/CMakeLists.txt                    (register 6 new QML)
-clients/qt_observer/README.md                         (Theater = default surface)
-tests/test_observer_visibility.py                     (+ ProjectionSummaryEnrichmentTests)
-tests/test_qt_observer_static_contract.py             (+ theater contract tests)
-docs/.../2026-06-06-p2-c-1-theater-view-design.md     (spec)
-docs/.../2026-06-06--p2-c-1-theater-view-plan.md      (plan)
-```
-**Diff stat:** 16 files changed, ~2350 insertions, 5 deletions. **`.gitignore`** (pre-existing unrelated edit) intentionally NOT committed.
+## Diff Check / Allowlist / Forbidden scan
+- `git diff --check main...HEAD` → **clean** (no whitespace/conflict markers).
+- All changed files within the plan allowlist. **AppShell.qml untouched** (overlay-only, §14.1 — verified empty diff).
+- Forbidden/secret scan on `clients` added lines (`QFile|QDir|file://|events.jsonl|snapshots/|werewolf_eval|api_key|Bearer|sk-…`) → **clean**. No client local file I/O; no secrets.
 
-## Diff check / forbidden scan
-- `git diff --check main...HEAD`: clean (one trailing-whitespace nit in the plan doc fixed).
-- Forbidden/secret scan on added client lines (`QFile`/`QDir`/`file://`/`events.jsonl`/`snapshots/`/`sk-…`/`Authorization:`/`Bearer`): **0 hits**.
-- No engine files touched; no new endpoint; no new deps; no client file I/O; no provider secrets.
+## Test Summary
+- **Backend pure (runs here):** `tests.test_settlement_bundle` **8/8 OK**, `tests.test_settlement_response` **7/7 OK** (branches: not_completed / no_game_log / completed-full / absent→missing_decision_log / invalid→invalid_decision_log / cache write-then-read / failed-run).
+- **Qt static contract:** `tests.test_qt_observer_static_contract` **62/62 OK**.
+- **Qt build:** `cmake --build appqt_observer` **exit 0** (QML AOT-valid syntax gate); `qmllint` no `Error:` lines.
+- **Visual (Task 9, standalone `.tmp/` harness, mock bundle, grabToImage→PNG→Read):** 6 scenarios judged PASS by the implementing agent — freeze / dock / report / **scroll-sync (sandbox+spine track `board_timeline[cursor_index]`, no feedback loop)** / history-direct (no freeze) / degraded (curtain + EmptyState). Harness fully reverted; tree clean. **NOTE:** PNGs were captured-and-deleted by the harness pass; the orchestrator independently re-verified build exit 0, 77 P2-D tests OK, the fix diff, and tree-clean — but did **not** personally view the PNGs (a reviewer may want a fresh capture).
+- **Pre-existing (NOT P2-D regressions):** 47 `RemoteDisconnected` errors in `test_observer_server.py` (localhost HTTP env-blocked, memory `werewolf-env-network-test-limits`); 1 `test_context_budget` failure reproduced on clean `main`.
 
-## Test summary
-- **Backend enrichment (pure, runs here):** `tests.test_observer_visibility` — **53/53 OK** incl. 4 new `ProjectionSummaryEnrichmentTests` (god gets summaries; role:pN enriched-but-no-leak; missing game-log → thin/no-error; no `reason_summary`/secret). TDD: both enrichment tests red (`KeyError: 'data'`) → green.
-- **Qt static contract:** `tests.test_qt_observer_static_contract` — **56/56 OK** (6 new QML files + objectNames + CMake registration; queue presentation-only/`_present`/no-`.sort`/reactive `current`; stage components no `.payload`; EvidenceConsole strong re-home; nav→TheaterView + `state: eventQueue.layoutPhase` + no `ring.perspective =`; stale-guard in both setters before requests).
-- **Qt build:** `cmake --build … appqt_observer` — **exit 0** (qmlcachegen AOT-compiles every QML = validity gate).
-- **ctest:** 100% (1/1, SSE parser).
-- **qmllint** on all 6 new QML: **0 `Error:` lines** (`[unqualified]` ObserverClient noise ignored per project convention).
-- **Full suite:** `Ran 576 tests … FAILED (failures=1, errors=47, skipped=1)` — **identical to baseline**: 47 errors are all `test_observer_server` `RemoteDisconnected` (documented localhost-HTTP block, memory `werewolf-env-network-test-limits`); 1 failure is the pre-existing `test_context_budget` AGENTS.md doc test (fails identically on `main`). **Zero new regressions.** `compileall` OK. **P2-C-1 adds no server-route tests.**
-- **Visual (grabToImage → PNG → Read; harness reverted, tree nets to zero):** 6 frames confirmed in `.tmp/p2c1_*.png`:
-  - `night` — ring centered, faction-colored seats, p1 active+glow, red `p1→p4` kill connector + arrowhead, p4 dimmed/dead.
-  - `day` — ring shrunk left, SpeechTheater expanded right, p3(seer) active, "发言 · p3" + fully-typed summary + L3 link.
-  - `voting` — ring re-emphasized, p5 active, `p5→p1` vote connector, bottom "投票" strip.
-  - `console` — Expanded (~66%), re-homed Seat Lens (上帝视角) + ViewBoundaryBadge + ProjectionProof + EventTimeline.
-  - `backfill_before` — event present (发言 · p2), summary empty → "· 等待文本 ·" placeholder.
-  - `backfill_after` — SAME p2 event back-fills its text reactively (no re-pump) — P1-A confirmed.
+## Key Hunks
+- **`settlement_bundle.py:_board_timeline`** — one node per (round,phase); `alive_player_ids` after deaths; last node == `result.survivors`. Only needs game-log → curtain never depends on scoring.
+- **`build_settlement_bundle` degrade pre-check** — `decision_log_status != "present"` → explicit `missing_/invalid_decision_log` (NOT via silent `score_game(game,None)`); scoring chain raise → `scoring_failed`. `degraded_reason` always a bare code (secret-free).
+- **dataclass access** — `metrics.result_metrics`/`score_summary` are dataclasses (`rm.margin`, `ss.player_outcome_scores`), not dicts; `mvp_player_id` = max outcome_score.
+- **`build_settlement_response`** — filesystem-only lazy compute-or-cache; `{available:false,reason}` for not-completed/no-game-log (incl. failed). Route handler is a 2-line wrapper (offline-tested logic).
+- **`ObserverApiClient::fetchSettlement`** — latest-wins serial guard mirroring `refreshProjection`; `setCurrentRunId` clears `m_settlementBundle` + notifies before new requests.
+- **`SeatRing` presentational** — `layoutMode`/`morphProgress`/`boardState`; ring↔docked seat-position lerp; docked liveness/highlight from parent `boardState`; references NO `settlementBundle`/`fetchSettlement`/`cursorIndex`; theater path zero-drift (ring guide + connector Canvas gated `visible: layoutMode !== "docked"`).
+- **`SettlementView` single cursor** — the ONE writable `cursorIndex`; resolves `board_timeline[cursorIndex]→boardState`; Spine `nodeClicked`/Report `cursorRequested` write via `setCursor`; `setCursor` scrolls report with `_programmaticScroll` guard. Morph `freeze`/`docking`/`report`; history `entryMode=1` → direct `report`.
+- **TheaterView activation** — gated on `currentStatus==="completed"` (never `failed`) + projection players loaded (game-log proxy) + `eventQueue.atEnd`; `_completedAtLoad` latch discriminates history-direct vs live without touching AppShell.
 
-## Key hunks
-- **Enrichment (`observer_visibility.py`):** `_load_game_log_summaries(run_dir)` builds `{game_log_event_id: {summary, target}}` (never raises); `build_projection_envelope` joins it onto each **already-visibility-filtered** event → `data.summary` nested + `target` top-level. Post-filter ⇒ god sees all, `role:pN` only its own; thin when game-log absent.
-- **C++ (`ObserverApiClient`):** `projectionEvents` parsed from the same `/projection` response under the existing latest-wins guard; `setCurrentPerspective`/`setCurrentRunId` clear `m_projectionEvents` + notify **before** the new stream/projection request (stale guard).
-- **Queue (`EventPresentationQueue.qml`):** append-order de-dup (no sort); `_present` PresentationEvent (`type` from `payload.type`, `summary`/`target` from enriched); **reactive computed `current`** (`_present(_currentRaw)`); `reset()` on run/perspective/source-gen; `resumeAfterTransition` yield-gate.
-- **TheaterView:** `state: eventQueue.layoutPhase` (declarative, P2-D); single terminal `ParallelAnimation.onStopped → resumeAfterTransition`; `SeatRing.perspective` single-bound to `currentPerspective` (P1-C).
-- **EvidenceConsole:** 3-state dock; Seat Lens sets `currentPerspective` only (no `ring.perspective` write); Back-to-God restores it.
+## Evidence Map (spec §12)
+- A1 overlay completed-only, no StackView/AppShell nav — `test_settlement_view_owns_cursor_and_is_overlay`; AppShell empty diff.
+- A2 SeatRing ring↔docked, theater zero-drift, docked boardState — `test_seatring_layoutmode_presentational`; visual dock/sync.
+- A3 single cursor, scroll-spy+spine via signals, anti-loop — `test_report_has_scrollspy_and_guard`, `test_spine_reads_cursor_via_binding`; visual sync.
+- A4 bundle v1 complete, cursor_index resolves, mvp=max — `test_full_bundle_shape`.
+- A5 three degrade codes explicit, curtain intact, bare code — `test_degrade_missing/invalid/on_scoring_error`, `test_degraded_reason_is_code_not_raw_exception`; visual degraded.
+- A6 lazy compute-or-cache, available envelope — `test_settlement_response` (7 branches).
+- A7 history-direct report entry — visual history.
+- A8 god full reveal, secret-free — `test_secret_free`.
+- A9 settlementBundle + fetchSettlement + stale clear — `test_client_exposes_settlement`; build.
+- A10 contract green + build exit 0 + visual — confirmed.
+- A11 no engine/scoring/validator change; only +1 builder +1 route +1 artifact — diff scan.
+- A12 P3-deepen contract: bundle keys frozen — spec §5.
 
-## Evidence Map (acceptance A1–A14)
-- A1 nav→TheaterView, LiveCockpit retired, honesty chain in console — *test_cockpit_nav_targets_theater_view; build; visual console*
-- A2 breathing ≤ ~0.7s, queue gated during transition — *queue `_gated`; visual 3 states; onStopped wired*
-- A3 queue append-order/de-dup, playback works, no future fast-forward — *test_event_queue_is_presentation_only; visual playback bar*
-- A4 god ring all roles + connectors; Seat Lens fog + reversible — *visual night/day/voting; EvidenceConsole binding*
-- A5 typewriter `current.summary` (full just-finished; placeholder live) — *visual day + backfill_before/after*
-- A6 enrichment canonical `data.summary`+`target`, no leak, thin when absent, no new server-route tests — *ProjectionSummaryEnrichmentTests*
-- A7 `projectionEvents` latest-wins + stale clear — *test_client_exposes_projection_events; build*
-- A8 static contract green; build exit 0; ctest; qmllint clean — *all above*
-- A9 no engine change/endpoint/deps/file-I/O; SSE thin unchanged — *diff/forbidden scan*
-- A10 presentation-only: append-order/no-sort/no-synthetic; PresentationEvent; components no `.payload` — *contract*
-- A11 existing `Theme.roleAccent` tokens (no Theme change) — *diff has no Theme.qml; visual faction colors*
-- A12 run/perspective clears projectionEvents + queue reset (clear precedes request, both setters) — *test_stale_guard_in_both_setters_before_requests*
-- A13 reactive back-fill (computed `current`); live directional connector needs target (spotlight only) — *visual backfill_before/after; SeatRing connector guard*
-- A14 reset re-syncs layout via `state: eventQueue.layoutPhase`; perspective never handler-assigned — *test_cockpit_nav_targets_theater_view*
+## Acceptance Checklist
+- [x] A1–A12 evidenced. [x] Build exit 0. [x] 77 P2-D tests OK. [x] Static contract 62 OK. [x] Hygiene/forbidden clean. [x] Tree refreshed.
 
-## Review trigger result
-All gates green; zero new regressions; visual verification confirms the breathing theater, connectors, typewriter, reactive back-fill, and 3-state console. Ready for review.
+## Review Trigger Result
+Self-review: PASS for merge consideration. **Open follow-ups (not blockers for this slice):**
+1. PNGs not independently re-viewed by the orchestrator (harness deleted them) — a reviewer may want a fresh visual capture.
+2. Branch based on `5f41d04`; `main` advanced to `7d2eedf` (witch_poison vocab fix PR #43) — **rebase before merge** so live witch-poison scoring flows into the bundle.
+3. Cinematic morph polish (depth-of-field blur / spotlight glow / vote-line / poison micro-anim) deferred to P2-D polish.

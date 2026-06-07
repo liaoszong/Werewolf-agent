@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 268
+- Entries: 281
 
 ```text
 ./
@@ -68,15 +68,19 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       │   │   ├── GlowDot.qml
 │       │   │   ├── ModeControl.qml
 │       │   │   ├── PerspectiveSwitcher.qml
+│       │   │   ├── PhaseTimeline.qml
 │       │   │   ├── PlaybackControls.qml
 │       │   │   ├── ProjectionProofPanel.qml
 │       │   │   ├── RoleCard.qml
 │       │   │   ├── SeatEditorPanel.qml
 │       │   │   ├── SeatRing.qml
 │       │   │   ├── SectionHeader.qml
+│       │   │   ├── SettlementReport.qml
+│       │   │   ├── SettlementSpine.qml
 │       │   │   ├── SpeechTheater.qml
 │       │   │   ├── StatusBadge.qml
-│       │   │   └── ViewBoundaryBadge.qml
+│       │   │   ├── ViewBoundaryBadge.qml
+│       │   │   └── WinnerBanner.qml
 │       │   ├── AppShell.qml
 │       │   ├── EventPresentationQueue.qml
 │       │   ├── HistoryView.qml
@@ -85,6 +89,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       │   ├── LiveCockpitView.qml
 │       │   ├── MatchSetupView.qml
 │       │   ├── PreflightView.qml
+│       │   ├── SettlementView.qml
 │       │   ├── TheaterView.qml
 │       │   └── Theme.qml
 │       ├── src/
@@ -190,7 +195,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   │   ├── 2026-06-04--g2d-prompt-configuration-mvp-plan.md
 │   │   │   ├── 2026-06-05--g3-1-live-deepseek-execution-plan.md
 │   │   │   ├── 2026-06-05--g3-2-qt-live-toggle-plan.md
-│   │   │   └── 2026-06-06--p2-c-1-theater-view-plan.md
+│   │   │   ├── 2026-06-06--p2-c-1-theater-view-plan.md
+│   │   │   └── 2026-06-06--p2-d-settlement-screen-plan.md
 │   │   └── reviews/
 │   │       ├── 2026-06-01--g1c-project-healthcheck-final.md
 │   │       ├── 2026-06-01--g1c-project-healthcheck.md
@@ -215,12 +221,14 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │       ├── 2026-06-05-g3-2-qt-live-toggle-design.md
 │   │       ├── 2026-06-05-p2-a-1-emergent-engine-design.md
 │   │       ├── 2026-06-05-p2-a-2-live-deepseek-emergent-smoke-design.md
-│   │       └── 2026-06-06-p2-c-1-theater-view-design.md
+│   │       ├── 2026-06-06-p2-c-1-theater-view-design.md
+│   │       └── 2026-06-06-p2-d-settlement-screen-design.md
 │   ├── CHECKPOINT_TEMPLATE.md
 │   ├── EVALUATION_RUBRIC.md
 │   ├── GOLD_DEMO.md
 │   ├── PRODUCT_ONE_PAGER.md
 │   ├── PROJECT_MAP.md
+│   ├── RISK_ASSESSMENT_2026-06-06.md
 │   ├── ROADMAP.md
 │   ├── SPIKES.md
 │   └── TASKS.md
@@ -273,6 +281,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       ├── scoring.py
 │       ├── scripted_game.py
 │       ├── semantic_labels.py
+│       ├── settlement_bundle.py
 │       ├── source_labels.py
 │       ├── validate_consensus_log.py
 │       ├── validate_decision_log.py
@@ -316,8 +325,12 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── test_scripted_game_runner.py
 │   ├── test_semantic_label_research.py
 │   ├── test_semantic_labels.py
+│   ├── test_settlement_bundle.py
+│   ├── test_settlement_response.py
 │   └── test_source_labels.py
 ├── .gitignore
 ├── AGENTS.md
+├── launch-theater.bat
+├── launch-theater.py
 └── README.md
 ```
