@@ -261,6 +261,16 @@ Item {
         sourceComponent: SettlementView {
             objectName: "settlementView"
             entryMode: theaterRoot.settlementEntryMode
+            // Exit the settlement overlay: stop streaming and leave the theater page.
+            // History entry (mode 1) returns to the history list; a live watch returns home.
+            onExitRequested: {
+                ObserverClient.disconnectStream()
+                var nav = theaterRoot.StackView.view.parent
+                if (theaterRoot.settlementEntryMode === 1)
+                    nav.navigateHistory()
+                else
+                    nav.navigateHome()
+            }
         }
     }
 

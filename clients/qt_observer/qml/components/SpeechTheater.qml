@@ -29,12 +29,24 @@ Item {
             player_speech: I18n.t("发言", "Speech"), player_vote: I18n.t("投票", "Vote"),
             seer_check: I18n.t("查验", "Check"), werewolf_kill: I18n.t("狼刀", "Kill"),
             witch_save: I18n.t("解药", "Save"), witch_kill: I18n.t("毒药", "Poison"),
+            witch_poison: I18n.t("毒药", "Poison"),
             witch_pass: I18n.t("弃药", "Pass"), player_died: I18n.t("死亡", "Death"),
             player_eliminated: I18n.t("出局", "Out"), role_revealed: I18n.t("亮牌", "Reveal"),
             role_assignment: I18n.t("分配", "Setup"), day_announcement: I18n.t("公告", "Notice"),
             game_over: I18n.t("终局", "End")
         })
         return m[t] || t
+    }
+    // Localized role name (role_revealed carries the role only inside the English
+    // game-log summary "{pid} revealed as {role}.", so we map it to Chinese here).
+    function _roleZh(r) {
+        switch (("" + r).toLowerCase()) {
+        case "werewolf": return I18n.t("狼人", "Werewolf")
+        case "seer": return I18n.t("预言家", "Seer")
+        case "witch": return I18n.t("女巫", "Witch")
+        case "villager": return I18n.t("村民", "Villager")
+        default: return r
+        }
     }
     function _phaseTag(ev) {
         var t = _t(ev)
@@ -55,10 +67,17 @@ Item {
         case "werewolf_kill":     return tg ? I18n.t("狼队袭击了 " + tg, "Werewolves attack " + tg) : _s(ev)
         case "seer_check":        return tg ? I18n.t("预言家 " + a + " 查验了 " + tg, "Seer " + a + " checks " + tg) : _s(ev)
         case "witch_save":        return tg ? I18n.t("女巫 " + a + " 用解药救了 " + tg, "Witch " + a + " saves " + tg) : _s(ev)
-        case "witch_kill":        return tg ? I18n.t("女巫 " + a + " 用毒药毒了 " + tg, "Witch " + a + " poisons " + tg) : _s(ev)
+        case "witch_kill":
+        case "witch_poison":      return tg ? I18n.t("女巫 " + a + " 用毒药毒了 " + tg, "Witch " + a + " poisons " + tg) : _s(ev)
         case "witch_pass":        return I18n.t("女巫 " + a + " 没有用药", "Witch " + a + " uses no potion")
         case "player_died":       return tg ? I18n.t(tg + " 在夜里死亡", tg + " died in the night") : _s(ev)
         case "player_eliminated": return tg ? I18n.t(tg + " 被投票出局", tg + " was voted out") : _s(ev)
+        case "role_revealed": {
+            if (!tg) return _s(ev)
+            var rm = _s(ev).match(/revealed as (\w+)/i)
+            return rm ? I18n.t(tg + " 亮牌，身份为" + _roleZh(rm[1]), tg + " revealed as " + _roleZh(rm[1]))
+                      : I18n.t(tg + " 亮牌", tg + " revealed")
+        }
         case "role_assignment":   return I18n.t("身份已分配给所有玩家", "Roles assigned to all players")
         default:                  return _s(ev) || _typeLabel(t)
         }

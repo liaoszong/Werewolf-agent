@@ -16,6 +16,11 @@ Item {
     // The ONE writable cursor source of truth (a board_timeline index, D6).
     property int cursorIndex: 0
 
+    // Emitted by the always-on exit affordance; the host (TheaterView Loader) decides
+    // where to navigate (history vs home). The overlay fills the theater and covers
+    // its back button, so without this the settlement screen had no way out.
+    signal exitRequested()
+
     // The fetched bundle (settlement-bundle.v1). SeatRing/spine/report never fetch.
     readonly property var bundle: ObserverClient.settlementBundle
     readonly property bool _degraded: bundle && bundle.degraded === true
@@ -138,6 +143,44 @@ Item {
             variant: "primary"
             onClicked: settle.state = "docking"
         }
+    }
+
+    // Always-on exit affordance (top-right). The overlay fills the theater and hides
+    // its back button, so this is the ONLY way out. Self-styled with report-palette
+    // tokens so it stays readable on BOTH the dark freeze canvas and the beige report
+    // canvas (the standard ghost AppButton uses dark-UI colors that vanish on beige).
+    Rectangle {
+        id: exitButton
+        objectName: "settlementExitButton"
+        anchors.top: parent.top
+        anchors.right: parent.right
+        anchors.margins: Theme.space.lg
+        z: 1000
+        implicitWidth: exitLabel.implicitWidth + Theme.space.xl * 2
+        implicitHeight: 36
+        radius: Theme.radius.sm
+        color: exitHover.hovered ? Theme.report.canvas : Theme.report.card
+        border.width: 1
+        border.color: Theme.report.border
+
+        Behavior on color { ColorAnimation { duration: Theme.motion.fast } }
+
+        Text {
+            id: exitLabel
+            anchors.centerIn: parent
+            text: I18n.t("✕ 退出", "✕ Exit")
+            color: Theme.report.text
+            font.family: Theme.font.family
+            font.pixelSize: Theme.size.body
+            font.weight: Theme.weight.semibold
+        }
+
+        HoverHandler { id: exitHover; cursorShape: Qt.PointingHandCursor }
+        TapHandler { onTapped: settle.exitRequested() }
+
+        Accessible.role: Accessible.Button
+        Accessible.name: exitLabel.text
+        Accessible.onPressAction: settle.exitRequested()
     }
 
     // -------------------------------------------------- Morph state machine (D4/D7)
