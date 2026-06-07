@@ -40,6 +40,7 @@ from werewolf_eval.observer_protocol import (
     validate_run_id,
     write_run_status,
 )
+from werewolf_eval.credential_store import CredentialStore
 from werewolf_eval.observer_visibility import (
     VisibilityProjectionError,
     build_projection_envelope,
@@ -82,6 +83,13 @@ class ObserverServerState:
     # ``live_launcher`` is wired only when an env API key was present at start.
     live_enabled: bool = False
     live_launcher: RunLauncher | None = None
+    # P2-B-1 BYO-key: in-memory client credentials + a per-launch live launcher
+    # factory (built from a key at launch). live_launcher above stays as the
+    # prebuilt ENV launcher (back-compat / fallback); env_key_available records
+    # whether the server started with an env key.
+    credential_store: CredentialStore = field(default_factory=CredentialStore)
+    live_launcher_factory: Callable[[str], RunLauncher] | None = None
+    env_key_available: bool = False
 
 
 def _check_live_capability(
@@ -96,8 +104,16 @@ def _check_live_capability(
         return None
     if not state.live_enabled:
         return (403, "live_api_disabled", "live API is not enabled on this server")
-    if state.live_launcher is None:
-        return (403, "missing_api_key", "live API key is not configured on this server")
+    # BYO-key: a credential is available if the client synced one OR the server
+    # started with an env key (back-compat). Prefer the legacy prebuilt launcher
+    # signal when present so existing env-only deployments are unchanged.
+    has_credential = (
+        state.credential_store.has("deepseek")
+        or state.env_key_available
+        or state.live_launcher is not None
+    )
+    if not has_credential:
+        return (403, "missing_api_key", "no DeepSeek credential is available (set one in the client)")
     return None
 
 
