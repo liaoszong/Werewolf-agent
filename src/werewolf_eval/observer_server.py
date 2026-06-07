@@ -92,6 +92,20 @@ class ObserverServerState:
     env_key_available: bool = False
 
 
+def _resolve_live_launcher_for_launch(
+    state: ObserverServerState,
+) -> tuple[RunLauncher | None, tuple[int, str, str] | None]:
+    """Pick the live launcher for THIS launch: a fresh one built from the client's
+    in-memory key (preferred), else the prebuilt env launcher, else a 403. The key
+    flows ONLY into the launcher closure (provider Authorization), never returned."""
+    client_key = state.credential_store.get("deepseek")
+    if client_key is not None and state.live_launcher_factory is not None:
+        return state.live_launcher_factory(client_key), None
+    if state.live_launcher is not None:
+        return state.live_launcher, None
+    return None, (403, "missing_api_key", "no DeepSeek credential is available")
+
+
 def _check_live_capability(
     state: ObserverServerState, mode: str
 ) -> tuple[int, str, str] | None:
@@ -606,7 +620,13 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
         run_dir.mkdir(parents=True)
 
         is_live = mode == "live"
-        base = state.live_launcher if is_live else state.launcher
+        if is_live:
+            base, live_reject = _resolve_live_launcher_for_launch(state)
+            if live_reject is not None:
+                self._send_error_json(*live_reject)
+                return
+        else:
+            base = state.launcher
 
         def _profile_launcher(
             rid: str,
