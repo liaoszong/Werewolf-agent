@@ -8,6 +8,28 @@
 
 ---
 
+## 修复进度(更新 2026-06-07)
+
+> 报告产出后已修复的项。**全套件现真实全绿:`NO_PROXY=127.0.0.1 python -m unittest discover -s tests` → 618 tests OK**(此前 FAILED:failures=1, errors=47 —— 47 个 error 是被强制代理拦截 localhost 所致,设 `NO_PROXY` 即解,非代码问题;详见环境说明)。
+
+**已修复(✅):**
+- **R-01 / R-03 / R-05 / V-1~V-8** witch 词汇全链 —— PR #43(`witch_kill`→`witch_poison`),`src` 已无 `witch_kill`。
+- **R-02** engine→scoring→settlement 无端到端测试 —— `tests/test_engine_to_scoring_e2e.py`(真实引擎输出过 score_game+attribute_game+settlement;含词汇 registry 静态守卫)。
+- **R-04** 女巫永远无法救人 —— `augment_witch_observation()` 把当晚 victim 注入女巫自身 prompt。
+- **R-07 / R-10 / R-14 / R-27** witch 降级/文档 caveat —— 词汇修复后 moot。
+- **R-08(部分)** —— settlement 缓存坏件自愈 + 不缓存降级/部分件(PR #45/#49);余:`bundle_version` 读回校验 + 原子写仍待做。
+- **R-13** 空 fix 分支 —— 随 #43 落地。
+- **R-15 / R-33** AGENTS.md 缺 Context Budget Gate(唯一真实失败测试)—— 已恢复段落。
+- **R-20(部分)** decision_quality 无标志 —— `decision_quality_available` 字段(PR #49,部分降级)。
+- **R-23** 五个陈旧分支 —— 已删。
+- **R-24** `.runs/` 未 gitignore —— PR #48。
+- **附录·持久化(HIGH)** `status.json` 从不写 → 重启后 run 不可结算 —— `write_run_status` 落盘 + `_get_status` 重启 fallback。
+- **附录·缓存中毒(MEDIUM)** 降级件被永久缓存 —— PR #45/#49 只缓存完整件。
+
+**仍待修(主要):** R-06(双 visibility 收敛)、R-09(per-seat model/token,趁 v1 schema)、R-08 余项、R-11(HTTP 测试 in-process harness;NO_PROXY 下已能跑绿)、R-12(render label 抽共享)、R-16/17/18/19/21/22、附录(DeepSeek 异常链带 key、runtime event 非字节可复现、SSE 重读全文件、review-packet 脱敏追踪)、R-25/26/37(文档路由)、R-28/29/30/34/35/36/38。
+
+---
+
 ## 执行摘要
 
 - **最致命(BLOCKER):** witch 毒药动作的事件词汇贯穿整条链路 mismatch(`emergent_engine.py:43/625` 发 `witch_kill`,`scoring.py:120/674/765` 只消费 `witch_poison`)。这不是异常,scorer 静默跳过,导致每一局 emergent/fake-default 游戏的毒药动作得分为 0、`poison_accuracy=0`、attribution F.3 失明,而 settlement bundle 仍以 `degraded=false` 渲染一份"看起来完整"的错误战报。**这正是被 PROJECT_MAP 声称"评测就绪以免 P3 返工"的那份数据。**

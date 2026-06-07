@@ -119,6 +119,19 @@ def render_observation_text(
     return RenderedObservation(text="\n".join(lines), source_event_ids=source_event_ids)
 
 
+def augment_witch_observation(base_text: str, victim: str | None) -> str:
+    """R-04 fix: the wolf kill is `werewolf_team`-visible, so the witch's role-filtered
+    observation never includes tonight's victim — without it a live witch can never
+    satisfy the `target==victim` save rule and is silently pushed toward a wolf win.
+    Surface the victim into the WITCH'S OWN prompt only (this is the witch's turn, so
+    no game-log event is added and nothing leaks to any other perspective)."""
+    if victim is not None:
+        return base_text + (
+            f"\n今晚 {victim} 被狼人袭击。若用解药救人,witch_save 的 target 必须为 {victim}。"
+        )
+    return base_text + "\n今晚没有玩家被狼人袭击(无可救目标)。"
+
+
 class BudgetExhausted(Exception):
     """Raised internally when the per-game request budget is hit; the run is
     then converted to a fail-closed failed outcome (no complete game_log)."""
@@ -559,6 +572,7 @@ class EmergentGameEngine:
         provider = self._agents[witch].provider
         obs = self._build_obs(witch, "night", rnd)
         rendered = render_observation_text(obs, self._events_by_id())
+        witch_obs_text = augment_witch_observation(rendered.text, victim)
         request = ProviderRequest(
             request_id=f"{self._game_id}_r{rnd:02d}_{witch}_witch",
             game_id=self._game_id,
@@ -568,7 +582,7 @@ class EmergentGameEngine:
             observation=obs.to_dict(),
             allowed_actions=list(WITCH_ACTIONS),
             allowed_targets=sorted(self._alive),
-            observation_text=rendered.text,
+            observation_text=witch_obs_text,
             response_kind="action",
             max_output_tokens=ACTION_MAX_OUTPUT_TOKENS,
         )
