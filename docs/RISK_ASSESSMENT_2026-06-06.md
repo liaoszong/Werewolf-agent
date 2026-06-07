@@ -13,6 +13,13 @@
 > 报告产出后已修复的项。**全套件现真实全绿:`NO_PROXY=127.0.0.1 python -m unittest discover -s tests` → 630 tests OK**(此前 FAILED:failures=1, errors=47 —— 47 个 error 是被强制代理拦截 localhost 所致,设 `NO_PROXY` 即解,非代码问题;详见环境说明)。
 
 **已修复(✅):**
+- **batch-6 CI/结构/perf(2026-06-07):**
+  - **R-38** 无 CI —— 新增 `.github/workflows/tests.yml`(clean Linux runner 跑全量;localhost 通,observer HTTP 测试真执行)。
+  - **R-11** HTTP 安全测试本环境 ERROR —— 由 CI 解决(clean runner 上 socket 测试真跑真验;in-process harness 重构为可选优化)。
+  - **R-06** 双 visibility 重复 frozenset —— 收敛为单一来源(observer_visibility 从 observer_protocol import);行为差异(protocol 对 role:pN 故意 under-share = 安全方向)保留,batch-2 守卫测试强制 protocol ⊆ projection。
+  - **附录·byte-repro** —— 文档化边界:runtime events.jsonl 是 observability(uuid/wall-clock ts),非可复现 eval 源;顺序由确定性 `seq` 承载,eval/replay 复现由 game-log/decision-log 保证。
+  - **附录·SSE perf** —— append-only 文件加 size-gate,空闲 tick 不再重读+重校验整文件。
+  - **R-35** legacy runners —— scripted/mock/attribute_game CLI 加 LEGACY docstring 指向 canonical 入口。
 - **batch-5 eval/engine/security 清理(2026-06-07):**
   - **R-19** 脱敏过宽 —— runtime_events VALUE 检查收窄到高置信凭证形状(去 bare secret/token/auth),不再毁正常游戏文本。
   - **R-21** per-decision ScoreRecord 丢弃 —— bundle 加性增 `score_records[]`。
@@ -47,7 +54,9 @@
 - **附录·持久化(HIGH)** `status.json` 从不写 → 重启后 run 不可结算 —— `write_run_status` 落盘 + `_get_status` 重启 fallback。
 - **附录·缓存中毒(MEDIUM)** 降级件被永久缓存 —— PR #45/#49 只缓存完整件。
 
-**仍待修(主要):** R-06 完全收敛(已加守卫,未单一权威)、R-11(HTTP 测试 in-process harness;NO_PROXY 下已能跑绿)、附录(runtime event 非字节可复现、SSE 重读全文件)、R-35/36/38。
+**仍待修 / 刻意不做:**
+- **R-36(8 launcher 无共享脚手架)** —— **刻意 deferred**:跨 8 个 launcher 抽 fail-closed 共享 helper 是大 refactor、破坏风险高、价值低(纯 DRY);报告本身评 low 且建议"裁剪 scripted runner 时一并处理"。守门契约已各自有测试覆盖,不强行返工。
+- **R-06 行为层完全收敛** —— **刻意不做**:常量已单一来源;让 /events,/stream 改走 projection 权威会让它们对受信 role:pN **多分享** role-private 事件,即**扩大泄漏面**。当前 protocol 故意 under-share(安全方向),由守卫测试强制 protocol ⊆ projection。单一 visibility 权威留作未来若要修 under-share 时的专项。
 
 ---
 

@@ -665,10 +665,22 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
         sent_count = 0
+        last_size = -1
         events_path = run_dir / "events.jsonl"
 
         def _read_new_events() -> list[dict[str, object]]:
-            nonlocal sent_count
+            nonlocal sent_count, last_size
+            # events.jsonl is append-only: skip the (whole-file) read+validate on idle
+            # ticks where the file hasn't grown. Without this gate the SSE loop re-read +
+            # re-validated the entire file every 100ms per connected client, forever
+            # (O(file × clients × 10/s) — quadratic-ish on a long game). (risk appendix)
+            try:
+                size = events_path.stat().st_size
+            except OSError:
+                return []
+            if size == last_size:
+                return []
+            last_size = size
             all_events = _read_events_jsonl_safe(events_path)
             new_events = all_events[sent_count:]
             return new_events

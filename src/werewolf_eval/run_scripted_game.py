@@ -1,3 +1,7 @@
+"""LEGACY (R-35): scripted-game CLI, reachable only from its own tests — NOT on the
+canonical product path (`run_observer_server` → `run_g1h_fake_runtime` for fake /
+`deepseek_launcher` for live). Kept for its passing tests; do not extend. See
+`docs/PROJECT_MAP.md`."""
 from __future__ import annotations
 
 import argparse

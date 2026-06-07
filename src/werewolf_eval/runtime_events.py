@@ -345,7 +345,15 @@ class RuntimeEventWriter:
         payload: dict[str, object] | None = None,
         refs: dict[str, object] | None = None,
     ) -> dict[str, object]:
-        """Build, validate, append, and return an event envelope."""
+        """Build, validate, append, and return an event envelope.
+
+        Reproducibility boundary (risk-assessment appendix): this runtime stream is an
+        OBSERVABILITY artifact, not the reproducible eval source. `event_id` is a uuid4
+        and `ts` is wall-clock, so two replays differ byte-for-byte here — that is fine.
+        Deterministic ordering is carried by the monotonic `seq`; deterministic eval /
+        replay reproducibility is guaranteed by the game-log / decision-log (seeded
+        engine ids `{game_id}_e{seq}`), which is what P3 scoring/replay consumes.
+        """
         event: dict[str, object] = {
             "event_id": str(uuid.uuid4()),
             "seq": self._next_seq(),

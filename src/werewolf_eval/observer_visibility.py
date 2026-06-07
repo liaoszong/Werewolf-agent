@@ -12,6 +12,14 @@ import json
 from pathlib import Path
 from typing import Any
 
+# R-06: single source of truth for these visibility sets — import them from
+# observer_protocol so the /events,/stream filter and the /projection filter can
+# never drift apart (the duplicate frozensets were the contract-drift seam).
+from werewolf_eval.observer_protocol import (
+    PUBLIC_EVENT_VISIBILITIES as PUBLIC_LIKE_EVENT_VISIBILITIES,
+    WEREWOLF_TEAM_EVENT_VISIBILITIES,
+)
+
 # ---------------------------------------------------------------------------
 # Constants (Step 1)
 # ---------------------------------------------------------------------------
@@ -19,10 +27,8 @@ from typing import Any
 CONTRACT_VERSION = "g2c.visibility.v1"
 ROLE_PERSPECTIVE_PREFIX = "role:"
 DEFAULT_PLAYER_IDS: tuple[str, ...] = tuple(f"p{i}" for i in range(1, 7))
-PUBLIC_LIKE_EVENT_VISIBILITIES: frozenset[str] = frozenset({"public", "all"})
-WEREWOLF_TEAM_EVENT_VISIBILITIES: frozenset[str] = frozenset(
-    {"public", "all", "werewolf_team"}
-)
+# PUBLIC_LIKE_EVENT_VISIBILITIES / WEREWOLF_TEAM_EVENT_VISIBILITIES are imported from
+# observer_protocol above (single source of truth, R-06).
 ROLE_SPECIFIC_EVENT_VISIBILITIES: frozenset[str] = frozenset({"seer", "witch"})
 
 _SNAPSHOTS_DIR = "snapshots"

@@ -1,3 +1,7 @@
+"""LEGACY (R-35): standalone attribution CLI, reachable only from its own tests. The
+canonical attribution entry is `attribution.attribute_game()` (used by render_demo /
+settlement_bundle); this thin CLI is not on the product path. Kept for its tests; do
+not extend. See `docs/PROJECT_MAP.md`."""
 from __future__ import annotations
 
 import argparse
