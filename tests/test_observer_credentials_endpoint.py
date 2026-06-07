@@ -101,6 +101,58 @@ class CredentialsEndpointLogicTests(unittest.TestCase):
         self.assertEqual(_credentials_delete_result(cs, "deepseek")[0], 200)   # idempotent
         self.assertEqual(_credentials_delete_result(cs, "openai")[0], 400)     # not allowlisted
 
+    def test_post_non_dict_json_body_is_rejected(self):
+        """A parsed non-dict JSON value (array, string, number) must yield
+        invalid_json — not be silently coerced to {} (fix 3)."""
+        import io
+        import json as _json
+        import socket
+        from unittest.mock import MagicMock, patch
+        from werewolf_eval.observer_server import ObserverRequestHandler, ObserverServerState
+
+        captured: list[tuple[int, str]] = []
+
+        class _FakeHandler(ObserverRequestHandler):
+            def __init__(self):  # noqa: D107
+                pass  # skip BaseHTTPRequestHandler init
+
+            def _send_error_json(self, status, code, message):
+                captured.append((status, code))
+
+            def _send_json(self, status, payload):
+                captured.append((status, "ok"))
+
+            def _is_loopback(self):
+                return True
+
+            def _get_state(self):
+                cs = CredentialStore()
+                return ObserverServerState(runs_dir=Path("/tmp"), launcher=lambda r, d: 0, credential_store=cs)
+
+            @property
+            def path(self):
+                return "/api/credentials"
+
+            @property
+            def headers(self):
+                h = MagicMock()
+                h.get = lambda k, d="": {"Content-Type": "application/json", "Content-Length": str(len(self._raw))}.get(k, d)
+                return h
+
+            @property
+            def rfile(self):
+                return io.BytesIO(self._raw)
+
+        for non_dict in (b"[]", b'["a","b"]', b'"hello"', b"42", b"true"):
+            captured.clear()
+            h = _FakeHandler()
+            h._raw = non_dict
+            h.do_POST()
+            self.assertTrue(captured, f"no response captured for body {non_dict}")
+            status, code = captured[0]
+            self.assertEqual(status, 400, f"expected 400 for body {non_dict}, got {status}")
+            self.assertEqual(code, "invalid_json", f"expected invalid_json for body {non_dict}, got {code}")
+
 
 if __name__ == "__main__":
     unittest.main()

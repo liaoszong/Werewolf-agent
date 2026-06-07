@@ -170,7 +170,7 @@ def _credentials_post_result(
     store: "CredentialStore", content_type: str, body: dict[str, object]
 ) -> tuple[int, dict[str, object]]:
     """Pure logic for POST /api/credentials. NEVER returns or logs the key."""
-    if not str(content_type or "").split(";")[0].strip() == "application/json":
+    if str(content_type or "").split(";")[0].strip() != "application/json":
         return (415, {"error": "unsupported_media_type"})
     provider = body.get("provider")
     api_key = body.get("api_key")
@@ -277,7 +277,7 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
 
     def _is_loopback(self) -> bool:
         host = self.client_address[0] if self.client_address else ""
-        return host in ("127.0.0.1", "::1", "localhost")
+        return host in ("127.0.0.1", "::1")
 
     def _get_status(self, run_id: str, run_dir: Path) -> str:
         state = self._get_state()
@@ -657,6 +657,8 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
             self._send_error_json(404, "not_found", "unknown endpoint")
         except ObserverProtocolError as exc:
             self._send_error_json(400, "bad_request", str(exc))
+        except Exception:
+            self._send_error_json(500, "internal_error", "Internal server error")
 
     def do_POST(self) -> None:
         segments = self._path_segments()
@@ -673,10 +675,11 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
                 raw = self.rfile.read(content_length) if content_length else b""
                 try:
                     body = json.loads(raw) if raw else {}
-                    if not isinstance(body, dict):
-                        body = {}
                 except json.JSONDecodeError:
                     self._send_error_json(400, "invalid_json", "credential body must be JSON")
+                    return
+                if raw and not isinstance(body, dict):
+                    self._send_error_json(400, "invalid_json", "credential body must be a JSON object")
                     return
                 status, payload = _credentials_post_result(
                     self._get_state().credential_store, content_type, body
