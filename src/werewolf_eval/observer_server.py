@@ -35,8 +35,10 @@ from werewolf_eval.observer_protocol import (
     normalize_perspective,
     parse_launch_request,
     parse_profile_launch_request,
+    read_run_status,
     safe_child_path,
     validate_run_id,
+    write_run_status,
 )
 from werewolf_eval.observer_visibility import (
     VisibilityProjectionError,
@@ -230,12 +232,18 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
     def _get_status(self, run_id: str, run_dir: Path) -> str:
         state = self._get_state()
         with state.lock:
-            return state.run_status.get(run_id, "unknown")
+            if run_id in state.run_status:
+                return state.run_status[run_id]
+        # Not in memory (e.g. server restarted since the run finished) -> fall back to
+        # the durable status.json so prior completed runs stay settleable.
+        return read_run_status(run_dir)
 
     def _set_status(self, run_id: str, status: str) -> None:
         state = self._get_state()
         with state.lock:
             state.run_status[run_id] = status
+        # Persist durably (outside the lock — file I/O) so the status survives a restart.
+        write_run_status(state.runs_dir / run_id, status)
 
     def _set_error(self, run_id: str, error: str) -> None:
         state = self._get_state()

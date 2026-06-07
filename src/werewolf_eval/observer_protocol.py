@@ -184,6 +184,27 @@ def _read_status(run_dir: Path) -> str:
     return "unknown"
 
 
+# Public alias for the durable status reader (used by the server's restart fallback).
+read_run_status = _read_status
+
+
+def write_run_status(run_dir: Path, status: str) -> None:
+    """Persist the run status durably so it survives a server restart. The server's
+    in-memory run_status dict is lost on bounce, which otherwise makes every prior
+    completed run report 'unknown' and become permanently un-settleable (the
+    settlement route gates on status=='completed'). Atomic temp+replace; best-effort
+    (never raises into the run thread)."""
+    if status not in RUN_STATUS_VALUES:
+        return
+    try:
+        run_dir.mkdir(parents=True, exist_ok=True)
+        tmp = run_dir / (_STATUS_FILE + ".tmp")
+        tmp.write_text(json.dumps({"status": status}), encoding="utf-8")
+        tmp.replace(run_dir / _STATUS_FILE)
+    except OSError:
+        pass
+
+
 def _count_events(run_dir: Path) -> int:
     """Count lines in events.jsonl."""
     events_path = run_dir / "events.jsonl"

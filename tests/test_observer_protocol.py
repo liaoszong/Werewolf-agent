@@ -34,12 +34,37 @@ from werewolf_eval.observer_protocol import (
     normalize_perspective,
     parse_launch_request,
     parse_profile_launch_request,
+    read_run_status,
     safe_child_path,
     snapshot_path,
     snapshot_visible_to_perspective,
     validate_run_id,
     validate_snapshot_name,
+    write_run_status,
 )
+
+
+class RunStatusDurabilityTests(TestCase):
+    """The server's in-memory run_status is lost on restart; without a durable
+    status.json a prior completed run reports 'unknown' and the settlement route
+    (gated on status=='completed') makes it permanently un-settleable."""
+
+    def test_status_persists_and_reads_back(self) -> None:
+        with TemporaryDirectory() as td:
+            d = Path(td)
+            write_run_status(d, "completed")
+            # simulates a fresh server (empty memory) reading a prior run's status
+            self.assertEqual(read_run_status(d), "completed")
+
+    def test_missing_status_file_is_unknown(self) -> None:
+        with TemporaryDirectory() as td:
+            self.assertEqual(read_run_status(Path(td)), "unknown")
+
+    def test_write_rejects_invalid_status_value(self) -> None:
+        with TemporaryDirectory() as td:
+            d = Path(td)
+            write_run_status(d, "garbage")
+            self.assertEqual(read_run_status(d), "unknown")  # nothing persisted
 
 
 # ---------------------------------------------------------------------------
