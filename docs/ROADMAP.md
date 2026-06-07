@@ -275,7 +275,7 @@ G1h event spine
 
 ## Current Priority
 
-G1h–G2d and G3-1/G3-2/G3-3 are now `completed`: the live observer platform supports a configurable server-side profile, an opt-in real-DeepSeek live execution path (fake-by-default), a Qt live/fake toggle with an honest HUD, and a runtime prompt-manifest that records the real model (validated by a passing real-DeepSeek smoke). The next implementation candidate is the G4 evaluation platform (real multi-game leaderboard, role-separated scorecards, provider/model/version comparison), which depends on capturing enough multi-game live run data.
+G1h–G2d and G3-1/G3-2/G3-3 are now `completed`: the live observer platform supports a configurable server-side profile, an opt-in real-DeepSeek live execution path (fake-by-default), a Qt live/fake toggle with an honest HUD, and a runtime prompt-manifest that records the real model (validated by a passing real-DeepSeek smoke). **(Superseded — current phase authority is `docs/PROJECT_MAP.md`.)** This file historically named the next candidate as the G4 evaluation platform (real multi-game leaderboard, role-separated scorecards, provider/model/version comparison); the real current phase is Phase 2 (P2-A emergent engine / P2-C theater / P2-D settlement). Those G4 evaluation/leaderboard capabilities are a later P3 concern.
 
 G1 series retrospective:
 - G1a proved fresh generated logs can feed validators, scoring, metrics, and replay demo.

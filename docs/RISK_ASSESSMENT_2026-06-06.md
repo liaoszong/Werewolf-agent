@@ -10,9 +10,13 @@
 
 ## 修复进度(更新 2026-06-07)
 
-> 报告产出后已修复的项。**全套件现真实全绿:`NO_PROXY=127.0.0.1 python -m unittest discover -s tests` → 625 tests OK**(此前 FAILED:failures=1, errors=47 —— 47 个 error 是被强制代理拦截 localhost 所致,设 `NO_PROXY` 即解,非代码问题;详见环境说明)。
+> 报告产出后已修复的项。**全套件现真实全绿:`NO_PROXY=127.0.0.1 python -m unittest discover -s tests` → 626 tests OK**(此前 FAILED:failures=1, errors=47 —— 47 个 error 是被强制代理拦截 localhost 所致,设 `NO_PROXY` 即解,非代码问题;详见环境说明)。
 
 **已修复(✅):**
+- **batch-4 engine+文档(2026-06-07):**
+  - **R-18** 狼 role-projection 快照拷全 event id(seer/witch 元数据泄漏,g1b/mock 路径)—— `_wolf_obs` 改用 `_private_refs_for_role("werewolf")`(all + werewolf_team);回归测试交叉核对夜2狼快照 vs game-log visibility。
+  - **R-29** fallback 目标恒为座位 0(系统性替罪)—— 三处 `candidates[0]`/`cands[0]` 改 `self._rng.choice`(seeded,确定性,分散)。
+  - **R-25/26/37** 文档路由陈旧 —— AGENTS.md 不再硬编码 G1h、改指 PROJECT_MAP(Qt/observer/emergent in scope);README 修"下一候选 G2d";TASKS/ROADMAP 正文 G4-next 加 inline superseded 标记。
 - **batch-3 eval-readiness/清理(2026-06-07):**
   - **R-09** 无 per-seat model/token —— 趁 v1 schema 未冻,`players[]` 加性增 `model`/`provider`(prompt-manifest)+ `token_usage`(provider-trace 按 actor 汇总);`_load_seat_meta()` best-effort。
   - **R-08 余项** —— 缓存命中校验 `bundle_version`(不符则重算,P3 永不读旧 schema)+ 原子写(temp+replace)。
@@ -35,7 +39,7 @@
 - **附录·持久化(HIGH)** `status.json` 从不写 → 重启后 run 不可结算 —— `write_run_status` 落盘 + `_get_status` 重启 fallback。
 - **附录·缓存中毒(MEDIUM)** 降级件被永久缓存 —— PR #45/#49 只缓存完整件。
 
-**仍待修(主要):** R-06 完全收敛(已加守卫,未单一权威)、R-11(HTTP 测试 in-process harness;NO_PROXY 下已能跑绿)、R-16/17/18/19/21/22、附录(runtime event 非字节可复现、SSE 重读全文件)、R-25/26/37(文档路由)、R-29/30/34/35/36/38。
+**仍待修(主要):** R-06 完全收敛(已加守卫,未单一权威)、R-11(HTTP 测试 in-process harness;NO_PROXY 下已能跑绿)、R-16/17/19/21/22、附录(runtime event 非字节可复现、SSE 重读全文件)、R-30/34/35/36/38。
 
 ---
 

@@ -33,6 +33,30 @@ class GameEngineContractTests(unittest.TestCase):
             {"p1": "werewolf", "p2": "werewolf"},
         )
 
+    def test_wolf_role_projection_snapshot_excludes_seer_witch_event_ids(self) -> None:
+        # R-18: the g1b wolf observation/snapshot used to embed EVERY event id, leaking
+        # seer/witch event ids+counts (metadata) to the werewolf team. The wolf snapshot
+        # must reference only the werewolf-visible set (all + werewolf_team).
+        from werewolf_eval.game_engine import GameEngine, build_default_config
+        from werewolf_eval.runtime_events import RuntimeEventWriter
+
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td)
+            writer = RuntimeEventWriter(run_id="g1b_mock_001", out_dir=out)
+            outputs = GameEngine.from_config(
+                build_default_config(game_id="g1b_mock_001"), runtime_events=writer
+            ).run()  # default g1b_default mode uses the _wolf_obs path
+
+            vis = {e["event_id"]: e.get("visibility") for e in outputs.game_log["events"]}
+            snap_path = out / "snapshots" / "obs_wolf_n2.json"
+            self.assertTrue(snap_path.exists(), "expected a Night-2 wolf snapshot")
+            snap = json.loads(snap_path.read_text(encoding="utf-8"))
+            leaked = [
+                eid for eid in snap["private_event_ids"]
+                if vis.get(eid) in ("seer", "witch")
+            ]
+            self.assertEqual(leaked, [], f"wolf snapshot leaked seer/witch ids: {leaked}")
+
     def test_mock_agent_returns_structured_action(self) -> None:
         from werewolf_eval.game_engine import AgentAction, MockAgent
 

@@ -457,7 +457,9 @@ class EmergentGameEngine:
             candidates = [pid for pid in self._seat_order if pid in self._alive and self._players_by_id[pid].role != "werewolf"]
             if not candidates:
                 return None
-            target = candidates[0]
+            # R-29: seeded pick (not always seat 0) so provider failures don't
+            # systematically scapegoat the lowest seat. Deterministic per seed.
+            target = self._rng.choice(candidates)
             self._consensus_entries.append(self._build_consensus_entry(consensus_id, rnd, wolves, target, wolves[0], [], status="coordinator_tie_break"))
             self._decision(wolves[0], "team", "night", "werewolf_kill", target, FALLBACK_DECISION_TYPE, f"fallback kill {target}", consensus_id=consensus_id)
             self._emit("night", rnd, "werewolf_kill", wolves[0], target, "werewolf_team", f"Wolf team kills {target}.")
@@ -554,7 +556,7 @@ class EmergentGameEngine:
             cands = self._alive_in_seat_order(exclude={seer})
             if not cands:
                 return
-            target = cands[0]
+            target = self._rng.choice(cands)  # R-29: seeded, not always seat 0
             dtype = FALLBACK_DECISION_TYPE
         else:
             dtype = "inference_based"
@@ -712,7 +714,7 @@ class EmergentGameEngine:
                 cands = self._alive_in_seat_order(exclude={voter})
                 if not cands:
                     continue
-                target = cands[0]
+                target = self._rng.choice(cands)  # R-29: seeded, not always seat 0
                 dtype = FALLBACK_DECISION_TYPE
             else:
                 dtype = "inference_based"
