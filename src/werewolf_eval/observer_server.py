@@ -617,7 +617,6 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
         if run_dir.exists():
             self._send_error_json(409, "conflict", f"Run already exists: {run_id}")
             return
-        run_dir.mkdir(parents=True)
 
         is_live = mode == "live"
         if is_live:
@@ -627,6 +626,7 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
                 return
         else:
             base = state.launcher
+        run_dir.mkdir(parents=True)
 
         def _profile_launcher(
             rid: str,

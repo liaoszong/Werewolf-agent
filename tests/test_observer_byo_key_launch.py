@@ -80,3 +80,87 @@ class ResolvedProfileNoKeyTests(unittest.TestCase):
         blob = json.dumps(art)
         for marker in ("sk-", "api_key", "authorization", "bearer"):
             self.assertNotIn(marker, blob.lower())
+
+
+class NoOrphanRunDirOnLiveRejectTests(unittest.TestCase):
+    """Regression: run_dir must NOT be created when the live launcher can't be
+    resolved (missing credential).  Before the fix, mkdir ran before the
+    resolver, leaving an orphan directory that caused any retry to 409."""
+
+    def _make_state(self, tmp: str) -> "ObserverServerState":
+        from werewolf_eval.observer_server import ObserverServerState
+        from werewolf_eval.credential_store import CredentialStore
+        cs = CredentialStore()  # empty — no key stored
+        return ObserverServerState(
+            runs_dir=Path(tmp),
+            launcher=lambda r, d: 0,
+            live_enabled=True,
+            credential_store=cs,
+            live_launcher_factory=None,  # no factory
+            env_key_available=False,     # no env key
+            live_launcher=None,          # no prebuilt launcher
+        )
+
+    def test_no_run_dir_created_on_missing_api_key_reject(self):
+        """_handle_profile_launch with live mode and no credential must send a
+        403 missing_api_key AND must leave runs_dir empty (no orphan subdir)."""
+        from werewolf_eval.observer_server import (
+            ObserverRequestHandler,
+            ObserverServerState,
+        )
+
+        # Capture what _send_error_json and _send_json receive.
+        captured_errors: list[tuple[int, str, str]] = []
+        captured_ok: list[tuple[int, object]] = []
+
+        class _FakeHandler(ObserverRequestHandler):
+            def __init__(self):  # noqa: D107
+                pass  # skip BaseHTTPRequestHandler init
+
+            def _send_error_json(self, status, code, message):
+                captured_errors.append((status, code, message))
+
+            def _send_json(self, status, payload):
+                captured_ok.append((status, payload))
+
+            def _get_state(self_h):
+                return self._state_obj  # type: ignore[attr-defined]
+
+            def _read_json_body(self):
+                return self._body  # type: ignore[attr-defined]
+
+        with TemporaryDirectory() as tmp:
+            state = self._make_state(tmp)
+            self._state_obj = state  # bind for the closure above
+
+            # Build a valid live profile body.
+            profile = _live_profile()
+            body = {"profile": profile, "mode": "live"}
+
+            handler = _FakeHandler()
+            handler._state_obj = state
+            handler._body = body
+            handler._handle_profile_launch(body)
+
+            # (a) A 403 missing_api_key error must have been sent.
+            self.assertTrue(
+                captured_errors,
+                "expected _send_error_json to be called but it was not",
+            )
+            status, code, _msg = captured_errors[0]
+            self.assertEqual(status, 403, f"expected 403, got {status}")
+            self.assertEqual(code, "missing_api_key", f"expected missing_api_key, got {code!r}")
+
+            # (b) No 202 success response must have been sent.
+            self.assertFalse(
+                captured_ok,
+                f"_send_json should not have been called but got: {captured_ok}",
+            )
+
+            # (c) The runs_dir must be empty — no orphan run subdir.
+            subdirs = list(Path(tmp).iterdir())
+            self.assertEqual(
+                subdirs,
+                [],
+                f"orphan dirs found in runs_dir: {subdirs}",
+            )
