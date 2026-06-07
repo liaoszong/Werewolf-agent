@@ -21,6 +21,8 @@ docs/generated-context/*.index.json
 docs/generated-context/current-task.ctx.md
 .logs/validate/
 .logs/review/
+# Transient brainstorming scratch (move to docs/ if a note becomes real doc)
+.grill/
 
 # API keys — never commit
 docs/secrets/api-keys.md
