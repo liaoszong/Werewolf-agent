@@ -55,6 +55,31 @@ class BuildReviewPacketTests(unittest.TestCase):
             "acceptance_items": [],
         }
 
+    def test_packet_redacts_credentials_from_diff(self):
+        # BYO-key invariant: a credential added to a TRACKED file would otherwise be
+        # embedded raw in a diff hunk and exported to reviewers/Codex. The packet must
+        # mask high-confidence credential shapes.
+        from scripts.dev.build_review_packet import build_packet, redact_secrets
+
+        args = self._minimal_args()
+        args["diff_text"] = _make_diff_block(
+            "sample.py",
+            [
+                'API_KEY = "sk-liveSECRETkey1234567890"',
+                "Authorization: Bearer tokenSECRET1234567890",
+            ],
+        )
+        packet = build_packet(**args)
+        self.assertNotIn("sk-liveSECRETkey1234567890", packet)
+        self.assertNotIn("tokenSECRET1234567890", packet)
+        self.assertIn("sk-<REDACTED>", packet)
+
+        # the redactor leaves ordinary review prose untouched (narrow on purpose)
+        self.assertEqual(
+            redact_secrets("keep your role a secret and pass the token along"),
+            "keep your role a secret and pass the token along",
+        )
+
     def test_packet_too_large_reported_when_acceptance_pushes_over_300_lines(self):
         from scripts.dev.build_review_packet import build_packet
 

@@ -9,6 +9,27 @@ import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
+# BYO-key invariant: the review packet is shared with reviewers/Codex, so it must
+# never carry a credential. The packet is built from `git diff` (so .runs/ artifacts,
+# which are gitignored+untracked, don't appear), but a key accidentally added to a
+# TRACKED file would otherwise be embedded raw in a diff hunk. These high-confidence
+# credential shapes are masked in the final packet (narrow on purpose — never bare
+# English words like "secret"/"token", which would mangle legitimate review text).
+_SECRET_REDACTIONS: list[tuple[re.Pattern[str], str]] = [
+    (re.compile(r"sk-[A-Za-z0-9_\-]{8,}"), "sk-<REDACTED>"),
+    (re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._\-]{8,}"), "Bearer <REDACTED>"),
+    (re.compile(r"(?i)(authorization\s*[:=]\s*)\S+"), r"\1<REDACTED>"),
+    (re.compile(r"(?i)(api[_-]?key\s*[:=]\s*['\"]?)[A-Za-z0-9._\-]{12,}"), r"\1<REDACTED>"),
+]
+
+
+def redact_secrets(text: str) -> str:
+    """Mask high-confidence credential shapes before the packet leaves the machine."""
+    for pattern, repl in _SECRET_REDACTIONS:
+        text = pattern.sub(repl, text)
+    return text
+
+
 FORBIDDEN_PATTERNS = [
     "provider",
     "network",
@@ -594,7 +615,9 @@ def build_packet(
             f"PACKET_TOO_LARGE = {'YES' if packet_too_large else 'NO'}",
         )
 
-    return packet
+    # Final safety net: strip any credential-shaped value before the packet is written
+    # and shared (BYO-key invariant — keys must never reach a review packet).
+    return redact_secrets(packet)
 
 
 def main() -> int:

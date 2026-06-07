@@ -115,13 +115,17 @@ class DeepSeekProviderTests(unittest.TestCase):
         self.assertNotIn("sk-test-key", str(ctx.exception))
 
     def test_http_error_does_not_expose_api_key(self) -> None:
+        # Worst case: the transport raises an exception whose OWN message carries the
+        # Bearer key (as if it had formatted the headers). The provider must neither
+        # surface it in the wrapped message NOR keep it reachable via the exception
+        # chain (BYO-key invariant: keys never reach crash logs).
         def error_transport(
             url: str,
             headers: dict[str, str],
             payload: dict[str, Any],
             timeout_seconds: int,
         ) -> dict[str, Any]:
-            raise RuntimeError("HTTP 500")
+            raise RuntimeError(f"HTTP 500 with header {headers['Authorization']}")
 
         config = DeepSeekProviderConfig(api_key="sk-test-secret-key")
         provider = DeepSeekProvider(config, transport=error_transport)
@@ -129,6 +133,9 @@ class DeepSeekProviderTests(unittest.TestCase):
             provider.respond(self._make_request())
         self.assertNotIn("sk-test-secret-key", str(ctx.exception))
         self.assertNotIn("sk-test", str(ctx.exception))
+        # the chain must be broken so traversal/traceback-with-locals can't reach the key
+        self.assertIsNone(ctx.exception.__cause__)
+        self.assertTrue(ctx.exception.__suppress_context__)
 
     def test_request_budget_is_enforced(self) -> None:
         config = DeepSeekProviderConfig(
