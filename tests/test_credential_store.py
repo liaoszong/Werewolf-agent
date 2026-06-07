@@ -51,6 +51,39 @@ class CredentialStoreTests(unittest.TestCase):
         self.assertEqual(errors, [])
         self.assertTrue(s.has("deepseek"))
 
+    def test_thread_safe_set_clear(self) -> None:
+        """set and clear interleaved across 8 threads must never raise."""
+        s = CredentialStore()
+        errors: list = []
+
+        def worker(i: int) -> None:
+            try:
+                for _ in range(200):
+                    s.set("deepseek", f"sk-{i}")
+                    s.has("deepseek")
+                    s.clear("deepseek")
+                    s.get("deepseek")
+            except Exception as exc:  # noqa: BLE001
+                errors.append(exc)
+
+        threads = [threading.Thread(target=worker, args=(i,)) for i in range(8)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        self.assertEqual(errors, [])
+
+    def test_non_string_provider_rejected(self) -> None:
+        s = CredentialStore()
+        with self.assertRaises(TypeError):
+            s.set(42, "sk-valid-key")  # type: ignore[arg-type]
+        with self.assertRaises(TypeError):
+            s.has(42)  # type: ignore[arg-type]
+        with self.assertRaises(TypeError):
+            s.get(42)  # type: ignore[arg-type]
+        with self.assertRaises(TypeError):
+            s.clear(42)  # type: ignore[arg-type]
+
     def test_empty_key_rejected(self) -> None:
         s = CredentialStore()
         with self.assertRaises(ValueError):
