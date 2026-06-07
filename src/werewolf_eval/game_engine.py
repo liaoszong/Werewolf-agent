@@ -540,8 +540,7 @@ class GameEngine:
         def _public_refs() -> list[str]:
             return [e["event_id"] for e in events if e["visibility"] in ("public", "all")]
 
-        def _private_refs(player_id: str) -> list[str]:
-            role = self._players_by_id[player_id].role
+        def _private_refs_for_role(role: str) -> list[str]:
             result: list[str] = []
             for e in events:
                 v = e["visibility"]
@@ -553,12 +552,18 @@ class GameEngine:
                     result.append(e["event_id"])
             return result
 
+        def _private_refs(player_id: str) -> list[str]:
+            return _private_refs_for_role(self._players_by_id[player_id].role)
+
         def _wolf_obs(phase: str, rnd: int, wolf_players: list[str]) -> AgentObservation:
             obs = AgentObservation(
                 game_id=game_id, player_id="wolf_team", role="werewolf", team="werewolf",
                 phase=phase, round=rnd, alive_players=sorted(alive),
                 public_event_ids=_public_refs(),
-                private_event_ids=[e["event_id"] for e in events],
+                # R-18: filter to the werewolf role's visible set (all + werewolf_team) —
+                # NOT every event id. Copying all ids leaked seer/witch event ids/counts
+                # (metadata) into the wolf role-projection snapshot in g1b/mock mode.
+                private_event_ids=_private_refs_for_role("werewolf"),
                 known_roles={pid: "werewolf" for pid in wolf_players},
             )
             if self._runtime_events is not None:
