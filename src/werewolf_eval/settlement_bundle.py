@@ -122,6 +122,9 @@ def _curtain(
         "core_metrics": {},
         "top_attribution": None,
         "turning_points": [],
+        # R-21: per-decision score records (additive, eval-v1) for P3 per-decision
+        # review / rubric audit / decision→event traceability. Empty until scored.
+        "score_records": [],
         "board_timeline": board,
     }
 
@@ -234,6 +237,28 @@ def build_settlement_bundle(
         }
 
     bundle["turning_points"] = [_tp_dict(tp) for tp in attribution.turn_points]
+
+    # R-21: keep the per-decision ScoreRecords (computed then discarded before) so P3
+    # per-decision review / rubric audit doesn't need a schema migration.
+    bundle["score_records"] = [
+        {
+            "score_id": r.score_id,
+            "event_id": r.event_id,
+            "decision_id": r.decision_id,
+            "actor": r.actor,
+            "round": r.round,
+            "phase": r.phase,
+            "action_type": r.action_type,
+            "target": r.target,
+            "outcome_score": r.outcome_score,
+            "decision_quality_score": r.decision_quality_score,
+            "rule_integrity_score": r.rule_integrity_score,
+            "rules_triggered": list(r.rules_triggered),
+            "evidence_event_ids": list(r.evidence_event_ids),
+            "notes": r.notes,
+        }
+        for r in score_log.records
+    ]
     return bundle
 
 

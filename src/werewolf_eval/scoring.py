@@ -191,6 +191,9 @@ def _event_visible_to_decision_actor(game: GameLog, event: Event, actor: str) ->
     if actor == "wolf_team":
         if event.visibility == "werewolf_team":
             return True
+        # R-16: `specific_player_ids` is the GOLD-game role_assignment visibility; both
+        # engines emit role_assignment as "public" instead, so this branch is exercised
+        # only by gold-replay logs (NOT dead — it keeps gold + emergent scoring aligned).
         if event.visibility == "specific_player_ids":
             return event.target in game.player_ids and _team_of(game, event.target) == "werewolf"
         return False

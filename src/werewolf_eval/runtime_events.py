@@ -60,17 +60,20 @@ RUNTIME_EVENT_VISIBILITIES: tuple[str, ...] = (
     "werewolf_team",
 )
 
-# Substrings that look like API-key / bearer-token secrets.
-# The redaction check is case-insensitive.
+# High-confidence credential SHAPES (case-insensitive). R-19: this set is matched
+# against arbitrary string VALUES, so it must NOT include bare English words like
+# "secret"/"token"/"auth" — those silently destroy (or crash on) legitimate game
+# text such as "keep your role secret" or a理由 mentioning a token. Aligned with
+# profile_config._VALUE_SECRET_MARKERS.
 SECRET_KEY_FRAGMENTS: tuple[str, ...] = (
     "sk-",
-    "Bearer ",
+    "bearer ",
     "api-key",
     "api_key",
     "apikey",
-    "secret",
-    "token",
-    "auth",
+    "authorization",
+    "access_key",
+    "deepseek_api_key",
 )
 
 # ---------------------------------------------------------------------------

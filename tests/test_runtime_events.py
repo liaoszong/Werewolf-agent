@@ -267,6 +267,22 @@ class RuntimeEventWriterTests(TestCase):
         self.assertEqual(result["items"][1], "ok")
         self.assertEqual(result["items"][2]["api_key"], "<REDACTED>")
 
+    def test_redaction_keeps_legit_game_text_with_secret_words(self) -> None:
+        """R-19: bare words secret/token/auth must NOT be redacted — only high-
+        confidence credential shapes (sk-/bearer/api_key/...). Game speech and
+        reasons legitimately use these words and must survive intact."""
+        data = {
+            "speech": "keep your role a secret and pass the token to p3",
+            "reason": "I authorize the vote; the seer's authority is clear",
+            "player": "authority_fan",
+        }
+        self.assertEqual(redact_secret_values(data), data)  # unchanged
+        assert_no_secret_patterns(data)  # does not raise
+        # a real credential shape is still caught
+        self.assertEqual(
+            redact_secret_values({"k": "sk-abc"})["k"], "<REDACTED>"
+        )
+
     def test_assert_no_secret_patterns_passes_clean(self) -> None:
         """assert_no_secret_patterns must not raise for clean data."""
         assert_no_secret_patterns({"safe": "value", "nested": {"also_safe": 42}})
