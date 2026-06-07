@@ -6,45 +6,15 @@ from html import escape
 from pathlib import Path
 from typing import Any
 
-
-ROLE_LABELS = {
-    "werewolf": "狼人",
-    "seer": "预言家",
-    "witch": "女巫",
-    "villager": "平民",
-}
-
-TEAM_LABELS = {
-    "werewolf": "狼人阵营",
-    "villager": "村民阵营",
-}
-
-PHASE_LABELS = {
-    "night": "夜晚",
-    "day": "白天",
-    "setup": "开局",
-}
-
-TYPE_LABELS = {
-    "role_assignment": "角色分配",
-    "werewolf_kill": "狼人选刀",
-    "seer_check": "预言家查验",
-    "witch_save": "女巫救人",
-    "witch_poison": "女巫毒人",
-    "player_speech": "发言",
-    "player_vote": "投票",
-    "player_eliminated": "玩家出局",
-    "role_revealed": "身份公开",
-    "player_died": "玩家死亡",
-    "game_over": "游戏结束",
-}
-
-STATUS_LABELS = {
-    "consensus": "一致同意",
-    "accepted_consensus": "接受共识",
-    "coordinator_tie_break": "协调者裁决",
-    "forced_random": "强制随机",
-}
+# Display labels live in one shared module (R-12) so a relabel / new event type lands
+# once across all renderers instead of drifting.
+from werewolf_eval.display_labels import (
+    PHASE_LABELS,
+    ROLE_LABELS,
+    STATUS_LABELS,
+    TEAM_LABELS,
+    TYPE_LABELS,
+)
 
 FAILURE_KIND_LABELS = {
     "timeout": "超时",
