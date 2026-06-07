@@ -144,8 +144,14 @@ class DeepSeekProvider:
         try:
             raw = self._transport(url, headers, payload, self._config.timeout_seconds)
         except Exception as exc:
-            msg = str(exc)
-            raise RuntimeError(f"DeepSeek transport error") from exc
+            # BYO-key invariant: the original exception's traceback frames hold the
+            # `headers` local (Authorization: Bearer <key>); `from exc` would keep that
+            # chain alive so any caller logging the full traceback-with-locals could leak
+            # the key. Break the chain (`from None`) and surface only the exception CLASS
+            # name (never its str, which can carry the URL) for debuggability.
+            raise RuntimeError(
+                f"DeepSeek transport error: {type(exc).__name__}"
+            ) from None
 
         choices = raw.get("choices", [])
         if not choices:
