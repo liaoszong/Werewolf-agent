@@ -95,6 +95,19 @@ class EngineToScoringSeamTests(unittest.TestCase):
         attribution = attribute_game(game, score_log, metrics)
         self.assertIsNotNone(attribution.top_attribution)
 
+    def test_f3_witch_misfire_is_evaluated_from_events_not_hardcoded(self):
+        # R-22: F.3 used to return a fixed g001 sentence regardless of the game. Now it
+        # is computed from the actual witch_poison targets. villager_win poisons the
+        # werewolf p2 (not a misfire) -> not_triggered, with an event-derived note (NOT
+        # the old hardcoded "p4 saves villager p5 ..." g001 prose).
+        outcome = _run_villager_win()
+        game = parse_game_log(outcome.game_log)
+        score_log = score_game(game, parse_decision_log(outcome.decision_log, game))
+        attribution = attribute_game(game, score_log, summarize_metrics(game, score_log))
+        f3 = attribution.rule_evaluation_summary["attribution:F.3.witch_misfire"]
+        self.assertEqual(f3.status, "not_triggered")  # poisoned a werewolf, not a good role
+        self.assertNotIn("p4 saves villager p5", f3.notes)  # no hardcoded g001 prose
+
     def test_witch_action_vocab_is_consumed_by_scoring(self):
         # Static registry guard: the engine's witch action constants must live in the
         # scorer's consumed set. This is the one comparison no test made before the

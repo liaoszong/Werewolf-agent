@@ -182,31 +182,53 @@ def _critical_vote_turn_points(game: GameLog) -> list[TurnPoint]:
 def _rule_evaluation_summary(game: GameLog, turn_points: list[TurnPoint], metrics: MetricsSummary) -> dict[str, RuleEvaluation]:
     critical_vote_ids = [turn_point.turn_point_id for turn_point in turn_points if turn_point.rule_id == "attribution:F.1.critical_vote"]
 
+    # R-22: F.3 is now evaluated from the ACTUAL events (a witch misfire = poisoning a
+    # non-werewolf), not a hardcoded g001 sentence. A witch poisoning a core good role
+    # is the misfire the rubric cares about. (F.2/F.4/F.5 full evaluation stays P3
+    # scope; their notes are generic so they no longer assert false g001 specifics for
+    # other games.)
+    team_by_pid = {p.player_id: p.team for p in game.players}
+    role_by_pid = {p.player_id: p.role for p in game.players}
+    misfire_targets = [
+        ev.target
+        for ev in game.events
+        if ev.type == "witch_poison"
+        and ev.target
+        and ev.target != "none"
+        and team_by_pid.get(ev.target) != "werewolf"
+    ]
+    if misfire_targets:
+        misfire_notes = "Witch poisoned non-werewolf target(s): " + ", ".join(
+            f"{pid}({role_by_pid.get(pid, 'unknown')})" for pid in misfire_targets
+        )
+    else:
+        misfire_notes = "No witch poison hit a non-werewolf (no misfire against a good role)."
+
     return {
         "attribution:F.1.critical_vote": RuleEvaluation(
             status="triggered" if critical_vote_ids else "not_triggered",
             triggered_turn_point_ids=critical_vote_ids,
-            notes="Round 2 elimination is 2-1, so one changed vote would change the result. p1 is revealed as werewolf." if critical_vote_ids else "No elimination vote has margin 1 with a known final role.",
+            notes="An elimination vote has margin 1 with a known final role, so one changed vote would change the result." if critical_vote_ids else "No elimination vote has margin 1 with a known final role.",
         ),
         "attribution:F.2.information_gap": RuleEvaluation(
             status="not_triggered",
             triggered_turn_point_ids=[],
-            notes="S2 records seer info_conveyed as 1.0. p3's p1 suspicion is publicly represented before p3 dies.",
+            notes="F.2 information_gap full evaluation is P3 scope; not generating turn points yet.",
         ),
         "attribution:F.3.witch_misfire": RuleEvaluation(
-            status="not_triggered",
+            status="triggered" if misfire_targets else "not_triggered",
             triggered_turn_point_ids=[],
-            notes="p4 saves villager p5 and poisons werewolf p2. No witch misfire against a core villager role is present.",
+            notes=misfire_notes,
         ),
         "attribution:F.4.vote_deviation": RuleEvaluation(
             status="not_triggered",
             triggered_turn_point_ids=[],
-            notes="Round 1 village vote accuracy is exactly 50%, not below 50%. Round 2 village vote accuracy is 100%.",
+            notes="F.4 vote_deviation full evaluation is P3 scope; not generating turn points yet.",
         ),
         "attribution:F.5.successful_disguise": RuleEvaluation(
             status="not_triggered",
             triggered_turn_point_ids=[],
-            notes="No werewolf is both voted but not eliminated and then survives at least 2 later rounds.",
+            notes="F.5 successful_disguise full evaluation is P3 scope; not generating turn points yet.",
         ),
     }
 
