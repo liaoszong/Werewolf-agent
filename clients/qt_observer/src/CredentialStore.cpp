@@ -58,6 +58,8 @@ QString CredentialStore::maskedCredential(const QString &provider) const
 
 void CredentialStore::saveCredential(const QString &provider, const QString &rawText)
 {
+    if (rawText.trimmed().isEmpty())
+        return;
     m_settings.setValue(QStringLiteral("byokey/") + provider, rawText);
     emit credentialChanged(provider);
 }
@@ -68,7 +70,8 @@ void CredentialStore::clearCredential(const QString &provider)
     emit credentialChanged(provider);
 
     // Best-effort DELETE to the local server — ignore response, clean up reply.
-    QNetworkRequest req(QUrl(m_baseUrl + QStringLiteral("/api/credentials/") + provider));
+    QNetworkRequest req(QUrl(m_baseUrl + QStringLiteral("/api/credentials/")
+        + QString::fromUtf8(QUrl::toPercentEncoding(provider))));
     QNetworkReply *reply = m_network->deleteResource(req);
     connect(reply, &QNetworkReply::finished, reply, &QNetworkReply::deleteLater);
 }
@@ -94,7 +97,7 @@ void CredentialStore::syncCredentialToServer(const QString &provider)
     connect(reply, &QNetworkReply::finished, this, [this, reply, provider]() {
         const int status =
             reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-        if (status == 200) {
+        if (status >= 200 && status < 300) {
             emit syncSucceeded(provider);
         } else {
             // Reason is key-free: derived from HTTP status or QNetworkReply error enum only.
