@@ -13,8 +13,8 @@ Covers:
 * Protocol — emergent observer-exposed artifacts ⊆ ALLOWED_ARTIFACTS;
   provider-turns.json is server-local (not exposed); templates unchanged.
 * Settlement — a fake emergent run settles and caches.
-* Visibility — `/events` thin filter + `/projection` role downgrade across
-  perspectives, with the §5.3 god-only-snapshot seam locked as current behavior.
+* Visibility — `/events` thin filter + `/projection` role-private unlock across
+  perspectives, with reverse non-leak assertions for non-matching roles.
 """
 
 from __future__ import annotations
@@ -237,24 +237,42 @@ class BridgeVisibilityTests(unittest.TestCase):
 
     # ---- channel B: /projection trust projection (§5.3 seam) ----
 
-    def test_projection_role_private_events_downgrade_to_hidden(self) -> None:
-        # Emergent writes ONLY god snapshots, so role:pN has no trusted role
-        # snapshot -> seer/witch/werewolf-team events downgrade to hidden and
-        # NONE of the unlock reasons appear. This locks the known seam.
+    def test_projection_role_private_events_now_unlocked(self) -> None:
+        # Per-seat role_projection snapshots let role:pN unlock that seat's own
+        # private events: p3=seer, p4=witch, p1=werewolf.
+        seat_index = build_seat_role_index(self._dir)
+
+        def _reasons(perspective: str) -> set[str]:
+            return {
+                event_visible_in_projection(e, perspective, seat_index)[1]
+                for e in self._events
+            }
+
+        self.assertIn("seer_event", _reasons("role:p3"))
+        self.assertIn("witch_event", _reasons("role:p4"))
+        self.assertIn("werewolf_team_event", _reasons("role:p1"))
+
+        env_p3 = build_projection_envelope(
+            run_dir=self._dir, run_id="br_vis", perspective="role:p3", events=self._events
+        )
+        self.assertIn("seer_check", _game_types(env_p3["events"]))
+
+    def test_projection_villager_still_sees_no_private_events(self) -> None:
+        # Reverse non-leak: p5 is a villager, so other seats' role_projection
+        # snapshots must not unlock seer/witch/wolf events for p5.
         seat_index = build_seat_role_index(self._dir)
         reasons = {
-            event_visible_in_projection(e, "role:p3", seat_index)[1]
+            event_visible_in_projection(e, "role:p5", seat_index)[1]
             for e in self._events
         }
         self.assertNotIn("seer_event", reasons)
         self.assertNotIn("witch_event", reasons)
         self.assertNotIn("werewolf_team_event", reasons)
 
-        envelope = build_projection_envelope(
-            run_dir=self._dir, run_id="br_vis", perspective="role:p3", events=self._events
+        env_p5 = build_projection_envelope(
+            run_dir=self._dir, run_id="br_vis", perspective="role:p5", events=self._events
         )
-        self.assertGreater(envelope["hidden_event_count"], 0)
-        self.assertEqual(_game_types(envelope["events"]) & _PRIVATE_TYPES, set())
+        self.assertEqual(_game_types(env_p5["events"]) & _PRIVATE_TYPES, set())
 
     def test_projection_team_werewolf_unlocks_kill_without_snapshot(self) -> None:
         envelope = build_projection_envelope(
