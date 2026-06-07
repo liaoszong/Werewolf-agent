@@ -8,11 +8,12 @@ wrapper over this; localhost HTTP server-route tests are env-blocked.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 import tempfile
 import unittest
 
-from werewolf_eval.settlement_bundle import build_settlement_response
+from werewolf_eval.settlement_bundle import BUNDLE_VERSION, build_settlement_response
 
 _GOLD = Path(__file__).resolve().parent.parent / "docs" / "gold-game"
 _GAME_JSON = (_GOLD / "g001-game-log.json").read_text(encoding="utf-8")
@@ -97,13 +98,27 @@ class TestBuildSettlementResponse(unittest.TestCase):
             d = self._run_dir(td)
             build_settlement_response(d, run_status="completed", run_id="r1")
             self.assertTrue((d / "settlement-bundle.json").exists())  # cached
-            # second call reads cache: mutate the cache, confirm the response
-            # reflects it (proves no recompute).
+            # second call reads cache: mutate the cache (keeping the CURRENT version so
+            # it's served, not recomputed), confirm the response reflects it.
             (d / "settlement-bundle.json").write_text(
-                '{"bundle_version":"cached_marker"}', encoding="utf-8"
+                '{"bundle_version":"' + BUNDLE_VERSION + '","run_id":"cached_marker"}',
+                encoding="utf-8",
             )
             r2 = build_settlement_response(d, run_status="completed", run_id="r1")
-            self.assertEqual(r2["bundle"]["bundle_version"], "cached_marker")
+            self.assertEqual(r2["bundle"]["run_id"], "cached_marker")
+
+    def test_stale_version_cache_is_recomputed(self):
+        # A cache written by an older/newer build (different bundle_version) must NOT be
+        # served — it's recomputed so P3 never reads a stale schema (R-08).
+        with tempfile.TemporaryDirectory() as td:
+            d = self._run_dir(td)
+            (d / "settlement-bundle.json").write_text(
+                '{"bundle_version":"p2d.settlement.OLD","run_id":"stale"}',
+                encoding="utf-8",
+            )
+            r = build_settlement_response(d, run_status="completed", run_id="r1")
+            self.assertEqual(r["bundle"]["bundle_version"], BUNDLE_VERSION)
+            self.assertEqual(r["bundle"]["run_id"], "r1")  # recomputed, not the stale one
 
     def test_partial_bundle_is_not_cached_and_recovers(self):
         # An INCOMPLETE bundle (partial: no decision-log yet) must NOT be persisted, so
@@ -139,6 +154,44 @@ class TestBuildSettlementResponse(unittest.TestCase):
             r = build_settlement_response(d, run_status="completed", run_id="r1")
             self.assertEqual(r["available"], False)
             self.assertEqual(r["reason"], "invalid_game_log")
+
+    def test_per_seat_model_and_token_from_artifacts(self):
+        # R-09: prompt-manifest.json gives per-seat model/provider; provider-trace.json
+        # responses give a per-seat token rollup. Both reach players[] additively.
+        with tempfile.TemporaryDirectory() as td:
+            d = self._run_dir(td)
+            (d / "prompt-manifest.json").write_text(
+                json.dumps(
+                    {
+                        "run_id": "r1",
+                        "source_label": "x",
+                        "agents": [
+                            {"player_id": "p1", "provider": "deepseek", "model": "deepseek-chat"},
+                            {"player_id": "p2", "provider": "deepseek", "model": "deepseek-reasoner"},
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (d / "provider-trace.json").write_text(
+                json.dumps(
+                    {
+                        "responses": [
+                            {"actor": "p1", "token_usage": {"total_tokens": 100}},
+                            {"actor": "p1", "token_usage": {"total_tokens": 50}},
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            r = build_settlement_response(d, run_status="completed", run_id="r1")
+            players = {p["player_id"]: p for p in r["bundle"]["players"]}
+            self.assertEqual(players["p1"]["model"], "deepseek-chat")
+            self.assertEqual(players["p2"]["model"], "deepseek-reasoner")
+            self.assertEqual(players["p1"]["token_usage"]["total_tokens"], 150)  # summed
+            # a seat with no manifest entry -> model None, empty token rollup
+            self.assertIsNone(players["p3"]["model"])
+            self.assertEqual(players["p3"]["token_usage"], {})
 
 
 if __name__ == "__main__":
