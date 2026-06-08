@@ -82,9 +82,12 @@ REQUIRED_OBJECT_NAMES = {
     "qml/components/SpeechTheater.qml": ["speechTheater"],
     "qml/components/EvidenceConsole.qml": ["evidenceConsole", "eventTimeline", "perspectiveSwitcher", "auditLinksPanel", "providerFailureSummary"],
     "qml/components/PlaybackControls.qml": ["playbackControls"],
+    # P2-B Q3: the dead "strategy" dropdown is replaced by persona-preset chips;
+    # per-seat temperature/max_tokens knobs are added.
     "qml/components/SeatEditorPanel.qml": [
         "seatEditorPanel", "seatEditorProvider", "seatEditorModel",
-        "seatEditorStrategy", "seatEditorPrompt",
+        "seatEditorPrompt", "seatEditorPersona", "seatEditorTemperature",
+        "seatEditorMaxTokens",
     ],
 }
 

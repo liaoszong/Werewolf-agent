@@ -94,7 +94,10 @@ Item {
             provider: ov.provider !== undefined ? ov.provider : def.provider,
             model: ov.model !== undefined ? ov.model : def.model,
             strategy: ov.strategy !== undefined ? ov.strategy : def.strategy,
-            prompt: ov.prompt !== undefined ? ov.prompt : (def.prompt || "")
+            prompt: ov.prompt !== undefined ? ov.prompt : (def.prompt || ""),
+            // Q3 per-seat sampling knobs — may be undefined (unset → provider default).
+            temperature: ov.temperature !== undefined ? ov.temperature : def.temperature,
+            max_tokens: ov.max_tokens !== undefined ? ov.max_tokens : def.max_tokens
         }
     }
 
@@ -103,6 +106,10 @@ Item {
         var eff = effective(seatId)
         if (eff[field] === value) return   // no-op: ignore init/seat-switch re-binds
         var frag = { provider: eff.provider, model: eff.model, strategy: eff.strategy, prompt: eff.prompt }
+        // Carry the optional numeric knobs only when already set, so editing another
+        // field never invents a temperature/max_tokens the user didn't choose.
+        if (eff.temperature !== undefined) frag.temperature = eff.temperature
+        if (eff.max_tokens !== undefined) frag.max_tokens = eff.max_tokens
         frag[field] = value
         if (field === "provider") {
             // Seed a model that's valid for the NEW provider, mirroring the
@@ -118,9 +125,30 @@ Item {
         }
         var ep = JSON.parse(JSON.stringify(root.editedProfile))
         if (!ep.seat_overrides) ep.seat_overrides = ({})
-        ep.seat_overrides[seatId] = frag
+        if (root._matchesRoleDefault(seatId, frag)) {
+            // Reverting every field back to the role default — drop the redundant
+            // override so the seat reads as inherited (and the inherit/override
+            // badge stays honest).
+            delete ep.seat_overrides[seatId]
+        } else {
+            ep.seat_overrides[seatId] = frag
+        }
         root.editedProfile = ep
         root.profileRevision++          // any edit invalidates a prior verdict
+    }
+
+    // "" / null / undefined all mean "unset" for override comparison; 0 stays 0.
+    function _norm(v) { return (v === undefined || v === null || v === "") ? "" : v }
+
+    // Does this fragment equal the seat's role default across every config field?
+    function _matchesRoleDefault(seatId, frag) {
+        var role = root.seatRoles[seatId] || ""
+        var def = (root.editedProfile.role_defaults && root.editedProfile.role_defaults[role]) || {}
+        var keys = ["provider", "model", "strategy", "prompt", "temperature", "max_tokens"]
+        for (var i = 0; i < keys.length; i++)
+            if (root._norm(frag[keys[i]]) !== root._norm(def[keys[i]]))
+                return false
+        return true
     }
 
     Rectangle { anchors.fill: parent; color: Theme.color.bgBase }
@@ -267,6 +295,9 @@ Item {
             seat: root.selectedSeatId ? root.effective(root.selectedSeatId) : ({})
             config: root.selectedSeatId ? root.effective(root.selectedSeatId) : ({})
             schema: ObserverClient.profileSchema
+            // Q3: a per-seat override exists once seat_overrides carries this seat.
+            overridden: root.selectedSeatId !== "" && root.editedProfile.seat_overrides
+                        && root.editedProfile.seat_overrides[root.selectedSeatId] !== undefined
             onEdited: function(field, value) { root.applyEdit(root.selectedSeatId, field, value) }
             onClosed: root.selectedSeatId = ""
             onRequestProviderSettings: root.StackView.view.parent.navigateProviderSettings()
