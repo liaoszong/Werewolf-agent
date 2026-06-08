@@ -24,11 +24,38 @@ from werewolf_eval.provider_registry import (
 
 
 class ProviderRegistryTests(unittest.TestCase):
-    def test_registry_covers_the_four_live_providers(self) -> None:
+    def test_registry_covers_all_live_providers(self) -> None:
         self.assertEqual(
             set(PROVIDER_REGISTRY),
-            {"deepseek", "openai", "anthropic", "openai_compatible"},
+            {
+                "deepseek", "openai", "anthropic", "openai_compatible",
+                "zhipu", "moonshot", "qwen", "minimax", "siliconflow",
+                "xai", "gemini", "modelscope", "openrouter",
+            },
         )
+
+    def test_preset_vendors_reuse_openai_class_and_compatible_label(self) -> None:
+        # The 9 presets all speak the OpenAI-compatible wire: one class, one
+        # shared source_label (kept in VALID_SOURCE_LABELS), each its own base_url.
+        presets = {
+            "zhipu": "https://api.z.ai/api/paas/v4",
+            "moonshot": "https://api.moonshot.ai/v1",
+            "qwen": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+            "minimax": "https://api.minimax.io/v1",
+            "siliconflow": "https://api.siliconflow.cn/v1",
+            "xai": "https://api.x.ai/v1",
+            "gemini": "https://generativelanguage.googleapis.com/v1beta/openai",
+            "modelscope": "https://api-inference.modelscope.cn/v1",
+            "openrouter": "https://openrouter.ai/api/v1",
+        }
+        for pid, base in presets.items():
+            spec = PROVIDER_REGISTRY[pid]
+            self.assertIs(spec.provider_cls, OpenAIProvider, pid)
+            self.assertEqual(spec.default_base_url, base, pid)
+            self.assertEqual(spec.models_path, "/models", pid)
+            self.assertEqual(spec.source_label, OPENAI_COMPATIBLE_PROVIDER_SOURCE_LABEL, pid)
+            self.assertFalse(spec.requires_base_url, pid)
+            self.assertTrue(len(spec.default_models) >= 1, pid)
 
     def test_specs_pin_class_base_url_models_path_and_label(self) -> None:
         ds = PROVIDER_REGISTRY["deepseek"]
@@ -111,7 +138,7 @@ class ProviderRegistryTests(unittest.TestCase):
 
     def test_build_provider_rejects_unknown_provider(self) -> None:
         with self.assertRaises(KeyError):
-            build_provider("gemini", ChatProviderConfig(api_key="k"))
+            build_provider("nonexistent_provider", ChatProviderConfig(api_key="k"))
 
     def test_build_provider_requires_base_url_for_custom(self) -> None:
         # openai_compatible has no default base_url; building it without one must
