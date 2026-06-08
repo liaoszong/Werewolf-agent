@@ -604,14 +604,34 @@ void ObserverApiClient::refreshCapabilities()
         }
         const QJsonObject obj = doc.object();
         m_defaultMode = obj.value(QStringLiteral("default_mode")).toString(QStringLiteral("fake"));
-        const QJsonObject deepseek =
+        // P2-B per-provider: live_api.providers now carries one posture entry per
+        // registered provider (deepseek/openai/anthropic/openai_compatible). Live
+        // is available iff ANY provider is available (each seat may use a
+        // different AI). When none is available the reason is taken from the first
+        // unavailable provider — in the no-provider-available case every entry
+        // shares the same server-supplied global reason, so any one is
+        // representative. QJsonObject iterates keys in sorted order, so the pick
+        // is deterministic.
+        const QJsonObject providers =
             obj.value(QStringLiteral("live_api")).toObject()
-               .value(QStringLiteral("providers")).toObject()
-               .value(QStringLiteral("deepseek")).toObject();
-        m_liveAvailable = deepseek.value(QStringLiteral("available")).toBool(false);
-        // Data-driven (verbatim) — never a client-side reason-code literal.
-        m_liveReasonCode = deepseek.value(QStringLiteral("reason_code")).toString();
-        m_liveReasonMessage = deepseek.value(QStringLiteral("message")).toString();
+               .value(QStringLiteral("providers")).toObject();
+        bool anyAvailable = false;
+        QString reasonCode;
+        QString reasonMessage;
+        for (auto it = providers.constBegin(); it != providers.constEnd(); ++it) {
+            const QJsonObject entry = it.value().toObject();
+            if (entry.value(QStringLiteral("available")).toBool(false)) {
+                anyAvailable = true;
+            } else if (reasonCode.isEmpty()) {
+                // Data-driven (verbatim) — never a client-side reason-code literal.
+                reasonCode = entry.value(QStringLiteral("reason_code")).toString();
+                reasonMessage = entry.value(QStringLiteral("message")).toString();
+            }
+        }
+        m_liveAvailable = anyAvailable;
+        // Reason only describes the unavailable posture; clear it when armed.
+        m_liveReasonCode = anyAvailable ? QString() : reasonCode;
+        m_liveReasonMessage = anyAvailable ? QString() : reasonMessage;
         emit capabilitiesChanged();
     });
 }

@@ -46,6 +46,38 @@ class CapabilityCredentialTests(unittest.TestCase):
             cap = _build_capabilities_payload(_state(t, live_enabled=False, env_key_available=True, has_client_key=True))
             self.assertFalse(cap["live_api"]["enabled"])
 
+    def test_per_provider_availability_is_independent(self) -> None:
+        # P2-B per-provider: configuring ONLY openai makes openai available while
+        # deepseek (and the others) stay unavailable — the bug being fixed is the
+        # old any-provider result masquerading as deepseek.
+        with TemporaryDirectory() as t:
+            cs = CredentialStore()
+            cs.set("openai", "sk-test-fake-openai-key")
+            st = ObserverServerState(
+                runs_dir=Path(t), launcher=lambda r, d: 0,
+                live_enabled=True, credential_store=cs,
+                env_key_available=False,
+            )
+            providers = _build_capabilities_payload(st)["live_api"]["providers"]
+            self.assertTrue(providers["openai"]["available"])
+            self.assertFalse(providers["deepseek"]["available"])
+            self.assertEqual(providers["deepseek"]["reason_code"], "missing_api_key")
+            self.assertFalse(providers["anthropic"]["available"])
+            # every registry provider is reported (not just deepseek)
+            self.assertIn("openai_compatible", providers)
+
+    def test_deepseek_env_backcompat_does_not_leak_to_other_providers(self) -> None:
+        # The legacy env key counts ONLY for deepseek; openai/anthropic must still
+        # report unavailable when no client credential exists for them.
+        with TemporaryDirectory() as t:
+            cap = _build_capabilities_payload(
+                _state(t, live_enabled=True, env_key_available=True, has_client_key=False)
+            )
+            providers = cap["live_api"]["providers"]
+            self.assertTrue(providers["deepseek"]["available"])
+            self.assertFalse(providers["openai"]["available"])
+            self.assertFalse(providers["anthropic"]["available"])
+
 
 from werewolf_eval.observer_server import (
     _credentials_post_result,

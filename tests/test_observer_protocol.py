@@ -584,7 +584,9 @@ class RuntimeCapabilitiesTests(TestCase):
     _SECRET_MARKERS = ("Authorization", "Bearer ", "DEEPSEEK_API_KEY", "sk-")
 
     def test_available_posture_has_no_reason(self) -> None:
-        cap = build_runtime_capabilities(live_enabled=True, deepseek_available=True)
+        cap = build_runtime_capabilities(
+            live_enabled=True, providers={"deepseek": {"available": True}}
+        )
         self.assertEqual(cap["schema_version"], "g3.runtime_capabilities.v1")
         self.assertEqual(cap["schema_version"], RUNTIME_CAPABILITIES_SCHEMA_VERSION)
         self.assertEqual(cap["default_mode"], "fake")
@@ -598,9 +600,13 @@ class RuntimeCapabilitiesTests(TestCase):
     def test_disabled_posture(self) -> None:
         cap = build_runtime_capabilities(
             live_enabled=False,
-            deepseek_available=False,
-            reason_code="live_api_disabled",
-            message="live API is not enabled on this server",
+            providers={
+                "deepseek": {
+                    "available": False,
+                    "reason_code": "live_api_disabled",
+                    "message": "live API is not enabled on this server",
+                }
+            },
         )
         self.assertEqual(cap["default_mode"], "fake")
         live = cap["live_api"]
@@ -613,9 +619,13 @@ class RuntimeCapabilitiesTests(TestCase):
     def test_flag_on_no_key_posture(self) -> None:
         cap = build_runtime_capabilities(
             live_enabled=True,
-            deepseek_available=False,
-            reason_code="missing_api_key",
-            message="live API key is not configured on this server",
+            providers={
+                "deepseek": {
+                    "available": False,
+                    "reason_code": "missing_api_key",
+                    "message": "live API key is not configured on this server",
+                }
+            },
         )
         live = cap["live_api"]
         self.assertTrue(live["enabled"])
@@ -628,26 +638,70 @@ class RuntimeCapabilitiesTests(TestCase):
         # posture never carries a reason even if one is passed.
         cap = build_runtime_capabilities(
             live_enabled=True,
-            deepseek_available=True,
-            reason_code="missing_api_key",
-            message="should be ignored",
+            providers={
+                "deepseek": {
+                    "available": True,
+                    "reason_code": "missing_api_key",
+                    "message": "should be ignored",
+                }
+            },
         )
         deepseek = cap["live_api"]["providers"]["deepseek"]
         self.assertNotIn("reason_code", deepseek)
         self.assertNotIn("message", deepseek)
 
+    def test_per_provider_independent_posture(self) -> None:
+        # P2-B head feature: each provider reports its OWN availability — only
+        # openai is configured, so it is available while the others are not.
+        cap = build_runtime_capabilities(
+            live_enabled=True,
+            providers={
+                "deepseek": {
+                    "available": False,
+                    "reason_code": "missing_api_key",
+                    "message": "no credential is available for deepseek",
+                },
+                "openai": {"available": True},
+                "anthropic": {
+                    "available": False,
+                    "reason_code": "missing_api_key",
+                    "message": "no credential is available for anthropic",
+                },
+            },
+        )
+        providers = cap["live_api"]["providers"]
+        # Emitted in sorted key order.
+        self.assertEqual(list(providers), ["anthropic", "deepseek", "openai"])
+        self.assertTrue(providers["openai"]["available"])
+        self.assertNotIn("reason_code", providers["openai"])
+        self.assertFalse(providers["deepseek"]["available"])
+        self.assertEqual(providers["deepseek"]["reason_code"], "missing_api_key")
+        self.assertFalse(providers["anthropic"]["available"])
+
     def test_no_secret_markers_in_any_posture(self) -> None:
         postures = [
-            build_runtime_capabilities(live_enabled=True, deepseek_available=True),
             build_runtime_capabilities(
-                live_enabled=False, deepseek_available=False,
-                reason_code="live_api_disabled",
-                message="live API is not enabled on this server",
+                live_enabled=True, providers={"deepseek": {"available": True}}
             ),
             build_runtime_capabilities(
-                live_enabled=True, deepseek_available=False,
-                reason_code="missing_api_key",
-                message="live API key is not configured on this server",
+                live_enabled=False,
+                providers={
+                    "deepseek": {
+                        "available": False,
+                        "reason_code": "live_api_disabled",
+                        "message": "live API is not enabled on this server",
+                    }
+                },
+            ),
+            build_runtime_capabilities(
+                live_enabled=True,
+                providers={
+                    "deepseek": {
+                        "available": False,
+                        "reason_code": "missing_api_key",
+                        "message": "live API key is not configured on this server",
+                    }
+                },
             ),
         ]
         for cap in postures:

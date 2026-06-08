@@ -195,25 +195,57 @@ def _check_live_profile_shape(
     return None
 
 
+def _provider_live_posture(
+    state: ObserverServerState, provider: str
+) -> tuple[bool, str | None, str | None]:
+    """Per-provider live posture for the capabilities payload.
+
+    Mirrors ``_check_live_capability`` but scoped to ONE provider so the HUD /
+    arming control can report which providers are actually usable (the head
+    feature: each seat may pick a different AI).  Reason CODES are identical to
+    the launch-time 403 codes:
+
+    * live disabled (global) → ``live_api_disabled`` for every provider.
+    * live enabled but this provider has no credential → ``missing_api_key``.
+      ``deepseek`` additionally counts the legacy env key / prebuilt env launcher
+      (back-compat); other providers are credential-only.
+
+    Never reads or returns a secret."""
+    if not state.live_enabled:
+        return (False, "live_api_disabled", "live API is not enabled on this server")
+    has_credential = state.credential_store.has(provider)
+    if provider == "deepseek":
+        has_credential = (
+            has_credential or state.env_key_available or state.live_launcher is not None
+        )
+    if has_credential:
+        return (True, None, None)
+    return (
+        False,
+        "missing_api_key",
+        f"no credential is available for {provider} (set one in the client)",
+    )
+
+
 def _build_capabilities_payload(state: ObserverServerState) -> dict[str, object]:
     """Derive the read-only ``g3.runtime_capabilities.v1`` payload from the live
-    capability gate.
+    capability gate, one entry per registered provider.
 
-    Posture comes ONLY from ``_check_live_capability(state, "live")`` (None ⇒
-    available; tuple ⇒ the launch-time ``(status, reason_code, message)``), so
-    the capabilities ``reason_code`` is identical to the launch-time 403 code.
-    Read-only: no writes, no provider call, and never a secret."""
-    reject = _check_live_capability(state, "live")
-    if reject is None:
-        return build_runtime_capabilities(
-            live_enabled=state.live_enabled, deepseek_available=True
-        )
-    _status, reason_code, message = reject
+    Each provider's posture comes from ``_provider_live_posture`` so the
+    ``reason_code`` matches the launch-time 403 code.  The aggregate "is live
+    available at all" (any provider available) equals ``_check_live_capability``
+    proceeding — the client derives that by OR-ing the per-provider ``available``
+    flags.  Read-only: no writes, no provider call, and never a secret."""
+    providers: dict[str, dict[str, object]] = {}
+    for provider in PROVIDER_REGISTRY:
+        available, reason_code, message = _provider_live_posture(state, provider)
+        info: dict[str, object] = {"available": available}
+        if not available:
+            info["reason_code"] = reason_code
+            info["message"] = message
+        providers[provider] = info
     return build_runtime_capabilities(
-        live_enabled=state.live_enabled,
-        deepseek_available=False,
-        reason_code=reason_code,
-        message=message,
+        live_enabled=state.live_enabled, providers=providers
     )
 
 

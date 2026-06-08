@@ -423,32 +423,43 @@ def parse_profile_launch_request(payload: dict[str, object]) -> dict[str, object
 def build_runtime_capabilities(
     *,
     live_enabled: bool,
-    deepseek_available: bool,
-    reason_code: str | None = None,
-    message: str | None = None,
+    providers: dict[str, dict[str, object]],
 ) -> dict[str, object]:
     """Build the read-only ``g3.runtime_capabilities.v1`` live-posture payload.
 
-    ``default_mode`` is hard-coded ``"fake"`` — live being *available* never
-    changes the default selection.  ``reason_code``/``message`` are attached
-    ONLY when the provider is not available (``deepseek_available`` is False), so
-    that the code mirrors the launch-time 403 from ``_check_live_capability``.
+    P2-B per-provider: ``providers`` maps each registered provider id
+    (``deepseek``/``openai``/``anthropic``/``openai_compatible``) to its OWN
+    posture ``{"available": bool, "reason_code"?: str, "message"?: str}``.  Each
+    entry is normalized independently — ``reason_code``/``message`` are emitted
+    ONLY when that provider is not available, mirroring the launch-time 403 code
+    from ``_check_live_capability``.  Provider keys are emitted in sorted order
+    for deterministic output.
+
+    ``default_mode`` is hard-coded ``"fake"`` — any provider being *available*
+    never changes the default selection.
 
     This payload carries posture only — ``enabled``/``available`` plus a key-free
-    canonical ``reason_code``/``message`` — and NEVER the key, the env var name,
-    an ``Authorization`` header, or a base-url secret."""
-    deepseek: dict[str, object] = {"available": bool(deepseek_available)}
-    if not deepseek_available:
-        if reason_code is not None:
-            deepseek["reason_code"] = reason_code
-        if message is not None:
-            deepseek["message"] = message
+    canonical ``reason_code``/``message`` per provider — and NEVER a key, the env
+    var name, an ``Authorization`` header, or a base-url secret."""
+    providers_payload: dict[str, object] = {}
+    for name in sorted(providers):
+        info = providers[name]
+        available = bool(info.get("available", False))
+        entry: dict[str, object] = {"available": available}
+        if not available:
+            reason_code = info.get("reason_code")
+            message = info.get("message")
+            if reason_code is not None:
+                entry["reason_code"] = reason_code
+            if message is not None:
+                entry["message"] = message
+        providers_payload[name] = entry
     return {
         "schema_version": RUNTIME_CAPABILITIES_SCHEMA_VERSION,
         "default_mode": DEFAULT_FAKE_MODE,
         "live_api": {
             "enabled": bool(live_enabled),
-            "providers": {"deepseek": deepseek},
+            "providers": providers_payload,
         },
     }
 
