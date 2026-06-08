@@ -35,6 +35,10 @@ class ObserverApiClient : public QObject {
     // SYNCHRONOUSLY by openRun(forReport) so it is reliable when the theater mounts
     // (currentStatus is async and was racy as the freeze/report discriminator).
     Q_PROPERTY(int settlementEntry READ settlementEntry NOTIFY settlementEntryChanged)
+    // P2-B (Q1): per-provider live model lists keyed by provider id (deepseek/
+    // openai/anthropic/openai_compatible). Populated by fetchProviderModels via the
+    // loopback GET /api/providers/{provider}/models endpoint. Never carries a key.
+    Q_PROPERTY(QVariantMap providerModels READ providerModels NOTIFY providerModelsChanged)
     // G2d-2 profile setup properties
     Q_PROPERTY(QVariantList profileItems READ profileItems NOTIFY profileItemsChanged)
     Q_PROPERTY(QVariantMap profileSchema READ profileSchema NOTIFY profileSchemaChanged)
@@ -80,6 +84,8 @@ public:
     // P2-D settlement accessor
     QVariantMap settlementBundle() const;
     int settlementEntry() const;
+    // P2-B (Q1) provider model-list accessor
+    QVariantMap providerModels() const;
     // G2d-2 profile setup accessors
     QVariantList profileItems() const;
     QVariantMap profileSchema() const;
@@ -116,6 +122,16 @@ public slots:
     Q_INVOKABLE void launchFromProfile(const QVariantMap &profile, const QString &mode);
     // G3-2 read-only live posture (no key, no provider call).
     Q_INVOKABLE void refreshCapabilities();
+    // P2-B (Q1): fetch the live model list for a configured provider via the
+    // loopback GET /api/providers/{provider}/models. On success updates
+    // providerModels[provider] and emits providerModelsFetched(provider); on
+    // failure emits providerModelsFailed with the key-free, server-supplied code
+    // (read from the JSON envelope and rendered data-driven by QML — server
+    // reason codes are never enumerated as client literals here).
+    Q_INVOKABLE void fetchProviderModels(const QString &provider);
+    // Drop a provider's cached (validated) model list — call when its credential
+    // changes so a re-entered, not-yet-validated key no longer reads as validated.
+    Q_INVOKABLE void invalidateProviderModels(const QString &provider);
 
 signals:
     void baseUrlChanged();
@@ -145,6 +161,10 @@ signals:
     // G3-2 capability + executed-truth signals
     void capabilitiesChanged();
     void currentExecutionModeChanged();
+    // P2-B (Q1) provider model-list signals
+    void providerModelsChanged();                                              // property NOTIFY (provider-agnostic)
+    void providerModelsFetched(const QString &provider);                       // a fetch for THIS provider succeeded
+    void providerModelsFailed(const QString &provider, const QString &reason); // reason is key-free
 
 private slots:
     void onStreamReadyRead();
@@ -182,6 +202,8 @@ private:
     QVariantMap m_settlementBundle;
     int m_settlementRequestSerial = 0;
     int m_settlementEntry = 0;   // 0 = freeze ceremony, 1 = history → report-direct
+    // P2-B (Q1) provider model lists, keyed by provider id
+    QVariantMap m_providerModels;
     // G2d-2 profile setup state
     QVariantList m_profileItems;
     QVariantMap m_profileSchema;

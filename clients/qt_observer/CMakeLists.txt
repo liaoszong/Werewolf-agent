@@ -40,6 +40,7 @@ qt_add_qml_module(appqt_observer
         qml/AppShell.qml
         qml/HomeView.qml
         qml/MatchSetupView.qml
+        qml/ProviderSettingsView.qml
         qml/PreflightView.qml
         qml/LiveCockpitView.qml
         qml/TheaterView.qml
@@ -65,6 +66,7 @@ qt_add_qml_module(appqt_observer
         qml/components/GlowDot.qml
         qml/components/AppCard.qml
         qml/components/AppButton.qml
+        qml/components/GearButton.qml
         qml/components/SectionHeader.qml
         qml/components/EmptyState.qml
         qml/components/SeatEditorPanel.qml

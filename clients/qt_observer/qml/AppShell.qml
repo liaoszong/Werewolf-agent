@@ -9,6 +9,9 @@ Item {
     anchors.fill: parent
 
     property string currentView: "home"
+    // The view to return to when leaving the provider-settings page (it is reached
+    // from any page via the global gear, so it remembers where it was opened from).
+    property string _providerReturnView: "home"
 
     // CLI --open-run: auto-open a run straight into the theater (mirrors Preflight's
     // poll-then-navigate so currentRunId is set before the cockpit loads).
@@ -165,6 +168,25 @@ Item {
                     }
                 }
             }
+
+            // Divider (hidden alongside the gear so no trailing separator is left
+            // dangling on the settings page itself).
+            Rectangle {
+                anchors.verticalCenter: parent.verticalCenter
+                visible: root.currentView !== "providerSettings"
+                width: 1
+                height: 16
+                color: Theme.color.border
+            }
+
+            // Global entry to the provider/model settings page (reachable from any
+            // view).  Hidden while already on that page to avoid re-entry loops.
+            GearButton {
+                objectName: "providerSettingsGear"
+                anchors.verticalCenter: parent.verticalCenter
+                visible: root.currentView !== "providerSettings"
+                onClicked: root.navigateProviderSettings()
+            }
         }
 
         // Bottom hairline
@@ -200,6 +222,7 @@ Item {
     Component { id: preflightComponent; PreflightView { objectName: "preflightView" } }
     Component { id: cockpitComponent; TheaterView { objectName: "theaterView" } }
     Component { id: historyComponent; HistoryView { objectName: "historyView" } }
+    Component { id: providerSettingsComponent; ProviderSettingsView { objectName: "providerSettingsView" } }
 
     function navigateHome() {
         stackView.replace(homeComponent)
@@ -224,5 +247,25 @@ Item {
     function navigateHistory() {
         stackView.replace(historyComponent)
         currentView = "history"
+    }
+
+    function navigateProviderSettings() {
+        if (currentView === "providerSettings")
+            return
+        _providerReturnView = currentView
+        stackView.replace(providerSettingsComponent)
+        currentView = "providerSettings"
+    }
+
+    // Return to whichever page opened the settings (a fresh replace re-runs that
+    // view's Component.onCompleted, so newly configured providers are picked up).
+    function returnFromProviderSettings() {
+        switch (_providerReturnView) {
+        case "setup": navigateSetup(); break
+        case "history": navigateHistory(); break
+        case "preflight": navigatePreflight(); break
+        case "cockpit": navigateCockpit(); break
+        default: navigateHome()
+        }
     }
 }

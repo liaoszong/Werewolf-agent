@@ -2,6 +2,7 @@
 
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QMetaEnum>
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QUrl>
@@ -26,6 +27,30 @@ void CredentialStore::setBaseUrl(const QString &baseUrl)
 QString CredentialStore::rawCredential(const QString &provider) const
 {
     return m_settings.value(QStringLiteral("byokey/") + provider).toString();
+}
+
+// base_url is NOT a secret — stored alongside the key under a separate prefix and
+// readable by QML (the masking rules apply only to the key).
+QString CredentialStore::baseUrlFor(const QString &provider) const
+{
+    return m_settings.value(QStringLiteral("byobase/") + provider).toString();
+}
+
+QStringList CredentialStore::configuredProviders() const
+{
+    // QSettings::allKeys() is const (unlike beginGroup); filter the key entries and
+    // keep only providers with a non-empty saved key.
+    QStringList providers;
+    const QString prefix = QStringLiteral("byokey/");
+    const QStringList keys = m_settings.allKeys();
+    for (const QString &k : keys) {
+        if (!k.startsWith(prefix))
+            continue;
+        const QString provider = k.mid(prefix.length());
+        if (!provider.isEmpty() && !m_settings.value(k).toString().isEmpty())
+            providers.append(provider);
+    }
+    return providers;
 }
 
 // static
@@ -56,17 +81,25 @@ QString CredentialStore::maskedCredential(const QString &provider) const
 // Q_INVOKABLE — mutations
 // ---------------------------------------------------------------------------
 
-void CredentialStore::saveCredential(const QString &provider, const QString &rawText)
+void CredentialStore::saveCredential(const QString &provider, const QString &rawText, const QString &baseUrl)
 {
     if (rawText.trimmed().isEmpty())
         return;
     m_settings.setValue(QStringLiteral("byokey/") + provider, rawText);
+    // A blank base_url clears any stored custom endpoint (the server then falls
+    // back to the provider's registry default). Non-blank values are trimmed.
+    const QString trimmedBase = baseUrl.trimmed();
+    if (trimmedBase.isEmpty())
+        m_settings.remove(QStringLiteral("byobase/") + provider);
+    else
+        m_settings.setValue(QStringLiteral("byobase/") + provider, trimmedBase);
     emit credentialChanged(provider);
 }
 
 void CredentialStore::clearCredential(const QString &provider)
 {
     m_settings.remove(QStringLiteral("byokey/") + provider);
+    m_settings.remove(QStringLiteral("byobase/") + provider);
     emit credentialChanged(provider);
 
     // Best-effort DELETE to the local server — ignore response, clean up reply.
@@ -88,6 +121,12 @@ void CredentialStore::syncCredentialToServer(const QString &provider)
     QJsonObject body;
     body[QStringLiteral("provider")] = provider;
     body[QStringLiteral("api_key")] = raw;
+    // base_url is optional (omitted = server uses the provider's registry default).
+    // It is required server-side only for openai_compatible; the settings form
+    // enforces that before saving, so a stored value reaches the server here.
+    const QString baseUrl = baseUrlFor(provider);
+    if (!baseUrl.isEmpty())
+        body[QStringLiteral("base_url")] = baseUrl;
     const QByteArray bodyBytes = QJsonDocument(body).toJson(QJsonDocument::Compact);
 
     QNetworkRequest req(QUrl(m_baseUrl + QStringLiteral("/api/credentials")));

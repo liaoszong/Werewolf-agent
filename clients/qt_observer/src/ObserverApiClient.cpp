@@ -77,6 +77,9 @@ QVariantList ObserverApiClient::projectionEvents() const { return m_projectionEv
 QVariantMap ObserverApiClient::settlementBundle() const { return m_settlementBundle; }
 int ObserverApiClient::settlementEntry() const { return m_settlementEntry; }
 
+// P2-B (Q1) provider model-list getter
+QVariantMap ObserverApiClient::providerModels() const { return m_providerModels; }
+
 // G2d-2 profile setup getters
 QVariantList ObserverApiClient::profileItems() const { return m_profileItems; }
 QVariantMap ObserverApiClient::profileSchema() const { return m_profileSchema; }
@@ -611,6 +614,55 @@ void ObserverApiClient::refreshCapabilities()
         m_liveReasonMessage = deepseek.value(QStringLiteral("message")).toString();
         emit capabilitiesChanged();
     });
+}
+
+// ---------------------------------------------------------------------------
+// P2-B (Q1) dynamic provider model discovery
+// ---------------------------------------------------------------------------
+
+void ObserverApiClient::fetchProviderModels(const QString &provider)
+{
+    if (provider.isEmpty())
+        return;
+    const QString encoded = QString::fromUtf8(QUrl::toPercentEncoding(provider));
+    QNetworkReply *reply =
+        get(QStringLiteral("/api/providers/") + encoded + QStringLiteral("/models"));
+    connect(reply, &QNetworkReply::finished, this, [this, reply, provider]() {
+        reply->deleteLater();
+        // Error responses (4xx/5xx) carry a key-free {code,message}; surface the
+        // code only (never the body of a 502, which is already sanitized server-side).
+        if (reply->error() != QNetworkReply::NoError) {
+            const int httpStatus =
+                reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+            const QJsonDocument edoc = QJsonDocument::fromJson(reply->readAll());
+            QString code = edoc.isObject()
+                ? edoc.object().value(QStringLiteral("code")).toString() : QString();
+            if (code.isEmpty()) {
+                code = httpStatus > 0
+                    ? QStringLiteral("http_") + QString::number(httpStatus)
+                    : QStringLiteral("unreachable");
+            }
+            emit providerModelsFailed(provider, code);
+            return;
+        }
+        const QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+        if (!doc.isObject()) {
+            emit providerModelsFailed(provider, QStringLiteral("invalid_response"));
+            return;
+        }
+        QVariantList models;
+        for (const QJsonValue &v : doc.object().value(QStringLiteral("models")).toArray())
+            models.append(v.toString());
+        m_providerModels.insert(provider, models);
+        emit providerModelsChanged();             // property NOTIFY (binding refresh)
+        emit providerModelsFetched(provider);     // carries identity for guarded UI feedback
+    });
+}
+
+void ObserverApiClient::invalidateProviderModels(const QString &provider)
+{
+    if (m_providerModels.remove(provider) > 0)
+        emit providerModelsChanged();
 }
 
 void ObserverApiClient::launchFromProfile(const QVariantMap &profile, const QString &mode)
