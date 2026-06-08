@@ -72,5 +72,73 @@ class EmergentDeepSeekRunnerTests(unittest.TestCase):
             self.assertTrue((out / "provider-turns.json").exists())
 
 
+class ProviderIdentityTests(unittest.TestCase):
+    def _agent(self, name, label):
+        from werewolf_eval.provider_contract import OPENAI_COMPATIBLE_PROVIDER_SOURCE_LABEL
+        class _P:
+            PROVIDER_NAME = name
+            SOURCE_LABEL = label
+            requests = []
+            responses = []
+            model = "m"
+            persona = ""
+        class _A:
+            provider = _P()
+        return _A()
+
+    def test_same_label_different_vendors_is_mixed(self) -> None:
+        from werewolf_eval.run_emergent_deepseek_game import _provider_identity
+        from werewolf_eval.provider_contract import (
+            OPENAI_COMPATIBLE_PROVIDER_SOURCE_LABEL, MIXED_PROVIDER_SOURCE_LABEL,
+        )
+        agents = {
+            "p1": self._agent("moonshot", OPENAI_COMPATIBLE_PROVIDER_SOURCE_LABEL),
+            "p2": self._agent("qwen", OPENAI_COMPATIBLE_PROVIDER_SOURCE_LABEL),
+        }
+        name, label = _provider_identity(agents)
+        self.assertEqual(name, "mixed")
+        self.assertEqual(label, MIXED_PROVIDER_SOURCE_LABEL)
+
+    def test_uniform_vendor_keeps_its_label(self) -> None:
+        from werewolf_eval.run_emergent_deepseek_game import _provider_identity
+        from werewolf_eval.provider_contract import OPENAI_COMPATIBLE_PROVIDER_SOURCE_LABEL
+        agents = {
+            "p1": self._agent("moonshot", OPENAI_COMPATIBLE_PROVIDER_SOURCE_LABEL),
+            "p2": self._agent("moonshot", OPENAI_COMPATIBLE_PROVIDER_SOURCE_LABEL),
+        }
+        name, label = _provider_identity(agents)
+        self.assertEqual(name, "moonshot")
+        self.assertEqual(label, OPENAI_COMPATIBLE_PROVIDER_SOURCE_LABEL)
+
+
+class SeatManifestHonestyTests(unittest.TestCase):
+    def _agent(self, name, model):
+        class _P:
+            PROVIDER_NAME = name
+            SOURCE_LABEL = "[OpenAI-compatible API output]"
+            requests = []
+            responses = []
+            persona = ""
+            def __init__(self, m): self._m = m
+            @property
+            def model(self): return self._m
+        class _A:
+            def __init__(self, p): self.provider = p
+        return _A(_P(model))
+
+    def test_manifest_keeps_each_vendor_id(self) -> None:
+        from werewolf_eval.run_emergent_deepseek_game import _seat_manifest_agents, PLAYER_IDS
+        agents = {
+            PLAYER_IDS[0]: self._agent("moonshot", "kimi-k2.6"),
+            PLAYER_IDS[1]: self._agent("qwen", "qwen3-max"),
+        }
+        rows = _seat_manifest_agents(agents, fallback_model="fallback")
+        by_pid = {r["player_id"]: r for r in rows}
+        self.assertEqual(by_pid[PLAYER_IDS[0]]["provider"], "moonshot")
+        self.assertEqual(by_pid[PLAYER_IDS[0]]["model"], "kimi-k2.6")
+        self.assertEqual(by_pid[PLAYER_IDS[1]]["provider"], "qwen")
+        self.assertEqual(by_pid[PLAYER_IDS[1]]["model"], "qwen3-max")
+
+
 if __name__ == "__main__":
     unittest.main()

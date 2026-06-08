@@ -52,7 +52,12 @@ def _provider_identity(agents: dict[str, ProviderAgent]) -> tuple[str, str]:
         for a in agents.values()
     }
     name = next(iter(names)) if len(names) == 1 else "mixed"
-    label = next(iter(labels)) if len(labels) == 1 else MIXED_PROVIDER_SOURCE_LABEL
+    # Heterogeneous EITHER by name (e.g. moonshot+qwen, which share the compatible
+    # label) or by label → the run-level label is the mixed label. Honest.
+    if len(names) == 1 and len(labels) == 1:
+        label = next(iter(labels))
+    else:
+        label = MIXED_PROVIDER_SOURCE_LABEL
     return name, label
 
 
