@@ -48,6 +48,43 @@ def _healthy() -> bool:
         return False
 
 
+def _server_is_current() -> bool:
+    """A reused server is only safe if it runs CURRENT backend code. Probe a
+    capability the current backend adds — ``provider_specs`` in the profile
+    schema (the multi-provider preset feature). An older server still answers
+    ``/health`` but serves a schema without it, which makes the client's
+    provider list render empty. Treat such a server as stale → restart."""
+    try:
+        schema = _get("/api/profiles/schema", timeout=2)
+        return bool(schema.get("provider_specs"))
+    except Exception:
+        return False
+
+
+def _kill_server_on_port(port: int) -> None:
+    """Best-effort stop of whatever is LISTENING on ``port`` — a stale observer
+    server this launcher did not start (so we have no handle to it). Windows uses
+    netstat+taskkill; POSIX falls back to pkill by module name. Failures are
+    swallowed: the worst case is the start-below times out with a clear message."""
+    try:
+        if os.name == "nt":
+            out = subprocess.run(
+                ["netstat", "-ano", "-p", "tcp"],
+                capture_output=True, text=True,
+            ).stdout
+            pids = set()
+            for line in out.splitlines():
+                if f":{port} " in line and "LISTENING" in line.upper():
+                    pids.add(line.split()[-1])
+            for pid in pids:
+                if pid.isdigit() and pid != "0":
+                    subprocess.run(["taskkill", "/F", "/PID", pid], capture_output=True)
+        else:
+            subprocess.run(["pkill", "-f", "run_observer_server"], capture_output=True)
+    except Exception:
+        pass
+
+
 def main() -> None:
     os.chdir(ROOT)
     env = dict(os.environ)
@@ -70,8 +107,19 @@ def main() -> None:
         return
 
     server = None
+    if _healthy() and not _server_is_current():
+        # A leftover server from OLDER backend code answers /health but serves a
+        # stale schema (no provider_specs) → the client's provider list is empty.
+        # Don't blindly reuse it: stop it so a fresh one (current code) starts.
+        print("[!] 检测到陈旧的服务器（缺少 provider_specs 能力），正在停止并重启…")
+        _kill_server_on_port(PORT)
+        for _ in range(20):          # wait for the port to free up
+            if not _healthy():
+                break
+            time.sleep(0.25)
+
     if _healthy():
-        print("[*] 检测到已在运行的服务器，直接复用。")
+        print("[*] 检测到已在运行的服务器（版本匹配），直接复用。")
     else:
         print("[*] 启动观察者服务器…")
         server = subprocess.Popen(
