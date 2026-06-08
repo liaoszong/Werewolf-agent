@@ -57,6 +57,17 @@ class ProviderRegistryTests(unittest.TestCase):
             self.assertFalse(spec.requires_base_url, pid)
             self.assertTrue(len(spec.default_models) >= 1, pid)
 
+    def test_trailing_slash_base_url_does_not_double_slash(self) -> None:
+        # model-list URL
+        self.assertEqual(
+            model_list_url("gemini", "https://host/v1beta/openai/"),
+            "https://host/v1beta/openai/models",
+        )
+        # chat URL (built by the provider instance)
+        cfg = ChatProviderConfig(api_key="k", base_url="https://host/v1beta/openai/", model="m")
+        prov = build_provider("gemini", cfg)
+        self.assertEqual(prov._build_url(), "https://host/v1beta/openai/chat/completions")
+
     def test_specs_pin_class_base_url_models_path_and_label(self) -> None:
         ds = PROVIDER_REGISTRY["deepseek"]
         self.assertIs(ds.provider_cls, DeepSeekProvider)
