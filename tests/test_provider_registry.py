@@ -146,6 +146,25 @@ class ProviderRegistryTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             build_provider("openai_compatible", ChatProviderConfig(api_key="k"))
 
+    def test_build_provider_stamps_vendor_identity(self) -> None:
+        # A preset reusing OpenAIProvider must report ITS registry id + the
+        # compatible source_label on the instance, not the class default "openai".
+        cfg = ChatProviderConfig(api_key="sk-fake", model="kimi-k2.6")
+        prov = build_provider("moonshot", cfg)
+        self.assertEqual(prov.PROVIDER_NAME, "moonshot")
+        self.assertEqual(prov.SOURCE_LABEL, OPENAI_COMPATIBLE_PROVIDER_SOURCE_LABEL)
+        # the stamped instance attrs shadow the class defaults respond() reads
+        self.assertNotEqual(prov.PROVIDER_NAME, OpenAIProvider.PROVIDER_NAME)
+
+    def test_build_provider_identity_unchanged_for_existing_four(self) -> None:
+        cfg = ChatProviderConfig(api_key="sk-fake", model="m")
+        self.assertEqual(build_provider("openai", cfg).PROVIDER_NAME, "openai")
+        self.assertEqual(build_provider("deepseek", cfg).PROVIDER_NAME, "deepseek")
+        self.assertEqual(
+            build_provider("anthropic", cfg).SOURCE_LABEL,
+            ANTHROPIC_PROVIDER_SOURCE_LABEL,
+        )
+
     def test_list_models_coerces_ids_to_str(self) -> None:
         def transport(url, headers, timeout):
             return {"data": [{"id": "m1"}, {"id": 123}, {"no_id": 1}, "junk"]}

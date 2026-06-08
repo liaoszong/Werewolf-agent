@@ -192,7 +192,14 @@ def build_provider(
         raise ValueError(f"provider {provider_id!r} requires a base_url")
     if not config.base_url:
         config = dataclasses.replace(config, base_url=spec.default_base_url)
-    return spec.provider_cls(config, transport=transport)
+    provider = spec.provider_cls(config, transport=transport)
+    # Stamp the registry identity so per-seat artifacts (manifest, provider trace,
+    # ProviderResponse.provider_name/source_label) name the REAL vendor, not the
+    # shared class default ("openai"). Instance attrs shadow the class attrs that
+    # respond() reads. No-op for the existing 4 (class defaults already match).
+    provider.PROVIDER_NAME = spec.provider_id
+    provider.SOURCE_LABEL = spec.source_label
+    return provider
 
 
 # --------------------------------------------------------------- model discovery
