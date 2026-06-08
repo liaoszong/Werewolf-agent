@@ -14,6 +14,9 @@ class SourceLabelsTests(unittest.TestCase):
             "[deterministic mock agent output]",
             "[deterministic fake provider output]",
             "[DeepSeek API output]",
+            "[OpenAI API output]",
+            "[Anthropic API output]",
+            "[OpenAI-compatible API output]",
         }
         self.assertEqual(VALID_SOURCE_LABELS, expected)
 

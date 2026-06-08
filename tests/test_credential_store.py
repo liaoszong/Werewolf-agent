@@ -89,6 +89,28 @@ class CredentialStoreTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             s.set("deepseek", "")
 
+    # P2-B-1 r2: per-provider base_url (custom OpenAI-compatible endpoints).
+    def test_set_with_base_url_is_retrievable(self) -> None:
+        s = CredentialStore()
+        s.set("openai_compatible", _KEY, "https://my.proxy/v1")
+        self.assertEqual(s.get("openai_compatible"), _KEY)
+        self.assertEqual(s.get_base_url("openai_compatible"), "https://my.proxy/v1")
+
+    def test_base_url_defaults_empty_when_set_without_one(self) -> None:
+        s = CredentialStore()
+        s.set("deepseek", _KEY)  # 2-arg back-compat
+        self.assertEqual(s.get_base_url("deepseek"), "")
+
+    def test_base_url_none_for_absent_provider(self) -> None:
+        s = CredentialStore()
+        self.assertIsNone(s.get_base_url("openai"))
+
+    def test_repr_never_contains_base_url_or_key(self) -> None:
+        s = CredentialStore()
+        s.set("openai_compatible", _KEY, "https://secret.host/internal")
+        self.assertNotIn("secret.host", repr(s))
+        self.assertNotIn(_KEY, repr(s))
+
 
 if __name__ == "__main__":
     unittest.main()

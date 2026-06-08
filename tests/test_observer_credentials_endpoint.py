@@ -88,10 +88,69 @@ class CredentialsEndpointLogicTests(unittest.TestCase):
         self.assertFalse(cs.has("deepseek"))
 
     def test_post_rejects_non_allowlisted_provider(self):
+        # P2-B-1 r2: registry providers are now allowlisted; only non-registry
+        # ids (and the fake provider, which has no key) are rejected.
         cs = self._cs()
-        for prov in ("fake_deterministic", "openai", "anthropic", "weird"):
+        for prov in ("fake_deterministic", "weird", "gemini"):
             status, _ = _credentials_post_result(cs, "application/json", {"provider": prov, "api_key": "k"})
             self.assertEqual(status, 400, prov)
+
+    def test_post_accepts_deepseek_openai_anthropic(self):
+        cs = self._cs()
+        for prov in ("deepseek", "openai", "anthropic"):
+            status, payload = _credentials_post_result(
+                cs, "application/json", {"provider": prov, "api_key": "sk-fake"}
+            )
+            self.assertEqual(status, 200, prov)
+            self.assertEqual(payload, {"stored": [prov]})
+            self.assertTrue(cs.has(prov))
+
+    def test_post_custom_requires_base_url(self):
+        cs = self._cs()
+        # openai_compatible requires a base_url (registry.requires_base_url)
+        status, _ = _credentials_post_result(
+            cs, "application/json", {"provider": "openai_compatible", "api_key": "k"}
+        )
+        self.assertEqual(status, 400)
+        self.assertFalse(cs.has("openai_compatible"))
+        status, payload = _credentials_post_result(
+            cs,
+            "application/json",
+            {"provider": "openai_compatible", "api_key": "k", "base_url": "https://my.proxy/v1"},
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(cs.get_base_url("openai_compatible"), "https://my.proxy/v1")
+
+    def test_post_rejects_non_http_base_url(self):
+        cs = self._cs()
+        for bad in ("ftp://x", "file:///etc/passwd", "api.openai.com", "gopher://x"):
+            status, payload = _credentials_post_result(
+                cs, "application/json",
+                {"provider": "openai_compatible", "api_key": "k", "base_url": bad},
+            )
+            self.assertEqual(status, 400, bad)
+            self.assertEqual(payload["error"], "invalid_base_url", bad)
+        self.assertFalse(cs.has("openai_compatible"))
+
+    def test_post_allows_localhost_http_base_url_for_local_models(self):
+        # local model servers (Ollama / LM Studio) are a first-class use case.
+        cs = self._cs()
+        status, _ = _credentials_post_result(
+            cs, "application/json",
+            {"provider": "openai_compatible", "api_key": "k", "base_url": "http://localhost:11434/v1"},
+        )
+        self.assertEqual(status, 200)
+
+    def test_post_stores_base_url_and_does_not_echo_secret(self):
+        cs = self._cs()
+        status, payload = _credentials_post_result(
+            cs,
+            "application/json",
+            {"provider": "deepseek", "api_key": "sk-secret", "base_url": "https://api.deepseek.com"},
+        )
+        self.assertEqual(status, 200)
+        self.assertNotIn("sk-secret", str(payload))
+        self.assertEqual(cs.get_base_url("deepseek"), "https://api.deepseek.com")
 
     def test_delete_clears_and_is_idempotent(self):
         cs = self._cs()
@@ -99,7 +158,8 @@ class CredentialsEndpointLogicTests(unittest.TestCase):
         self.assertEqual(_credentials_delete_result(cs, "deepseek"), (200, {"cleared": "deepseek"}))
         self.assertFalse(cs.has("deepseek"))
         self.assertEqual(_credentials_delete_result(cs, "deepseek")[0], 200)   # idempotent
-        self.assertEqual(_credentials_delete_result(cs, "openai")[0], 400)     # not allowlisted
+        self.assertEqual(_credentials_delete_result(cs, "openai")[0], 200)     # now allowlisted
+        self.assertEqual(_credentials_delete_result(cs, "weird")[0], 400)      # still rejected
 
     def test_post_non_dict_json_body_is_rejected(self):
         """A parsed non-dict JSON value (array, string, number) must yield

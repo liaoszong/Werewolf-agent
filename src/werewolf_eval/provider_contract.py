@@ -5,6 +5,9 @@ from typing import Any
 
 FAKE_PROVIDER_SOURCE_LABEL = "[deterministic fake provider output]"
 DEEPSEEK_PROVIDER_SOURCE_LABEL = "[DeepSeek API output]"
+OPENAI_PROVIDER_SOURCE_LABEL = "[OpenAI API output]"
+ANTHROPIC_PROVIDER_SOURCE_LABEL = "[Anthropic API output]"
+OPENAI_COMPATIBLE_PROVIDER_SOURCE_LABEL = "[OpenAI-compatible API output]"
 
 
 @dataclass(frozen=True)
@@ -24,6 +27,13 @@ class ProviderRequest:
     observation_text: str = ""
     response_kind: str = "action"
     max_output_tokens: int | None = None
+    # P2-B-3 (additive, back-compat): a per-seat PERSONA/strategy seed that is
+    # PREPENDED to (never replaces) the built-in machine-contract system prompt,
+    # plus an optional per-request sampling temperature. Empty/None = unchanged
+    # behavior. Request-level values override the provider config's per-seat
+    # values when set (covers the witch direct-call path too).
+    persona_prompt: str = ""
+    temperature: float | None = None
 
 
 @dataclass(frozen=True)

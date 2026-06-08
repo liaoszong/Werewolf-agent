@@ -84,6 +84,29 @@ class ProfileValidationTests(unittest.TestCase):
         with self.assertRaises(ProfileValidationError):
             validate_profile(_valid_profile(seat_overrides={"p3": {"model": "deepseek-chat"}}))
 
+    def test_allows_current_deepseek_live_model(self):
+        # P2-B-1 r2: live providers format-check the model (trust the live list).
+        # Regression: the current default model deepseek-v4-flash was rejected by
+        # the stale allowlist {deepseek-chat, deepseek-reasoner}.
+        validate_profile(_valid_profile(seat_overrides={
+            "p3": {"provider": "deepseek", "model": "deepseek-v4-flash", "prompt": "x", "strategy": "default"},
+        }))
+
+    def test_rejects_empty_live_model(self):
+        # format check still rejects a blank model for a live provider
+        with self.assertRaises(ProfileValidationError):
+            validate_profile(_valid_profile(seat_overrides={
+                "p3": {"provider": "deepseek", "model": "", "prompt": "x", "strategy": "default"},
+            }))
+
+    def test_fake_provider_model_still_allowlisted(self):
+        # fake_deterministic keeps its strict allowlist ({none}); a real model name
+        # over the fake provider must still be rejected.
+        p = _valid_profile()
+        p["role_defaults"]["werewolf"]["model"] = "deepseek-v4-flash"
+        with self.assertRaises(ProfileValidationError):
+            validate_profile(p)
+
     def test_rejects_oversized_prompt(self):
         p = _valid_profile()
         p["role_defaults"]["seer"]["prompt"] = "x" * 9000

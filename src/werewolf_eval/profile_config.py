@@ -21,6 +21,11 @@ ALLOWED_MODELS: dict[str, frozenset[str]] = {
     "fake_deterministic": frozenset({"none"}),
     "deepseek": frozenset({"deepseek-chat", "deepseek-reasoner"}),
 }
+# P2-B-1 r2: providers whose model is validated against ALLOWED_MODELS. Live
+# providers are deliberately absent (they trust the live model list); only the
+# deterministic fake provider keeps a strict model allowlist.
+_MODEL_ALLOWLIST_PROVIDERS: frozenset[str] = frozenset({"fake_deterministic"})
+
 ALLOWED_STRATEGIES: frozenset[str] = frozenset({"default", "aggressive", "cautious"})
 ALLOWED_ROLES: frozenset[str] = frozenset({"werewolf", "seer", "witch", "villager"})
 CANONICAL_DEFAULT_6P_ROLES: dict[str, int] = {
@@ -160,9 +165,20 @@ def _check_resolved_seat(seat_cfg: dict, seat: str) -> None:
     prompt = seat_cfg["prompt"]
     if provider not in ALLOWED_PROVIDERS:
         raise ProfileValidationError(f"{seat}: provider {provider!r} not allowed")
-    if model not in ALLOWED_MODELS.get(provider, frozenset()):
+    # P2-B-1 r2: only the fake provider keeps a strict model allowlist. Live
+    # providers (deepseek, and the multi-providers added in P2-B-3) trust the
+    # live model list fetched from the provider, so they format-check only — a
+    # non-empty string. This also fixes the latent bug where the current default
+    # model (deepseek-v4-flash) was rejected by a stale allowlist. (ALLOWED_MODELS
+    # still backs build_profile_schema's offline fallback dropdown.)
+    if provider in _MODEL_ALLOWLIST_PROVIDERS:
+        if model not in ALLOWED_MODELS.get(provider, frozenset()):
+            raise ProfileValidationError(
+                f"{seat}: model {model!r} not valid for provider {provider!r}"
+            )
+    elif not isinstance(model, str) or not model:
         raise ProfileValidationError(
-            f"{seat}: model {model!r} not valid for provider {provider!r}"
+            f"{seat}: model must be a non-empty string for provider {provider!r}"
         )
     if strategy not in ALLOWED_STRATEGIES:
         raise ProfileValidationError(f"{seat}: strategy {strategy!r} not allowed")
