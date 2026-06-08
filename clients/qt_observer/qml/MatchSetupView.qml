@@ -68,7 +68,19 @@ Item {
         function onCapabilitiesChanged() {
             if (!ObserverClient.liveAvailable) setupModeControl.resetToFake()
         }
-        function onLaunchSucceeded() { root.StackView.view.parent.navigatePreflight() }
+        function onLaunchSucceeded() {
+            // launchFromProfile already created the run (with THIS profile + the
+            // resolved live/fake mode) and set currentRunId. Watch it directly.
+            // The old path navigated to PreflightView, whose 开始对局 fired
+            // startDefaultMatch() — a hardcoded FAKE default game that clobbered the
+            // just-launched live run. That is the "always fake" bug; bypass it.
+            // openRun fetches the run detail so the HUD shows the real execution_mode
+            // (真实AI for live); connectStream attaches the live SSE feed (unlike
+            // startDefaultMatch, launchFromProfile does not stream on its own).
+            ObserverClient.openRun(ObserverClient.currentRunId, false)
+            ObserverClient.connectStream()
+            root.StackView.view.parent.navigateCockpit()
+        }
     }
 
     // Lookup a provider spec from the server registry (provider_specs in profileSchema).
