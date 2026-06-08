@@ -49,14 +49,20 @@ def _healthy() -> bool:
 
 
 def _server_is_current() -> bool:
-    """A reused server is only safe if it runs CURRENT backend code. Probe a
-    capability the current backend adds — ``provider_specs`` in the profile
-    schema (the multi-provider preset feature). An older server still answers
-    ``/health`` but serves a schema without it, which makes the client's
-    provider list render empty. Treat such a server as stale → restart."""
+    """A reused server is only safe if it matches what THIS launcher starts:
+    current backend code AND live enabled. Two failure modes this catches:
+      - older code: serves a profile schema WITHOUT ``provider_specs`` (the
+        multi-provider preset feature) → client provider list renders empty.
+      - started without ``--allow-live-api``: capabilities report
+        ``live_api.enabled == False`` → the client's LIVE control is stuck on
+        ``live_api_disabled`` and no real-AI game can launch.
+    Either → treat as stale and restart."""
     try:
         schema = _get("/api/profiles/schema", timeout=2)
-        return bool(schema.get("provider_specs"))
+        if not schema.get("provider_specs"):
+            return False
+        caps = _get("/api/runtime/capabilities", timeout=2)
+        return bool(caps.get("live_api", {}).get("enabled"))
     except Exception:
         return False
 
@@ -124,7 +130,11 @@ def main() -> None:
         print("[*] 启动观察者服务器…")
         server = subprocess.Popen(
             [sys.executable, "-m", "werewolf_eval.run_observer_server",
-             "--host", "127.0.0.1", "--port", str(PORT), "--runs-dir", ".runs"],
+             "--host", "127.0.0.1", "--port", str(PORT), "--runs-dir", ".runs",
+             # Enable the live (real-AI) path so the client's LIVE control works.
+             # Spending is still gated client-side (two-click arming + BYO-key);
+             # the server only needs a client-synced key to actually launch live.
+             "--allow-live-api"],
             env=env)
         for _ in range(60):
             if _healthy():
