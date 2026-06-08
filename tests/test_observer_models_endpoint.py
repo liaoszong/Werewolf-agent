@@ -20,7 +20,7 @@ def _ok_models_transport(url: str, headers: dict[str, str], timeout: int) -> dic
 class ProviderModelsEndpointTests(unittest.TestCase):
     def test_unsupported_provider_400(self) -> None:
         cs = CredentialStore()
-        status, payload = _provider_models_result(cs, "gemini", transport=_ok_models_transport)
+        status, payload = _provider_models_result(cs, "not_a_real_provider", transport=_ok_models_transport)
         self.assertEqual(status, 400)
         self.assertEqual(payload["error"], "unsupported_provider")
 

@@ -123,7 +123,7 @@ class CredentialsEndpointLogicTests(unittest.TestCase):
         # P2-B-1 r2: registry providers are now allowlisted; only non-registry
         # ids (and the fake provider, which has no key) are rejected.
         cs = self._cs()
-        for prov in ("fake_deterministic", "weird", "gemini"):
+        for prov in ("fake_deterministic", "weird", "not_a_real_provider"):
             status, _ = _credentials_post_result(cs, "application/json", {"provider": prov, "api_key": "k"})
             self.assertEqual(status, 400, prov)
 
