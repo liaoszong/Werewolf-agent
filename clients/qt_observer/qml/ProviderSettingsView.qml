@@ -86,7 +86,14 @@ Item {
     }
 
     onSelectedProviderChanged: loadProviderIntoForm()
-    Component.onCompleted: loadProviderIntoForm()
+    Component.onCompleted: {
+        loadProviderIntoForm()
+        // The provider list is data-driven from profileSchema.provider_specs. When
+        // this page is opened directly (global gear) before MatchSetup ever loads,
+        // the schema has not been fetched yet — fetch it so the list populates.
+        if (!ObserverClient.profileSchema || !ObserverClient.profileSchema.provider_specs)
+            ObserverClient.refreshProfileSchema()
+    }
 
     Connections {
         target: CredentialStore
