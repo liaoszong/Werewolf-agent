@@ -58,6 +58,9 @@ PROVIDER_REGISTRY: dict[str, ProviderSpec] = {
         default_base_url="https://api.deepseek.com",
         models_path="/models",
         source_label=DEEPSEEK_PROVIDER_SOURCE_LABEL,
+        # Offline UI fallback so a deepseek seat has a VALID model before a live
+        # fetch (these are DeepSeek's real chat models).
+        default_models=("deepseek-chat", "deepseek-reasoner"),
     ),
     "openai": ProviderSpec(
         provider_id="openai",
@@ -66,6 +69,7 @@ PROVIDER_REGISTRY: dict[str, ProviderSpec] = {
         default_base_url="https://api.openai.com/v1",
         models_path="/models",
         source_label=OPENAI_PROVIDER_SOURCE_LABEL,
+        default_models=("gpt-4o", "gpt-4o-mini"),
     ),
     "anthropic": ProviderSpec(
         provider_id="anthropic",
@@ -74,6 +78,7 @@ PROVIDER_REGISTRY: dict[str, ProviderSpec] = {
         default_base_url="https://api.anthropic.com",
         models_path="/v1/models",
         source_label=ANTHROPIC_PROVIDER_SOURCE_LABEL,
+        default_models=("claude-sonnet-4-6", "claude-haiku-4-5-20251001"),
     ),
     "openai_compatible": ProviderSpec(
         provider_id="openai_compatible",

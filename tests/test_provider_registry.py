@@ -68,6 +68,17 @@ class ProviderRegistryTests(unittest.TestCase):
         prov = build_provider("gemini", cfg)
         self.assertEqual(prov._build_url(), "https://host/v1beta/openai/chat/completions")
 
+    def test_original_providers_have_offline_model_defaults(self) -> None:
+        # Regression guard: the seat editor's offline model fallback reads
+        # ProviderSpec.default_models. deepseek MUST carry its real models so a
+        # deepseek seat that hasn't live-fetched still launches on a VALID model
+        # (else every live call fails on a stray/empty model id and the game looks
+        # fake). openai/anthropic carry sensible defaults too.
+        self.assertIn("deepseek-chat", PROVIDER_REGISTRY["deepseek"].default_models)
+        self.assertIn("deepseek-reasoner", PROVIDER_REGISTRY["deepseek"].default_models)
+        self.assertTrue(PROVIDER_REGISTRY["openai"].default_models)
+        self.assertTrue(PROVIDER_REGISTRY["anthropic"].default_models)
+
     def test_specs_pin_class_base_url_models_path_and_label(self) -> None:
         ds = PROVIDER_REGISTRY["deepseek"]
         self.assertIs(ds.provider_cls, DeepSeekProvider)
