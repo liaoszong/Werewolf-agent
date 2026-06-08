@@ -227,6 +227,9 @@ def list_models(
     spec = PROVIDER_REGISTRY[provider_id]
     url = model_list_url(provider_id, config.base_url)  # applies default fallback
     # Reuse the provider's exact auth header builder (single source of truth).
+    # This instantiates the class directly (NOT via build_provider) on purpose:
+    # model listing only needs config-driven auth headers, never the stamped
+    # PROVIDER_NAME/SOURCE_LABEL identity, so the un-stamped instance is correct.
     headers = spec.provider_cls(config)._build_headers()
     fetch = transport if transport is not None else _default_models_transport
     try:

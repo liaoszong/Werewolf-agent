@@ -367,6 +367,11 @@ class ProfileSchemaTests(unittest.TestCase):
         from werewolf_eval.profile_config import ALLOWED_PROVIDERS
         from werewolf_eval.provider_registry import PROVIDER_REGISTRY
         self.assertTrue(set(PROVIDER_REGISTRY) <= ALLOWED_PROVIDERS)
+        # Equality (minus the fake provider, which has no ProviderSpec) catches the
+        # OTHER drift: a stale/typo'd id in the literal that no registry backs —
+        # it would pass profile validation but be rejected at live launch as
+        # unsupported_live_provider. The only allowed non-registry id is the fake.
+        self.assertEqual(ALLOWED_PROVIDERS - {"fake_deterministic"}, set(PROVIDER_REGISTRY))
 
     def test_allowed_providers_includes_preset_vendors(self):
         from werewolf_eval.profile_config import ALLOWED_PROVIDERS
