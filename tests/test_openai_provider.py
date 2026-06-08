@@ -135,6 +135,21 @@ class OpenAIProviderTests(unittest.TestCase):
         provider.respond(self._request())
         self.assertEqual(_CAPTURE["payload"]["temperature"], 0.7)
 
+    def test_max_tokens_is_min_of_request_and_config(self) -> None:
+        # Engine sets request.max_output_tokens per response-kind; a per-seat
+        # config max_tokens acts as a ceiling (min). Both directions tested.
+        provider = OpenAIProvider(self._config(max_tokens=300), transport=_capturing_transport)
+        provider.respond(self._request(max_output_tokens=120))
+        self.assertEqual(_CAPTURE["payload"]["max_tokens"], 120)  # engine cap < seat
+        provider2 = OpenAIProvider(self._config(max_tokens=50), transport=_capturing_transport)
+        provider2.respond(self._request(max_output_tokens=120))
+        self.assertEqual(_CAPTURE["payload"]["max_tokens"], 50)   # seat < engine cap
+
+    def test_max_tokens_falls_back_to_config_when_request_unset(self) -> None:
+        provider = OpenAIProvider(self._config(max_tokens=222), transport=_capturing_transport)
+        provider.respond(self._request())  # no max_output_tokens
+        self.assertEqual(_CAPTURE["payload"]["max_tokens"], 222)
+
     def test_temperature_omitted_when_none(self) -> None:
         provider = OpenAIProvider(self._config(), transport=_capturing_transport)
         provider.respond(self._request())

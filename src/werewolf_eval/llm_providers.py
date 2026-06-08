@@ -159,6 +159,13 @@ class BaseChatProvider:
     def model(self) -> str:
         return self._config.model
 
+    @property
+    def persona(self) -> str:
+        """The per-seat persona seed baked into this provider's config (used by the
+        runner to record a per-seat prompt_hash in the manifest). Empty string when
+        no persona was set."""
+        return self._config.persona_prompt
+
     # -- per-seat effective knobs (request overrides config) -------------------
     def _effective_persona(self, request: ProviderRequest) -> str:
         return request.persona_prompt or self._config.persona_prompt
@@ -167,6 +174,20 @@ class BaseChatProvider:
         if request.temperature is not None:
             return request.temperature
         return self._config.temperature
+
+    def _effective_max_tokens(self, request: ProviderRequest) -> int:
+        """The per-call output cap. The engine sets a per-response-kind cap on the
+        request (action vs speech); a per-seat ``max_tokens`` acts as a CEILING on
+        top of it (``min``), so it can tighten a seat's budget but never exceed the
+        engine's safety cap. With the default seat budget this is a no-op
+        (min(120, 256) == 120), preserving legacy behavior exactly."""
+        req = request.max_output_tokens
+        cfg = self._config.max_tokens
+        if req is None:
+            return cfg
+        if cfg is None:
+            return req
+        return min(req, cfg)
 
     def _system_for(self, request: ProviderRequest) -> str:
         if request.response_kind == "speech":
@@ -267,7 +288,7 @@ class OpenAICompatibleProvider(BaseChatProvider):
                 {"role": "user", "content": self._user_content(request)},
             ],
             "stream": False,
-            "max_tokens": request.max_output_tokens or self._config.max_tokens,
+            "max_tokens": self._effective_max_tokens(request),
         }
         if self.INCLUDE_THINKING:
             payload["thinking"] = {"type": "disabled"}
@@ -343,7 +364,7 @@ class AnthropicProvider(BaseChatProvider):
             "messages": [
                 {"role": "user", "content": self._user_content(request)},
             ],
-            "max_tokens": request.max_output_tokens or self._config.max_tokens,
+            "max_tokens": self._effective_max_tokens(request),
         }
         temperature = self._effective_temperature(request)
         if temperature is not None:

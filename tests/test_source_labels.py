@@ -17,6 +17,7 @@ class SourceLabelsTests(unittest.TestCase):
             "[OpenAI API output]",
             "[Anthropic API output]",
             "[OpenAI-compatible API output]",
+            "[mixed provider output]",
         }
         self.assertEqual(VALID_SOURCE_LABELS, expected)
 

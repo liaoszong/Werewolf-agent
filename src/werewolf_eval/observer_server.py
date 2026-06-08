@@ -41,8 +41,10 @@ from werewolf_eval.observer_protocol import (
     write_run_status,
 )
 from werewolf_eval.credential_store import CredentialStore
+from werewolf_eval.deepseek_launcher import build_multi_provider_launcher
 from werewolf_eval.llm_providers import ChatProviderConfig
 from werewolf_eval.provider_registry import PROVIDER_REGISTRY, list_models
+from werewolf_eval.seat_agents import ProviderCredential
 from werewolf_eval.observer_visibility import (
     VisibilityProjectionError,
     build_projection_envelope,
@@ -92,20 +94,59 @@ class ObserverServerState:
     credential_store: CredentialStore = field(default_factory=CredentialStore)
     live_launcher_factory: Callable[[str], RunLauncher] | None = None
     env_key_available: bool = False
+    # P2-B-3/B-4: per-seat multi-provider launcher builder. Given the resolved
+    # seats + a {provider: ProviderCredential} map, returns a RunLauncher that runs
+    # the game with each seat on its own provider/model/persona. Injectable so
+    # tests can pass a fake (no network); built with the server live limits in
+    # create_observer_server.
+    multi_provider_launcher_factory: Callable[..., RunLauncher] | None = None
 
 
 def _resolve_live_launcher_for_launch(
     state: ObserverServerState,
+    resolved_seats: list[dict],
 ) -> tuple[RunLauncher | None, tuple[int, str, str] | None]:
-    """Pick the live launcher for THIS launch: a fresh one built from the client's
-    in-memory key (preferred), else the prebuilt env launcher, else a 403. The key
-    flows ONLY into the launcher closure (provider Authorization), never returned."""
-    client_key = state.credential_store.get("deepseek")
-    if client_key is not None and state.live_launcher_factory is not None:
-        return state.live_launcher_factory(client_key), None
-    if state.live_launcher is not None:
+    """Pick the live launcher for THIS launch. P2-B-4 multi-provider:
+
+    1. If EVERY provider used by the seats has a client credential → a per-seat
+       multi-provider launcher (the general path; handles mixed and single-provider).
+    2. Back-compat deepseek-only: client deepseek key via the single-key factory,
+       else the prebuilt env launcher.
+    3. No silent fallback: a seat whose provider lacks a credential → 403.
+
+    Keys flow ONLY into the launcher closures (provider Authorization), never
+    returned."""
+    used = {str(seat.get("provider")) for seat in resolved_seats}
+    creds: dict[str, ProviderCredential] = {}
+    missing: list[str] = []
+    for provider in sorted(used):
+        key = state.credential_store.get(provider)
+        if key:
+            creds[provider] = ProviderCredential(
+                key=key, base_url=state.credential_store.get_base_url(provider) or ""
+            )
+        else:
+            missing.append(provider)
+
+    if not missing and state.multi_provider_launcher_factory is not None:
+        return state.multi_provider_launcher_factory(resolved_seats, creds), None
+    # Back-compat (deepseek-only) paths. The legacy launchers run ONE shared model
+    # for all seats, so they may only serve a UNIFORM profile (single provider +
+    # single model); a mixed-model deepseek profile must go through the multi
+    # launcher above (per-seat) to avoid resolved-profile.json claiming models the
+    # run never used.
+    uniform = len({(str(s.get("provider")), str(s.get("model"))) for s in resolved_seats}) == 1
+    if used == {"deepseek"} and uniform and "deepseek" in creds and state.live_launcher_factory is not None:
+        return state.live_launcher_factory(creds["deepseek"].key), None
+    if used == {"deepseek"} and uniform and state.live_launcher is not None:
         return state.live_launcher, None
-    return None, (403, "missing_api_key", "no DeepSeek credential is available")
+    if missing:
+        return None, (
+            403,
+            "missing_provider_credential",
+            f"no credential for provider(s): {', '.join(sorted(set(missing)))}",
+        )
+    return None, (403, "missing_api_key", "no live credential is available")
 
 
 def _check_live_capability(
@@ -120,16 +161,16 @@ def _check_live_capability(
         return None
     if not state.live_enabled:
         return (403, "live_api_disabled", "live API is not enabled on this server")
-    # BYO-key: a credential is available if the client synced one OR the server
-    # started with an env key (back-compat). Prefer the legacy prebuilt launcher
-    # signal when present so existing env-only deployments are unchanged.
+    # BYO-key: a credential is available if the client synced ANY supported
+    # provider key OR the server started with an env key (back-compat). This is a
+    # COARSE gate; the per-seat credential check happens at launcher resolution.
     has_credential = (
-        state.credential_store.has("deepseek")
+        any(state.credential_store.has(p) for p in PROVIDER_REGISTRY)
         or state.env_key_available
         or state.live_launcher is not None
     )
     if not has_credential:
-        return (403, "missing_api_key", "no DeepSeek credential is available (set one in the client)")
+        return (403, "missing_api_key", "no live credential is available (set one in the client)")
     return None
 
 
@@ -137,21 +178,18 @@ def _check_live_profile_shape(
     resolved_seats: list[dict],
 ) -> tuple[int, str, str] | None:
     """Shape gate for live launches — evaluated AFTER validation, only for live
-    mode.  Provider check precedes the model check (gate order E before F).
+    mode.  P2-B-3: every seat's provider must be a SUPPORTED live provider (in the
+    registry); ``fake_deterministic`` and unknown providers are rejected. Mixed
+    providers AND mixed models are now allowed (that is the multi-provider feature)
+    — the per-seat credential requirement is enforced at launcher resolution.
     Returns ``(status, code, message)`` to reject, or ``None`` to proceed."""
     providers = {seat.get("provider") for seat in resolved_seats}
-    if providers - {"deepseek"}:
+    unsupported = providers - set(PROVIDER_REGISTRY)
+    if unsupported:
         return (
             400,
             "unsupported_live_provider",
-            "live launch requires every seat to use the deepseek provider",
-        )
-    models = {seat.get("model") for seat in resolved_seats}
-    if len(models) > 1:
-        return (
-            400,
-            "mixed_models",
-            "live launch requires a single shared deepseek model",
+            f"live launch does not support provider(s): {', '.join(sorted(str(p) for p in unsupported))}",
         )
     return None
 
@@ -669,9 +707,12 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
             self._send_error_json(400, "invalid_profile", str(exc))
             return
 
-        # SHAPE gate (AFTER validate) — live only.
+        # SHAPE gate (AFTER validate) — live only. Resolve seats once and reuse
+        # for the launcher resolution (per-seat credential check).
+        resolved_seats: list[dict] = []
         if mode == "live":
-            shape_reject = _check_live_profile_shape(resolve_profile(profile))
+            resolved_seats = resolve_profile(profile)
+            shape_reject = _check_live_profile_shape(resolved_seats)
             if shape_reject is not None:
                 self._send_error_json(*shape_reject)
                 return
@@ -684,7 +725,7 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
 
         is_live = mode == "live"
         if is_live:
-            base, live_reject = _resolve_live_launcher_for_launch(state)
+            base, live_reject = _resolve_live_launcher_for_launch(state, resolved_seats)
             if live_reject is not None:
                 self._send_error_json(*live_reject)
                 return
@@ -918,6 +959,8 @@ def create_observer_server(
     live_launcher: RunLauncher | None = None,
     live_launcher_factory: Callable[[str], RunLauncher] | None = None,
     env_key_available: bool = False,
+    live_max_requests: int = 32,
+    live_max_tokens: int = 256,
 ) -> ThreadingHTTPServer:
     """Create and configure a threaded observer HTTP server.
 
@@ -927,13 +970,26 @@ def create_observer_server(
 
     ``live_launcher_factory`` is the per-launch builder used with a client-supplied
     key (P2-B-1 BYO-key path); ``env_key_available`` records whether the server
-    started with an env key (back-compat signal for capability gate)."""
+    started with an env key (back-compat signal for capability gate).
+
+    P2-B-4: when live is enabled, a ``multi_provider_launcher_factory`` is built
+    with the server live limits — the per-seat multi-provider launch path."""
     if launcher is None:
         launcher = default_fake_launcher
     runs_dir.mkdir(parents=True, exist_ok=True)
     if profiles_dir is None:
         profiles_dir = runs_dir.parent / "profiles"
     profiles_dir.mkdir(parents=True, exist_ok=True)
+
+    multi_provider_launcher_factory: Callable[..., RunLauncher] | None = None
+    if live_enabled:
+        def multi_provider_launcher_factory(resolved_seats, credentials):  # type: ignore[misc]
+            return build_multi_provider_launcher(
+                resolved_seats=resolved_seats,
+                credentials=credentials,
+                max_requests=live_max_requests,
+                default_max_tokens=live_max_tokens,
+            )
 
     state = ObserverServerState(
         runs_dir=runs_dir,
@@ -943,6 +999,7 @@ def create_observer_server(
         live_launcher=live_launcher,
         live_launcher_factory=live_launcher_factory,
         env_key_available=env_key_available,
+        multi_provider_launcher_factory=multi_provider_launcher_factory,
     )
 
     class _BoundHandler(ObserverRequestHandler):

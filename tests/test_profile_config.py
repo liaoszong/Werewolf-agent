@@ -74,10 +74,16 @@ class ProfileValidationTests(unittest.TestCase):
             validate_profile(_valid_profile(seat_overrides={"p9": {"strategy": "default"}}))
 
     def test_rejects_disallowed_provider(self):
+        # openai/anthropic are now allowed (P2-B-3); an unknown provider is rejected.
         p = _valid_profile()
-        p["role_defaults"]["seer"]["provider"] = "openai"
+        p["role_defaults"]["seer"]["provider"] = "gemini"
         with self.assertRaises(ProfileValidationError):
             validate_profile(p)
+
+    def test_allows_anthropic_provider_seat(self):
+        validate_profile(_valid_profile(seat_overrides={
+            "p3": {"provider": "anthropic", "model": "claude-haiku-4-5", "prompt": "x", "strategy": "default"},
+        }))
 
     def test_rejects_incoherent_partial_override(self):
         # model alone over a fake_deterministic provider -> invalid pair
@@ -98,6 +104,60 @@ class ProfileValidationTests(unittest.TestCase):
             validate_profile(_valid_profile(seat_overrides={
                 "p3": {"provider": "deepseek", "model": "", "prompt": "x", "strategy": "default"},
             }))
+
+    def test_allows_per_seat_temperature_and_max_tokens(self):
+        # P2-B-3: optional per-seat numeric knobs.
+        validate_profile(_valid_profile(seat_overrides={
+            "p3": {"provider": "deepseek", "model": "deepseek-v4-flash", "prompt": "x",
+                   "strategy": "default", "temperature": 0.7, "max_tokens": 512},
+        }))
+
+    def test_allows_temperature_zero(self):
+        # 0.0 is a meaningful (deterministic) temperature and must be accepted.
+        validate_profile(_valid_profile(seat_overrides={
+            "p3": {"provider": "deepseek", "model": "deepseek-v4-flash", "prompt": "x",
+                   "strategy": "default", "temperature": 0.0},
+        }))
+
+    def test_rejects_out_of_range_temperature(self):
+        with self.assertRaises(ProfileValidationError):
+            validate_profile(_valid_profile(seat_overrides={
+                "p3": {"provider": "deepseek", "model": "deepseek-v4-flash", "prompt": "x",
+                       "strategy": "default", "temperature": 5.0},
+            }))
+
+    def test_rejects_non_numeric_temperature(self):
+        with self.assertRaises(ProfileValidationError):
+            validate_profile(_valid_profile(seat_overrides={
+                "p3": {"provider": "deepseek", "model": "deepseek-v4-flash", "prompt": "x",
+                       "strategy": "default", "temperature": "hot"},
+            }))
+
+    def test_rejects_bool_temperature(self):
+        # bool is an int subclass — must not sneak through numeric validation.
+        with self.assertRaises(ProfileValidationError):
+            validate_profile(_valid_profile(seat_overrides={
+                "p3": {"provider": "deepseek", "model": "deepseek-v4-flash", "prompt": "x",
+                       "strategy": "default", "temperature": True},
+            }))
+
+    def test_rejects_nonpositive_max_tokens(self):
+        with self.assertRaises(ProfileValidationError):
+            validate_profile(_valid_profile(seat_overrides={
+                "p3": {"provider": "deepseek", "model": "deepseek-v4-flash", "prompt": "x",
+                       "strategy": "default", "max_tokens": 0},
+            }))
+
+    def test_resolved_artifact_carries_temperature_and_max_tokens(self):
+        from werewolf_eval.profile_config import build_resolved_profile_artifact
+        p = _valid_profile(seat_overrides={
+            "p3": {"provider": "deepseek", "model": "deepseek-v4-flash", "prompt": "x",
+                   "strategy": "default", "temperature": 0.3, "max_tokens": 400},
+        })
+        art = build_resolved_profile_artifact(p, run_id="r")
+        p3 = next(s for s in art["seats"] if s["player_id"] == "p3")
+        self.assertEqual(p3["temperature"], 0.3)
+        self.assertEqual(p3["max_tokens"], 400)
 
     def test_fake_provider_model_still_allowlisted(self):
         # fake_deterministic keeps its strict allowlist ({none}); a real model name
@@ -256,7 +316,10 @@ class ProfileSchemaTests(unittest.TestCase):
     def test_schema_shape(self):
         s = build_profile_schema()
         self.assertEqual(s["schema_version"], PROFILE_SCHEMA_VERSION)
-        self.assertEqual(set(s["providers"]), {"fake_deterministic", "deepseek"})
+        self.assertEqual(
+            set(s["providers"]),
+            {"fake_deterministic", "deepseek", "openai", "anthropic", "openai_compatible"},
+        )
         self.assertEqual(s["models"]["deepseek"], ["deepseek-chat", "deepseek-reasoner"])
         self.assertEqual(s["models"]["fake_deterministic"], ["none"])
         self.assertIn("default", s["strategies"])
@@ -269,6 +332,14 @@ class ProfileSchemaTests(unittest.TestCase):
         self.assertEqual(s["providers"], sorted(s["providers"]))
         blob = json.dumps(s)
         self.assertNotIn(":\\", blob)
+
+    def test_allowed_providers_superset_of_registry(self):
+        # Single-source guard: every live provider in the registry must be an
+        # allowed profile provider (profile_config stays pure by hardcoding the
+        # set; this test enforces it never drifts behind the registry).
+        from werewolf_eval.profile_config import ALLOWED_PROVIDERS
+        from werewolf_eval.provider_registry import PROVIDER_REGISTRY
+        self.assertTrue(set(PROVIDER_REGISTRY) <= ALLOWED_PROVIDERS)
 
 
 if __name__ == "__main__":

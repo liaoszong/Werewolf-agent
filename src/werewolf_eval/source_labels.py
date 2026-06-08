@@ -10,4 +10,5 @@ VALID_SOURCE_LABELS = {
     "[OpenAI API output]",
     "[Anthropic API output]",
     "[OpenAI-compatible API output]",
+    "[mixed provider output]",
 }

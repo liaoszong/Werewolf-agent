@@ -16,7 +16,13 @@ from typing import Any
 PROFILE_SCHEMA_VERSION = "g2d.profile.v1"
 
 ALLOWED_TEMPLATES: frozenset[str] = frozenset({"default_6p_fake"})
-ALLOWED_PROVIDERS: frozenset[str] = frozenset({"fake_deterministic", "deepseek"})
+# P2-B-3: every live provider in provider_registry.PROVIDER_REGISTRY plus the
+# deterministic fake. Kept as a literal so this module stays pure (stdlib only,
+# no provider-runtime import); a consistency test enforces it stays a superset of
+# the registry.
+ALLOWED_PROVIDERS: frozenset[str] = frozenset(
+    {"fake_deterministic", "deepseek", "openai", "anthropic", "openai_compatible"}
+)
 ALLOWED_MODELS: dict[str, frozenset[str]] = {
     "fake_deterministic": frozenset({"none"}),
     "deepseek": frozenset({"deepseek-chat", "deepseek-reasoner"}),
@@ -25,6 +31,13 @@ ALLOWED_MODELS: dict[str, frozenset[str]] = {
 # providers are deliberately absent (they trust the live model list); only the
 # deterministic fake provider keeps a strict model allowlist.
 _MODEL_ALLOWLIST_PROVIDERS: frozenset[str] = frozenset({"fake_deterministic"})
+
+# P2-B-3: optional per-seat sampling knobs (numeric, unlike the string config keys).
+TEMPERATURE_MIN: float = 0.0
+TEMPERATURE_MAX: float = 2.0
+MAX_TOKENS_MIN: int = 1
+MAX_TOKENS_MAX: int = 8192
+_NUMERIC_CONFIG_KEYS: frozenset[str] = frozenset({"temperature", "max_tokens"})
 
 ALLOWED_STRATEGIES: frozenset[str] = frozenset({"default", "aggressive", "cautious"})
 ALLOWED_ROLES: frozenset[str] = frozenset({"werewolf", "seer", "witch", "villager"})
@@ -52,7 +65,7 @@ DEFAULT_SEAT_IDS: tuple[str, ...] = tuple(DEFAULT_6P_SEAT_ROLES)
 PROMPT_MAX_LEN = 8000
 
 _SAFE_NAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,255}$")
-_CONFIG_KEYS = frozenset({"provider", "model", "prompt", "strategy"})
+_CONFIG_KEYS = frozenset({"provider", "model", "prompt", "strategy", "temperature", "max_tokens"})
 _SECRET_KEY_FRAGMENTS = (
     "api_key",
     "api-key",
@@ -92,7 +105,12 @@ def _hash_text(text: str) -> str:
 def _reject_secret_like_keys(obj: Any, path: str = "") -> None:
     if isinstance(obj, dict):
         for key, value in obj.items():
-            if any(frag in str(key).lower() for frag in _SECRET_KEY_FRAGMENTS):
+            # Known config keys are exempt from the fragment scan (e.g. "max_tokens"
+            # contains "token"); recursion into the value still catches nested
+            # secret-like keys.
+            if str(key).lower() not in _CONFIG_KEYS and any(
+                frag in str(key).lower() for frag in _SECRET_KEY_FRAGMENTS
+            ):
                 raise ProfileValidationError(
                     f"secret-like key not allowed: {path}{key}"
                 )
@@ -123,6 +141,25 @@ def _template_seat_roles(template: str) -> dict[str, str]:
     raise ProfileValidationError(f"unknown template: {template!r}")
 
 
+def _check_numeric_field(field_name: str, value: object, where: str) -> None:
+    """Validate a per-seat numeric knob. ``bool`` is rejected explicitly (it is an
+    ``int`` subclass and must not pass as a number)."""
+    if field_name == "temperature":
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise ProfileValidationError(f"{where}.temperature must be a number")
+        if not (TEMPERATURE_MIN <= float(value) <= TEMPERATURE_MAX):
+            raise ProfileValidationError(
+                f"{where}.temperature must be in [{TEMPERATURE_MIN}, {TEMPERATURE_MAX}]"
+            )
+    elif field_name == "max_tokens":
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise ProfileValidationError(f"{where}.max_tokens must be an integer")
+        if not (MAX_TOKENS_MIN <= value <= MAX_TOKENS_MAX):
+            raise ProfileValidationError(
+                f"{where}.max_tokens must be in [{MAX_TOKENS_MIN}, {MAX_TOKENS_MAX}]"
+            )
+
+
 def _check_fragment(fragment: object, *, where: str, required: bool) -> None:
     if not isinstance(fragment, dict):
         raise ProfileValidationError(f"{where} must be an object")
@@ -136,6 +173,9 @@ def _check_fragment(fragment: object, *, where: str, required: bool) -> None:
             if field_name not in fragment:
                 raise ProfileValidationError(f"{where} missing {field_name!r}")
     for field_name, value in fragment.items():
+        if field_name in _NUMERIC_CONFIG_KEYS:
+            _check_numeric_field(field_name, value, where)
+            continue
         if not isinstance(value, str):
             raise ProfileValidationError(f"{where}.{field_name} must be a string")
     prompt = fragment.get("prompt")
@@ -155,6 +195,8 @@ def _resolve_seat(profile: dict, seat: str, role: str) -> dict[str, Any]:
         "model": merged.get("model"),
         "prompt": merged.get("prompt", ""),
         "strategy": merged.get("strategy"),
+        "temperature": merged.get("temperature"),
+        "max_tokens": merged.get("max_tokens"),
     }
 
 
@@ -267,6 +309,8 @@ def build_resolved_profile_artifact(
                 "provider": seat_cfg["provider"],
                 "model": seat_cfg["model"],
                 "strategy": seat_cfg["strategy"],
+                "temperature": seat_cfg.get("temperature"),
+                "max_tokens": seat_cfg.get("max_tokens"),
                 "prompt_hash": _hash_text(prompt) if prompt else "",
             }
         )

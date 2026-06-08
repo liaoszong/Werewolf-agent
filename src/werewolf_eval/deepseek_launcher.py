@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Mapping
 
 from werewolf_eval.deepseek_provider import DeepSeekProvider, DeepSeekProviderConfig
 from werewolf_eval.provider_agent import ProviderAgent
@@ -30,6 +30,7 @@ from werewolf_eval.run_emergent_deepseek_game import (
     _deepseek_factory as _emergent_deepseek_factory,
     run_emergent_deepseek_game,
 )
+from werewolf_eval.seat_agents import ProviderCredential, build_seat_agents
 
 RunLauncher = Callable[[str, Path], int]
 
@@ -188,6 +189,53 @@ def build_emergent_deepseek_launcher(
             out_dir=rdir,
             provider_factory=factory,
             model=model,
+            max_requests_per_game=max_requests,
+            max_day_rounds=max_day_rounds,
+        )
+        if code == 0:
+            return 0
+        if _audit_is_budget_exhausted(rdir / "failure-audit.json"):
+            return 3
+        return 2
+
+    return _launcher
+
+
+def build_multi_provider_launcher(
+    *,
+    resolved_seats: list[dict],
+    credentials: Mapping[str, ProviderCredential],
+    max_requests: int = DEFAULT_MAX_LIVE_REQUESTS,
+    max_day_rounds: int = DEFAULT_MAX_DAY_ROUNDS,
+    timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS,
+    default_max_tokens: int = 256,
+    transport=None,
+    runner: Callable[..., int] = run_emergent_deepseek_game,
+) -> RunLauncher:
+    """P2-B-3: a ``RunLauncher`` that drives the emergent engine with PER-SEAT
+    providers — each seat uses its own provider/model/persona/temperature, so a
+    single game can mix DeepSeek + OpenAI + Anthropic.
+
+    Seat agents are built fresh inside the closure (the launcher is reusable). A
+    missing per-seat credential raises ``ValueError`` (no silent fallback; the
+    server gate in P2-B-4 rejects with 403 before reaching here). ``runner`` is
+    injectable for offline tests; the budget-exhausted → exit 3 mapping mirrors
+    the single-provider launcher."""
+    def _launcher(run_id: str, run_dir: Path) -> int:
+        rdir = Path(run_dir)
+        agents = build_seat_agents(
+            resolved_seats,
+            credentials,
+            max_requests=max_requests,
+            timeout_seconds=timeout_seconds,
+            default_max_tokens=default_max_tokens,
+            transport=transport,
+        )
+        code = runner(
+            game_id=run_id,
+            out_dir=rdir,
+            provider_factory=lambda pid: agents[pid],
+            model="",  # per-seat models live on each provider; no single model
             max_requests_per_game=max_requests,
             max_day_rounds=max_day_rounds,
         )

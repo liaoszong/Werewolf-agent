@@ -14,6 +14,10 @@ _CLIENT = "sk-test-fake-client-AAAA"
 _ENV = "sk-test-fake-env-BBBB"
 
 
+def _deepseek_seats():
+    return [{"player_id": f"p{i}", "provider": "deepseek", "model": "deepseek-chat"} for i in range(1, 7)]
+
+
 class ResolveLiveLauncherTests(unittest.TestCase):
     def _state(self, *, client, env):
         cs = CredentialStore()
@@ -36,15 +40,17 @@ class ResolveLiveLauncherTests(unittest.TestCase):
         return st, captured
 
     def test_client_key_preferred_over_env(self):
+        # No multi factory wired → the back-compat single-key factory handles the
+        # deepseek-only client-key case (client beats env).
         st, captured = self._state(client=True, env=True)
-        launcher, err = _resolve_live_launcher_for_launch(st)
+        launcher, err = _resolve_live_launcher_for_launch(st, _deepseek_seats())
         self.assertIsNone(err)
         self.assertIsNotNone(launcher)
         self.assertEqual(captured["key"], _CLIENT)   # client beats env
 
     def test_env_fallback_when_no_client_key(self):
         st, captured = self._state(client=False, env=True)
-        launcher, err = _resolve_live_launcher_for_launch(st)
+        launcher, err = _resolve_live_launcher_for_launch(st, _deepseek_seats())
         self.assertIsNone(err)
         self.assertIs(launcher, st.live_launcher)    # uses the prebuilt env launcher
 
@@ -52,9 +58,10 @@ class ResolveLiveLauncherTests(unittest.TestCase):
         st, _ = self._state(client=False, env=False)
         st.live_launcher = None
         st.env_key_available = False
-        launcher, err = _resolve_live_launcher_for_launch(st)
+        launcher, err = _resolve_live_launcher_for_launch(st, _deepseek_seats())
         self.assertIsNone(launcher)
-        self.assertEqual(err[1], "missing_api_key")
+        # P2-B-4: the per-seat resolver reports which provider lacks a credential.
+        self.assertEqual(err[1], "missing_provider_credential")
 
 
 def _live_profile():

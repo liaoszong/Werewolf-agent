@@ -8,6 +8,8 @@ DEEPSEEK_PROVIDER_SOURCE_LABEL = "[DeepSeek API output]"
 OPENAI_PROVIDER_SOURCE_LABEL = "[OpenAI API output]"
 ANTHROPIC_PROVIDER_SOURCE_LABEL = "[Anthropic API output]"
 OPENAI_COMPATIBLE_PROVIDER_SOURCE_LABEL = "[OpenAI-compatible API output]"
+# P2-B-3: a game where seats span more than one provider stamps this label.
+MIXED_PROVIDER_SOURCE_LABEL = "[mixed provider output]"
 
 
 @dataclass(frozen=True)

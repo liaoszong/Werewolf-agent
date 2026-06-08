@@ -26,6 +26,7 @@ from werewolf_eval.emergent_engine import EmergentBudget, EmergentGameEngine, bu
 from werewolf_eval.provider_agent import ProviderAgent
 from werewolf_eval.provider_contract import (
     DEEPSEEK_PROVIDER_SOURCE_LABEL,
+    MIXED_PROVIDER_SOURCE_LABEL,
     provider_trace_to_dict,
     ProviderTrace,
 )
@@ -40,7 +41,46 @@ def _write_json(path: Path, payload: Any) -> None:
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
-def _collect_trace(game_id: str, agents: dict[str, ProviderAgent]) -> dict:
+def _provider_identity(agents: dict[str, ProviderAgent]) -> tuple[str, str]:
+    """Derive the run-level provider_name + source_label from the seat providers.
+    Uniform → that provider's name/label; heterogeneous → "mixed" / the mixed
+    label. ``getattr`` fallbacks keep legacy/fake providers (which lack the
+    class attrs) reporting exactly as before ("deepseek" / DeepSeek label)."""
+    names = {getattr(a.provider, "PROVIDER_NAME", "deepseek") for a in agents.values()}
+    labels = {
+        getattr(a.provider, "SOURCE_LABEL", DEEPSEEK_PROVIDER_SOURCE_LABEL)
+        for a in agents.values()
+    }
+    name = next(iter(names)) if len(names) == 1 else "mixed"
+    label = next(iter(labels)) if len(labels) == 1 else MIXED_PROVIDER_SOURCE_LABEL
+    return name, label
+
+
+def _seat_manifest_agents(agents: dict[str, ProviderAgent], fallback_model: str) -> list[dict]:
+    """Per-seat manifest rows. ``provider.model or fallback_model`` preserves the
+    legacy single-model manifest (the fake provider's model is None) while giving
+    real per-seat models under multi-provider; persona → per-seat prompt_hash."""
+    rows: list[dict] = []
+    for pid in PLAYER_IDS:
+        if pid not in agents:
+            continue
+        provider = agents[pid].provider
+        rows.append({
+            "player_id": pid,
+            "provider": getattr(provider, "PROVIDER_NAME", "deepseek"),
+            "model": getattr(provider, "model", None) or fallback_model,
+            "prompt": getattr(provider, "persona", "") or "",
+        })
+    return rows
+
+
+def _collect_trace(
+    game_id: str,
+    agents: dict[str, ProviderAgent],
+    *,
+    provider_name: str,
+    source_label: str,
+) -> dict:
     seen_req: set[str] = set()
     seen_resp: set[str] = set()
     reqs: list = []
@@ -55,7 +95,7 @@ def _collect_trace(game_id: str, agents: dict[str, ProviderAgent]) -> dict:
                 seen_resp.add(r.request_id)
                 resps.append(r)
     return provider_trace_to_dict(
-        ProviderTrace(game_id=game_id, provider_name="deepseek", source_label=DEEPSEEK_PROVIDER_SOURCE_LABEL, requests=reqs, responses=resps, failures=[])
+        ProviderTrace(game_id=game_id, provider_name=provider_name, source_label=source_label, requests=reqs, responses=resps, failures=[])
     )
 
 
@@ -87,28 +127,36 @@ def run_emergent_deepseek_game(
     seed: int = 0,
     max_requests_per_game: int = 64,
     max_day_rounds: int = 3,
+    source_label: str | None = None,
 ) -> int:
     writer = RuntimeEventWriter(run_id=game_id, out_dir=out_dir)
     agents = {pid: provider_factory(pid) for pid in PLAYER_IDS}
+    # P2-B-3: run-level identity derived from the seat providers (uniform or mixed);
+    # an explicit source_label overrides. Legacy/fake paths derive "deepseek".
+    provider_name, derived_label = _provider_identity(agents)
+    effective_label = source_label or derived_label
     engine = EmergentGameEngine(
         config=build_emergent_config(game_id=game_id),
         agents=agents,
         seed=seed,
-        source_label=DEEPSEEK_PROVIDER_SOURCE_LABEL,
+        source_label=effective_label,
         budget=EmergentBudget(max_requests=max_requests_per_game, max_day_rounds=max_day_rounds),
         runtime_events=writer,
     )
     outcome = engine.run()
 
     # provider trace + turns summary are written in BOTH outcomes (live evidence).
-    _write_json(out_dir / "provider-trace.json", _collect_trace(game_id, agents))
+    _write_json(
+        out_dir / "provider-trace.json",
+        _collect_trace(game_id, agents, provider_name=provider_name, source_label=effective_label),
+    )
     _write_json(out_dir / "provider-turns.json", _provider_turns_summary(outcome.provider_turns))
 
-    # MANDATORY spine: prompt-manifest with the REAL model.
+    # MANDATORY spine: prompt-manifest with the REAL per-seat provider/model/persona.
     manifest = build_prompt_manifest(
         run_id=game_id,
-        source_label=DEEPSEEK_PROVIDER_SOURCE_LABEL,
-        agents=[{"player_id": pid, "provider": "deepseek", "model": model} for pid in PLAYER_IDS],
+        source_label=effective_label,
+        agents=_seat_manifest_agents(agents, model),
     )
     manifest["secrets_redacted"] = True
     writer.write_prompt_manifest(manifest)

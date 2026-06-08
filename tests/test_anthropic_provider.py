@@ -142,6 +142,14 @@ class AnthropicProviderTests(unittest.TestCase):
         provider.respond(self._request())
         self.assertEqual(_CAPTURE["payload"]["temperature"], 0.5)
 
+    def test_max_tokens_is_min_of_request_and_config(self) -> None:
+        provider = AnthropicProvider(self._config(max_tokens=300), transport=_capturing_transport)
+        provider.respond(self._request(max_output_tokens=120))
+        self.assertEqual(_CAPTURE["payload"]["max_tokens"], 120)
+        provider2 = AnthropicProvider(self._config(max_tokens=50), transport=_capturing_transport)
+        provider2.respond(self._request(max_output_tokens=120))
+        self.assertEqual(_CAPTURE["payload"]["max_tokens"], 50)
+
     def test_transport_error_does_not_leak_key(self) -> None:
         def boom(
             url: str,

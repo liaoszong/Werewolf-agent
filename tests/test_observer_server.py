@@ -1132,15 +1132,21 @@ class LiveGateHelperTests(TestCase):
         self.assertEqual(result[0], 400)  # type: ignore[index]
         self.assertEqual(result[1], "unsupported_live_provider")  # type: ignore[index]
 
-    def test_shape_mixed_models_is_400_mixed(self) -> None:
+    def test_shape_mixed_models_now_allowed(self) -> None:
+        # P2-B-3: mixed models (and mixed providers) are the feature, no longer a
+        # shape rejection. The per-seat credential check happens at launch.
         seats = _resolved_seats("deepseek", "deepseek-chat")
         seats[2]["model"] = "deepseek-reasoner"
-        result = _check_live_profile_shape(seats)
-        self.assertEqual(result[0], 400)  # type: ignore[index]
-        self.assertEqual(result[1], "mixed_models")  # type: ignore[index]
+        self.assertIsNone(_check_live_profile_shape(seats))
 
-    def test_shape_provider_check_precedes_model_check(self) -> None:
-        # A profile that is BOTH non-deepseek AND mixed-model → provider error wins.
+    def test_shape_mixed_providers_now_allowed(self) -> None:
+        seats = _resolved_seats("deepseek", "deepseek-chat")
+        seats[0]["provider"] = "anthropic"
+        seats[0]["model"] = "claude-haiku-4-5"
+        self.assertIsNone(_check_live_profile_shape(seats))
+
+    def test_shape_rejects_unsupported_provider_among_supported(self) -> None:
+        # An unsupported provider (fake) on any seat still fails the shape gate.
         seats = _resolved_seats("deepseek", "deepseek-chat")
         seats[0]["provider"] = "fake_deterministic"
         seats[0]["model"] = "none"
@@ -1272,18 +1278,26 @@ class LiveDispatchTests(TestCase):
         *,
         live_enabled: bool = False,
         live_launcher_set: bool = False,
+        credential_store: object | None = None,
+        multi_factory: object | None = None,
         tmp: Path | None = None,
     ) -> tuple[_InProcessHandler, Path]:
         runs = (tmp or Path(self._tmp.name)) / "runs"
         runs.mkdir(parents=True, exist_ok=True)
         profiles = (tmp or Path(self._tmp.name)) / "profiles"
         profiles.mkdir(parents=True, exist_ok=True)
+        kwargs = {}
+        if credential_store is not None:
+            kwargs["credential_store"] = credential_store
+        if multi_factory is not None:
+            kwargs["multi_provider_launcher_factory"] = multi_factory
         state = ObserverServerState(
             runs_dir=runs,
             launcher=self._fake_launcher,
             profiles_dir=profiles,
             live_enabled=live_enabled,
             live_launcher=self._live_launcher if live_launcher_set else None,
+            **kwargs,
         )
         handler = _InProcessHandler(state)
         handler._handle_profile_launch(body)
@@ -1338,13 +1352,37 @@ class LiveDispatchTests(TestCase):
         self.assertEqual(h.responses[-1][1]["code"], "unsupported_live_provider")
         self.assertFalse(self._run_dir(runs, "r_unsup").exists())
 
-    # 6. mode=live + >1 distinct deepseek model → 400 mixed_models
-    def test_live_mixed_models_400_no_run_dir(self) -> None:
+    # 6. mode=live + >1 distinct deepseek model → ALLOWED (P2-B-3) but must run via
+    #    the per-seat MULTI launcher (the env single-model path can't honor mixed
+    #    models, so it is gated to uniform profiles).
+    def test_live_mixed_models_runs_via_multi(self) -> None:
+        from werewolf_eval.credential_store import CredentialStore
+        cs = CredentialStore()
+        cs.set("deepseek", "sk-ds")
+        captured: dict = {}
+
+        def multi_factory(resolved_seats, credentials):
+            captured["models"] = {s["model"] for s in resolved_seats}
+            def _run(rid, rdir):
+                (rdir / "multi.sentinel").write_text("multi", encoding="utf-8")
+                return 0
+            return _run
+
         body = {"profile": _mixed_model_deepseek_profile(), "run_id": "r_mix", "mode": "live"}
+        h, runs = self._dispatch(body, live_enabled=True, credential_store=cs, multi_factory=multi_factory)
+        self.assertEqual(h.responses[-1][0], 202)
+        self.assertEqual(h.responses[-1][1]["mode"], "live")
+        self.assertTrue((self._run_dir(runs, "r_mix") / "multi.sentinel").exists())
+        self.assertEqual(captured["models"], {"deepseek-chat", "deepseek-reasoner"})
+
+    def test_live_mixed_models_env_only_requires_client_key(self) -> None:
+        # Env-only deployment can't honor per-seat models → 403 (no silent
+        # single-model fallback that would misrepresent the run).
+        body = {"profile": _mixed_model_deepseek_profile(), "run_id": "r_mix2", "mode": "live"}
         h, runs = self._dispatch(body, live_enabled=True, live_launcher_set=True)
-        self.assertEqual(h.responses[-1][0], 400)
-        self.assertEqual(h.responses[-1][1]["code"], "mixed_models")
-        self.assertFalse(self._run_dir(runs, "r_mix").exists())
+        self.assertEqual(h.responses[-1][0], 403)
+        self.assertEqual(h.responses[-1][1]["code"], "missing_provider_credential")
+        self.assertFalse(self._run_dir(runs, "r_mix2").exists())
 
     # 7. mode=live + single-model deepseek + live_launcher → live launcher ran
     def test_live_valid_runs_live_launcher(self) -> None:
@@ -1355,6 +1393,51 @@ class LiveDispatchTests(TestCase):
         rd = self._run_dir(runs, "r_live")
         self.assertTrue((rd / "live.sentinel").exists())
         self.assertFalse((rd / "fake.sentinel").exists())
+
+    # P2-B-4: mixed-provider profile + per-seat client creds → multi launcher ran.
+    def _mixed_provider_profile(self):
+        p = _deepseek_profile("mixedprov")
+        p["seat_overrides"] = {
+            "p3": {"provider": "anthropic", "model": "claude-haiku-4-5", "prompt": "", "strategy": "default"},
+        }
+        return p
+
+    def test_live_multi_provider_runs_with_per_seat_creds(self) -> None:
+        from werewolf_eval.credential_store import CredentialStore
+        cs = CredentialStore()
+        cs.set("deepseek", "sk-ds")
+        cs.set("anthropic", "sk-ant")
+        captured: dict = {}
+
+        def multi_factory(resolved_seats, credentials):
+            captured["providers"] = {s["provider"] for s in resolved_seats}
+            captured["creds"] = set(credentials)
+            def _run(rid, rdir):
+                (rdir / "multi.sentinel").write_text("multi", encoding="utf-8")
+                return 0
+            return _run
+
+        body = {"profile": self._mixed_provider_profile(), "run_id": "r_multi", "mode": "live"}
+        h, runs = self._dispatch(body, live_enabled=True, credential_store=cs, multi_factory=multi_factory)
+        self.assertEqual(h.responses[-1][0], 202)
+        self.assertEqual(h.responses[-1][1]["mode"], "live")
+        self.assertTrue((self._run_dir(runs, "r_multi") / "multi.sentinel").exists())
+        self.assertEqual(captured["providers"], {"deepseek", "anthropic"})
+        self.assertEqual(captured["creds"], {"deepseek", "anthropic"})
+
+    def test_live_missing_provider_credential_403_no_run_dir(self) -> None:
+        from werewolf_eval.credential_store import CredentialStore
+        cs = CredentialStore()
+        cs.set("deepseek", "sk-ds")  # anthropic seat has NO credential
+
+        def multi_factory(resolved_seats, credentials):
+            return lambda rid, rdir: 0
+
+        body = {"profile": self._mixed_provider_profile(), "run_id": "r_nocred", "mode": "live"}
+        h, runs = self._dispatch(body, live_enabled=True, credential_store=cs, multi_factory=multi_factory)
+        self.assertEqual(h.responses[-1][0], 403)
+        self.assertEqual(h.responses[-1][1]["code"], "missing_provider_credential")
+        self.assertFalse(self._run_dir(runs, "r_nocred").exists())
 
     # 8. capability precedes validity/shape: not-enabled + malformed profile
     def test_capability_precedes_validity_disabled_with_malformed(self) -> None:

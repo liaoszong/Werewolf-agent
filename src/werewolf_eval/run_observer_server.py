@@ -96,6 +96,8 @@ def main() -> int:
         live_launcher=env_launcher,
         live_launcher_factory=factory,
         env_key_available=env_key_available,
+        live_max_requests=args.max_live_requests,
+        live_max_tokens=_LIVE_MAX_TOKENS,
     )
     host, port = server.server_address[:2]
     print("observer_server=started")
