@@ -98,6 +98,17 @@ class ProviderRegistryTests(unittest.TestCase):
         )
         self.assertEqual(provider._config.base_url, "https://my.proxy/v1")
 
+    def test_spec_has_default_models_field_defaulting_empty(self) -> None:
+        # Existing 4 providers carry no offline model hints by default.
+        from werewolf_eval.provider_registry import ProviderSpec
+        from werewolf_eval.llm_providers import OpenAIProvider
+        spec = ProviderSpec(
+            provider_id="x", label="X", provider_cls=OpenAIProvider,
+            default_base_url="https://example/v1", models_path="/models",
+            source_label="[OpenAI-compatible API output]",
+        )
+        self.assertEqual(spec.default_models, ())
+
     def test_build_provider_rejects_unknown_provider(self) -> None:
         with self.assertRaises(KeyError):
             build_provider("gemini", ChatProviderConfig(api_key="k"))

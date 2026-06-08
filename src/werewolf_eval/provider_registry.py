@@ -45,6 +45,9 @@ class ProviderSpec:
     models_path: str
     source_label: str
     requires_base_url: bool = False
+    # Offline UI fallback model ids (live fetch overrides). NOT a validation
+    # allowlist — live providers trust the fetched/typed model id.
+    default_models: tuple[str, ...] = ()
 
 
 PROVIDER_REGISTRY: dict[str, ProviderSpec] = {
