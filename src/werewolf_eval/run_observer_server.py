@@ -98,6 +98,9 @@ def main() -> int:
         env_key_available=env_key_available,
         live_max_requests=args.max_live_requests,
         live_max_tokens=_LIVE_MAX_TOKENS,
+        # A fresh server seeds a baseline default profile so the setup page is
+        # never an empty 'no profiles' state on first run.
+        seed_default_profile=True,
     )
     host, port = server.server_address[:2]
     print("observer_server=started")

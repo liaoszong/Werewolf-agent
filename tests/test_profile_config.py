@@ -6,6 +6,7 @@ from pathlib import Path
 from werewolf_eval.profile_config import (
     PROFILE_SCHEMA_VERSION,
     ProfileValidationError,
+    build_default_profile,
     build_profile_schema,
     build_resolved_profile_artifact,
     list_profiles,
@@ -30,6 +31,27 @@ def _valid_profile(**overrides):
     }
     base.update(overrides)
     return base
+
+
+class DefaultProfileTests(unittest.TestCase):
+    def test_build_default_profile_validates(self):
+        validate_profile(build_default_profile())  # must not raise
+
+    def test_default_profile_shape(self):
+        p = build_default_profile()
+        self.assertEqual(p["schema_version"], PROFILE_SCHEMA_VERSION)
+        self.assertEqual(p["template"], "default_6p_fake")
+        self.assertEqual(sorted(p["role_defaults"]), ["seer", "villager", "werewolf", "witch"])
+
+    def test_default_profile_prompts_are_prefilled(self):
+        # The whole point of the seed: the per-seat prompt box is never blank.
+        p = build_default_profile()
+        for role, frag in p["role_defaults"].items():
+            self.assertTrue(frag["prompt"].strip(), f"{role} default prompt must be non-empty")
+            self.assertEqual(frag["provider"], "fake_deterministic")
+
+    def test_default_profile_name_is_overridable(self):
+        self.assertEqual(build_default_profile("custom")["name"], "custom")
 
 
 class ProfileValidationTests(unittest.TestCase):

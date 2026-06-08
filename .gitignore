@@ -15,6 +15,9 @@ __pycache__/
 .tmp/
 # local observer run output (game-log/snapshots/events) — never committed
 .runs/
+# local + server-seeded match profiles (the default is regenerated on startup by
+# observer_server._seed_default_profile; user profiles are local data)
+profiles/
 
 # Generated context-budget artifacts
 docs/generated-context/*.index.json

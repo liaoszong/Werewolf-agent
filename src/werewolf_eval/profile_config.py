@@ -64,6 +64,30 @@ DEFAULT_6P_SEAT_ROLES: dict[str, str] = {
 DEFAULT_SEAT_IDS: tuple[str, ...] = tuple(DEFAULT_6P_SEAT_ROLES)
 PROMPT_MAX_LEN = 8000
 
+# Editable starter personas per role. These are PREPENDED to the machine contract
+# as the per-seat persona (llm_providers.compose_system) — they flavor behavior but
+# never replace the JSON contract. Seeded into the default profile so the per-seat
+# prompt box is never blank; users tweak from here (e.g. make the wolf aggressive).
+DEFAULT_ROLE_PROMPTS: dict[str, str] = {
+    "werewolf": (
+        "你是狼人阵营的一员。夜晚与狼队友配合选择击杀目标;白天伪装成好人,"
+        "用合理的逻辑误导其他玩家、把怀疑引向好人,并优先保护狼队友。"
+        "发言冷静自然,不要暴露身份。"
+    ),
+    "seer": (
+        "你是预言家(好人阵营)。每晚可以查验一名玩家的真实身份;白天用查验到的信息"
+        "引导好人投票放逐狼人,同时提防被狼人冒充。发言条理清晰,让队友信任你。"
+    ),
+    "witch": (
+        "你是女巫(好人阵营)。你有一瓶解药和一瓶毒药,各只能用一次。谨慎判断何时救人、"
+        "何时毒人,把药用在最关键的时刻,帮助好人阵营获胜。"
+    ),
+    "villager": (
+        "你是村民(好人阵营),没有特殊能力。通过观察发言、投票和逻辑找出狼人;"
+        "积极参与讨论、提出你的推理,带领好人阵营走向胜利。"
+    ),
+}
+
 _SAFE_NAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,255}$")
 _CONFIG_KEYS = frozenset({"provider", "model", "prompt", "strategy", "temperature", "max_tokens"})
 _SECRET_KEY_FRAGMENTS = (
@@ -400,3 +424,26 @@ def list_profiles(profiles_dir: Path) -> list[dict]:
             entry["error"] = str(exc)
         entries.append(entry)
     return entries
+
+
+def build_default_profile(name: str = "default_6p") -> dict:
+    """A baseline, always-valid starter profile: the default 6-player template,
+    deterministic-simulation providers, and pre-filled editable role prompts. Used
+    to seed an empty profiles dir so a fresh setup page is never an empty
+    'no profiles' state — users customise per-seat in the client from here."""
+    roles = sorted(set(DEFAULT_6P_SEAT_ROLES.values()))
+    role_defaults = {
+        role: {
+            "provider": "fake_deterministic",
+            "model": "none",
+            "strategy": "default",
+            "prompt": DEFAULT_ROLE_PROMPTS.get(role, ""),
+        }
+        for role in roles
+    }
+    return {
+        "schema_version": PROFILE_SCHEMA_VERSION,
+        "name": name,
+        "template": "default_6p_fake",
+        "role_defaults": role_defaults,
+    }

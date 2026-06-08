@@ -51,6 +51,7 @@ from werewolf_eval.observer_visibility import (
 )
 from werewolf_eval.profile_config import (
     ProfileValidationError,
+    build_default_profile,
     build_profile_schema,
     build_resolved_profile_artifact,
     list_profiles,
@@ -949,6 +950,25 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
 # ---------------------------------------------------------------------------
 
 
+def _seed_default_profile(profiles_dir: Path) -> None:
+    """Seed a baseline default profile when the dir has no VALID profile yet, so a
+    fresh setup page is never an empty 'no profiles' state. Idempotent and
+    non-fatal: never overwrites an existing file (respects user edits); a read-only
+    dir is silently ignored (the empty state simply shows)."""
+    if any(entry["valid"] for entry in list_profiles(profiles_dir)):
+        return
+    profile = build_default_profile()
+    path = profiles_dir / f"{profile['name']}.json"
+    if path.exists():
+        return
+    try:
+        path.write_text(
+            json.dumps(profile, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+    except OSError:
+        pass
+
+
 def create_observer_server(
     host: str,
     port: int,
@@ -961,6 +981,7 @@ def create_observer_server(
     env_key_available: bool = False,
     live_max_requests: int = 32,
     live_max_tokens: int = 256,
+    seed_default_profile: bool = False,
 ) -> ThreadingHTTPServer:
     """Create and configure a threaded observer HTTP server.
 
@@ -980,6 +1001,10 @@ def create_observer_server(
     if profiles_dir is None:
         profiles_dir = runs_dir.parent / "profiles"
     profiles_dir.mkdir(parents=True, exist_ok=True)
+    # Opt-in (the CLI passes True): a fresh server isn't an empty setup page. Tests
+    # using this factory leave it off so their temp profiles dirs stay pristine.
+    if seed_default_profile:
+        _seed_default_profile(profiles_dir)
 
     multi_provider_launcher_factory: Callable[..., RunLauncher] | None = None
     if live_enabled:

@@ -23,10 +23,58 @@ from werewolf_eval.observer_server import (
     _check_live_capability,
     _check_live_profile_shape,
     _map_launcher_exit_reason,
+    _seed_default_profile,
     create_observer_server,
     default_fake_launcher,
 )
+from werewolf_eval.profile_config import build_default_profile, list_profiles
 from werewolf_eval.runtime_events import RuntimeEventWriter
+
+
+class SeedDefaultProfileTests(TestCase):
+    """P2-B: a fresh server seeds a baseline default profile so the setup page is
+    never an empty 'no profiles' state — idempotent and non-destructive."""
+
+    def test_seeds_default_when_dir_empty(self) -> None:
+        with TemporaryDirectory() as tmp:
+            pdir = Path(tmp) / "profiles"
+            pdir.mkdir()
+            _seed_default_profile(pdir)
+            entries = list_profiles(pdir)
+            self.assertEqual(len(entries), 1)
+            self.assertTrue(entries[0]["valid"])
+            self.assertEqual(entries[0]["name"], "default_6p")
+
+    def test_skips_when_a_valid_profile_exists(self) -> None:
+        with TemporaryDirectory() as tmp:
+            pdir = Path(tmp) / "profiles"
+            pdir.mkdir()
+            (pdir / "mine.json").write_text(
+                json.dumps(build_default_profile("mine")), encoding="utf-8"
+            )
+            _seed_default_profile(pdir)
+            self.assertEqual(sorted(p.stem for p in pdir.glob("*.json")), ["mine"])
+
+    def test_never_overwrites_existing_default_file(self) -> None:
+        with TemporaryDirectory() as tmp:
+            pdir = Path(tmp) / "profiles"
+            pdir.mkdir()
+            # A user-broken default_6p.json must not be clobbered.
+            (pdir / "default_6p.json").write_text("{}", encoding="utf-8")
+            _seed_default_profile(pdir)
+            self.assertEqual((pdir / "default_6p.json").read_text(encoding="utf-8"), "{}")
+
+    def test_factory_seeds_only_when_opted_in(self) -> None:
+        with TemporaryDirectory() as tmp:
+            runs_on = Path(tmp) / "on" / "runs"
+            srv = create_observer_server("127.0.0.1", 0, runs_on, seed_default_profile=True)
+            srv.server_close()
+            self.assertTrue(any(e["valid"] for e in list_profiles(runs_on.parent / "profiles")))
+
+            runs_off = Path(tmp) / "off" / "runs"
+            srv2 = create_observer_server("127.0.0.1", 0, runs_off)
+            srv2.server_close()
+            self.assertEqual(list_profiles(runs_off.parent / "profiles"), [])
 
 
 def _event(kind: str = "test", visibility: str = "public", seq: int = 0) -> dict[str, object]:
