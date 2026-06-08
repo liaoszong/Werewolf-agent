@@ -363,6 +363,24 @@ class ProfileSchemaTests(unittest.TestCase):
         from werewolf_eval.provider_registry import PROVIDER_REGISTRY
         self.assertTrue(set(PROVIDER_REGISTRY) <= ALLOWED_PROVIDERS)
 
+    def test_allowed_providers_includes_preset_vendors(self):
+        from werewolf_eval.profile_config import ALLOWED_PROVIDERS
+        for pid in ("zhipu", "moonshot", "qwen", "minimax",
+                    "siliconflow", "xai", "gemini", "modelscope", "openrouter"):
+            self.assertIn(pid, ALLOWED_PROVIDERS, pid)
+
+    def test_preset_vendor_model_is_format_checked_not_allowlisted(self):
+        # A live vendor seat validates with any non-empty model string (no
+        # ALLOWED_MODELS entry needed); empty/non-string is rejected.
+        from werewolf_eval.profile_config import _check_resolved_seat, ProfileValidationError
+        ok = {"provider": "moonshot", "model": "kimi-k2.6",
+              "strategy": "default", "prompt": ""}
+        _check_resolved_seat(ok, "p1")  # no raise
+        bad = {"provider": "moonshot", "model": "",
+               "strategy": "default", "prompt": ""}
+        with self.assertRaises(ProfileValidationError):
+            _check_resolved_seat(bad, "p1")
+
 
 if __name__ == "__main__":
     unittest.main()

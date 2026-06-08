@@ -21,7 +21,13 @@ ALLOWED_TEMPLATES: frozenset[str] = frozenset({"default_6p_fake"})
 # no provider-runtime import); a consistency test enforces it stays a superset of
 # the registry.
 ALLOWED_PROVIDERS: frozenset[str] = frozenset(
-    {"fake_deterministic", "deepseek", "openai", "anthropic", "openai_compatible"}
+    {
+        "fake_deterministic", "deepseek", "openai", "anthropic", "openai_compatible",
+        # P2-B preset vendors (OpenAI-compatible). Kept as a literal so this module
+        # stays registry-free; test_allowed_providers_superset_of_registry guards it.
+        "zhipu", "moonshot", "qwen", "minimax", "siliconflow",
+        "xai", "gemini", "modelscope", "openrouter",
+    }
 )
 ALLOWED_MODELS: dict[str, frozenset[str]] = {
     "fake_deterministic": frozenset({"none"}),
