@@ -335,9 +335,16 @@ void ObserverApiClient::startStreamRequest()
 void ObserverApiClient::stopStream()
 {
     if (m_streamReply) {
-        m_streamReply->abort();
-        m_streamReply->deleteLater();
+        // Re-entrancy guard: abort() can SYNCHRONOUSLY emit finished/errorOccurred,
+        // whose slots (onStreamFinished/onStreamError) null m_streamReply. Doing
+        // abort() then deleteLater() on the member therefore dereferenced a
+        // now-null m_streamReply (SIGSEGV in deleteLater). Null the member FIRST and
+        // disconnect, then operate on a local handle so re-entrant calls are no-ops.
+        QNetworkReply *reply = m_streamReply;
         m_streamReply = nullptr;
+        reply->disconnect(this);
+        reply->abort();
+        reply->deleteLater();
     }
     if (m_connected) {
         m_connected = false;

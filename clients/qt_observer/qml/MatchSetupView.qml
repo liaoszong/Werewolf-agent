@@ -75,10 +75,10 @@ Item {
             // startDefaultMatch() — a hardcoded FAKE default game that clobbered the
             // just-launched live run. That is the "always fake" bug; bypass it.
             // openRun fetches the run detail so the HUD shows the real execution_mode
-            // (真实AI for live); connectStream attaches the live SSE feed (unlike
-            // startDefaultMatch, launchFromProfile does not stream on its own).
+            // (真实AI for live). Do NOT connectStream() here — TheaterView.onCompleted
+            // attaches the live stream itself; a second connect re-enters stopStream()
+            // and crashes.
             ObserverClient.openRun(ObserverClient.currentRunId, false)
-            ObserverClient.connectStream()
             root.StackView.view.parent.navigateCockpit()
         }
     }
