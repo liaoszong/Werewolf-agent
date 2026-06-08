@@ -235,3 +235,19 @@ def list_models(
         raise_sanitized_transport_error(f"{provider_id} models", exc)
     data = raw.get("data", []) if isinstance(raw, dict) else []
     return [str(m["id"]) for m in data if isinstance(m, dict) and m.get("id")]
+
+
+def provider_specs_payload() -> list[dict[str, object]]:
+    """Read-only UI metadata for every registered provider. The observer server
+    merges this into the profile-schema response so the Qt client can data-drive
+    its provider list and per-provider model dropdowns. Never carries a secret."""
+    return [
+        {
+            "id": spec.provider_id,
+            "label": spec.label,
+            "default_base_url": spec.default_base_url,
+            "requires_base_url": spec.requires_base_url,
+            "default_models": list(spec.default_models),
+        }
+        for spec in PROVIDER_REGISTRY.values()
+    ]

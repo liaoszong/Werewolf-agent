@@ -23,6 +23,7 @@ from werewolf_eval.observer_server import (
     _check_live_capability,
     _check_live_profile_shape,
     _map_launcher_exit_reason,
+    _schema_payload,
     _seed_default_profile,
     create_observer_server,
     default_fake_launcher,
@@ -1887,3 +1888,15 @@ class RunDetailExecutionModeTests(TestCase):
         detail = h._run_detail_with_reason("rd_both", run_dir)
         self.assertEqual(detail["execution_mode"], "live")
         self.assertEqual(detail["reason"], "provider_failure")
+
+
+class ProviderSpecsInSchemaTests(TestCase):
+    def test_schema_payload_includes_provider_specs(self) -> None:
+        payload = _schema_payload()
+        self.assertIn("provider_specs", payload)
+        ids = {row["id"] for row in payload["provider_specs"]}
+        self.assertIn("qwen", ids)
+        self.assertIn("deepseek", ids)
+        # the base profile-schema fields are still present
+        self.assertIn("providers", payload)
+        self.assertIn("roles", payload)

@@ -174,6 +174,22 @@ class ProviderRegistryTests(unittest.TestCase):
         )
         self.assertEqual(models, ["m1", "123"])
 
+    def test_provider_specs_payload_shape(self) -> None:
+        from werewolf_eval.provider_registry import provider_specs_payload
+        payload = provider_specs_payload()
+        ids = {row["id"] for row in payload}
+        self.assertEqual(ids, set(PROVIDER_REGISTRY))
+        moon = next(r for r in payload if r["id"] == "moonshot")
+        self.assertEqual(
+            set(moon),
+            {"id", "label", "default_base_url", "requires_base_url", "default_models"},
+        )
+        self.assertEqual(moon["label"], "Moonshot Kimi")
+        self.assertEqual(moon["default_base_url"], "https://api.moonshot.ai/v1")
+        self.assertFalse(moon["requires_base_url"])
+        self.assertIn("kimi-k2.6", moon["default_models"])
+        self.assertIsInstance(moon["default_models"], list)  # JSON-serializable
+
     def test_list_models_sanitizes_transport_error(self) -> None:
         def boom(url, headers, timeout):
             raise RuntimeError("HTTP 500 Bearer sk-secret-models")

@@ -43,7 +43,7 @@ from werewolf_eval.observer_protocol import (
 from werewolf_eval.credential_store import CredentialStore
 from werewolf_eval.deepseek_launcher import build_multi_provider_launcher
 from werewolf_eval.llm_providers import ChatProviderConfig
-from werewolf_eval.provider_registry import PROVIDER_REGISTRY, list_models
+from werewolf_eval.provider_registry import PROVIDER_REGISTRY, list_models, provider_specs_payload
 from werewolf_eval.seat_agents import ProviderCredential
 from werewolf_eval.observer_visibility import (
     VisibilityProjectionError,
@@ -225,6 +225,15 @@ def _provider_live_posture(
         "missing_api_key",
         f"no credential is available for {provider} (set one in the client)",
     )
+
+
+def _schema_payload() -> dict[str, object]:
+    """The profile-schema response: the pure validation schema plus the
+    registry-derived provider UI metadata (kept here so profile_config stays
+    registry-free)."""
+    schema = build_profile_schema()
+    schema["provider_specs"] = provider_specs_payload()
+    return schema
 
 
 def _build_capabilities_payload(state: ObserverServerState) -> dict[str, object]:
@@ -488,7 +497,7 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
                 return
 
             if segments == ["api", "profiles", "schema"]:
-                self._send_json(200, build_profile_schema())
+                self._send_json(200, _schema_payload())
                 return
 
             # P2-B-1 r2: dynamic model discovery for a configured provider.
