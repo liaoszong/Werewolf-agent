@@ -53,17 +53,25 @@ class ProviderSpec:
 
 | provider_id | label | default_base_url | requires_base_url | default_models(示例,可覆盖) |
 |---|---|---|---|---|
-| `zhipu` | 智谱 GLM | `https://open.bigmodel.cn/api/paas/v4` | false | `glm-4.6`, `glm-4.5-air` |
-| `moonshot` | Moonshot Kimi | `https://api.moonshot.ai/v1` | false | `kimi-k2-0905-preview`, `moonshot-v1-8k` |
-| `qwen` | 阿里 Qwen | `https://dashscope.aliyuncs.com/compatible-mode/v1` | false | `qwen-max`, `qwen-plus`, `qwen-turbo` |
-| `minimax` | MiniMax | `https://api.minimax.io/v1` | false | `MiniMax-Text-01` |
+| `zhipu` | 智谱 GLM | `https://api.z.ai/api/paas/v4` | false | `glm-4.7`, `glm-4.6`, `glm-4.5-air` |
+| `moonshot` | Moonshot Kimi | `https://api.moonshot.ai/v1` | false | `kimi-k2.6`, `moonshot-v1-8k` |
+| `qwen` | 阿里 Qwen | `https://dashscope.aliyuncs.com/compatible-mode/v1` | false | `qwen3-max`, `qwen-plus`, `qwen-flash` |
+| `minimax` | MiniMax | `https://api.minimax.io/v1` | false | `MiniMax-M3`, `MiniMax-Text-01` |
 | `siliconflow` | 硅基流动 | `https://api.siliconflow.cn/v1` | false | `deepseek-ai/DeepSeek-V3`, `Qwen/Qwen2.5-72B-Instruct` |
-| `xai` | xAI Grok | `https://api.x.ai/v1` | false | `grok-4`, `grok-3` |
-| `gemini` | Google Gemini | `https://generativelanguage.googleapis.com/v1beta/openai` | false | `gemini-2.5-pro`, `gemini-2.5-flash` |
+| `xai` | xAI Grok | `https://api.x.ai/v1` | false | `grok-4.3`, `grok-4` |
+| `gemini` | Google Gemini | `https://generativelanguage.googleapis.com/v1beta/openai` | false | `gemini-3.5-flash`, `gemini-2.5-flash`, `gemini-2.5-pro` |
 | `modelscope` | 魔搭 ModelScope | `https://api-inference.modelscope.cn/v1` | false | `Qwen/Qwen2.5-72B-Instruct`, `deepseek-ai/DeepSeek-V3` |
-| `openrouter` | OpenRouter | `https://openrouter.ai/api/v1` | false | `openai/gpt-4o`, `anthropic/claude-3.5-sonnet` |
+| `openrouter` | OpenRouter | `https://openrouter.ai/api/v1` | false | `~openai/gpt-latest`, `~anthropic/claude-sonnet-latest`, `openrouter/auto` |
 
-> `models_path="/models"`(沿用),逐 base_url 解析为 `{base}/models`(如 moonshot→`/v1/models`、gemini→`/v1beta/openai/models`)。少数厂商的 `/models` GET 可能不存在(如 zhipu/minimax 视版本而定)—— `default_models` 兜底,用户也可手填 model;live 信任格式,不卡 allowlist。模型 id 时效性快(尤其 ModelScope/SiliconFlow),但模型定位为「离线兜底、非 allowlist」,风险可接受。
+**地区/入口备注**(default_base_url 均可被用户覆盖):
+- `zhipu`:默认走 **Z.AI 国际入口** `api.z.ai/api/paas/v4`;**国内用户可覆盖为** `https://open.bigmodel.cn/api/paas/v4`。
+- `qwen`:默认北京 `dashscope.aliyuncs.com`;国际/美国弗吉尼亚/香港账号按官方地区 URL 覆盖(如 `dashscope-intl.aliyuncs.com/compatible-mode/v1`)。
+- `moonshot`:默认国际 `api.moonshot.ai/v1`;国内 `api.moonshot.cn/v1`。
+- `minimax`:默认国际 `api.minimax.io/v1`;国内 `api.minimaxi.com/v1`。
+
+> **默认模型说明**:`kimi-k2-0905-preview` 已被 Kimi 官方标记 deprecated(官方 Quickstart 现用 `kimi-k2.6`),故不作默认。其余默认值按各厂商 2026 官方文档主线商业模型选取。模型 id 时效性快(尤其 ModelScope/SiliconFlow/各家版本号),但模型定位为「离线兜底、非 allowlist」—— live 拉取/手填覆盖,风险可接受。
+>
+> **base_url 拼接正规化(实现+测试约束)**:`default_base_url` 统一**无尾斜杠**存储,但 `model_list_url()` 与 `{base}/chat/completions` 拼接前必须 `rstrip("/")`(用户也可能填带尾斜杠的 base,如 Gemini 官方示例 `…/v1beta/openai/`)—— 避免双斜杠/漏斜杠。`models_path="/models"` 沿用,逐 base_url 解析为 `{base}/models`(moonshot→`/v1/models`、gemini→`/v1beta/openai/models`)。少数厂商 `/models` GET 可能不存在 → `default_models` 兜底 + 手填。
 
 ## 后端切片
 
@@ -86,6 +94,7 @@ class ProviderSpec:
 ## 测试
 
 - registry:13 家一致性;每家 `model_list_url` / `build_provider` 正确解析 base_url + `OpenAIProvider`;`default_models` 字段存在。
+- **base_url 正规化**:带尾斜杠的 base(如 `…/v1beta/openai/`)经 `model_list_url` 与 chat 拼接后**无双斜杠/漏斜杠**(Gemini 尾斜杠 vs registry 无尾斜杠回归)。
 - `profile_config`:`ALLOWED_PROVIDERS ⊇ registry`(现有一致性测试自动覆盖新 9 家);`_MODEL_ALLOWLIST_PROVIDERS` 仍只含 fake(live 不卡 allowlist 回归)。
 - schema:`build_profile_schema()` 经 server handler 富化后含 `provider_specs`,每条含 5 字段(id/label/default_base_url/requires_base_url/default_models)。
 - **artifact honesty**:混局(座位跨 ≥2 新厂商)断言 `resolved-profile` / prompt-manifest / provider-trace / 运行时脊柱里**每座位 `provider_id` + `model` 原样保留**,不被 generic source_label 抹平。
