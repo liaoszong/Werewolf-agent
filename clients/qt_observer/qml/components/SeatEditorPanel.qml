@@ -140,14 +140,25 @@ AppCard {
         return (root._credRev, CredentialStore.configuredProviders()).indexOf(p) >= 0
     }
 
+    function _specFor(pid) {
+        var specs = (ObserverClient.profileSchema
+                     && ObserverClient.profileSchema.provider_specs) || []
+        for (var i = 0; i < specs.length; i++)
+            if (specs[i].id === pid) return specs[i]
+        return null
+    }
+
+    function _modelsFor(pid) {
+        var live = ObserverClient.providerModels[pid]
+        if (live && live.length > 0) return live
+        var spec = _specFor(pid)
+        return (spec && spec.default_models) ? spec.default_models : []
+    }
+
     function _providerLabel(p) {
-        switch (p) {
-        case "deepseek": return "DeepSeek"
-        case "openai": return "OpenAI"
-        case "anthropic": return "Anthropic"
-        case "openai_compatible": return I18n.t("OpenAI 兼容", "OpenAI-compatible")
-        case "fake_deterministic": return I18n.t("模拟(无需 Key)", "Simulation (no key)")
-        }
+        if (p === "fake_deterministic") return I18n.t("模拟(无需 Key)", "Simulation (no key)")
+        var spec = _specFor(p)
+        if (spec && spec.label) return spec.label
         return p
     }
 
@@ -187,9 +198,9 @@ AppCard {
     readonly property var modelList: {
         var p = config && config.provider ? config.provider : ""
         if (!p) return []
-        var live = ObserverClient.providerModels[p]
-        if (live && live.length > 0) return live
-        return (schema && schema.models && schema.models[p]) ? schema.models[p] : []
+        // live fetched list wins; else the registry's per-provider default_models;
+        // else empty (user types a model id).
+        return root._modelsFor(p)
     }
     readonly property int promptMax: schema && schema.prompt_max_len ? schema.prompt_max_len : 8000
 

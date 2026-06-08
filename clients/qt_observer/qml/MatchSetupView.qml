@@ -71,16 +71,21 @@ Item {
         function onLaunchSucceeded() { root.StackView.view.parent.navigatePreflight() }
     }
 
+    // Lookup a provider spec from the server registry (provider_specs in profileSchema).
+    function _specFor(pid) {
+        var specs = (ObserverClient.profileSchema
+                     && ObserverClient.profileSchema.provider_specs) || []
+        for (var i = 0; i < specs.length; i++)
+            if (specs[i].id === pid) return specs[i]
+        return null
+    }
+
     // Friendly provider label for the seat card's AI line (mirrors the inspector's
     // SeatEditorPanel._providerLabel so the board and inspector agree).
     function providerLabel(p) {
-        switch (p) {
-        case "deepseek": return "DeepSeek"
-        case "openai": return "OpenAI"
-        case "anthropic": return "Anthropic"
-        case "openai_compatible": return I18n.t("OpenAI 兼容", "OpenAI-compatible")
-        case "fake_deterministic": return I18n.t("模拟(无需 Key)", "Simulation (no key)")
-        }
+        if (p === "fake_deterministic") return I18n.t("模拟(无需 Key)", "Simulation (no key)")
+        var spec = _specFor(p)
+        if (spec && spec.label) return spec.label
         return p || I18n.t("未设", "unset")
     }
 
@@ -119,7 +124,8 @@ Item {
             // "" when nothing is known yet; the inspector reconciles once the live
             // list arrives, and an empty model fails validation (blocks launch).
             var live = ObserverClient.providerModels[value] || []
-            var stat = (ObserverClient.profileSchema.models || {})[value] || []
+            var spec = root._specFor(value)
+            var stat = (spec && spec.default_models) ? spec.default_models : []
             var models = live.length > 0 ? live : stat
             frag.model = models.length > 0 ? models[0] : ""
         }
