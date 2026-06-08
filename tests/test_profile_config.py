@@ -96,9 +96,10 @@ class ProfileValidationTests(unittest.TestCase):
             validate_profile(_valid_profile(seat_overrides={"p9": {"strategy": "default"}}))
 
     def test_rejects_disallowed_provider(self):
-        # openai/anthropic are now allowed (P2-B-3); an unknown provider is rejected.
+        # The preset vendors (incl. gemini) are now allowed (P2-B); a provider id
+        # that is in NO registry is still rejected.
         p = _valid_profile()
-        p["role_defaults"]["seer"]["provider"] = "gemini"
+        p["role_defaults"]["seer"]["provider"] = "definitely_not_a_provider"
         with self.assertRaises(ProfileValidationError):
             validate_profile(p)
 
@@ -340,7 +341,11 @@ class ProfileSchemaTests(unittest.TestCase):
         self.assertEqual(s["schema_version"], PROFILE_SCHEMA_VERSION)
         self.assertEqual(
             set(s["providers"]),
-            {"fake_deterministic", "deepseek", "openai", "anthropic", "openai_compatible"},
+            {
+                "fake_deterministic", "deepseek", "openai", "anthropic", "openai_compatible",
+                "zhipu", "moonshot", "qwen", "minimax", "siliconflow",
+                "xai", "gemini", "modelscope", "openrouter",
+            },
         )
         self.assertEqual(s["models"]["deepseek"], ["deepseek-chat", "deepseek-reasoner"])
         self.assertEqual(s["models"]["fake_deterministic"], ["none"])
