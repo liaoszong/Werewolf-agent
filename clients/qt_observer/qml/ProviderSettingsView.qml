@@ -15,14 +15,24 @@ Item {
     id: root
     objectName: "providerSettingsView"
 
-    // Client-side mirror of the server PROVIDER_REGISTRY (provider_registry.py).
-    // Only openai_compatible requires a custom base URL; the rest carry a default.
-    readonly property var providerCatalog: [
-        { id: "deepseek",          defaultBase: "https://api.deepseek.com",  requiresBase: false },
-        { id: "openai",            defaultBase: "https://api.openai.com/v1", requiresBase: false },
-        { id: "anthropic",         defaultBase: "https://api.anthropic.com", requiresBase: false },
-        { id: "openai_compatible", defaultBase: "",                          requiresBase: true  }
-    ]
+    // Data-driven from the server PROVIDER_REGISTRY (profile schema provider_specs).
+    // Falls back to an empty list until the schema loads; selectedProvider stays
+    // valid because the default "deepseek" is always present in the registry.
+    readonly property var providerCatalog: {
+        var specs = (ObserverClient.profileSchema
+                     && ObserverClient.profileSchema.provider_specs) || []
+        var out = []
+        for (var i = 0; i < specs.length; i++) {
+            out.push({
+                id: specs[i].id,
+                label: specs[i].label,
+                defaultBase: specs[i].default_base_url,
+                requiresBase: specs[i].requires_base_url,
+                defaultModels: specs[i].default_models || []
+            })
+        }
+        return out
+    }
 
     property string selectedProvider: "deepseek"
     property int credRev: 0            // bump to re-evaluate CredentialStore.* accessors
@@ -34,18 +44,15 @@ Item {
         for (var i = 0; i < providerCatalog.length; i++)
             if (providerCatalog[i].id === id)
                 return providerCatalog[i]
-        return providerCatalog[0]
+        return { id: id, label: id, defaultBase: "", requiresBase: false, defaultModels: [] }
     }
     readonly property var selectedSpec: specFor(selectedProvider)
 
-    // Live-localized label (so the custom provider's "(自定义)" tracks the toggle).
+    // Live-localized label derived from the server catalog.
     function labelFor(id) {
-        switch (id) {
-        case "deepseek": return "DeepSeek"
-        case "openai": return "OpenAI"
-        case "anthropic": return "Anthropic"
-        case "openai_compatible": return I18n.t("OpenAI 兼容(自定义)", "OpenAI-compatible (custom)")
-        }
+        var s = specFor(id)
+        if (s && s.id === id)
+            return s.label
         return id
     }
 
@@ -188,77 +195,64 @@ Item {
                                     "Green=validated · Amber=configured · Gray=unset")
                 }
 
-                Column {
+                ListView {
                     width: parent.width
+                    height: parent.height - y    // fill remaining card height
+                    clip: true
                     spacing: Theme.space.xs
+                    boundsBehavior: Flickable.StopAtBounds
+                    ScrollIndicator.vertical: ScrollIndicator { }
+                    model: root.providerCatalog
+                    delegate: Rectangle {
+                        id: providerRow
+                        required property var modelData
+                        width: ListView.view.width
+                        height: 56
+                        radius: Theme.radius.md
+                        readonly property bool isSelected: root.selectedProvider === modelData.id
+                        color: isSelected ? Theme.color.surfaceAlt
+                                          : (rowHover.hovered ? Theme.color.surfaceInset : "transparent")
+                        Behavior on color { ColorAnimation { duration: Theme.motion.fast } }
 
-                    Repeater {
-                        model: root.providerCatalog
-                        delegate: Rectangle {
-                            id: providerRow
-                            required property var modelData
-                            width: parent.width
-                            height: 56
-                            radius: Theme.radius.md
-                            readonly property bool isSelected: root.selectedProvider === modelData.id
-                            color: isSelected ? Theme.color.surfaceAlt
-                                              : (rowHover.hovered ? Theme.color.surfaceInset : "transparent")
-
-                            Behavior on color { ColorAnimation { duration: Theme.motion.fast } }
-
-                            // Left accent bar on the selected provider.
-                            Rectangle {
-                                anchors.left: parent.left
-                                anchors.top: parent.top
-                                anchors.bottom: parent.bottom
-                                anchors.margins: Theme.space.sm
-                                width: 2
-                                radius: 1
-                                color: Theme.color.primary
-                                visible: providerRow.isSelected
-                            }
-
-                            GlowDot {
-                                id: rowDot
-                                anchors.left: parent.left
-                                anchors.leftMargin: Theme.space.lg
-                                anchors.verticalCenter: parent.verticalCenter
-                                diameter: 9
-                                color: root.dotColor(providerRow.modelData.id)
-                            }
-
-                            Column {
-                                anchors.left: rowDot.right
-                                anchors.leftMargin: Theme.space.md
-                                anchors.right: parent.right
-                                anchors.rightMargin: Theme.space.md
-                                anchors.verticalCenter: parent.verticalCenter
-                                spacing: 2
-
-                                Text {
-                                    width: parent.width
-                                    elide: Text.ElideRight
-                                    text: root.labelFor(providerRow.modelData.id)
-                                    color: Theme.color.text
-                                    font.family: Theme.font.family
-                                    font.pixelSize: Theme.size.body
-                                    font.weight: Theme.weight.medium
-                                }
-                                Text {
-                                    width: parent.width
-                                    elide: Text.ElideRight
-                                    text: (root.credRev, CredentialStore.hasCredential(providerRow.modelData.id))
-                                          ? CredentialStore.maskedCredential(providerRow.modelData.id)
-                                          : I18n.t("未配置", "Not configured")
-                                    color: Theme.color.textMuted
-                                    font.family: Theme.font.mono
-                                    font.pixelSize: Theme.size.micro
-                                }
-                            }
-
-                            HoverHandler { id: rowHover; cursorShape: Qt.PointingHandCursor }
-                            TapHandler { onTapped: root.selectedProvider = providerRow.modelData.id }
+                        Rectangle {
+                            anchors.left: parent.left; anchors.top: parent.top; anchors.bottom: parent.bottom
+                            anchors.margins: Theme.space.sm
+                            width: 2; radius: 1
+                            color: Theme.color.primary
+                            visible: providerRow.isSelected
                         }
+                        GlowDot {
+                            id: rowDot
+                            anchors.left: parent.left; anchors.leftMargin: Theme.space.lg
+                            anchors.verticalCenter: parent.verticalCenter
+                            diameter: 9
+                            color: root.dotColor(providerRow.modelData.id)
+                        }
+                        Column {
+                            anchors.left: rowDot.right; anchors.leftMargin: Theme.space.md
+                            anchors.right: parent.right; anchors.rightMargin: Theme.space.md
+                            anchors.verticalCenter: parent.verticalCenter
+                            spacing: 2
+                            Text {
+                                width: parent.width; elide: Text.ElideRight
+                                text: root.labelFor(providerRow.modelData.id)
+                                color: Theme.color.text
+                                font.family: Theme.font.family
+                                font.pixelSize: Theme.size.body
+                                font.weight: Theme.weight.medium
+                            }
+                            Text {
+                                width: parent.width; elide: Text.ElideRight
+                                text: (root.credRev, CredentialStore.hasCredential(providerRow.modelData.id))
+                                      ? CredentialStore.maskedCredential(providerRow.modelData.id)
+                                      : I18n.t("未配置", "Not configured")
+                                color: Theme.color.textMuted
+                                font.family: Theme.font.mono
+                                font.pixelSize: Theme.size.micro
+                            }
+                        }
+                        HoverHandler { id: rowHover; cursorShape: Qt.PointingHandCursor }
+                        TapHandler { onTapped: root.selectedProvider = providerRow.modelData.id }
                     }
                 }
             }
