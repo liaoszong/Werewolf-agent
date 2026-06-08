@@ -775,25 +775,27 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
             base = state.launcher
         run_dir.mkdir(parents=True)
 
-        def _profile_launcher(
-            rid: str,
-            rdir: Path,
-            base: RunLauncher = base,
-            profile: dict = profile,
-            is_live: bool = is_live,
-        ) -> int:
-            code = base(rid, rdir)
-            artifact = build_resolved_profile_artifact(
-                profile,
-                rid,
-                execution_mode="live" if is_live else "fake",
-                live_api="used" if is_live else "not_used",
-            )
-            (rdir / "resolved-profile.json").write_text(
-                json.dumps(artifact, ensure_ascii=False, indent=2, sort_keys=True),
-                encoding="utf-8",
-            )
-            return code
+        # Write the resolved-profile (which carries execution_mode) SYNCHRONOUSLY here,
+        # before the async run starts and before the 202 returns. The artifact is built
+        # entirely from launch-time inputs, so the content is identical to writing it
+        # after the run — but writing it up front means the client's immediate openRun
+        # finds execution_mode, so the HUD shows the real live/fake posture DURING the
+        # run (the run-detail execution_mode is read from this file), not only after it
+        # completes. Previously it was written in the launcher thread, which raced the
+        # client's openRun → the HUD was stuck on SIMULATION for the whole live run.
+        artifact = build_resolved_profile_artifact(
+            profile,
+            run_id,
+            execution_mode="live" if is_live else "fake",
+            live_api="used" if is_live else "not_used",
+        )
+        (run_dir / "resolved-profile.json").write_text(
+            json.dumps(artifact, ensure_ascii=False, indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
+
+        def _profile_launcher(rid: str, rdir: Path, base: RunLauncher = base) -> int:
+            return base(rid, rdir)
 
         self._launch_run_async(run_id, run_dir, _profile_launcher)
         self._send_json(
