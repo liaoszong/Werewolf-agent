@@ -3,6 +3,12 @@ import QtQuick.Controls
 import qt_observer
 import "components"
 
+// Match-setup "scheduling sandbox" (P2-B Q2). The six seats sit as a centred
+// board of RoleCards; clicking one scales the board down + slides it left, dims
+// the others, highlights the chosen seat in coral, and slides a per-seat
+// inspector in from the right. Credentials now live entirely on the provider
+// settings page (reached via the global top-bar gear) — this page only assigns
+// already-configured providers/models to seats.
 Item {
     id: root
     objectName: "matchSetupView"
@@ -22,46 +28,29 @@ Item {
         && root._validatedRevision === root.profileRevision
     property int _validatedRevision: -1
     property bool _initialLoadDone: false
-    readonly property int cardWidth: 168
-
-    // Step 2: credential sync state machine
-    property bool _credSynced: false
-    property string _credSyncError: ""
-    property int _credRev: 0
-    Connections {
-        target: CredentialStore
-        function onSyncSucceeded(p) { if (p === "deepseek") { root._credSynced = true; root._credSyncError = "" } }
-        function onSyncFailed(p, reason) { if (p === "deepseek") { root._credSynced = false; root._credSyncError = reason } }
-        function onCredentialChanged(p) { if (p === "deepseek") { root._credSynced = false; root._credSyncError = ""; root._credRev++ } }
-    }
-    readonly property string _credStatus: {
-        var hasLocal = CredentialStore.hasCredential("deepseek")
-        var envAvail = ObserverClient.liveAvailable && !hasLocal   // server reports available w/o local key => env
-        if (root._credSyncError !== "") return I18n.t("本地已保存，同步失败，无法启动真实 AI", "Saved locally, sync failed — cannot run live")
-        if (hasLocal && root._credSynced) return I18n.t("已配置凭证（本地）", "Credential configured (local)")
-        if (hasLocal && !root._credSynced) return I18n.t("本地已保存，尚未同步到 server", "Saved locally, not yet synced")
-        if (envAvail) return I18n.t("使用服务器环境凭证", "Using server env credential")
-        return I18n.t("未配置", "Not configured")
-    }
+    readonly property int cardWidth: 156
+    readonly property int cardHeight: 176
 
     Component.onCompleted: {
         ObserverClient.refreshProfileSchema()
         ObserverClient.refreshProfiles()
         // Learn the live posture BEFORE launch (no "guess, click, get 403").
         ObserverClient.refreshCapabilities()
+        // Q2: re-sync every locally-configured credential into the server session
+        // so the inspector's live model fetch (and live launch) authenticate even
+        // after a server restart — credentials live only in the client + server RAM.
+        var configured = CredentialStore.configuredProviders()
+        for (var i = 0; i < configured.length; i++)
+            CredentialStore.syncCredentialToServer(configured[i])
     }
 
-    // C3: any profile/seat change or live becoming unavailable disarms the FSM
-    // through the SINGLE resetToFake() entry — the parent never mutates state.
+    // C3: any seat (de)selection disarms the live FSM through the single entry.
     onSelectedSeatIdChanged: setupModeControl.resetToFake()
 
-    // Load the first profile once the list arrives.
     Connections {
         target: ObserverClient
         function onProfileItemsChanged() {
-            // One-shot initial auto-load of the first profile; keyed on a
-            // dedicated flag so it never competes with an explicit picker-driven
-            // fetch (which momentarily clears editedProfile).
+            // One-shot initial auto-load of the first profile.
             if (!root._initialLoadDone && ObserverClient.profileItems.length > 0) {
                 root._initialLoadDone = true
                 ObserverClient.fetchProfile(ObserverClient.profileItems[0].name)
@@ -72,14 +61,27 @@ Item {
             if (!root.editedProfile.seat_overrides) root.editedProfile.seat_overrides = ({})
             root.profileRevision++
             root._validatedRevision = -1
-            if (!root.selectedSeatId && root.seatIds.length > 0) root.selectedSeatId = root.seatIds[0]
-            setupModeControl.resetToFake()   // C3: a new profile disarms live
+            root.selectedSeatId = ""          // Q2: a fresh profile opens in the sandbox
+            setupModeControl.resetToFake()     // C3: a new profile disarms live
         }
         // C3: live becoming unavailable must disarm any armed/confirmed state.
         function onCapabilitiesChanged() {
             if (!ObserverClient.liveAvailable) setupModeControl.resetToFake()
         }
         function onLaunchSucceeded() { root.StackView.view.parent.navigatePreflight() }
+    }
+
+    // Friendly provider label for the seat card's AI line (mirrors the inspector's
+    // SeatEditorPanel._providerLabel so the board and inspector agree).
+    function providerLabel(p) {
+        switch (p) {
+        case "deepseek": return "DeepSeek"
+        case "openai": return "OpenAI"
+        case "anthropic": return "Anthropic"
+        case "openai_compatible": return I18n.t("OpenAI 兼容", "OpenAI-compatible")
+        case "fake_deterministic": return I18n.t("模拟(无需 Key)", "Simulation (no key)")
+        }
+        return p || I18n.t("未设", "unset")
     }
 
     // Field-level effective config for a seat.
@@ -99,12 +101,20 @@ Item {
     // Materialize a full coherent override fragment on edit.
     function applyEdit(seatId, field, value) {
         var eff = effective(seatId)
-        if (eff[field] === value) return   // no-op: ignore init/seat-switch re-binds; don't bump revision
+        if (eff[field] === value) return   // no-op: ignore init/seat-switch re-binds
         var frag = { provider: eff.provider, model: eff.model, strategy: eff.strategy, prompt: eff.prompt }
         frag[field] = value
         if (field === "provider") {
-            var models = (ObserverClient.profileSchema.models || {})[value] || []
-            frag.model = models.length > 0 ? models[0] : frag.model
+            // Seed a model that's valid for the NEW provider, mirroring the
+            // inspector's modelList preference (live fetched list first, static
+            // schema fallback). Never keep the previous provider's model — that
+            // would persist an incoherent {provider, model} pair and launch it.
+            // "" when nothing is known yet; the inspector reconciles once the live
+            // list arrives, and an empty model fails validation (blocks launch).
+            var live = ObserverClient.providerModels[value] || []
+            var stat = (ObserverClient.profileSchema.models || {})[value] || []
+            var models = live.length > 0 ? live : stat
+            frag.model = models.length > 0 ? models[0] : ""
         }
         var ep = JSON.parse(JSON.stringify(root.editedProfile))
         if (!ep.seat_overrides) ep.seat_overrides = ({})
@@ -115,7 +125,7 @@ Item {
 
     Rectangle { anchors.fill: parent; color: Theme.color.bgBase }
 
-    // -------------------------------------------------------------- Header row
+    // -------------------------------------------------------------- Header
     Column {
         id: header
         anchors.top: parent.top
@@ -126,64 +136,10 @@ Item {
         anchors.rightMargin: Theme.layout.pageMargin
         spacing: Theme.space.md
 
-        // Intent (setup control), NOT executed truth.  The segmented fake/live
-        // arming control replaces the old amber deterministic-mock banner.
-        // Fake stays the unconditional default; live arms in two deliberate
-        // clicks and is available only when the server's capabilities say so.
-        // (Executed truth lives in the global AppShell DataSourceChip, driven by
-        // run-detail execution_mode — never local files.)
+        // Intent (setup control), NOT executed truth — the fake/live arming control.
         ModeControl {
             id: setupModeControl
             objectName: "setupModeControl"
-        }
-
-        // Step 1: Inline credential panel for DeepSeek API key
-        Column {
-            spacing: Theme.space.sm
-            width: parent.width
-
-            Row {
-                spacing: Theme.space.sm
-                width: parent.width
-
-                TextField {
-                    id: credField
-                    objectName: "setupCredentialField"
-                    echoMode: TextInput.Password
-                    width: parent.width - saveCredBtn.width - clearCredBtn.width - Theme.space.sm * 2
-                    placeholderText: (root._credRev, CredentialStore.hasCredential("deepseek"))
-                        ? I18n.t("已保存：" + CredentialStore.maskedCredential("deepseek"),
-                                 "Saved: " + CredentialStore.maskedCredential("deepseek"))
-                        : I18n.t("输入 DeepSeek API Key", "Enter DeepSeek API key")
-                }
-
-                AppButton {
-                    id: saveCredBtn
-                    objectName: "setupCredentialSave"
-                    text: I18n.t("保存", "Save")
-                    variant: "secondary"
-                    onClicked: {
-                        CredentialStore.saveCredential("deepseek", credField.text)
-                        CredentialStore.syncCredentialToServer("deepseek")
-                        credField.clear()
-                    }
-                }
-
-                AppButton {
-                    id: clearCredBtn
-                    objectName: "setupCredentialClear"
-                    text: I18n.t("清除", "Clear")
-                    variant: "ghost"
-                    onClicked: CredentialStore.clearCredential("deepseek")
-                }
-            }
-
-            Text {
-                objectName: "setupCredentialStatus"
-                text: root._credStatus
-                color: root._credSyncError !== "" ? Theme.color.danger : Theme.color.textMuted
-                font.family: Theme.font.family; font.pixelSize: Theme.size.caption
-            }
         }
 
         Text {
@@ -236,61 +192,97 @@ Item {
                          "Drop a JSON into the server's profiles/ dir.")
     }
 
-    // ----------------------------------------------------- Master (seat grid)
-    Flickable {
-        id: master
+    // -------------------------------------------------- Scheduling sandbox
+    Item {
+        id: board
         anchors.top: header.bottom
         anchors.left: parent.left
+        anchors.right: parent.right
         anchors.bottom: actionBar.top
         anchors.topMargin: Theme.space.xl
         anchors.leftMargin: Theme.layout.pageMargin
-        width: root.cardWidth * 2 + Theme.space.lg
-        contentHeight: setupRoleCards.height
-        clip: true
+        anchors.rightMargin: Theme.layout.pageMargin
+        anchors.bottomMargin: Theme.space.lg
         visible: ObserverClient.profileItems.length > 0
+        clip: true
+        state: root.selectedSeatId !== "" ? "editing" : ""
 
-        Grid {
-            id: setupRoleCards
-            objectName: "setupRoleCards"
-            columns: 2
-            spacing: Theme.space.lg
-            Repeater {
-                model: root.seatIds
-                // RoleCard verified public API (qml/components/RoleCard.qml):
-                //   seatId, roleName, displayRole, displayTeam, visibilityLabel,
-                //   aiLabel, statusText, accentText, selected. Use ONLY these.
-                delegate: RoleCard {
-                    property var eff: root.effective(modelData)
-                    seatId: modelData
-                    roleName: eff.role
-                    displayRole: eff.role
-                    displayTeam: eff.team || ""
-                    aiLabel: (eff.provider || "") + " · " + (eff.model || "")
-                    selected: root.selectedSeatId === modelData
-                    width: 168
-                    height: 168
-                    MouseArea { anchors.fill: parent; onClicked: root.selectedSeatId = modelData }
+        // Card board — centred in the sandbox, scaled + shifted left when editing.
+        Item {
+            id: gridStage
+            width: setupRoleCards.width
+            height: setupRoleCards.height
+            anchors.verticalCenter: parent.verticalCenter
+            x: (board.width - width) / 2
+            transformOrigin: Item.Left
+
+            Grid {
+                id: setupRoleCards
+                objectName: "setupRoleCards"
+                columns: 3
+                spacing: Theme.space.lg
+                Repeater {
+                    model: root.seatIds
+                    // RoleCard public API: seatId, roleName, displayRole, displayTeam,
+                    // visibilityLabel, aiLabel, statusText, accentText, selected,
+                    // selectedAccent.
+                    delegate: RoleCard {
+                        required property var modelData
+                        property var eff: root.effective(modelData)
+                        seatId: modelData
+                        roleName: eff.role
+                        displayRole: eff.role
+                        displayTeam: eff.team || ""
+                        aiLabel: root.providerLabel(eff.provider) + " · " + (eff.model || I18n.t("未设","unset"))
+                        selected: root.selectedSeatId === modelData
+                        selectedAccent: Theme.report.accent   // coral
+                        // Non-selected seats dim while a seat is being edited.
+                        opacity: (board.state === "editing" && root.selectedSeatId !== modelData) ? 0.4 : 1.0
+                        width: root.cardWidth
+                        height: root.cardHeight
+                        MouseArea { anchors.fill: parent; onClicked: root.selectedSeatId = modelData }
+                    }
                 }
             }
         }
-    }
 
-    // ----------------------------------------------------- Detail (seat editor)
-    SeatEditorPanel {
-        id: detail
-        anchors.top: header.bottom
-        anchors.right: parent.right
-        anchors.bottom: actionBar.top
-        anchors.left: master.right
-        anchors.topMargin: Theme.space.xl
-        anchors.rightMargin: Theme.layout.pageMargin
-        anchors.leftMargin: Theme.space.xl
-        anchors.bottomMargin: Theme.space.lg
-        visible: root.selectedSeatId !== "" && ObserverClient.profileItems.length > 0
-        seat: root.selectedSeatId ? root.effective(root.selectedSeatId) : ({})
-        config: root.selectedSeatId ? root.effective(root.selectedSeatId) : ({})
-        schema: ObserverClient.profileSchema
-        onEdited: function(field, value) { root.applyEdit(root.selectedSeatId, field, value) }
+        // Sandbox hint (only while nothing is selected).
+        Text {
+            anchors.top: gridStage.bottom
+            anchors.topMargin: Theme.space.xl
+            anchors.horizontalCenter: board.horizontalCenter
+            visible: root.selectedSeatId === ""
+            text: I18n.t("点击座位卡进行配置", "Click a seat to configure it")
+            color: Theme.color.textMuted
+            font.family: Theme.font.family; font.pixelSize: Theme.size.caption
+        }
+
+        // Per-seat inspector — parked off-screen right, slides in when editing.
+        SeatEditorPanel {
+            id: inspector
+            width: 380
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            x: board.width
+            seat: root.selectedSeatId ? root.effective(root.selectedSeatId) : ({})
+            config: root.selectedSeatId ? root.effective(root.selectedSeatId) : ({})
+            schema: ObserverClient.profileSchema
+            onEdited: function(field, value) { root.applyEdit(root.selectedSeatId, field, value) }
+            onClosed: root.selectedSeatId = ""
+            onRequestProviderSettings: root.StackView.view.parent.navigateProviderSettings()
+        }
+
+        states: State {
+            name: "editing"
+            PropertyChanges { target: gridStage; x: board.width * 0.03; scale: 0.86 }
+            PropertyChanges { target: inspector; x: board.width - inspector.width }
+        }
+        transitions: Transition {
+            ParallelAnimation {
+                NumberAnimation { target: gridStage; properties: "x,scale"; duration: Theme.motion.slow; easing.type: Easing.OutCubic }
+                NumberAnimation { target: inspector; property: "x"; duration: Theme.motion.slow; easing.type: Easing.OutCubic }
+            }
+        }
     }
 
     // ------------------------------------------------------ Bottom action bar
@@ -318,19 +310,11 @@ Item {
             anchors.right: parent.right; anchors.rightMargin: Theme.layout.pageMargin
             anchors.verticalCenter: parent.verticalCenter
             // Advances to Preflight only via onLaunchSucceeded (202 + currentRunId).
-            // C2: pass an EXPLICIT resolved mode ("fake"|"live") — "live" only
-            // when the arming FSM is live_confirmed; never a C++ default arg.
-            // Step 3: no-silent-env-fallback guard (spec §3.7):
-            // if a local key exists but hasn't synced, block launch; never silently fall back to server env.
-            onClicked: {
-                if (setupModeControl.resolvedMode === "live"
-                        && CredentialStore.hasCredential("deepseek")
-                        && !root._credSynced) {
-                    CredentialStore.syncCredentialToServer("deepseek")  // retry sync; status updates via signals
-                    return
-                }
-                ObserverClient.launchFromProfile(root.editedProfile, setupModeControl.resolvedMode)
-            }
+            // C2: pass an EXPLICIT resolved mode ("fake"|"live"). Credentials are
+            // configured + synced on the settings page (and re-synced on load above),
+            // so there is no inline credential gate here — a missing per-seat server
+            // credential surfaces as the server's 403 on launch.
+            onClicked: ObserverClient.launchFromProfile(root.editedProfile, setupModeControl.resolvedMode)
         }
     }
 }

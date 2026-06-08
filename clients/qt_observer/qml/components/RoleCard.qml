@@ -17,6 +17,10 @@ Item {
     property string statusText: ""
     property string accentText: ""
     property bool selected: false
+    // Accent for the selected state — defaults to the Nightfall silver/primary so
+    // the theater & settlement boards are unchanged; the match-setup sandbox passes
+    // the warm coral so the chosen seat pops against the dimmed others.
+    property color selectedAccent: Theme.color.primary
 
     width: 140
     height: 160
@@ -43,6 +47,19 @@ Item {
     opacity: root._dead ? 0.55 : 1.0
     Behavior on opacity { NumberAnimation { duration: Theme.motion.base } }
 
+    // Soft accent halo behind the surface — only when selected. A second, larger
+    // ring at low alpha reads as a gentle glow without needing layer effects.
+    Rectangle {
+        anchors.fill: surface
+        anchors.margins: -3
+        radius: surface.radius + 3
+        color: "transparent"
+        border.width: 3
+        border.color: Theme.withAlpha(root.selectedAccent, 0.35)
+        opacity: root.selected ? 1 : 0
+        Behavior on opacity { NumberAnimation { duration: Theme.motion.fast } }
+    }
+
     // ---------------------------------------------------------------- Surface
     Rectangle {
         id: surface
@@ -50,7 +67,7 @@ Item {
         radius: Theme.radius.lg
         color: Theme.color.surface
         border.width: root.selected ? 2 : 1
-        border.color: root.selected ? Theme.color.primary : Theme.color.border
+        border.color: root.selected ? root.selectedAccent : Theme.color.border
 
         Behavior on border.color { ColorAnimation { duration: Theme.motion.fast } }
 

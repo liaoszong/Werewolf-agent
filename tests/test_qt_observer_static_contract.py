@@ -31,6 +31,7 @@ REQUIRED_QML_VIEWS = [
     "qml/HomeView.qml",
     "qml/SettlementView.qml",
     "qml/MatchSetupView.qml",
+    "qml/ProviderSettingsView.qml",
     "qml/PreflightView.qml",
     "qml/LiveCockpitView.qml",
     "qml/TheaterView.qml",
@@ -57,10 +58,16 @@ REQUIRED_OBJECT_NAMES = {
     "Main.qml": ["werewolfObserverMainWindow", "appShellLoader"],
     "qml/AppShell.qml": ["appShell", "appShellStack", "dataSourceChip"],
     "qml/HomeView.qml": ["homeView", "startNewMatchButton", "historyButton", "serverStatusBadge", "recentRunsList"],
+    # P2-B Q2: credentials moved OUT of the setup view to the dedicated provider
+    # settings page (below); the setup view is now a pure scheduling sandbox.
     "qml/MatchSetupView.qml": ["matchSetupView", "setupRoleCards", "setupContinueButton",
-                               "setupProfilePicker", "setupValidateButton", "setupModeControl",
-                               "setupCredentialField", "setupCredentialSave",
-                               "setupCredentialClear", "setupCredentialStatus"],
+                               "setupProfilePicker", "setupValidateButton", "setupModeControl"],
+    # P2-B Q1: the provider/model settings page — the new home of the BYO-key
+    # credential panel.
+    "qml/ProviderSettingsView.qml": ["providerSettingsView", "providerKeyField",
+                                     "providerBaseUrlField", "providerSaveButton",
+                                     "providerFetchModelsButton", "providerClearButton",
+                                     "providerSettingsBackButton"],
     "qml/PreflightView.qml": ["preflightView", "preflightServerStatus", "preflightTemplateSummary", "preflightVisibilitySummary", "startMatchButton"],
     "qml/LiveCockpitView.qml": ["liveCockpitView", "runStatusBadge", "playerPanelGrid", "eventTimeline", "perspectiveSwitcher", "auditLinksPanel", "providerFailureSummary"],
     "qml/TheaterView.qml": ["theaterView"],
@@ -759,19 +766,34 @@ class QtObserverSettlementViewTests(unittest.TestCase):
 
 
 class QtObserverCredentialPanelTests(unittest.TestCase):
-    """P2-B-1 BYO-key: credential panel objectNames exist and the raw key is
-    never reachable from QML (no getRawKey, no Q_INVOKABLE rawCredential)."""
+    """P2-B BYO-key: credential panel objectNames exist and the raw key is
+    never reachable from QML (no getRawKey, no Q_INVOKABLE rawCredential).
 
-    def test_credential_panel_object_names_in_match_setup_view(self) -> None:
-        # (a) The four credential-panel objectNames must exist so they cannot be
-        # silently removed or renamed without the contract test catching it.
-        content = (QT / "qml/MatchSetupView.qml").read_text(encoding="utf-8")
-        for name in ["setupCredentialField", "setupCredentialSave",
-                     "setupCredentialClear", "setupCredentialStatus"]:
+    P2-B Q2: the credential panel moved out of MatchSetupView into the dedicated
+    ProviderSettingsView (reached via the global gear); the setup view no longer
+    carries any credential input."""
+
+    def test_credential_panel_object_names_in_provider_settings_view(self) -> None:
+        # (a) The credential-panel objectNames must exist on the settings page so
+        # they cannot be silently removed or renamed without the contract catching it.
+        content = (QT / "qml/ProviderSettingsView.qml").read_text(encoding="utf-8")
+        for name in ["providerKeyField", "providerBaseUrlField",
+                     "providerSaveButton", "providerClearButton", "providerStatusText"]:
             pattern = rf'objectName:\s*"{name}"'
             self.assertRegex(
                 content, pattern,
-                f"Missing objectName '{name}' in qml/MatchSetupView.qml"
+                f"Missing objectName '{name}' in qml/ProviderSettingsView.qml"
+            )
+
+    def test_setup_view_has_no_inline_credential_input(self) -> None:
+        # P2-B Q2 invariant: the setup view must NOT reintroduce an inline key field
+        # (credentials belong solely to the settings page now).
+        content = (QT / "qml/MatchSetupView.qml").read_text(encoding="utf-8")
+        for name in ["setupCredentialField", "setupCredentialSave",
+                     "setupCredentialClear", "setupCredentialStatus"]:
+            self.assertNotIn(
+                name, content,
+                f"setup view must not carry credential objectName '{name}' (moved to settings)"
             )
 
     def test_credential_store_header_has_no_raw_key_exposure(self) -> None:
