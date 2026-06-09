@@ -19,14 +19,15 @@ def _deepseek_seats():
 
 
 class ResolveLiveLauncherTests(unittest.TestCase):
-    def _state(self, *, client, env):
+    def _state(self, *, client, env, client_base_url=""):
         cs = CredentialStore()
         if client:
-            cs.set("deepseek", _CLIENT)
+            cs.set("deepseek", _CLIENT, base_url=client_base_url)
         captured = {}
 
-        def factory(api_key):
+        def factory(api_key, base_url=None):
             captured["key"] = api_key
+            captured["base_url"] = base_url
             return lambda r, d: 0
 
         from werewolf_eval.observer_server import ObserverServerState
@@ -47,6 +48,18 @@ class ResolveLiveLauncherTests(unittest.TestCase):
         self.assertIsNone(err)
         self.assertIsNotNone(launcher)
         self.assertEqual(captured["key"], _CLIENT)   # client beats env
+
+    def test_client_base_url_forwarded_to_factory(self):
+        # provider-02: a client-supplied custom base_url must reach the launcher
+        # factory, not be silently dropped (leaving the server's hard-coded
+        # default endpoint) on the uniform-deepseek back-compat path.
+        url = "https://deepseek.example-proxy.internal/v1"
+        st, captured = self._state(client=True, env=False, client_base_url=url)
+        launcher, err = _resolve_live_launcher_for_launch(st, _deepseek_seats())
+        self.assertIsNone(err)
+        self.assertIsNotNone(launcher)
+        self.assertEqual(captured["key"], _CLIENT)
+        self.assertEqual(captured["base_url"], url)
 
     def test_env_fallback_when_no_client_key(self):
         st, captured = self._state(client=False, env=True)

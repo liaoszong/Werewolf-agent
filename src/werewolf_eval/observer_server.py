@@ -93,7 +93,7 @@ class ObserverServerState:
     # prebuilt ENV launcher (back-compat / fallback); env_key_available records
     # whether the server started with an env key.
     credential_store: CredentialStore = field(default_factory=CredentialStore)
-    live_launcher_factory: Callable[[str], RunLauncher] | None = None
+    live_launcher_factory: Callable[..., RunLauncher] | None = None
     env_key_available: bool = False
     # P2-B-3/B-4: per-seat multi-provider launcher builder. Given the resolved
     # seats + a {provider: ProviderCredential} map, returns a RunLauncher that runs
@@ -138,7 +138,15 @@ def _resolve_live_launcher_for_launch(
     # run never used.
     uniform = len({(str(s.get("provider")), str(s.get("model"))) for s in resolved_seats}) == 1
     if used == {"deepseek"} and uniform and "deepseek" in creds and state.live_launcher_factory is not None:
-        return state.live_launcher_factory(creds["deepseek"].key), None
+        cred = creds["deepseek"]
+        # Forward the client's custom base_url when one was supplied; otherwise
+        # call the legacy single-arg factory so its server-default endpoint stands.
+        launcher = (
+            state.live_launcher_factory(cred.key, cred.base_url)
+            if cred.base_url
+            else state.live_launcher_factory(cred.key)
+        )
+        return launcher, None
     if used == {"deepseek"} and uniform and state.live_launcher is not None:
         return state.live_launcher, None
     if missing:
@@ -1020,7 +1028,7 @@ def create_observer_server(
     profiles_dir: Path | None = None,
     live_enabled: bool = False,
     live_launcher: RunLauncher | None = None,
-    live_launcher_factory: Callable[[str], RunLauncher] | None = None,
+    live_launcher_factory: Callable[..., RunLauncher] | None = None,
     env_key_available: bool = False,
     live_max_requests: int = 32,
     live_max_tokens: int = 256,
