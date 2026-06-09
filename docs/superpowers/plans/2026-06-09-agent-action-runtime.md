@@ -4,7 +4,7 @@
 
 **Goal:** Replace the hardcoded action-resolution core in `emergent_engine.py` with a data-driven Agent Action Runtime (registry + scheduler + joint settler + trigger system), behind a semantic-parity gate, then prove extensibility by adding the hunter.
 
-**Architecture:** New additive module `src/werewolf_eval/action_runtime/`. Phase 1 builds the data model (BoardRuleset / Registry / ActionEnvelope / Validator) and proves it **reproduces** today's `ALLOWED_ACTIONS_BY_ROLE_PHASE` + the engine's per-action target rules — **without touching the engine** (799 tests stay green). Phase 2 adds the scheduler + joint settler + the old-vs-new parity harness. Phase 3 swaps the engine onto the new runtime (semantic parity locked = v1.0), deletes the old `_resolve_*`, then adds hunter (v1.1).
+**Architecture:** New additive module `src/werewolf_eval/action_runtime/`. Phase 1 builds the data model (BoardRuleset / Registry / ActionEnvelope / Validator) and proves it **reproduces** today's `ALLOWED_ACTIONS_BY_ROLE_PHASE` + the engine's per-action target rules — **without touching the engine** (the existing ~824-test suite stays green). Phase 2 adds the scheduler + joint settler + the old-vs-new parity harness. Phase 3 swaps the engine onto the new runtime (semantic parity locked = v1.0), deletes the old `_resolve_*`, then adds hunter (v1.1).
 
 **Tech Stack:** Python 3.12, stdlib only, `unittest` (run with `NO_PROXY='*' PYTHONPATH=src python -m unittest`). Spec: `docs/superpowers/specs/2026-06-09-agent-action-runtime-architecture-design.md`.
 
@@ -123,7 +123,7 @@ The engine's per-action target rules, encoded as named predicates. Source of tru
 - `werewolf_kill` → alive AND non-wolf (`emergent_engine.py:519-523`)
 - `seer_check` → alive AND ≠ self (`:626`)
 - `witch_save` → == tonight's victim (`augment_witch_observation`, R-04)
-- `witch_poison` → alive (`:662` allowed_targets = alive)
+- `witch_poison` → alive AND ≠ self (the real guard is `:702` `target == witch` → reject; `:662` is only the broad target *list* shown to the model, NOT the adjudication guard — do not derive the rule from it)
 - `player_vote` → alive AND ≠ self (`:733`)
 
 **Files:**
@@ -203,7 +203,7 @@ def _alive_non_wolf(s: RuntimeState, actor: str, cand: str) -> bool:
 
 
 def _is_night_victim(s: RuntimeState, actor: str, cand: str) -> bool:
-    return cand == s.night_victim
+    return cand is not None and cand == s.night_victim
 
 
 TARGET_RULES: dict[str, TargetPredicate] = {
@@ -330,7 +330,7 @@ def rules_v1() -> BoardRuleset:
         AbilityDefinition("werewolf_kill", "phase:night", "alive_non_wolf", ARITY_ONE, "werewolf_team"),
         AbilityDefinition("seer_check",    "phase:night", "exclude_self",   ARITY_ONE, "seer"),
         AbilityDefinition("witch_save",    "phase:night", "is_night_victim", ARITY_ONE, "witch"),
-        AbilityDefinition("witch_poison",  "phase:night", "alive_only",     ARITY_ONE, "witch"),
+        AbilityDefinition("witch_poison",  "phase:night", "exclude_self",   ARITY_ONE, "witch"),
         AbilityDefinition("witch_pass",    "phase:night", "",               ARITY_NONE, "witch"),
         AbilityDefinition("player_vote",   "phase:day_vote", "exclude_self", ARITY_ONE, "public"),
     )
@@ -608,21 +608,28 @@ class ValidatorTests(unittest.TestCase):
             role=role, phase=phase, action=action, target=target,
             reason_summary="x", decision_type="inference_based", confidence=0.9)
 
+    # --- target legality: use validate_in_state (needs the RuntimeState) ---
     def test_wolf_kill_villager_ok(self) -> None:
-        self.assertTrue(self.v.validate(self._env("werewolf", "night", "werewolf_kill", "p5")).ok)
+        self.assertTrue(self.v.validate_in_state(self._env("werewolf", "night", "werewolf_kill", "p5"), self.s).ok)
 
     def test_wolf_kill_wolf_rejected(self) -> None:
-        r = self.v.validate(self._env("werewolf", "night", "werewolf_kill", "p2"))
+        r = self.v.validate_in_state(self._env("werewolf", "night", "werewolf_kill", "p2"), self.s)
         self.assertFalse(r.ok)
         self.assertEqual(r.reason_kind, "invalid_target")
 
     def test_seer_check_self_rejected(self) -> None:
-        self.assertFalse(self.v.validate(self._env("seer", "night", "seer_check", "p3")).ok)
+        self.assertFalse(self.v.validate_in_state(self._env("seer", "night", "seer_check", "p3"), self.s).ok)
 
     def test_witch_save_non_victim_rejected(self) -> None:
-        self.assertFalse(self.v.validate(self._env("witch", "night", "witch_save", "p1")).ok)
-        self.assertTrue(self.v.validate(self._env("witch", "night", "witch_save", "p5")).ok)
+        self.assertFalse(self.v.validate_in_state(self._env("witch", "night", "witch_save", "p1"), self.s).ok)
+        self.assertTrue(self.v.validate_in_state(self._env("witch", "night", "witch_save", "p5"), self.s).ok)
 
+    def test_witch_poison_self_rejected(self) -> None:
+        # engine rejects the witch poisoning herself (emergent_engine.py:702)
+        self.assertFalse(self.v.validate_in_state(self._env("witch", "night", "witch_poison", "p4"), self.s).ok)
+        self.assertTrue(self.v.validate_in_state(self._env("witch", "night", "witch_poison", "p1"), self.s).ok)
+
+    # --- action allowed / arity: stateless validate() ---
     def test_action_not_allowed_for_role_phase(self) -> None:
         r = self.v.validate(self._env("villager", "night", "werewolf_kill", "p1"))
         self.assertFalse(r.ok)
@@ -688,7 +695,7 @@ class ActionValidator:
         return ValidationResult(False, "invalid_target")
 ```
 
-> NOTE for the implementer: the test calls `validate(...)` but target legality needs state. Adjust the test to call `validate_in_state(env, self.s)` for the target-legality cases (wolf-kill-wolf, seer-self, witch-save) and keep `validate(...)` for the action-allowed/arity cases. This split keeps "is this action allowed for the role/phase" (stateless) separate from "is this target legal now" (stateful). Update the failing test accordingly before Step 4.
+> Design note (already reflected in the Step-1 test above): `validate()` is **stateless** — it judges only action-allowed-for-(role,phase) + arity. `validate_in_state(env, state)` adds **target legality**. Target-legality cases therefore go through `validate_in_state`; the action-allowed/arity case through `validate`. Keep that split when writing the test — do not call `validate()` for a target-legality assertion (it cannot see the state and rejects unconditionally).
 
 - [ ] **Step 4: Run test to verify it passes**
 
@@ -750,7 +757,8 @@ git commit -m "feat(action-runtime): Phase 1 complete — data model + static-co
 - **`scheduler.py` — PhaseScheduler.** Data-driven turn loop over the ruleset; night as a DAG of pending intents (witch_save depends on the wolf victim, not the seer). Collects validated `ActionEnvelope`s as pending intents.
 - **`settler.py` — JointSettler.** Night joint resolution from the ruleset's interaction table (`save_cancels_kill`, `poison_stacks`, 奶穿 once guard exists). Produces the death list. Reproduces today's `_resolve_witch(victim,…)` outcome for the 4-role board.
 - **`triggers.py` — TriggerSystem.** Death-resolution queue with the deterministic `death_order_key`, cycle termination, transitive closure. No triggers fire for the 4-role board (no hunter yet) — but the queue exists and is unit-tested against chain-death fixtures.
-- **`runtime.py` — orchestrator.** Wires registry + scheduler + settler + triggers into a `run_actions(state, agents)` that emits the SAME events (event_id/type/target/visibility/summary) the engine emits today, feeding the existing spine.
+- **`context.py` — RoleContract + AgentContextPacket (spec §4.4/4.5; do NOT drop).** Stable per-turn identity injection (the spec's named fix for "the model forgot it is p5") + the enhancement seam `build(actor, phase, state, enhancements={})`. Baseline reproduces today's `render_observation_text` identity lines byte-for-byte. `ProviderInputMode` (§4.6) renders the packet as strict-JSON in baseline.
+- **`runtime.py` — orchestrator.** Wires registry + scheduler + settler + triggers + context into a `run_actions(state, agents)` that emits the SAME events (event_id/type/target/visibility/summary) the engine emits today, feeding the existing spine.
 - **`tests/test_action_runtime_parity.py` — the harness.** Run the new runtime and the old `EmergentGameEngine` on the SAME seed × the canonical fake scripts (villager-win, werewolf-win). Assert Layer-1 semantic parity (winner, deaths, votes, night targets, check results, visibility, fallback). Emit any byte divergence into `docs/generated-games/runtime-v2-parity-diff-ledger.json` + `.logs/review/latest/parity-diff-summary.md` (spec §7.3 fields). **Phase 2 gate: semantic parity passes on all seeds in the harness; 824 suite green.**
 
 ---
