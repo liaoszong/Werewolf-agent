@@ -24,7 +24,58 @@ For a 4-role game the hunter role is never queried, so `rules_v1_1` yields byte-
 `allowed_actions`/settlement/validation → the determinism test stays green (the gate).
 
 **Tech Stack:** Python 3.12, `unittest` (`NO_PROXY='*' PYTHONPATH=src python -m unittest`).
-Gate after EACH task: `test_deterministic_same_seed_byte_identical` + full suite green.
+Gate after EACH task: full suite green. (NB: `test_deterministic_same_seed_byte_identical` is a
+*determinism canary*, not the byte-safety proof — the 4-role byte-safety is pinned by
+`test_allowed_actions_pinned` + the structural superset, per audit ROBUSTNESS GAP #5.)
+
+## Post-review corrections (plan was NO_GO; these 3 fixes are folded into the tasks below)
+
+An agent review reproduced 3 defects in the original draft. The tasks below are written in
+their CORRECTED form; this section records why.
+
+1. **Store the registry on the engine (Task 2 Step 1).** The hook calls `self._registry`, so
+   `__init__` must keep it:
+   ```python
+   _ruleset = rules_v1_1()
+   self._registry = RoleAbilityRegistry(_ruleset)
+   self._settler = JointSettler(_ruleset)
+   self._validator = ActionValidator(self._registry)
+   ```
+   (The original discarded the registry inline → `AttributeError` crashed every game on the
+   first death, breaking determinism.)
+
+2. **Validate the shot via the on_death ability's predicate, NOT `validate_in_state(phase=…)`.**
+   `hunter_shoot`'s trigger is `event:on_death`, which no phase string resolves, so the
+   phase-keyed validator returns `invalid_action` for every shot. Use the predicate directly:
+   ```python
+   from werewolf_eval.action_runtime.abilities import TARGET_RULES   # add to engine imports
+   ...
+   if action_name == "hunter_shoot":
+       ab = next((a for a in self._registry.on_death_abilities("hunter")
+                  if a.action_id == "hunter_shoot"), None)
+       pred = TARGET_RULES.get(ab.target_rule) if ab else None
+       legal = pred is not None and target is not None and pred(self._runtime_state(), hunter, target)
+       if not legal:
+           self._record_failure(rnd, phase, hunter, "invalid_action", f"{hunter} invalid hunter_shoot {target}", target)
+           self._downgrade_turn(turn, f"invalid hunter_shoot {target}")
+           action_name, target = "hunter_pass", None
+   ```
+
+3. **Distinct request phase for the shot (avoid fake-script key collision).** Add
+   `HUNTER_SHOT_REQUEST_PHASE = "hunter_shot"` (module constant). The shot's `ProviderRequest`
+   uses `phase=HUNTER_SHOT_REQUEST_PHASE` (so the fake key is `(p6,"hunter_shot",r)` for BOTH
+   night and day deaths, never colliding with the `(p6,"day",r)` vote); the obs/`request_id`
+   use the real `phase`; the emitted game_log event still uses the real `phase`. The fake
+   provider keys on `(actor, request.phase, round)`, so the phase string is what must differ.
+
+4. **Guard the night death loop against a double `player_died`.** Add `if pid not in self._alive:
+   continue` at the top of the `for pid in deaths:` loop (byte-neutral for 4-role — the settler
+   already yields distinct alive deaths — but prevents a doubled event if a hunter's shot lands
+   on a co-scheduled night victim).
+
+5. **Out of scope (note for later):** launching a hunter board via the profile path needs
+   `profile_config.ALLOWED_ROLES` + `observer_visibility._KNOWN_ROLE_TEAMS` to learn "hunter";
+   the tests here construct `GameConfig` directly and bypass that.
 
 ---
 
