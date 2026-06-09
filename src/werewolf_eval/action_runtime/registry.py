@@ -1,0 +1,40 @@
+from __future__ import annotations
+
+from werewolf_eval.action_runtime.abilities import AbilityDefinition, TARGET_RULES
+from werewolf_eval.action_runtime.ruleset import BoardRuleset
+from werewolf_eval.action_runtime.state import RuntimeState
+
+# runtime phase -> the trigger string used in AbilityDefinition.trigger
+_PHASE_TRIGGER = {"night": "phase:night", "day_vote": "phase:day_vote"}
+
+
+class RoleAbilityRegistry:
+    """Projects the active ruleset: which actions a (role, phase) may take, and
+    which targets are legal in a given state. Single source for allowed_actions /
+    allowed_targets / ability cards (cards land in Phase 2)."""
+
+    def __init__(self, ruleset: BoardRuleset) -> None:
+        self._rs = ruleset
+        self._by_role = {r.role: r for r in ruleset.roles}
+
+    def ability(self, action_id: str) -> AbilityDefinition:
+        return self._rs.ability(action_id)
+
+    def abilities_for(self, role: str, phase: str) -> list[AbilityDefinition]:
+        trig = _PHASE_TRIGGER[phase]
+        role_def = self._by_role[role]
+        return [
+            self._rs.ability(aid)
+            for aid in role_def.ability_ids
+            if self._rs.ability(aid).trigger == trig
+        ]
+
+    def allowed_actions(self, role: str, phase: str) -> list[str]:
+        return [a.action_id for a in self.abilities_for(role, phase)]
+
+    def allowed_targets(self, action_id: str, actor: str, state: RuntimeState) -> list[str]:
+        ability = self._rs.ability(action_id)
+        if not ability.target_rule:
+            return []
+        pred = TARGET_RULES[ability.target_rule]
+        return [pid for pid in sorted(state.alive) if pred(state, actor, pid)]
