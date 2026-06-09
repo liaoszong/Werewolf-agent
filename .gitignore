@@ -42,3 +42,6 @@ clients/qt_observer/build/
 
 # brainstorming visual companion mockups
 .superpowers/
+
+# Claude Code agent worktree scratch (embedded git repos)
+.claude/worktrees/
