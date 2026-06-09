@@ -22,7 +22,7 @@ from werewolf_eval.semantic_labels import load_semantic_label_log
 
 # Display labels live in one shared module (R-12) so a relabel / new event type lands
 # once across all renderers instead of drifting.
-from werewolf_eval.display_labels import ROLE_LABELS, TEAM_LABELS, TYPE_LABELS
+from werewolf_eval.display_labels import PHASE_LABELS, ROLE_LABELS, TEAM_LABELS, TYPE_LABELS
 
 
 def _html(value: object) -> str:
@@ -59,7 +59,7 @@ def build_demo_context(game: GameLog, score_log: Any, metrics: Any, attribution:
         {
             "sequence": event.sequence,
             "round": event.round,
-            "phase": event.phase,
+            "phase": PHASE_LABELS.get(event.phase, event.phase),
             "type": event.type,
             "type_label": TYPE_LABELS.get(event.type, event.type),
             "actor": event.actor,

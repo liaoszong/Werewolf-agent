@@ -864,5 +864,31 @@ class QtObserverCredentialPanelTests(unittest.TestCase):
                 )
 
 
+class QtObserverVocabContractTests(unittest.TestCase):
+    """R-01 renamed the engine token witch_kill -> witch_poison; the QML client
+    must follow it, and team labels must be localized like role labels."""
+
+    def test_event_queue_recognizes_canonical_witch_poison(self) -> None:
+        # qml-01 + qml-02: currentAction() and the _durationMs hold-time table must
+        # key off the canonical witch_poison token the engine emits, not the stale
+        # witch_kill (which left witch poison un-highlighted and timed at the default).
+        content = (QT / "qml/EventPresentationQueue.qml").read_text(encoding="utf-8")
+        self.assertIn("witch_poison", content)
+        # both the currentAction branch and the duration table reference it
+        self.assertGreaterEqual(content.count("witch_poison"), 2)
+        # the hold-time table gives witch_poison an explicit duration (not the default)
+        self.assertRegex(content, r"witch_poison:\s*\d+")
+
+    def test_role_card_localizes_team_label(self) -> None:
+        # qml-03: the team label must be localized (like the role name), not the raw
+        # english projection token. The raw token stays available for the accent dot.
+        content = (QT / "qml/components/RoleCard.qml").read_text(encoding="utf-8")
+        self.assertIn("_teamLabel", content)
+        self.assertIn("狼人阵营", content)
+        self.assertIn("村民阵营", content)
+        # the team Text must not render the raw token directly anymore
+        self.assertNotRegex(content, r"text:\s*root\.displayTeam\b")
+
+
 if __name__ == "__main__":
     unittest.main()

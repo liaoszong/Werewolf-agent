@@ -44,6 +44,16 @@ Item {
         }
     }
 
+    // Localized team / faction label (the raw token still drives the accent dot).
+    function _teamLabel(t) {
+        switch (("" + t).toLowerCase()) {
+        case "werewolf": return I18n.t("狼人阵营", "Werewolves")
+        case "villager": return I18n.t("村民阵营", "Villagers")
+        case "unknown": return I18n.t("未知", "Unknown")
+        default: return t
+        }
+    }
+
     opacity: root._dead ? 0.55 : 1.0
     Behavior on opacity { NumberAnimation { duration: Theme.motion.base } }
 
@@ -162,7 +172,7 @@ Item {
 
             Text {
                 anchors.verticalCenter: parent.verticalCenter
-                text: root.displayTeam
+                text: root._teamLabel(root.displayTeam)
                 font.family: Theme.font.family
                 font.pixelSize: Theme.size.micro
                 color: Theme.color.textSecondary
