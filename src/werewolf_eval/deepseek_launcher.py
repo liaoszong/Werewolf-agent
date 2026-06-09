@@ -6,9 +6,14 @@ verbatim.  It adds zero engine logic; its only post-run work is to read the
 ``failure-audit.json`` it caused and classify the run-failure exit code so the
 observer can map it to a key-free run-status reason (A7):
 
-* runner exit 0                                  -> 0
-* runner nonzero + reason has "budget exceeded"  -> 3 (budget_exhausted)
+* runner exit 0                                   -> 0
+* runner nonzero + budget exhaustion              -> 3 (budget_exhausted)
 * runner nonzero otherwise                        -> 2 (provider_failure)
+
+Budget exhaustion is detected by a single shared predicate
+(``_failure_is_budget_exhausted``): the structured ``kind == "budget_exhausted"``
+field OR either reason wording ("budget exhausted" / "budget exceeded"), so the
+legacy and emergent exit-code paths agree.
 
 The API key lives only inside the provider config + Authorization header; it is
 never logged, traced, or written to any artifact.
@@ -71,6 +76,30 @@ def _default_provider_factory(config: DeepSeekProviderConfig) -> ProviderFactory
     return factory
 
 
+def _failure_is_budget_exhausted(failure: Any) -> bool:
+    """Single source of truth for "this failure is a request-budget exhaustion".
+
+    Detects it three ways so the two live exit-code paths (legacy single-provider
+    and emergent/multi-provider) agree on the observer-facing 0/2/3 contract:
+    - the STRUCTURED field ``kind == "budget_exhausted"`` (emergent engine,
+      ``emergent_engine.py``); this is the authoritative signal.
+    - the legacy reason wording ``"budget exceeded"`` (``llm_providers`` raises
+      ``"request budget exceeded"``, which ``provider_agent`` wraps as a
+      ``kind="timeout"`` failure — so the budget signal survives only in the
+      reason string, not the kind).
+    - the emergent reason wording ``"budget exhausted"`` (note: *exhausted*, not
+      *exceeded*) — guards against any path that records the wording without the
+      structured kind. A substring-only detector keyed on "budget exceeded" alone
+      silently misclassified every emergent budget failure as a generic failure.
+    """
+    if not isinstance(failure, dict):
+        return False
+    if failure.get("kind") == "budget_exhausted":
+        return True
+    reason = str(failure.get("reason", ""))
+    return "budget exhausted" in reason or "budget exceeded" in reason
+
+
 def _classify_failure(run_dir: Path) -> int:
     """Read the launcher's own ``failure-audit.json`` and return 3 when the run
     failed because the request budget was exhausted, else 2."""
@@ -79,9 +108,10 @@ def _classify_failure(run_dir: Path) -> int:
         audit = json.loads(audit_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return 2
-    for failure in audit.get("failures", []):
-        if "budget exceeded" in str(failure.get("reason", "")):
-            return 3
+    if not isinstance(audit, dict):
+        return 2
+    if any(_failure_is_budget_exhausted(f) for f in audit.get("failures", [])):
+        return 3
     return 2
 
 
@@ -138,20 +168,16 @@ def _audit_is_budget_exhausted(audit_path: Path) -> bool:
 
     The emergent engine serializes budget exhaustion as a STRUCTURED failure with
     ``kind == "budget_exhausted"`` (the reason string reads "budget exhausted:
-    N/M requests"). We match the structured field — NOT the legacy
-    ``_classify_failure`` ``"budget exceeded"`` substring, whose wording differs
-    and would silently miss every emergent budget failure. Any read/parse error
-    is treated as not-budget (conservative → exit 2), never raised."""
+    N/M requests"). Detection is shared with ``_classify_failure`` via
+    ``_failure_is_budget_exhausted`` so both exit-code paths agree. Any read/parse
+    error is treated as not-budget (conservative → exit 2), never raised."""
     try:
         audit = json.loads(audit_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return False
     if not isinstance(audit, dict):
         return False
-    for failure in audit.get("failures", []):
-        if isinstance(failure, dict) and failure.get("kind") == "budget_exhausted":
-            return True
-    return False
+    return any(_failure_is_budget_exhausted(f) for f in audit.get("failures", []))
 
 
 def build_emergent_deepseek_launcher(
