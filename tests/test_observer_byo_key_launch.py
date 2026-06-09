@@ -186,6 +186,49 @@ class NoOrphanRunDirOnLiveRejectTests(unittest.TestCase):
             )
 
 
+class CrossOriginGuardTests(unittest.TestCase):
+    """observer-01: state-changing endpoints must reject DNS-rebind (non-loopback
+    Host) and cross-origin (CSRF) requests, not gate on peer IP alone."""
+
+    def _handler(self, headers):
+        from werewolf_eval.observer_server import ObserverRequestHandler
+
+        class _H(ObserverRequestHandler):
+            def __init__(self_h):  # skip BaseHTTPRequestHandler.__init__
+                self_h.headers = headers
+                self_h.client_address = ("127.0.0.1", 5555)
+                self_h.sent = []
+
+            def _send_error_json(self_h, status, code, message):
+                self_h.sent.append((status, code, message))
+
+        return _H()
+
+    def test_loopback_host_without_origin_is_allowed(self):
+        # Non-browser client (e.g. the Qt observer): Host loopback, no Origin.
+        h = self._handler({"Host": "127.0.0.1:8765"})
+        self.assertFalse(h._reject_cross_origin())
+        self.assertEqual(h.sent, [])
+
+    def test_localhost_same_origin_is_allowed(self):
+        h = self._handler({"Host": "localhost:8765", "Origin": "http://localhost:8765"})
+        self.assertFalse(h._reject_cross_origin())
+
+    def test_ipv6_loopback_host_is_allowed(self):
+        h = self._handler({"Host": "[::1]:8765"})
+        self.assertFalse(h._reject_cross_origin())
+
+    def test_dns_rebind_nonloopback_host_is_rejected(self):
+        h = self._handler({"Host": "attacker.example.com:8765"})
+        self.assertTrue(h._reject_cross_origin())
+        self.assertEqual(h.sent[0][0], 403)
+
+    def test_cross_origin_request_is_rejected(self):
+        h = self._handler({"Host": "127.0.0.1:8765", "Origin": "http://attacker.example.com"})
+        self.assertTrue(h._reject_cross_origin())
+        self.assertEqual(h.sent[0][0], 403)
+
+
 from werewolf_eval.observer_server import _sanitize_launcher_error
 
 
