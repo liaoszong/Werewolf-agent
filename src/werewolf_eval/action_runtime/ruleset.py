@@ -31,8 +31,9 @@ class BoardRuleset:
 
 
 def rules_v1() -> BoardRuleset:
-    """The current standard 6-player board, encoded as data. Mirrors
-    ALLOWED_ACTIONS_BY_ROLE_PHASE (provider_agent.py) + the engine target rules.
+    """The current standard 6-player board, encoded as data. The single source of
+    allowed actions (it replaced provider_agent's static ALLOWED_ACTIONS_BY_ROLE_PHASE
+    map) + the engine target rules.
 
     NOTE: witch_poison's target rule is ``exclude_self`` (alive AND != witch), the
     real engine guard at emergent_engine.py:702 (``target == witch`` is rejected) —

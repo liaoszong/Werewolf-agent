@@ -11,7 +11,6 @@ from werewolf_eval.action_runtime.abilities import TARGET_RULES
 from werewolf_eval.action_runtime.registry import RoleAbilityRegistry
 from werewolf_eval.action_runtime.ruleset import rules_v1
 from werewolf_eval.action_runtime.state import RuntimeState
-from werewolf_eval.provider_agent import ALLOWED_ACTIONS_BY_ROLE_PHASE
 
 
 class RuntimeStateTests(unittest.TestCase):
@@ -93,20 +92,21 @@ class RegistryParityTests(unittest.TestCase):
     def setUp(self) -> None:
         self.reg = RoleAbilityRegistry(rules_v1())
 
-    def test_allowed_actions_match_static_map_exactly(self) -> None:
-        # runtime "night" -> static "night"; runtime "day_vote" -> static "day".
-        phase_map = {"night": "night", "day_vote": "day"}
-        for (role, static_phase), expected in ALLOWED_ACTIONS_BY_ROLE_PHASE.items():
-            rt_phase = next(rt for rt, st in phase_map.items() if st == static_phase)
-            got = self.reg.allowed_actions(role, rt_phase)
-            # witch night has save+poison+pass in the registry; the static map lists
-            # only the adjudicating [witch_save, witch_poison]. Compare the
-            # adjudicating subset for parity (pass is a no-target engine path).
-            adjudicating = [a for a in got if a != "witch_pass"]
-            self.assertEqual(
-                sorted(adjudicating), sorted(expected),
-                f"{role}/{static_phase}: {adjudicating} != {expected}",
-            )
+    def test_allowed_actions_pinned(self) -> None:
+        # The registry IS the source of truth now (the static ALLOWED_ACTIONS_BY_ROLE_PHASE
+        # map was deleted); pin its full contract explicitly. Order matters — the prompt
+        # joins this list and uses [0] as the example action.
+        expected = {
+            ("werewolf", "night"): ["werewolf_kill"],
+            ("seer", "night"): ["seer_check"],
+            ("witch", "night"): ["witch_save", "witch_poison", "witch_pass"],
+            ("werewolf", "day_vote"): ["player_vote"],
+            ("seer", "day_vote"): ["player_vote"],
+            ("witch", "day_vote"): ["player_vote"],
+            ("villager", "day_vote"): ["player_vote"],
+        }
+        for (role, phase), want in expected.items():
+            self.assertEqual(self.reg.allowed_actions(role, phase), want, f"{role}/{phase}")
 
     def test_legal_targets_wolf_kill_excludes_wolves(self) -> None:
         s = RuntimeState(

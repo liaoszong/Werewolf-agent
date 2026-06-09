@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from werewolf_eval.action_runtime import RoleAbilityRegistry, rules_v1
 from werewolf_eval.game_engine import AgentAction, AgentObservation
 from werewolf_eval.provider_contract import (
     ProviderFailure,
@@ -16,15 +17,15 @@ class ProviderActionError(ValueError):
         self.failure = failure
 
 
-ALLOWED_ACTIONS_BY_ROLE_PHASE: dict[tuple[str, str], list[str]] = {
-    ("seer", "night"): ["seer_check"],
-    ("witch", "night"): ["witch_save", "witch_poison"],
-    ("werewolf", "night"): ["werewolf_kill"],
-    ("seer", "day"): ["player_vote"],
-    ("witch", "day"): ["player_vote"],
-    ("villager", "day"): ["player_vote"],
-    ("werewolf", "day"): ["player_vote"],
-}
+# Single source of allowed actions (replaced the static ALLOWED_ACTIONS_BY_ROLE_PHASE
+# map). decide() reaches only wolf-kill/seer-check/day-vote — the witch and speeches call
+# provider.respond() directly — and the registry returns the identical list (same order)
+# for those, so prompt bytes are unchanged. Built once at import (rules_v1() is pure/cheap).
+_ALLOWED_ACTIONS_REGISTRY = RoleAbilityRegistry(rules_v1())
+# External engine phase -> registry phase. The engine emits 'day' for votes; the registry
+# keys day votes under 'day_vote'. MUST map: an unmapped phase degrades to [] (registry
+# hardening), which would silently reject every vote (contract A / audit B4-1).
+_REGISTRY_PHASE = {"day": "day_vote"}
 
 
 class ProviderAgent:
@@ -105,7 +106,9 @@ class ProviderAgent:
         round_num = observation.round
         role = observation.role
 
-        allowed_actions = ALLOWED_ACTIONS_BY_ROLE_PHASE.get((role, phase), [])
+        allowed_actions = _ALLOWED_ACTIONS_REGISTRY.allowed_actions(
+            role, _REGISTRY_PHASE.get(phase, phase)
+        )
         allowed_targets = list(observation.alive_players)
 
         request_id = f"{game_id}_r{round_num:02d}_{actor}"

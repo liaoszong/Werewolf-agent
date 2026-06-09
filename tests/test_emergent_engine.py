@@ -182,6 +182,20 @@ class RobustnessTests(unittest.TestCase):
         self.assertIn("invalid_action", [f["kind"] for f in outcome.failure_audit["failures"]])
         parse_game_log(outcome.game_log)
 
+    def test_clean_game_has_no_vote_invalid_action(self) -> None:
+        # Contract A guard (allowed_actions swap): the day-vote allowed_actions must include
+        # player_vote, so a clean scripted game produces ZERO vote-phase invalid_action
+        # failures. If allowed_actions for phase 'day' were ever empty (a bad day->day_vote
+        # map after the swap), every vote would be rejected -> this fails. The game completes
+        # either way via the seeded fallback, so this keys on the FAILURE RECORD, not status.
+        outcome = _run(build_villager_win_script())
+        self.assertEqual(outcome.status, "completed")
+        vote_failures = [
+            f for f in outcome.failure_audit["failures"]
+            if f.get("phase") == "day" and f.get("kind") == "invalid_action"
+        ]
+        self.assertEqual(vote_failures, [], f"unexpected vote rejections: {vote_failures}")
+
     def test_voter_votes_self_falls_back(self) -> None:
         # Audit B5-3: the ONLY validator-discriminated vote reject is a self-vote (dead/unknown
         # targets are caught upstream by ProviderAgent.decide). p6 votes itself -> invalid -> fallback.

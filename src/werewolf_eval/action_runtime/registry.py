@@ -22,8 +22,8 @@ class RoleAbilityRegistry:
 
     def abilities_for(self, role: str, phase: str) -> list[AbilityDefinition]:
         # Unknown role/phase -> [] (degrades to a clean invalid_action), matching the
-        # pre-swap engine's never-raise contract. Guards the lockstep-drift hazard
-        # where ALLOWED_ACTIONS_BY_ROLE_PHASE and rules_v1's role set fall out of sync.
+        # engine's never-raise contract. Defensive for callers passing a role/phase not in
+        # this ruleset (e.g. a future role before its RulesVariant lands).
         trig = _PHASE_TRIGGER.get(phase)
         role_def = self._by_role.get(role)
         if trig is None or role_def is None:
