@@ -37,6 +37,18 @@ class RoleAbilityRegistry:
     def allowed_actions(self, role: str, phase: str) -> list[str]:
         return [a.action_id for a in self.abilities_for(role, phase)]
 
+    def on_death_abilities(self, role: str) -> list[AbilityDefinition]:
+        """Abilities a role's death triggers (trigger == 'event:on_death'). [] for an
+        unknown role or a role with no death trigger (so the engine hook is a no-op)."""
+        role_def = self._by_role.get(role)
+        if role_def is None:
+            return []
+        return [
+            self._rs.ability(aid)
+            for aid in role_def.ability_ids
+            if self._rs.ability(aid).trigger == "event:on_death"
+        ]
+
     def shown_targets(self, action_id: str, state: RuntimeState) -> list[str]:
         """The BROAD target list the model is SHOWN in the prompt — the full alive
         set, matching the engine's ``observation.alive_players``

@@ -62,3 +62,24 @@ def rules_v1() -> BoardRuleset:
         "guard+save_same_target": "death",
     }
     return BoardRuleset("rules_v1", roles, abilities, night_rules)
+
+
+def rules_v1_1() -> BoardRuleset:
+    """rules_v1 + the hunter (a versioned superset — does NOT edit rules_v1, per audit
+    contract C). Backward-compatible: the 4 original roles' abilities/target-rules are
+    byte-identical, so a 4-role game under rules_v1_1 behaves exactly as under rules_v1
+    (pinned by test_allowed_actions_pinned + the determinism canary)."""
+    base = rules_v1()
+    hunter_abilities = (
+        # on_death shot: a model decision fired when the hunter dies (night kill or vote-out).
+        AbilityDefinition("hunter_shoot", "event:on_death", "exclude_self", ARITY_ONE, "public"),
+        AbilityDefinition("hunter_pass", "event:on_death", "", ARITY_NONE, "public"),
+    )
+    hunter = RoleDefinition("hunter", "villager", ("player_vote", "hunter_shoot", "hunter_pass"))
+    return BoardRuleset(
+        "rules_v1_1",
+        base.roles + (hunter,),
+        base.abilities + hunter_abilities,
+        dict(base._night_rules),
+        base.death_order_key,
+    )

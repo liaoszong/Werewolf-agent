@@ -8,7 +8,7 @@ from werewolf_eval.action_runtime.abilities import (
 )
 from werewolf_eval.action_runtime.envelope import ActionEnvelope
 from werewolf_eval.action_runtime.registry import RoleAbilityRegistry
-from werewolf_eval.action_runtime.ruleset import BoardRuleset, rules_v1
+from werewolf_eval.action_runtime.ruleset import BoardRuleset, rules_v1, rules_v1_1
 from werewolf_eval.action_runtime.settler import JointSettler, NightIntents, NightResult
 from werewolf_eval.action_runtime.state import RuntimeState
 from werewolf_eval.action_runtime.triggers import TriggerSystem
@@ -22,6 +22,7 @@ __all__ = [
     "RoleAbilityRegistry",
     "BoardRuleset",
     "rules_v1",
+    "rules_v1_1",
     "JointSettler",
     "NightIntents",
     "NightResult",
