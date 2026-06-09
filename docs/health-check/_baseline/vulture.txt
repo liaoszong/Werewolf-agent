@@ -1,0 +1,16 @@
+vulture UNAVAILABLE on this host (best-effort attempt failed).
+
+Reason: `python -m pip install vulture` could not reach PyPI — same proxy/egress
+block as coverage (see coverage.txt), consistent with the documented env limit.
+
+Consequence for this health check:
+- No automated dead-function / dead-variable list was produced locally
+  (vulture_findings_count = 0 in the baseline summary means "tool absent",
+  NOT "zero dead code found").
+- Phase 2 (slimming) therefore did NOT have vulture's function-level signal;
+  it worked at module granularity from import-refs.txt (only one 0-ref module:
+  validate_failure_audit) plus git grep for dynamic references, and stayed
+  conservative (no DEAD-CONFIRMED grade assigned to any source module).
+
+Where to get the real signal: run on CI / a networked host, e.g.
+  vulture src/werewolf_eval --min-confidence 80
