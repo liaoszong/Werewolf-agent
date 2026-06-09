@@ -49,7 +49,9 @@ class ActionValidator:
         ability = self._reg.ability(env.action)
         if ability.target_arity == ARITY_NONE:
             return ValidationResult(True)
-        pred = TARGET_RULES[ability.target_rule]
-        if env.targets and all(pred(state, env.actor, t) for t in env.targets):
+        # .get mirrors registry.legal_targets' guard: a malformed ability (arity != none
+        # but empty/unknown target_rule) rejects rather than KeyError-ing.
+        pred = TARGET_RULES.get(ability.target_rule)
+        if pred is not None and env.targets and all(pred(state, env.actor, t) for t in env.targets):
             return ValidationResult(True)
         return ValidationResult(False, "invalid_target")

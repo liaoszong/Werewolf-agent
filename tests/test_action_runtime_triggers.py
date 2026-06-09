@@ -50,6 +50,17 @@ class TriggerTests(unittest.TestCase):
         st = RuntimeState(alive=frozenset(SEAT), roles={p: "villager" for p in SEAT})
         self.assertEqual(ts.resolve(["p4", "p1", "p3"], st), ["p1", "p3", "p4"])
 
+    def test_handler_returning_dead_pid_is_ignored(self) -> None:
+        # Hardening (mirror the settler): a buggy handler returning an already-dead pid
+        # cannot inject a phantom death row.
+        st = RuntimeState(alive=frozenset({"p1", "p3"}), roles={"p1": "villager", "p3": "hunter"})
+
+        def hunter(_s: RuntimeState, dead: str) -> list[str]:
+            return ["p2"]   # p2 is NOT in alive
+
+        ts = TriggerSystem({"hunter": hunter}, SEAT)
+        self.assertEqual(ts.resolve(["p3"], st), ["p3"])
+
 
 if __name__ == "__main__":
     unittest.main()

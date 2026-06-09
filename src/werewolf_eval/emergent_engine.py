@@ -892,7 +892,7 @@ class EmergentGameEngine:
             deaths: list[str] = list(
                 self._settler.resolve_night(
                     NightIntents(wolf_victim=victim, saved=saved, poison_target=poison_target),
-                    RuntimeState(alive=frozenset(self._alive), roles={}),
+                    self._runtime_state(),
                 ).deaths
             )
             for pid in deaths:

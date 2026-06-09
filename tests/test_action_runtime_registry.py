@@ -126,6 +126,19 @@ class RegistryParityTests(unittest.TestCase):
         )
         self.assertEqual(self.reg.shown_targets("werewolf_kill", s), ["p1", "p2", "p3", "p5"])
 
+    def test_unknown_role_or_phase_returns_empty_not_keyerror(self) -> None:
+        # Hardening: degrade to [] (clean invalid_action) instead of KeyError, matching the
+        # pre-swap never-raise contract + guarding lockstep drift with the static map.
+        self.assertEqual(self.reg.allowed_actions("hunter", "day_vote"), [])
+        self.assertEqual(self.reg.allowed_actions("seer", "dusk"), [])
+
+    def test_witch_night_actions_exact_order_including_pass(self) -> None:
+        # B5-5: pin witch_pass's presence + position (the static-map parity test filters it out).
+        self.assertEqual(
+            self.reg.allowed_actions("witch", "night"),
+            ["witch_save", "witch_poison", "witch_pass"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

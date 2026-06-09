@@ -21,8 +21,13 @@ class RoleAbilityRegistry:
         return self._rs.ability(action_id)
 
     def abilities_for(self, role: str, phase: str) -> list[AbilityDefinition]:
-        trig = _PHASE_TRIGGER[phase]
-        role_def = self._by_role[role]
+        # Unknown role/phase -> [] (degrades to a clean invalid_action), matching the
+        # pre-swap engine's never-raise contract. Guards the lockstep-drift hazard
+        # where ALLOWED_ACTIONS_BY_ROLE_PHASE and rules_v1's role set fall out of sync.
+        trig = _PHASE_TRIGGER.get(phase)
+        role_def = self._by_role.get(role)
+        if trig is None or role_def is None:
+            return []
         return [
             self._rs.ability(aid)
             for aid in role_def.ability_ids

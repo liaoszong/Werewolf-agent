@@ -182,6 +182,16 @@ class RobustnessTests(unittest.TestCase):
         self.assertIn("invalid_action", [f["kind"] for f in outcome.failure_audit["failures"]])
         parse_game_log(outcome.game_log)
 
+    def test_voter_votes_self_falls_back(self) -> None:
+        # Audit B5-3: the ONLY validator-discriminated vote reject is a self-vote (dead/unknown
+        # targets are caught upstream by ProviderAgent.decide). p6 votes itself -> invalid -> fallback.
+        s = build_villager_win_script()
+        s[("p6", "day", 1)] = json.dumps({"action": "player_vote", "target": "p6", "reason_summary": "x", "decision_type": "inference_based", "confidence": 1.0}, ensure_ascii=False)
+        outcome = _run(s)
+        self.assertEqual(outcome.status, "completed")
+        self.assertIn("invalid_action", [f["kind"] for f in outcome.failure_audit["failures"]])
+        parse_game_log(outcome.game_log)
+
     def test_malformed_speech_uses_placeholder(self) -> None:
         from werewolf_eval.emergent_engine import SPEECH_REQUEST_PHASE
         s = build_villager_win_script()

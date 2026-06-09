@@ -46,7 +46,9 @@ class TriggerSystem:
             handler = self._triggers.get(state.roles.get(dead, ""))
             if handler is None:
                 continue
-            new_deaths = [d for d in handler(state, dead) if d not in seen]
+            # Gate on still-alive (mirror the settler) so a buggy handler can't inject
+            # a phantom death row; de-dup against already-processed.
+            new_deaths = [d for d in handler(state, dead) if d not in seen and d in state.alive]
             queue.extend(new_deaths)
-            queue.sort(key=self._seat_index)   # deterministic next pick
+            queue.sort(key=lambda p: (self._seat_index(p), p))   # deterministic (seat, then id)
         return processed
