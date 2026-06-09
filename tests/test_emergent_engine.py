@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -14,6 +15,7 @@ from werewolf_eval.emergent_engine import (
     EmergentBudget,
     EmergentGameEngine,
     SPEECH_EMPTY_PLACEHOLDER,
+    SPEECH_REQUEST_PHASE,
     build_emergent_config,
 )
 from werewolf_eval.emergent_fake_script import (
@@ -24,6 +26,7 @@ from werewolf_eval.emergent_fake_script import (
 from werewolf_eval.fake_provider import DeterministicFakeProvider
 from werewolf_eval.game_log import parse_game_log
 from werewolf_eval.provider_agent import ProviderAgent
+from werewolf_eval.runtime_events import RuntimeEventWriter
 
 
 def _run(script, *, seed=0, budget=None, game_id="p2a1_test"):
@@ -206,6 +209,95 @@ class BudgetTests(unittest.TestCase):
         outcome = _run(build_villager_win_script(), budget=EmergentBudget(max_requests=80, max_day_rounds=0))
         self.assertEqual(outcome.status, "failed")
         self.assertEqual(outcome.end_condition, "round_cap")
+
+
+class _DiskSnoopProvider:
+    """Wraps a provider and, at the FIRST round-1 day speech (by which point all
+    night-1 events have already been emitted), snapshots ``game-log.json`` from
+    disk into *captured*. Proves the partial game-log is readable mid-run — the
+    exact thing the live theater's projection needs to draw night-1 pointing
+    lines and speech bodies BEFORE the game ends."""
+
+    def __init__(self, inner, out_dir: Path, captured: dict) -> None:
+        self._inner = inner
+        self._out_dir = Path(out_dir)
+        self._captured = captured
+
+    def respond(self, request):
+        if (
+            request.phase == SPEECH_REQUEST_PHASE
+            and request.round == 1
+            and not self._captured.get("_taken")
+        ):
+            self._captured["_taken"] = True
+            try:
+                self._captured["log"] = json.loads(
+                    (self._out_dir / "game-log.json").read_text(encoding="utf-8")
+                )
+            except (OSError, json.JSONDecodeError):
+                self._captured["log"] = None   # absent/torn -> pre-fix behaviour
+        return self._inner.respond(request)
+
+
+class LivePartialLogTests(unittest.TestCase):
+    """Option A: the emergent engine mirrors the in-progress game-log/decision-log
+    to the spine dir as events are emitted, so the live projection can enrich
+    events (summary/target/reason_summary) WHILE the game runs — not only at end."""
+
+    def test_game_log_readable_mid_run_for_projection(self) -> None:
+        script = build_villager_win_script()
+        captured: dict = {}
+        with tempfile.TemporaryDirectory() as td:
+            out_dir = Path(td)
+            writer = RuntimeEventWriter(run_id="g_mid", out_dir=out_dir)
+            agents = {
+                pid: ProviderAgent(
+                    player_id=pid,
+                    provider=_DiskSnoopProvider(
+                        DeterministicFakeProvider(dict(script)), out_dir, captured
+                    ),
+                )
+                for pid in ("p1", "p2", "p3", "p4", "p5", "p6")
+            }
+            engine = EmergentGameEngine(
+                config=build_emergent_config(game_id="g_mid"),
+                agents=agents,
+                seed=0,
+                runtime_events=writer,
+            )
+            outcome = engine.run()
+
+        self.assertEqual(outcome.status, "completed")
+        log = captured.get("log")
+        self.assertIsNotNone(
+            log, "game-log.json must exist on disk during day-1 speeches (mid-run)"
+        )
+        events = log.get("events", [])
+        kills = [e for e in events if e.get("type") == "werewolf_kill"]
+        self.assertTrue(kills, "night-1 werewolf_kill must be on disk before day-1 speeches")
+        # The two fields the theater needs: target (pointing line) + data.summary (body).
+        self.assertEqual(kills[0].get("target"), "p5")
+        self.assertEqual(kills[0]["data"]["summary"], "Wolf team kills p5.")
+
+    def test_failed_run_leaves_no_partial_logs(self) -> None:
+        # fail-closed invariant: a failed run must leave NO game log on disk, even
+        # though setup events were emitted (and a partial was written) before the
+        # round-cap failure. The cleanup in _failed_outcome must remove them.
+        script = build_villager_win_script()
+        with tempfile.TemporaryDirectory() as td:
+            out_dir = Path(td)
+            writer = RuntimeEventWriter(run_id="g_fail", out_dir=out_dir)
+            engine = EmergentGameEngine(
+                config=build_emergent_config(game_id="g_fail"),
+                agents=build_emergent_fake_agents(script),
+                seed=0,
+                budget=EmergentBudget(max_requests=80, max_day_rounds=0),
+                runtime_events=writer,
+            )
+            outcome = engine.run()
+            self.assertEqual(outcome.status, "failed")
+            self.assertFalse((out_dir / "game-log.json").exists())
+            self.assertFalse((out_dir / "decision-log.json").exists())
 
 
 if __name__ == "__main__":

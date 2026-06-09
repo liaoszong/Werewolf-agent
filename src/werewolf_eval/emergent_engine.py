@@ -289,6 +289,7 @@ class EmergentGameEngine:
                 visibility=visibility,
                 payload={"event_id": evt["event_id"], "type": etype},
             )
+        self._flush_partial_logs()
         return evt
 
     def _decision(
@@ -321,11 +322,61 @@ class EmergentGameEngine:
                 "strategy_tag": None,
             }
         )
+        self._flush_partial_logs()
 
     def _record_failure(
         self, rnd: int, phase: str, actor: str, kind: str, reason: str, target: str | None = None
     ) -> None:
         self._failures.append(build_failure(self._game_id, rnd, phase, actor, kind, reason, target))
+
+    # ---- log envelopes (single source of shape) ------------------------
+
+    def _game_log_dict(self, result: dict[str, Any] | None) -> dict[str, Any]:
+        """The game-log envelope. ``result=None`` is the in-progress (partial)
+        shape used during the live run; the completed run passes the final result.
+        Both share this one builder so the partial and the end-of-game log can
+        never drift."""
+        log: dict[str, Any] = {
+            "game_id": self._game_id,
+            "source_label": self._source_label,
+            "players": [
+                {"player_id": p.player_id, "role": p.role, "team": p.team}
+                for p in self._config.players
+            ],
+            "events": self._events,
+        }
+        if result is not None:
+            log["result"] = result
+        return log
+
+    def _decision_log_dict(self) -> dict[str, Any]:
+        return {
+            "decision_log_id": f"{self._game_id}_decision_log",
+            "game_id": self._game_id,
+            "source_label": self._source_label,
+            "decisions": self._decisions,
+        }
+
+    # Partial-log filenames mirrored to the spine dir during a live run.
+    _PARTIAL_LOG_NAMES = ("game-log.json", "decision-log.json")
+
+    def _flush_partial_logs(self) -> None:
+        """Mirror the in-progress game-log + decision-log to the spine dir so the
+        live theater's projection can draw pointing lines (event.target) and speech
+        bodies (data.summary) / reasons WHILE the game runs, instead of only after
+        completion. No-op without a runtime writer (offline unit tests). The
+        end-of-game complete log written by the launcher supersedes these."""
+        if self._runtime_events is None:
+            return
+        self._runtime_events.write_partial_log("game-log.json", self._game_log_dict(result=None))
+        self._runtime_events.write_partial_log("decision-log.json", self._decision_log_dict())
+
+    def _discard_partial_logs(self) -> None:
+        """Fail-closed: remove any partial logs a failed run left on disk."""
+        if self._runtime_events is None:
+            return
+        for name in self._PARTIAL_LOG_NAMES:
+            self._runtime_events.remove_partial_log(name)
 
     def _write_god_snapshot(self, name: str, rnd: int, phase: str) -> None:
         """Write a god-view snapshot to the runtime spine (P2-A-2 mandatory spine
@@ -764,6 +815,10 @@ class EmergentGameEngine:
             return self._failed_outcome("budget_exhausted", str(exc))
 
     def _failed_outcome(self, end_condition: str, reason: str) -> GameOutcome:
+        # Fail-closed: setup/early events may have mirrored a partial game-log to
+        # disk; a failed run must leave NO game log (matches the launcher, which
+        # writes only the failure audit on failure).
+        self._discard_partial_logs()
         self._record_failure(0, "game_end", "system", end_condition, reason)
         failure_audit = {
             "game_id": self._game_id,
@@ -855,24 +910,15 @@ class EmergentGameEngine:
         )
         self._write_god_snapshot("final_god_view", end_round, "game_end")
 
-        game_log = {
-            "game_id": game_id,
-            "source_label": self._source_label,
-            "players": [{"player_id": p.player_id, "role": p.role, "team": p.team} for p in self._config.players],
-            "events": self._events,
-            "result": {
+        game_log = self._game_log_dict(
+            result={
                 "winner": winner,
                 "end_round": end_round,
                 "survivors": sorted(self._alive),
                 "end_condition": end_condition,
-            },
-        }
-        decision_log = {
-            "decision_log_id": f"{game_id}_decision_log",
-            "game_id": game_id,
-            "source_label": self._source_label,
-            "decisions": self._decisions,
-        }
+            }
+        )
+        decision_log = self._decision_log_dict()
         consensus_log = {
             "consensus_log_id": f"{game_id}_consensus_log",
             "game_id": game_id,

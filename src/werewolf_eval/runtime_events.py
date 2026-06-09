@@ -410,6 +410,33 @@ class RuntimeEventWriter:
         )
         return f"snapshots/{name}.json"
 
+    # -- write_partial_log --------------------------------------------------
+
+    def write_partial_log(self, name: str, payload: dict[str, object]) -> Path:
+        """Atomically mirror an in-progress log (e.g. ``game-log.json``) into the
+        run dir so the live projection can enrich events (summary/target/
+        reason_summary) WHILE the game is still running — not only at completion.
+
+        Written via a temp file + atomic replace so a concurrent server read of
+        ``/projection`` never observes a torn file (a half-written JSON would just
+        be skipped by the reader's JSONDecodeError guard, but atomicity avoids
+        even that transient miss). Mirrors the launcher's final-write shape so the
+        end-of-game complete log (with ``result``) cleanly supersedes the partial.
+        """
+        path = self._out_dir / name
+        tmp = self._out_dir / (name + ".tmp")
+        tmp.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        )
+        tmp.replace(path)
+        return path
+
+    def remove_partial_log(self, name: str) -> None:
+        """Remove an in-progress log file. Fail-closed: a failed run must leave no
+        game log on disk, even though setup events wrote a partial before failure."""
+        (self._out_dir / name).unlink(missing_ok=True)
+        (self._out_dir / (name + ".tmp")).unlink(missing_ok=True)
+
     # -- write_prompt_manifest ----------------------------------------------
 
     def write_prompt_manifest(self, manifest: dict[str, object]) -> Path:
