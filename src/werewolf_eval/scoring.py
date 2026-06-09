@@ -534,6 +534,19 @@ def _round_elimination_event(game: GameLog, round_number: int) -> str | None:
 
 def _score_player_vote(game: GameLog, event: Event, eliminated_by_round: dict[int, str], assessment: DecisionAssessment | None = None) -> ScoreRecord:
     actor_role = _role_of(game, event.actor)
+    if event.target not in _player_by_id(game):
+        # game_log validation accepts non-player vote targets (``none``/``*_team``);
+        # the engine never emits them, but replays/hand-written logs can. There is no
+        # deterministic vote-scoring row for a non-player target, so record a rubric gap
+        # rather than KeyError on role/team lookup.
+        return _record(
+            event,
+            0,
+            ["rubric-gap:vote_target_not_a_player"],
+            [event.event_id],
+            f"Vote target {event.target!r} is not a player id; no deterministic vote scoring row applies.",
+            assessment,
+        )
     target_role = _role_of(game, event.target)
     target_team = _team_of(game, event.target)
     eliminated_target = eliminated_by_round.get(event.round)
@@ -720,8 +733,13 @@ def _vote_events(game: GameLog) -> list[Event]:
 
 
 def _vote_accuracy_by_player(game: GameLog) -> dict[str, dict[str, float | int]]:
+    players = _player_by_id(game)
     result = {player.player_id: {"accurate_votes": 0, "total_votes": 0, "vote_accuracy": 0.0} for player in game.players}
     for event in _vote_events(game):
+        if event.target not in players:
+            # Non-player vote targets (``none``/``*_team``) are abstentions, not votes
+            # against a player; exclude them from vote accuracy instead of KeyError.
+            continue
         actor_team = _team_of(game, event.actor)
         target_team = _team_of(game, event.target)
         result[event.actor]["total_votes"] += 1
@@ -822,8 +840,8 @@ def _result_metrics(game: GameLog) -> ResultMetrics:
     return ResultMetrics(
         winner=game.result.winner,
         game_length=game.result.end_round,
-        werewolf_survival_rate=_round_float(len(alive_werewolves) / len(werewolves)),
-        villager_survival_rate=_round_float(len(alive_villagers) / len(villagers)),
+        werewolf_survival_rate=_round_float(len(alive_werewolves) / len(werewolves)) if werewolves else 0.0,
+        villager_survival_rate=_round_float(len(alive_villagers) / len(villagers)) if villagers else 0.0,
         margin=len(winner_alive) - len(loser_alive),
         werewolf_win_speed=None if game.result.winner != "werewolf" else _round_float((len(alive_werewolves) - len(alive_villagers)) / game.result.end_round),
         villager_win_efficiency=None if game.result.winner != "villager" else _round_float(len(werewolf_deaths) / game.result.end_round),
