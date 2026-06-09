@@ -31,6 +31,7 @@ from werewolf_eval.game_engine import (
 from werewolf_eval.runtime_events import build_god_snapshot, build_role_projection_snapshot
 from werewolf_eval.provider_agent import ProviderActionError
 from werewolf_eval.provider_contract import ProviderRequest
+from werewolf_eval.action_runtime import JointSettler, NightIntents, RuntimeState, rules_v1
 
 # The provider request phase used for free-text speeches. The game_log event is
 # still recorded with phase="day"; the distinct request phase only keeps the
@@ -230,6 +231,9 @@ class EmergentGameEngine:
         self._seq = 0
         self._d_counter = 0
         self._alive: set[str] = set(self._players_by_id)
+        # Phase-3 swap: night joint resolution delegates to the Agent Action
+        # Runtime's JointSettler (rules_v1) instead of inline death logic.
+        self._settler = JointSettler(rules_v1())
 
     # ---- small helpers -------------------------------------------------
 
@@ -856,11 +860,15 @@ class EmergentGameEngine:
             self._resolve_seer(rnd)
             saved, poison_target, save_used, poison_used = self._resolve_witch(rnd, victim, save_used, poison_used)
 
-            deaths: list[str] = []
-            if victim is not None and not saved and victim in self._alive:
-                deaths.append(victim)
-            if poison_target is not None and poison_target in self._alive and poison_target not in deaths:
-                deaths.append(poison_target)
+            # Night settlement delegates to the Agent Action Runtime's JointSettler
+            # (Phase-3 swap). Byte-identical to the prior inline logic for rules_v1 —
+            # proven by tests/test_action_runtime_parity.py and the full suite below.
+            deaths: list[str] = list(
+                self._settler.resolve_night(
+                    NightIntents(wolf_victim=victim, saved=saved, poison_target=poison_target),
+                    RuntimeState(alive=frozenset(self._alive), roles={}),
+                ).deaths
+            )
             for pid in deaths:
                 self._alive.discard(pid)
                 self._emit("night", rnd, "player_died", "system", pid, "all", f"{pid} died during the night.")
