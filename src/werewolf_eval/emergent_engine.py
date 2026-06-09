@@ -46,6 +46,10 @@ from werewolf_eval.action_runtime.abilities import TARGET_RULES
 # still recorded with phase="day"; the distinct request phase only keeps the
 # speech provider call from colliding with the day vote at (actor, "day", round).
 SPEECH_REQUEST_PHASE = "day_speech"
+# Distinct request phase for the hunter's on-death shot, so its fake-script key
+# (actor, phase, round) never collides with the hunter's day-vote key (p6,"day",r).
+# The emitted game_log event still uses the real "night"/"day" phase.
+HUNTER_SHOT_REQUEST_PHASE = "hunter_shot"
 SPEECH_MAX_CHARS = 200
 SPEECH_EMPTY_PLACEHOLDER = "（发言无效）"
 
@@ -202,6 +206,14 @@ class GameOutcome:
 def build_emergent_config(game_id: str = "p2a1_emergent_001") -> GameConfig:
     """Default 6-player board: p1/p2 wolves, p3 seer, p4 witch, p5/p6 villagers."""
     return build_default_config(game_id=game_id)
+
+
+def build_emergent_hunter_config(game_id: str = "hunter_v11") -> GameConfig:
+    """6-player hunter board: p1/p2 wolves, p3 seer, p4 witch, p5 villager, p6 hunter."""
+    cfg = build_default_config(game_id=game_id)
+    players = list(cfg.players)
+    players[5] = EnginePlayer("p6", "hunter", "villager")
+    return GameConfig(game_id=game_id, players=players)
 
 
 class EmergentGameEngine:
@@ -840,6 +852,83 @@ class EmergentGameEngine:
             return leaders[0]
         return leaders[self._rng.randrange(len(leaders))]
 
+    # ---- death-triggered abilities (hunter v1.1) -----------------------
+
+    def _trigger_on_death(self, dead: str, rnd: int, phase: str) -> None:
+        """Fire a dead player's on_death ability (data-driven via the ruleset). For the
+        hunter that is a model-driven shot; the shot victim may itself trigger (cascade —
+        terminates because each pid is removed from _alive before recursing). No-op for any
+        role with no on_death ability, so 4-role games are byte-unchanged."""
+        role = self._players_by_id[dead].role
+        if not self._registry.on_death_abilities(role):
+            return
+        target = self._resolve_hunter_shot(dead, rnd, phase)
+        if target is not None and target in self._alive:
+            self._alive.discard(target)
+            self._emit(phase, rnd, "player_died", "system", target, "all",
+                       f"{target} was shot by {dead}.")
+            self._trigger_on_death(target, rnd, phase)
+
+    def _resolve_hunter_shot(self, hunter: str, rnd: int, phase: str) -> str | None:
+        """Ask the hunter's provider for a shot (hunter_shoot) or a pass. Validate via the
+        on_death ability's target predicate (exclude_self/alive — NOT the phase-keyed
+        validator, which can't see event:on_death abilities); downgrade an illegal shot to a
+        pass; charge budget; record a decision + provider_turn; emit the event. Returns the
+        shot target, or None for a pass / no valid target. Draws NO self._rng, so it never
+        perturbs the seeded RNG order of a 4-role game."""
+        self._budget.charge()
+        obs = self._build_obs(hunter, phase, rnd)
+        rendered = render_observation_text(obs, self._events_by_id())
+        request = ProviderRequest(
+            request_id=f"{self._game_id}_r{rnd:02d}_{hunter}_shot",
+            game_id=self._game_id, actor=hunter, phase=HUNTER_SHOT_REQUEST_PHASE, round=rnd,
+            observation=obs.to_dict(),
+            allowed_actions=["hunter_shoot", "hunter_pass"],
+            allowed_targets=sorted(self._alive),
+            observation_text=rendered.text + "\n你已出局,作为猎人可开枪带走一名存活玩家,或选择不开枪。",
+            response_kind="action", max_output_tokens=ACTION_MAX_OUTPUT_TOKENS,
+        )
+        turn: dict[str, Any] = {
+            "request_id": request.request_id, "round": rnd, "phase": phase, "actor": hunter,
+            "response_kind": "action", "live_requested": True, "kind": None,
+            "fallback_reason": None, "source_label": None,
+            "model": getattr(self._agents[hunter].provider, "model", None), "token_usage": None,
+            "observation_source_event_ids": list(rendered.source_event_ids),
+        }
+        self._provider_turns.append(turn)
+        action_name, target = "hunter_pass", None
+        try:
+            response = self._agents[hunter].provider.respond(request)
+            turn["source_label"] = response.source_label
+            turn["token_usage"] = dict(response.token_usage)
+            parsed = json.loads(response.raw_content)
+            action_name = parsed.get("action", "hunter_pass")
+            target = parsed.get("target")
+            turn["kind"] = LIVE_SUCCESS
+        except Exception as exc:  # noqa: BLE001
+            self._record_failure(rnd, phase, hunter, "parse_failure", f"{hunter} hunter parse failed: {exc}")
+            turn["kind"] = INVALID_FALLBACK
+            turn["fallback_reason"] = f"hunter parse failed: {exc}"
+            action_name, target = "hunter_pass", None
+
+        if action_name == "hunter_shoot":
+            ab = next((a for a in self._registry.on_death_abilities("hunter")
+                       if a.action_id == "hunter_shoot"), None)
+            pred = TARGET_RULES.get(ab.target_rule) if ab else None
+            legal = pred is not None and target is not None and pred(self._runtime_state(), hunter, target)
+            if not legal:
+                self._record_failure(rnd, phase, hunter, "invalid_action", f"{hunter} invalid hunter_shoot {target}", target)
+                self._downgrade_turn(turn, f"invalid hunter_shoot {target}")
+                action_name, target = "hunter_pass", None
+
+        if action_name == "hunter_shoot" and target is not None:
+            self._decision(hunter, "single", phase, "hunter_shoot", target, "retaliatory", f"hunter {hunter} shoots {target}")
+            self._emit(phase, rnd, "hunter_shoot", hunter, target, "public", f"Hunter {hunter} shoots {target}.")
+            return target
+        self._decision(hunter, "single", phase, "hunter_pass", "none", FALLBACK_DECISION_TYPE, f"{hunter} does not shoot")
+        self._emit(phase, rnd, "hunter_pass", hunter, "none", "public", f"Hunter {hunter} does not shoot.")
+        return None
+
     # ---- main loop -----------------------------------------------------
 
     def run(self) -> GameOutcome:
@@ -900,8 +989,11 @@ class EmergentGameEngine:
                 ).deaths
             )
             for pid in deaths:
+                if pid not in self._alive:   # a hunter shot may have already killed a co-victim
+                    continue
                 self._alive.discard(pid)
                 self._emit("night", rnd, "player_died", "system", pid, "all", f"{pid} died during the night.")
+                self._trigger_on_death(pid, rnd, "night")
 
             self._write_god_snapshot(f"god_view_r{rnd}_night", rnd, "night")
 
@@ -925,6 +1017,7 @@ class EmergentGameEngine:
                 role = self._players_by_id[eliminated].role
                 self._emit("day", rnd, "player_eliminated", "system", eliminated, "all", f"{eliminated} eliminated by vote.")
                 self._emit("day", rnd, "role_revealed", "system", eliminated, "all", f"{eliminated} revealed as {role}.")
+                self._trigger_on_death(eliminated, rnd, "day")
 
             self._write_god_snapshot(f"god_view_r{rnd}_day", rnd, "day")
 
