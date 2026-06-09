@@ -38,8 +38,9 @@ from werewolf_eval.action_runtime import (
     NightIntents,
     RoleAbilityRegistry,
     RuntimeState,
-    rules_v1,
+    rules_v1_1,
 )
+from werewolf_eval.action_runtime.abilities import TARGET_RULES
 
 # The provider request phase used for free-text speeches. The game_log event is
 # still recorded with phase="day"; the distinct request phase only keeps the
@@ -241,9 +242,12 @@ class EmergentGameEngine:
         self._alive: set[str] = set(self._players_by_id)
         # Phase-3 swap: night joint resolution delegates to the Agent Action
         # Runtime's JointSettler, and per-action legality to its registry/validator.
-        _ruleset = rules_v1()
+        # rules_v1_1 is a backward-compatible superset (adds the hunter); 4-role games
+        # are byte-identical (the hunter role is never queried).
+        _ruleset = rules_v1_1()
+        self._registry = RoleAbilityRegistry(_ruleset)
         self._settler = JointSettler(_ruleset)
-        self._validator = ActionValidator(RoleAbilityRegistry(_ruleset))
+        self._validator = ActionValidator(self._registry)
 
     # ---- small helpers -------------------------------------------------
 
