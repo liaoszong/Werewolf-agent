@@ -163,6 +163,25 @@ class RobustnessTests(unittest.TestCase):
         # log still validates
         parse_game_log(outcome.game_log)
 
+    def test_bad_wolf_kill_targets_teammate_falls_back(self) -> None:
+        # Phase-3 validator swap reject path: p1 tries to kill wolf teammate p2 ->
+        # invalid -> failure recorded; game still completes (p2's valid proposal wins).
+        s = build_villager_win_script()
+        s[("p1", "night", 1)] = json.dumps({"action": "werewolf_kill", "target": "p2", "reason_summary": "x", "decision_type": "team_coordinated", "confidence": 1.0}, ensure_ascii=False)
+        outcome = _run(s)
+        self.assertEqual(outcome.status, "completed")
+        self.assertIn("invalid_action", [f["kind"] for f in outcome.failure_audit["failures"]])
+        parse_game_log(outcome.game_log)
+
+    def test_bad_seer_check_self_falls_back(self) -> None:
+        # Phase-3 validator swap reject path: p3 (seer) checks itself -> invalid -> fallback.
+        s = build_villager_win_script()
+        s[("p3", "night", 1)] = json.dumps({"action": "seer_check", "target": "p3", "reason_summary": "x", "decision_type": "inference_based", "confidence": 1.0}, ensure_ascii=False)
+        outcome = _run(s)
+        self.assertEqual(outcome.status, "completed")
+        self.assertIn("invalid_action", [f["kind"] for f in outcome.failure_audit["failures"]])
+        parse_game_log(outcome.game_log)
+
     def test_malformed_speech_uses_placeholder(self) -> None:
         from werewolf_eval.emergent_engine import SPEECH_REQUEST_PHASE
         s = build_villager_win_script()
