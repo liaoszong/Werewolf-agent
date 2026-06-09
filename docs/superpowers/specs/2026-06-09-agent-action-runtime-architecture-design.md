@@ -47,7 +47,7 @@ These were converged across the brainstorming dialogue and a GPT cross-review. T
 3. **Baseline modality is uniform strict-JSON for every model.** Tool-calling / function-calling is **not** auto-enabled per provider. It is only an **explicitly logged enhancement / ablation axis** — otherwise a tool-calling model vs a JSON model is comparing "model + interface", not model ability.
 4. **Identity is a Role Contract, not a callable skill.** It is re-injected stably every turn (you are pX, role, team, win-goal, current abilities, teammates) + enforced by validation. The model must never have to "ask" who it is.
 5. **Rules / persona / strategy are separate layers.** `baseline_fair` uses the **rules layer only**. Persona and strategy are enhancement-only and never leak into the rule layer (no "prioritize killing the seer" in a role's rule definition).
-6. **Design for the general case; implement incrementally.** The abstraction must pass **paper-validation against the hardest interactions** (奶穿 / lovers heartbreak / chain death — §5) even though v1 only *implements* hunter. We never want to re-architect to fit a later role.
+6. **Design for the general case; implement incrementally.** The abstraction must pass **paper-validation against the hardest interactions** (奶穿 / lovers heartbreak / chain death — §5) even though the early versions *implement* only hunter (v1.1), then guard (v1.5). We never want to re-architect to fit a later role.
 7. **Innovation boundary (honest scope).** Data drives the **wiring** (which role, which phase/trigger, which `target_rule`, which visibility). A genuinely **new effect** still needs a small `resolver` plugin (one handler). We promise "new role = data (+ maybe a small resolver)"; we do **not** promise a no-code general rules DSL.
 
 ---
@@ -62,8 +62,8 @@ PhaseScheduler reaches NIGHT
   → wolves have ability `werewolf_kill` (trigger=night, target_rule=alive_non_wolf)
   → for each wolf: build AgentContextPacket (RoleContract + visible state + abilities)
        → ProviderInputMode renders it (baseline = strict-JSON ability card)
-       → model returns ActionEnvelope {actor:p1, action:werewolf_kill, target:p3, reason, confidence}
-       → ActionValidator checks envelope vs AbilityDefinition (action allowed? target in alive_non_wolf?)
+       → model returns ActionEnvelope {actor:p1, action:werewolf_kill, targets:[p3], reason, confidence}
+       → ActionValidator checks envelope vs AbilityDefinition (action allowed? each target in alive_non_wolf?)
        → valid envelope recorded as a PENDING INTENT (not executed)
   → JointSettler resolves the night: collect {wolf_kill:p3 (+ tally), witch_save?, witch_poison?, guard?}
        → apply interaction rules → death list
@@ -79,6 +79,12 @@ The model "tells the system it wants to kill p3" by emitting a **schema-validate
 
 Each component has one purpose, a defined interface, and is testable in isolation.
 
+### 4.0 BoardRuleset / RulesVariant — the rules container (read by Registry, Settler, TriggerSystem)
+- **Purpose:** make the *rules of this board* an explicit, versioned, swappable object — **not** global truths hardcoded in resolvers. Bundles: board composition + role config, **night interaction rules** (e.g. the 奶穿 outcome), **death-trigger ordering** (§4.10), and win-condition details.
+- **`rules_v1`** is the default ruleset (the current standard board). Any rule change (奶穿 dies vs survives, a different win condition, a different death order) is a **new `RulesVariant` that bumps `rules_version`** — never a silent global change. Cross-`rules_version` games are not directly comparable (same discipline as the baseline version).
+- **Consumers read from it:** the Registry projects abilities/targets per the ruleset's board; the JointSettler applies the ruleset's interaction table; the TriggerSystem uses the ruleset's death-order key. This is what lets "标准局 / 娱乐局 / 自定义板子" coexist without fighting.
+- **Interface:** `active_ruleset(state) → RulesVariant`; settler / trigger / registry take the ruleset as input, never as hardcoded constants.
+
 ### 4.1 RoleDefinition
 - **Purpose:** declare a role's identity, team, win-condition, and ability list.
 - **Shape:** `{ role, team, win_condition_ref, abilities: [ability_id, …] }`.
@@ -88,7 +94,7 @@ Each component has one purpose, a defined interface, and is testable in isolatio
 - **Purpose:** declare one ability fully and declaratively.
 - **Shape:** `{ action_id, trigger, input_schema, target_rule, visibility, resolver_ref, summary_template, emits: {event?, decision?} }`.
   - `trigger` — `phase:<name>` (e.g. `night`, `day_vote`) **or** `event:<name>` (e.g. `on_death`).
-  - `target_rule` — declarative predicate: `alive_only`, `exclude_self`, `alive_non_wolf`, `is_night_victim`, … (baseline rule-layer guards live here; this is where `exclude_self` kills the self-vote bug).
+  - `target_rule` — declarative predicate: `alive_only`, `exclude_self`, `alive_non_wolf`, `is_night_victim`, … (baseline rule-layer guards live here; this is where `exclude_self` kills *mechanically illegal* self-targeting — **not** the strategy-layer self-vote *quality* problem, i.e. a model *reasoning* it should vote itself, which is enhancement-layer, §1.3).
   - `visibility` — maps **directly** onto the existing `RUNTIME_EVENT_VISIBILITIES` (`public|all|seer|witch|werewolf_team|…`, runtime_events.py:53). No new visibility primitive invented here.
   - `resolver_ref` — names an effect handler (immediate vs pending-intent — see §4.8).
 - **Replaces:** `ALLOWED_ACTIONS_BY_ROLE_PHASE` (provider_agent.py:19) + the per-method inline schemas.
@@ -115,8 +121,15 @@ Each component has one purpose, a defined interface, and is testable in isolatio
 - **Invariant:** the internal canonical is always `ActionEnvelope`, regardless of modality.
 
 ### 4.7 ActionEnvelope + ActionValidator
-- **ActionEnvelope:** `{ actor, role, phase, action, target, reason_summary, decision_type, confidence }` — the uniform internal intent (today's parsed `AgentAction`, generalized).
-- **ActionValidator:** validate the envelope against the matched `AbilityDefinition` — action allowed for `(role, phase)`, `target` satisfies `target_rule`. On failure → the existing seeded fallback path (R-29), preserved. **Baseline rule guards (`exclude_self`, `alive_only`, `phase_allowed`) are enforced here** — this is where the mechanical self-vote dies.
+- **ActionEnvelope:** the uniform internal intent —
+  ```
+  { actor, role, phase, action,
+    targets: [],   // 0 (pass / speech), 1 (kill / check), or N (cupid link, multi-target)
+    params: {},    // ability-specific extras (e.g. witch potion choice)
+    reason_summary, decision_type, confidence }
+  ```
+  Generalizes today's single-`target` `AgentAction` so no future role is cramped (hunter-pass = 0 targets, cupid = 2, multi-target abilities = N). **Parity projection (preserves §7.1):** for existing single-target actions the serializer writes the legacy `target: targets[0]` into `decision_log` / `game_log` so those artifacts stay **byte-identical**; an inbound legacy `target` maps to `targets[0]`. New `targets[]`/`params` fields surface only for new roles, under the `runtime_v2` boundary.
+- **ActionValidator:** validate the envelope against the matched `AbilityDefinition` — action allowed for `(role, phase)`, each `target` in `targets` satisfies `target_rule`, arity matches the ability. On failure → the existing seeded fallback path (R-29), preserved. **Baseline rule guards (`exclude_self`, `alive_only`, `phase_allowed`) are enforced here** — this is where the mechanical self-vote dies.
 - **Replaces:** the validation in `ProviderAgent.decide` (provider_agent.py:236-357) + per-resolver inline checks.
 
 ### 4.8 PhaseScheduler
@@ -133,7 +146,7 @@ Each component has one purpose, a defined interface, and is testable in isolatio
 - **Purpose:** reactive, event-triggered abilities — **a death-resolution queue**, not a single callback.
 - **Key design (must be built to this even in v1):**
   - **Queue + transitive closure:** a death enqueues; processing a death may enqueue more (lover heartbreak → hunter shot → wolf-king shot → …). Process until the queue drains.
-  - **Deterministic ordering:** when multiple deaths land simultaneously, the order abilities fire is **seeded** (preserves byte-determinism for eval replay).
+  - **Deterministic ordering (decided — see §9):** simultaneous deaths in one settlement batch resolve by a deterministic **`death_order_key = (phase_priority, cause_priority, seat_index)`** defined by the active ruleset (§4.0) — **never a seeded shuffle** in baseline. Death-trigger order is *rule semantics*, not randomness: a spectator / replay must be able to explain "why A shot before B", not attribute it to a seed. (A `seeded-shuffle` order is allowed only as an explicit `RulesVariant`.) Fully reproducible either way.
   - **Cycle termination:** a visited/processed set prevents infinite loops (e.g. mutual lover references).
 - **Replaces:** would-be `if role == "hunter" and died:` branches in the main loop.
 
@@ -145,10 +158,10 @@ Each component has one purpose, a defined interface, and is testable in isolatio
 
 ## 5. Hard-case paper validation
 
-The abstraction is only worth rewriting for if it absorbs the hard interactions **without re-architecture**. v1 implements **only hunter**; the rest are validated **on paper** here.
+The abstraction is only worth rewriting for if it absorbs the hard interactions **without re-architecture**. The early versions implement only hunter (v1.1) then guard (v1.5); the rest are validated **on paper** here.
 
-### 5.1 奶穿 — guard + witch save the same target → dies anyway
-JointSettler (§4.9) collects `{wolf_kill: A, guard_protect: A, witch_save: A}`. Interaction rule: *two protections on one target cancel → A dies*. ✔ Handled by the settler's rule table over the collected intent set — no per-ability resolver could see this; the joint settler can.
+### 5.1 奶穿 — guard + witch save the same target
+This outcome is a **`rules_v1` settlement rule (§4.0), not a universal truth** — house rules differ (some have 奶穿 *survive*). In `rules_v1` the JointSettler (§4.9) collects `{wolf_kill: A, guard_protect: A, witch_save: A}` and applies the ruleset's rule *two protections on one target cancel → A dies*. ✔ The architectural point: the settler resolves it from the **active ruleset's interaction table** over the collected intent set — no per-ability resolver could see this; a different `RulesVariant` (奶穿 survives) supplies a different rule and bumps `rules_version`. The abstraction holds either way.
 
 ### 5.2 猎人 / 狼王 连环死 — chain death
 TriggerSystem (§4.10) death queue:
@@ -159,7 +172,7 @@ queue: [B] → B is hunter → B shoots C → enqueue C
 queue: [C] → C is wolf-king → C shoots D → enqueue D
 queue: [D] → no trigger → drain
 ```
-Ordering seeded; visited set terminates cycles. ✔ Handled by the queue; v1 implements only the `hunter_shoot` leaf but the queue exists.
+Ordering by the deterministic `death_order_key` (§4.10); visited set terminates cycles. ✔ Handled by the queue; v1.1 implements only the `hunter_shoot` leaf but the queue exists.
 
 ### 5.3 丘比特 情侣殉情 — lovers heartbreak
 Cupid sets a **relationship** at setup (not an active per-turn ability). The heartbreak is a TriggerSystem **rule keyed on the relationship** (`on_death(x) → if lover(x)=y and alive(y): enqueue death(y)`). ✔ Fits the trigger queue as a death-propagation rule; no new machinery.
@@ -172,10 +185,13 @@ Cupid sets a **relationship** at setup (not an active per-turn ability). The hea
 
 | Version | Adds | Validates |
 |---|---|---|
-| **v1** | current 4 roles on the new runtime **+ hunter** | TriggerSystem `on_death` (proves "add role = add data") |
-| **v1.5** | guard | JointSettler pending-protection (proves joint settlement incl. 奶穿) |
+| **v1.0** | current 4 roles on the new runtime, **no new role** | old↔new **semantic parity** — prove the new foundation is *equivalent* |
+| **v1.1** | **+ hunter** | TriggerSystem `on_death` + the add-role path — prove the new foundation is *stronger* |
+| **v1.5** | + guard | JointSettler pending-protection (joint settlement incl. 奶穿) |
 | **v2** | wolf-king, idiot, knight | trigger variety; non-death special rules |
 | **v3** | cupid / lovers / chain-death / custom boards | relationships + deep death-propagation |
+
+**先证明等价(v1.0),再用猎人证明更强(v1.1)** — semantic parity and the first new role are **separate milestones, never merged into one phase**.
 
 **Out of scope for this spec (separate enhancement specs):** SeatMemory, WolfTeamChannel, SpeechVoteConsistency, Persona, ReflectionSummary, Belief/Suspicion model, spectator explanation cards. This spec only leaves the `AgentContextPacket` seam (§4.5).
 
@@ -195,7 +211,7 @@ The current engine + the 799-test suite + the byte-determinism test define corre
 ### 7.3 Parity gate (decision: **semantic parity = hard; byte parity = best-effort diagnostic**)
 - **Layer 1 — semantic parity (HARD GATE).** Same seed / profile / fake provider → identical winner, deaths, votes, night targets, check results, **visibility boundaries**, and fallback behavior.
 - **Layer 2 — byte parity (best-effort diagnostic).** Pursue byte-identical output; if it diverges, **locate the exact cause** (the new scheduler/settler may legitimately change RNG draw order). Do not force the new design to mimic the old engine's incidental ordering.
-- **Layer 3 — blessed diff ledger.** Every non-byte-identical difference is recorded: which field, why it is legitimate, whether it affects scoring / visibility / replay, whether the golden fixture updates, whether it belongs to the `runtime_v2` boundary. **No silent blessing.**
+- **Layer 3 — blessed diff ledger (format decided — see §9).** Every non-byte-identical difference is recorded — **no silent blessing.** Primary machine artifact: `docs/generated-games/runtime-v2-parity-diff-ledger.json`; human summary: `.logs/review/latest/parity-diff-summary.md`. Each entry carries at least: `seed`, `profile`, `old_event_ref`, `new_event_ref`, `field_path`, `old_value_hash`, `new_value_hash`, `semantic_class`, `reason`, `affects_visibility`, `affects_scoring`, `affects_replay`, `blessed_by`.
 - **Named preserve-invariants (from health check):** (a) the P2-A-2 **no-feed-leak** hard gate; (b) **scripted gold-game g1b/g1c/g1f byte-identical replay** — these run the `game_engine.py` *scripted* path, which the rewrite only *shares code with* (B-2 dedup) and must **not** behaviorally change, so their bytes stay frozen. Both are Layer-1 gates. (This byte-freeze is about the *scripted* path; the *emergent* runtime's own output is governed by the semantic-hard / byte-diagnostic / ledger gate above — see §9.1.)
 
 ### 7.4 Discipline
@@ -205,7 +221,7 @@ The current engine + the 799-test suite + the byte-determinism test define corre
 4. Run new vs old on the same seed / fake provider / profile; compare semantic results, event visibility, log shape, provider trace, manifest.
 5. After parity holds → **swap-then-delete** the old `_resolve_*` path (no long-lived hybrid).
 6. **Behavior improvements are separate later PRs** — anti-self-vote (beyond the mechanical `exclude_self` guard), real wolf consensus, speech↔vote consistency, memory — **never mixed into a parity PR**.
-7. First new role = **hunter** (proves "add role = add data"); second = **guard** (proves joint settlement).
+7. First new role = **hunter** (v1.1, only after v1.0 parity + swap-delete — proves "add role = add data"); second = **guard** (v1.5, proves joint settlement). Parity (v1.0) and the first new role (v1.1) are never in the same phase.
 8. `baseline_fair` keeps strict-JSON `ActionEnvelope`; tool-calling only as an explicit enhancement / ablation axis.
 9. `runtime_version` / `input_modality` / `enabled_scaffolds` → manifest / trace.
 
@@ -225,7 +241,7 @@ The current engine + the 799-test suite + the byte-determinism test define corre
   - Validator rule guards (`exclude_self` rejects self-target; `alive_only`; `phase_allowed`).
   - Scheduler DAG (witch intent depends on wolf victim; ordering deterministic).
   - JointSettler interaction table (save/guard/poison incl. **奶穿**).
-  - TriggerSystem death queue (chain death, seeded ordering, cycle termination).
+  - TriggerSystem death queue (chain death, **deterministic** `death_order_key` §4.10, cycle termination).
 - **Role-add acceptance:** hunter added via data (+ one `hunter_shoot` resolver) with **no scheduler/loop edits** — the structural proof.
 - **Net preserved:** the existing 799-test suite stays green throughout.
 
@@ -235,12 +251,12 @@ The current engine + the 799-test suite + the byte-determinism test define corre
 
 1. **Byte-parity reachability (emergent runtime output).** The *emergent* runtime's own game-logs may not reach byte-identity once the scheduler reorders RNG draws → we accept a `runtime_v2` re-baseline of the **emergent** reference outputs, each divergence recorded in the diff ledger. (Distinct from the **scripted** gold-game replays in §7.3, whose bytes stay frozen.) Decision already leans this way; confirm during phase 1.
 2. **Resolver-plugin interface.** The exact contract for an effect handler (immediate vs pending-intent, access to state) needs a small sub-design at implementation time.
-3. **Trigger ordering key.** Seat-order vs seeded-shuffle for simultaneous deaths — pick one, document it (determinism requirement is non-negotiable).
-4. **Diff-ledger location/format.** Where the blessed-diff ledger lives (a doc? a JSON artifact in the run?) — decide before phase 1 lands.
-5. **B-2 visibility ADR coordination.** The shared observation/visibility extraction touches the no-feed-leak boundary; the health check requires an ADR first. This rewrite should fulfill / reference that ADR rather than fork it.
+3. **B-2 visibility ADR coordination.** The shared observation/visibility extraction touches the no-feed-leak boundary; the health check requires an ADR first. This rewrite should fulfill / reference that ADR rather than fork it.
+
+> **Decided during review** (previously open): **trigger ordering** = deterministic `death_order_key = (phase_priority, cause_priority, seat_index)`, not seeded-shuffle (§4.10); **diff-ledger format** = JSON artifact + markdown summary with the fixed field list (§7.3). **奶穿 / death-order / win-conditions** are now `rules_v1` settlement rules inside `BoardRuleset` (§4.0), not global truths. **ActionEnvelope** carries `targets[]` + `params{}` (§4.7).
 
 ---
 
 ## 10. Next step
 
-Per the brainstorming flow, after user review of this spec → **writing-plans** to produce the phased implementation plan (phase 1 = parity-preserving registry+validator; phase 2 = scheduler+settler; phase 3 = swap-delete + hunter). No code before the plan is written and approved.
+Per the brainstorming flow, after user review of this spec → **writing-plans** to produce the phased implementation plan (phase 1 = parity-preserving registry+validator; phase 2 = scheduler+settler+`BoardRuleset`; phase 3 = swap-delete → **v1.0 parity locked** → hunter **v1.1**). No code before the plan is written and (agent-)reviewed.
