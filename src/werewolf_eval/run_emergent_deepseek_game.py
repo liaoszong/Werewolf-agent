@@ -30,7 +30,7 @@ from werewolf_eval.provider_contract import (
     provider_trace_to_dict,
     ProviderTrace,
 )
-from werewolf_eval.runtime_events import RuntimeEventWriter, build_prompt_manifest
+from werewolf_eval.runtime_events import RuntimeEventWriter, build_prompt_manifest, redact_secret_values
 
 ProviderFactory = Callable[[str], ProviderAgent]
 PLAYER_IDS = ["p1", "p2", "p3", "p4", "p5", "p6"]
@@ -153,7 +153,9 @@ def run_emergent_deepseek_game(
     # provider trace + turns summary are written in BOTH outcomes (live evidence).
     _write_json(
         out_dir / "provider-trace.json",
-        _collect_trace(game_id, agents, provider_name=provider_name, source_label=effective_label),
+        redact_secret_values(
+            _collect_trace(game_id, agents, provider_name=provider_name, source_label=effective_label)
+        ),
     )
     _write_json(out_dir / "provider-turns.json", _provider_turns_summary(outcome.provider_turns))
 

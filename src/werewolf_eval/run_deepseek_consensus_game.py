@@ -24,6 +24,7 @@ from werewolf_eval.provider_contract import (
 from werewolf_eval.runtime_events import (
     RuntimeEventWriter,
     build_prompt_manifest,
+    redact_secret_values,
 )
 
 
@@ -116,7 +117,7 @@ def run_deepseek_consensus_game_with_provider_factory(
     except ProviderActionError as exc:
         failures.append(exc.failure)
         trace = _collect_trace(game_id, agents, failures)
-        trace_payload = provider_trace_to_dict(trace)
+        trace_payload = redact_secret_values(provider_trace_to_dict(trace))
         _write_json(str(out_dir / "provider-trace.json"), trace_payload)
 
         failure_audit = {
@@ -181,7 +182,7 @@ def run_deepseek_consensus_game_with_provider_factory(
         _write_json(str(out_dir / "consensus-log.json"), outputs.consensus_log)
 
     trace = _collect_trace(game_id, agents, [])
-    trace_payload = provider_trace_to_dict(trace)
+    trace_payload = redact_secret_values(provider_trace_to_dict(trace))
     _write_json(str(out_dir / "provider-trace.json"), trace_payload)
 
     failure_audit = {

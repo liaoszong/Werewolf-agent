@@ -161,5 +161,62 @@ class DeepSeekProviderGameCliTests(unittest.TestCase):
             self.assertGreater(len(failure_audit["failures"]), 0)
 
 
+class _SecretEchoingProvider(_FakeDeepSeekProvider):
+    """Returns a valid action but echoes a secret-looking token in an EXTRA
+    raw_content field the action parser ignores. The token therefore lands only
+    in ProviderResponse.raw_content (the provider trace), not in the parsed
+    decision-log — isolating the provider-trace redaction behaviour."""
+
+    SECRET = "Authorization: Bearer sk-LEAKED-INTO-RAW-CONTENT-0123456789"
+
+    def respond(self, request: Any) -> Any:
+        from werewolf_eval.provider_contract import ProviderResponse
+
+        self.requests.append(request)
+        action = request.allowed_actions[0] if request.allowed_actions else "player_vote"
+        target = request.allowed_targets[0] if request.allowed_targets else request.actor
+        raw = json.dumps({
+            "action": action,
+            "target": target,
+            "reason_summary": "auto",
+            "decision_type": "inference_based",
+            "confidence": 1.0,
+            "debug_echo": self.SECRET,
+        })
+        response = ProviderResponse(
+            request_id=request.request_id,
+            provider_name="deepseek",
+            source_label="[DeepSeek API output]",
+            raw_content=raw,
+            latency_ms=100,
+            token_usage={"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30},
+        )
+        self.responses.append(response)
+        return response
+
+
+def _secret_provider_factory(player_id: str) -> Any:
+    from werewolf_eval.provider_agent import ProviderAgent
+
+    return ProviderAgent(player_id, _SecretEchoingProvider())
+
+
+class ProviderTraceRedactionTests(unittest.TestCase):
+    def test_provider_trace_is_redacted_before_write(self) -> None:
+        with TemporaryDirectory() as tmp:
+            out_dir = Path(tmp)
+            code = run_deepseek_game_with_provider_factory(
+                game_id="g1e_redact",
+                out_dir=out_dir,
+                provider_factory=_secret_provider_factory,
+            )
+            self.assertEqual(code, 0)
+            trace_text = (out_dir / "provider-trace.json").read_text(encoding="utf-8")
+            # The secret must not survive into the on-disk trace; redaction replaces it.
+            self.assertNotIn("sk-LEAKED-INTO-RAW-CONTENT", trace_text)
+            self.assertNotIn("Bearer sk-", trace_text)
+            self.assertIn("<REDACTED>", trace_text)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -18,6 +18,7 @@ from werewolf_eval.provider_contract import (
     provider_trace_to_dict,
     ProviderTrace,
 )
+from werewolf_eval.runtime_events import redact_secret_values
 
 
 def _write_json(path: str, payload: dict) -> None:
@@ -87,7 +88,7 @@ def run_deepseek_game_with_provider_factory(
     except ProviderActionError as exc:
         failures.append(exc.failure)
         trace = _collect_trace(game_id, agents, wolf_agent, failures)
-        trace_payload = provider_trace_to_dict(trace)
+        trace_payload = redact_secret_values(provider_trace_to_dict(trace))
         _write_json(str(out_dir / "provider-trace.json"), trace_payload)
 
         failure_audit = {
@@ -112,7 +113,7 @@ def run_deepseek_game_with_provider_factory(
     _write_json(str(out_dir / "decision-log.json"), outputs.decision_log)
 
     trace = _collect_trace(game_id, agents, wolf_agent, [])
-    trace_payload = provider_trace_to_dict(trace)
+    trace_payload = redact_secret_values(provider_trace_to_dict(trace))
     _write_json(str(out_dir / "provider-trace.json"), trace_payload)
 
     failure_audit = {
