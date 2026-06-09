@@ -228,6 +228,17 @@ class CrossOriginGuardTests(unittest.TestCase):
         self.assertTrue(h._reject_cross_origin())
         self.assertEqual(h.sent[0][0], 403)
 
+    def test_userinfo_authority_does_not_spoof_loopback(self):
+        # A userinfo-confusion value (real host is after the '@') must not be read as
+        # loopback: http://127.0.0.1:8765@attacker.example.com resolves to attacker.
+        h = self._handler({"Host": "127.0.0.1:8765", "Origin": "http://127.0.0.1:8765@attacker.example.com"})
+        self.assertTrue(h._reject_cross_origin())
+        self.assertEqual(h.sent[0][0], 403)
+
+    def test_subdomain_of_loopback_label_is_rejected(self):
+        h = self._handler({"Host": "127.0.0.1.attacker.example.com:8765"})
+        self.assertTrue(h._reject_cross_origin())
+
 
 from werewolf_eval.observer_server import _sanitize_launcher_error
 

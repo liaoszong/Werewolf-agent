@@ -386,6 +386,8 @@ def _hostname_of(value: str) -> str:
     if "://" in text:
         text = text.split("://", 1)[1]
     text = text.split("/", 1)[0]
+    if "@" in text:  # strip userinfo (user:pass@host); the real host is after the '@'
+        text = text.rsplit("@", 1)[1]
     if text.startswith("["):  # [::1] or [::1]:port
         return text[1:].split("]", 1)[0]
     if text.count(":") == 1:  # host:port (a bare IPv6 like ::1 has >1 colon)

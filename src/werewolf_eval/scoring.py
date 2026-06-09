@@ -533,20 +533,22 @@ def _round_elimination_event(game: GameLog, round_number: int) -> str | None:
 
 
 def _score_player_vote(game: GameLog, event: Event, eliminated_by_round: dict[int, str], assessment: DecisionAssessment | None = None) -> ScoreRecord:
-    actor_role = _role_of(game, event.actor)
-    if event.target not in _player_by_id(game):
-        # game_log validation accepts non-player vote targets (``none``/``*_team``);
-        # the engine never emits them, but replays/hand-written logs can. There is no
-        # deterministic vote-scoring row for a non-player target, so record a rubric gap
-        # rather than KeyError on role/team lookup.
+    players = _player_by_id(game)
+    if event.actor not in players or event.target not in players:
+        # game_log validation accepts non-player actors ("system"/"wolf_team") and
+        # non-player targets ("none"/"*_team") on a player_vote; the engine never emits
+        # them, but replays/hand-written logs can. There is no deterministic vote-scoring
+        # row for a non-player actor/target, so record a rubric gap rather than KeyError
+        # on the role/team lookup.
         return _record(
             event,
             0,
             ["rubric-gap:vote_target_not_a_player"],
             [event.event_id],
-            f"Vote target {event.target!r} is not a player id; no deterministic vote scoring row applies.",
+            f"Vote references a non-player id (actor={event.actor!r}, target={event.target!r}); no deterministic vote scoring row applies.",
             assessment,
         )
+    actor_role = _role_of(game, event.actor)
     target_role = _role_of(game, event.target)
     target_team = _team_of(game, event.target)
     eliminated_target = eliminated_by_round.get(event.round)
@@ -729,17 +731,21 @@ def _alive_players_after_game(game: GameLog) -> set[str]:
 
 
 def _vote_events(game: GameLog) -> list[Event]:
-    return [event for event in game.events if event.type == "player_vote"]
+    # Only player-to-player votes participate in vote metrics. game_log validation
+    # permits non-player actors ("system"/"wolf_team") and targets ("none"/"*_team")
+    # on a player_vote; the engine never emits them, but replays / hand-written logs
+    # can, and the role/team lookups in the metric helpers would KeyError on them.
+    players = _player_by_id(game)
+    return [
+        event
+        for event in game.events
+        if event.type == "player_vote" and event.actor in players and event.target in players
+    ]
 
 
 def _vote_accuracy_by_player(game: GameLog) -> dict[str, dict[str, float | int]]:
-    players = _player_by_id(game)
     result = {player.player_id: {"accurate_votes": 0, "total_votes": 0, "vote_accuracy": 0.0} for player in game.players}
-    for event in _vote_events(game):
-        if event.target not in players:
-            # Non-player vote targets (``none``/``*_team``) are abstentions, not votes
-            # against a player; exclude them from vote accuracy instead of KeyError.
-            continue
+    for event in _vote_events(game):  # already filtered to player-to-player votes
         actor_team = _team_of(game, event.actor)
         target_team = _team_of(game, event.target)
         result[event.actor]["total_votes"] += 1

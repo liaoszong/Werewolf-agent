@@ -424,6 +424,44 @@ class MalformedInputRobustnessTests(unittest.TestCase):
         self.assertEqual(record.outcome_score, 0)
         self.assertIn("rubric-gap:vote_target_not_a_player", record.rules_triggered)
 
+    def test_score_game_does_not_crash_on_non_player_vote_actor(self) -> None:
+        # game_log validation permits actor in {"system","wolf_team"} on any event
+        # type, including player_vote. Such an actor is not a player id.
+        players = self._board()
+        game = GameLog(
+            game_id="bad_actor",
+            source_label="emergent_offline",
+            players=players,
+            events=[self._vote("wolf_team", "p3")],
+            result=GameResult(
+                winner="werewolf",
+                end_round=1,
+                survivors=[p.player_id for p in players],
+                end_condition="all_villagers_eliminated",
+            ),
+        )
+        score_log = score_game(game)  # must not raise KeyError on the actor lookup
+        record = next(r for r in score_log.records if r.event_id == "e_wolf_team_p3")
+        self.assertEqual(record.outcome_score, 0)
+        self.assertIn("rubric-gap:vote_target_not_a_player", record.rules_triggered)
+
+    def test_vote_accuracy_excludes_non_player_vote_actor(self) -> None:
+        players = self._board()
+        game = GameLog(
+            game_id="bad_actor_metrics",
+            source_label="emergent_offline",
+            players=players,
+            events=[self._vote("wolf_team", "p3")],
+            result=GameResult(
+                winner="werewolf",
+                end_round=1,
+                survivors=[p.player_id for p in players],
+                end_condition="all_villagers_eliminated",
+            ),
+        )
+        metrics = summarize_metrics(game, score_game(game))  # must not raise KeyError
+        self.assertNotIn("wolf_team", metrics.process_metrics.vote_accuracy_by_player)
+
     def test_vote_accuracy_excludes_non_player_vote_target(self) -> None:
         players = self._board()
         game = GameLog(
