@@ -32,7 +32,19 @@ class RoleAbilityRegistry:
     def allowed_actions(self, role: str, phase: str) -> list[str]:
         return [a.action_id for a in self.abilities_for(role, phase)]
 
-    def allowed_targets(self, action_id: str, actor: str, state: RuntimeState) -> list[str]:
+    def shown_targets(self, action_id: str, state: RuntimeState) -> list[str]:
+        """The BROAD target list the model is SHOWN in the prompt — the full alive
+        set, matching the engine's ``observation.alive_players``
+        (provider_agent.py:109, rendered verbatim at llm_providers.py:98/91).
+        Legality is a SEPARATE concern (see ``legal_targets`` / the validator):
+        the engine shows the broad list and adjudicates narrowly. Routing the
+        narrow list into the prompt would change prompt bytes + the model's
+        instruction → parity break, so the two are kept distinct here."""
+        return sorted(state.alive)
+
+    def legal_targets(self, action_id: str, actor: str, state: RuntimeState) -> list[str]:
+        """The NARROW set of legal targets (the ``target_rule`` predicate) — for
+        validation / adjudication ONLY, never for the prompt."""
         ability = self._rs.ability(action_id)
         if not ability.target_rule:
             return []

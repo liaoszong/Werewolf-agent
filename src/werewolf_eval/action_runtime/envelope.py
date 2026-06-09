@@ -8,7 +8,13 @@ from typing import Any
 class ActionEnvelope:
     """Uniform internal action intent. ``targets`` is 0/1/N; ``params`` carries
     ability-specific extras. ``.target`` projects to the legacy single-target field
-    so decision_log / game_log stay byte-identical for existing roles (spec §4.7)."""
+    for decision_log / game_log (spec §4.7).
+
+    Byte-parity caveat (Phase 3): the engine writes the literal string ``"none"``
+    for no-target rows (witch_pass, speeches, announcements — emergent_engine.py:720),
+    whereas ``.target`` returns Python ``None`` for empty ``targets``. The swap-time
+    serializer MUST map empty targets back to ``"none"`` (not ``null``) to keep those
+    rows byte-identical — the ``.target`` property alone is not sufficient."""
 
     actor: str
     role: str

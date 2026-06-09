@@ -11,7 +11,10 @@ from werewolf_eval.action_runtime.state import RuntimeState
 @dataclass(frozen=True)
 class ValidationResult:
     ok: bool
-    reason_kind: str = ""   # "" | "invalid_action" | "invalid_target" | "bad_arity"
+    # "" | "invalid_action" | "invalid_target" | "bad_arity" | "needs_state"
+    # ("needs_state" = a well-formed single-target action whose legality can only
+    # be decided with the live state — see validate_in_state.)
+    reason_kind: str = ""
 
 
 class ActionValidator:
@@ -35,7 +38,7 @@ class ActionValidator:
         if len(env.targets) != 1:
             return ValidationResult(False, "bad_arity")
         # A well-formed single-target action: legality is undecidable without state.
-        return ValidationResult(False, "invalid_target")
+        return ValidationResult(False, "needs_state")
 
     def validate_in_state(self, env: ActionEnvelope, state: RuntimeState) -> ValidationResult:
         """Full verdict: action-allowed + arity (stateless) PLUS target legality

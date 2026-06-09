@@ -54,8 +54,10 @@ def rules_v1() -> BoardRuleset:
     )
     night_rules = {
         # 奶穿: guard-protect AND witch-save on the same target -> still dies.
+        # Only rules the settler actually consults live here — a key in this table
+        # is authoritative (§4.0), so we do NOT list save_cancels_kill/poison_stacks
+        # (the settler hardcodes those rules_v1 semantics; a future RulesVariant that
+        # wants them configurable must add them here AND have the settler read them).
         "guard+save_same_target": "death",
-        "save_cancels_kill": "true",
-        "poison_stacks": "true",
     }
     return BoardRuleset("rules_v1", roles, abilities, night_rules)

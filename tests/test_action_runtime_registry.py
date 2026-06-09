@@ -108,13 +108,23 @@ class RegistryParityTests(unittest.TestCase):
                 f"{role}/{static_phase}: {adjudicating} != {expected}",
             )
 
-    def test_allowed_targets_wolf_kill_excludes_wolves(self) -> None:
+    def test_legal_targets_wolf_kill_excludes_wolves(self) -> None:
         s = RuntimeState(
             alive=frozenset({"p1", "p2", "p3", "p5"}),
             roles={"p1": "werewolf", "p2": "werewolf", "p3": "seer", "p5": "villager"},
         )
-        targets = self.reg.allowed_targets("werewolf_kill", "p1", s)
-        self.assertEqual(sorted(targets), ["p3", "p5"])  # no wolves, no dead
+        legal = self.reg.legal_targets("werewolf_kill", "p1", s)
+        self.assertEqual(sorted(legal), ["p3", "p5"])  # narrow: no wolves, no dead
+
+    def test_shown_targets_is_broad_alive_list_for_prompt_parity(self) -> None:
+        # The model is SHOWN the full alive list (incl. self + teammates), exactly
+        # like the engine's observation.alive_players (provider_agent.py:109) — the
+        # narrow legal_targets must NOT drive the prompt (Phase-3 parity).
+        s = RuntimeState(
+            alive=frozenset({"p1", "p2", "p3", "p5"}),
+            roles={"p1": "werewolf", "p2": "werewolf", "p3": "seer", "p5": "villager"},
+        )
+        self.assertEqual(self.reg.shown_targets("werewolf_kill", s), ["p1", "p2", "p3", "p5"])
 
 
 if __name__ == "__main__":
