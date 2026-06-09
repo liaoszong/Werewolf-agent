@@ -109,6 +109,21 @@ class HunterGameTests(unittest.TestCase):
         self.assertTrue([e for e in self._events(outcome) if e["type"] == "hunter_pass"])
         self.assertFalse([e for e in self._events(outcome) if e["type"] == "hunter_shoot"])
 
+    def test_hunter_unknown_action_is_flagged_and_passes(self) -> None:
+        # An unknown but parseable hunter action -> invalid_action + downgrade (witch parity),
+        # not a silent live_success.
+        s = build_hunter_night_kill_script()
+        s[("p4", "night", 1)] = json.dumps(
+            {"action": "witch_poison", "target": "p1", "reason_summary": "x", "decision_type": "retaliatory", "confidence": 1.0},
+            ensure_ascii=False)
+        s[("p6", "hunter_shot", 1)] = json.dumps(
+            {"action": "banana", "target": "p2", "reason_summary": "x", "decision_type": "default", "confidence": 1.0},
+            ensure_ascii=False)
+        outcome = self._run(s)
+        self.assertEqual(outcome.status, "completed")
+        self.assertIn("invalid_action", [f["kind"] for f in outcome.failure_audit["failures"]])
+        self.assertFalse([e for e in self._events(outcome) if e["type"] == "hunter_shoot"])
+
     def test_4role_game_unaffected_no_hunter_events(self) -> None:
         # The hunter machinery is inert on a 4-role board (add-role = add-data, not a global change).
         from werewolf_eval.emergent_engine import build_emergent_config

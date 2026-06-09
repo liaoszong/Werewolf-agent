@@ -920,6 +920,12 @@ class EmergentGameEngine:
                 self._record_failure(rnd, phase, hunter, "invalid_action", f"{hunter} invalid hunter_shoot {target}", target)
                 self._downgrade_turn(turn, f"invalid hunter_shoot {target}")
                 action_name, target = "hunter_pass", None
+        elif action_name != "hunter_pass":
+            # an unknown but parseable action -> flag + downgrade (parity with the witch
+            # resolver), so a malformed live response doesn't inflate live_success_rate.
+            self._record_failure(rnd, phase, hunter, "invalid_action", f"{hunter} unknown hunter action {action_name}", target)
+            self._downgrade_turn(turn, f"unknown hunter action {action_name}")
+            action_name, target = "hunter_pass", None
 
         if action_name == "hunter_shoot" and target is not None:
             self._decision(hunter, "single", phase, "hunter_shoot", target, "retaliatory", f"hunter {hunter} shoots {target}")
