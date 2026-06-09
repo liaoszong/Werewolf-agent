@@ -68,10 +68,10 @@ def resolve_live_launcher(
         else None
     )
 
-    def factory(key: str) -> RunLauncher:
+    def factory(key: str, base_url: str | None = None) -> RunLauncher:
         return build_emergent_deepseek_launcher(
             api_key=key,
-            base_url=args.deepseek_base_url,
+            base_url=base_url or args.deepseek_base_url,
             model=args.deepseek_model,
             max_tokens=_LIVE_MAX_TOKENS,
             max_requests=args.max_live_requests,

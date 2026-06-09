@@ -15,6 +15,8 @@ from typing import Any
 
 from werewolf_eval.deepseek_launcher import (
     DEFAULT_MAX_LIVE_REQUESTS,
+    _audit_is_budget_exhausted,
+    _classify_failure,
     build_deepseek_launcher,
     build_deepseek_provider_config,
 )
@@ -203,6 +205,62 @@ class DeepSeekLauncherTests(unittest.TestCase):
                 self.assertNotIn("sk-test-fake-key", text, path.name)
                 for marker in _SECRET_MARKERS:
                     self.assertNotIn(marker, text, f"{marker!r} in {path.name}")
+
+
+class BudgetClassifierConsistencyTests(unittest.TestCase):
+    """The two budget-failure detectors (_classify_failure substring vs
+    _audit_is_budget_exhausted structured kind) must agree. The substring-only
+    detector silently missed the emergent engine's "budget exhausted" wording
+    (vs the legacy "budget exceeded"), so reusing it on an emergent audit would
+    misclassify a budget-exhausted run as a generic failure (exit 2 not 3)."""
+
+    @staticmethod
+    def _audit_dir(tmp: str, failures: list[dict]) -> Path:
+        rdir = Path(tmp)
+        (rdir / "failure-audit.json").write_text(
+            json.dumps({"game_id": "g", "source_label": "x", "failures": failures}),
+            encoding="utf-8",
+        )
+        return rdir
+
+    def test_classify_failure_detects_structured_budget_kind(self) -> None:
+        # emergent: kind="budget_exhausted", reason uses "exhausted" not "exceeded".
+        with TemporaryDirectory() as tmp:
+            rdir = self._audit_dir(tmp, [{"kind": "budget_exhausted", "reason": "budget exhausted: 30/30 requests"}])
+            self.assertEqual(_classify_failure(rdir), 3)
+
+    def test_classify_failure_detects_exhausted_wording_without_kind(self) -> None:
+        with TemporaryDirectory() as tmp:
+            rdir = self._audit_dir(tmp, [{"kind": "timeout", "reason": "provider error: budget exhausted: 30/30 requests"}])
+            self.assertEqual(_classify_failure(rdir), 3)
+
+    def test_classify_failure_still_detects_legacy_exceeded_wording(self) -> None:
+        # regression: legacy llm_providers raises "request budget exceeded" (kind timeout).
+        with TemporaryDirectory() as tmp:
+            rdir = self._audit_dir(tmp, [{"kind": "timeout", "reason": "provider error: request budget exceeded: 32"}])
+            self.assertEqual(_classify_failure(rdir), 3)
+
+    def test_classify_failure_generic_stays_exit_2(self) -> None:
+        with TemporaryDirectory() as tmp:
+            rdir = self._audit_dir(tmp, [{"kind": "timeout", "reason": "provider error: simulated provider failure"}])
+            self.assertEqual(_classify_failure(rdir), 2)
+
+    def test_audit_detector_also_accepts_exhausted_wording(self) -> None:
+        # symmetry: the structured detector should agree with _classify_failure even
+        # if a path emits the wording without the structured kind.
+        with TemporaryDirectory() as tmp:
+            rdir = self._audit_dir(tmp, [{"kind": "timeout", "reason": "budget exhausted: 30/30 requests"}])
+            self.assertTrue(_audit_is_budget_exhausted(rdir / "failure-audit.json"))
+
+    def test_audit_detector_still_accepts_structured_kind(self) -> None:
+        with TemporaryDirectory() as tmp:
+            rdir = self._audit_dir(tmp, [{"kind": "budget_exhausted", "reason": "budget exhausted: 30/30"}])
+            self.assertTrue(_audit_is_budget_exhausted(rdir / "failure-audit.json"))
+
+    def test_audit_detector_rejects_generic_failure(self) -> None:
+        with TemporaryDirectory() as tmp:
+            rdir = self._audit_dir(tmp, [{"kind": "timeout", "reason": "provider error: simulated"}])
+            self.assertFalse(_audit_is_budget_exhausted(rdir / "failure-audit.json"))
 
 
 if __name__ == "__main__":

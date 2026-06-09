@@ -10,8 +10,9 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from werewolf_eval.decision_log import load_decision_log, parse_decision_log
-from werewolf_eval.game_log import load_game_log
+from werewolf_eval.game_log import Event, GameLog, GameResult, Player, load_game_log
 from werewolf_eval.scoring import (
+    _result_metrics,
     metrics_summary_to_dict,
     score_game,
     score_log_to_dict,
@@ -326,6 +327,159 @@ class DeterministicScorerTests(unittest.TestCase):
         self.assertEqual(
             payload["source_label"], "[scripted deterministic output][decision-log]"
         )
+
+
+class MalformedInputRobustnessTests(unittest.TestCase):
+    """Scoring must not crash on logs that pass game-log validation but have
+    degenerate team composition (0 wolves / 0 villagers) or non-player vote
+    targets (``none`` / ``*_team``). game_log validation permits both."""
+
+    @staticmethod
+    def _player(pid: str, role: str, team: str) -> Player:
+        return Player(player_id=pid, role=role, team=team)
+
+    @staticmethod
+    def _vote(actor: str, target: str) -> Event:
+        return Event(
+            event_id=f"e_{actor}_{target}",
+            sequence=1,
+            round=1,
+            phase="day",
+            type="player_vote",
+            actor=actor,
+            target=target,
+            visibility="public",
+            data={},
+        )
+
+    def test_summarize_metrics_handles_board_with_zero_werewolves(self) -> None:
+        # 6 villager-team players (with the usual special villager roles so the
+        # seer/witch process-metrics are well-defined), 0 werewolves -> the team
+        # survival-rate division would otherwise raise ZeroDivisionError.
+        roles = ["seer", "witch", "hunter", "villager", "villager", "villager"]
+        players = [self._player(f"p{i+1}", role, "villager") for i, role in enumerate(roles)]
+        game = GameLog(
+            game_id="zero_wolf",
+            source_label="emergent_offline",
+            players=players,
+            events=[],
+            result=GameResult(
+                winner="villager",
+                end_round=1,
+                survivors=[p.player_id for p in players],
+                end_condition="all_werewolves_eliminated",
+            ),
+        )
+        metrics = summarize_metrics(game, score_game(game))  # must not raise ZeroDivisionError
+        self.assertEqual(metrics.result_metrics.werewolf_survival_rate, 0.0)
+        self.assertEqual(metrics.result_metrics.villager_survival_rate, 1.0)
+
+    def test_result_metrics_handles_board_with_zero_villagers(self) -> None:
+        # A 0-villager-team board has no seer/witch by definition, so exercise the
+        # symmetric guard directly on _result_metrics (the unit with the division).
+        players = [self._player(f"p{i}", "werewolf", "werewolf") for i in range(1, 7)]
+        game = GameLog(
+            game_id="zero_villager",
+            source_label="emergent_offline",
+            players=players,
+            events=[],
+            result=GameResult(
+                winner="werewolf",
+                end_round=1,
+                survivors=[p.player_id for p in players],
+                end_condition="all_villagers_eliminated",
+            ),
+        )
+        metrics = _result_metrics(game)  # must not raise ZeroDivisionError
+        self.assertEqual(metrics.villager_survival_rate, 0.0)
+        self.assertEqual(metrics.werewolf_survival_rate, 1.0)
+
+    def _board(self) -> list[Player]:
+        return [
+            self._player("p1", "werewolf", "werewolf"),
+            self._player("p2", "werewolf", "werewolf"),
+            self._player("p3", "seer", "villager"),
+            self._player("p4", "witch", "villager"),
+            self._player("p5", "villager", "villager"),
+            self._player("p6", "villager", "villager"),
+        ]
+
+    def test_score_game_does_not_crash_on_non_player_vote_target(self) -> None:
+        # target="none" (abstain) passes game-log validation but is not a player id.
+        players = self._board()
+        game = GameLog(
+            game_id="abstain",
+            source_label="emergent_offline",
+            players=players,
+            events=[self._vote("p5", "none")],
+            result=GameResult(
+                winner="werewolf",
+                end_round=1,
+                survivors=[p.player_id for p in players],
+                end_condition="all_villagers_eliminated",
+            ),
+        )
+        score_log = score_game(game)  # must not raise KeyError
+        record = next(r for r in score_log.records if r.event_id == "e_p5_none")
+        self.assertEqual(record.outcome_score, 0)
+        self.assertIn("rubric-gap:vote_target_not_a_player", record.rules_triggered)
+
+    def test_score_game_does_not_crash_on_non_player_vote_actor(self) -> None:
+        # game_log validation permits actor in {"system","wolf_team"} on any event
+        # type, including player_vote. Such an actor is not a player id.
+        players = self._board()
+        game = GameLog(
+            game_id="bad_actor",
+            source_label="emergent_offline",
+            players=players,
+            events=[self._vote("wolf_team", "p3")],
+            result=GameResult(
+                winner="werewolf",
+                end_round=1,
+                survivors=[p.player_id for p in players],
+                end_condition="all_villagers_eliminated",
+            ),
+        )
+        score_log = score_game(game)  # must not raise KeyError on the actor lookup
+        record = next(r for r in score_log.records if r.event_id == "e_wolf_team_p3")
+        self.assertEqual(record.outcome_score, 0)
+        self.assertIn("rubric-gap:vote_target_not_a_player", record.rules_triggered)
+
+    def test_vote_accuracy_excludes_non_player_vote_actor(self) -> None:
+        players = self._board()
+        game = GameLog(
+            game_id="bad_actor_metrics",
+            source_label="emergent_offline",
+            players=players,
+            events=[self._vote("wolf_team", "p3")],
+            result=GameResult(
+                winner="werewolf",
+                end_round=1,
+                survivors=[p.player_id for p in players],
+                end_condition="all_villagers_eliminated",
+            ),
+        )
+        metrics = summarize_metrics(game, score_game(game))  # must not raise KeyError
+        self.assertNotIn("wolf_team", metrics.process_metrics.vote_accuracy_by_player)
+
+    def test_vote_accuracy_excludes_non_player_vote_target(self) -> None:
+        players = self._board()
+        game = GameLog(
+            game_id="abstain_metrics",
+            source_label="emergent_offline",
+            players=players,
+            events=[self._vote("p5", "none")],
+            result=GameResult(
+                winner="werewolf",
+                end_round=1,
+                survivors=[p.player_id for p in players],
+                end_condition="all_villagers_eliminated",
+            ),
+        )
+        metrics = summarize_metrics(game, score_game(game))  # must not raise KeyError
+        p5 = metrics.process_metrics.vote_accuracy_by_player["p5"]
+        self.assertEqual(p5["total_votes"], 0)
+        self.assertEqual(p5["vote_accuracy"], 0.0)
 
 
 if __name__ == "__main__":

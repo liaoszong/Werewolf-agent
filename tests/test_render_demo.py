@@ -35,6 +35,16 @@ class RuntimeDemoRenderTests(unittest.TestCase):
         self.s5_metrics = summarize_metrics(self.game, self.s5_score_log)
         self.s5_attribution = attribute_game(self.game, self.s5_score_log, self.s5_metrics)
 
+    def test_timeline_phase_column_is_localized(self) -> None:
+        # render-01: the timeline phase column must show display labels (夜晚/白天/
+        # 开局), not raw english tokens — matching the already-localized type column.
+        context = build_demo_context(self.game, self.score_log, self.metrics, self.attribution)
+        phases = {row["phase"] for row in context["timeline"]}
+        for raw in ("night", "day", "setup", "game_end"):
+            self.assertNotIn(raw, phases)
+        self.assertIn("夜晚", phases)
+        self.assertIn("白天", phases)
+
     def test_build_demo_context_uses_runtime_outputs(self) -> None:
         context = build_demo_context(self.game, self.score_log, self.metrics, self.attribution)
 

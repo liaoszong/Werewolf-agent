@@ -23,6 +23,7 @@ PHASE_LABELS = {
     "night": "夜晚",
     "day": "白天",
     "setup": "开局",
+    "game_end": "终局",
 }
 
 TYPE_LABELS = {

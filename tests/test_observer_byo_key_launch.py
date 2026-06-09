@@ -19,14 +19,15 @@ def _deepseek_seats():
 
 
 class ResolveLiveLauncherTests(unittest.TestCase):
-    def _state(self, *, client, env):
+    def _state(self, *, client, env, client_base_url=""):
         cs = CredentialStore()
         if client:
-            cs.set("deepseek", _CLIENT)
+            cs.set("deepseek", _CLIENT, base_url=client_base_url)
         captured = {}
 
-        def factory(api_key):
+        def factory(api_key, base_url=None):
             captured["key"] = api_key
+            captured["base_url"] = base_url
             return lambda r, d: 0
 
         from werewolf_eval.observer_server import ObserverServerState
@@ -47,6 +48,18 @@ class ResolveLiveLauncherTests(unittest.TestCase):
         self.assertIsNone(err)
         self.assertIsNotNone(launcher)
         self.assertEqual(captured["key"], _CLIENT)   # client beats env
+
+    def test_client_base_url_forwarded_to_factory(self):
+        # provider-02: a client-supplied custom base_url must reach the launcher
+        # factory, not be silently dropped (leaving the server's hard-coded
+        # default endpoint) on the uniform-deepseek back-compat path.
+        url = "https://deepseek.example-proxy.internal/v1"
+        st, captured = self._state(client=True, env=False, client_base_url=url)
+        launcher, err = _resolve_live_launcher_for_launch(st, _deepseek_seats())
+        self.assertIsNone(err)
+        self.assertIsNotNone(launcher)
+        self.assertEqual(captured["key"], _CLIENT)
+        self.assertEqual(captured["base_url"], url)
 
     def test_env_fallback_when_no_client_key(self):
         st, captured = self._state(client=False, env=True)
@@ -171,6 +184,60 @@ class NoOrphanRunDirOnLiveRejectTests(unittest.TestCase):
                 [],
                 f"orphan dirs found in runs_dir: {subdirs}",
             )
+
+
+class CrossOriginGuardTests(unittest.TestCase):
+    """observer-01: state-changing endpoints must reject DNS-rebind (non-loopback
+    Host) and cross-origin (CSRF) requests, not gate on peer IP alone."""
+
+    def _handler(self, headers):
+        from werewolf_eval.observer_server import ObserverRequestHandler
+
+        class _H(ObserverRequestHandler):
+            def __init__(self_h):  # skip BaseHTTPRequestHandler.__init__
+                self_h.headers = headers
+                self_h.client_address = ("127.0.0.1", 5555)
+                self_h.sent = []
+
+            def _send_error_json(self_h, status, code, message):
+                self_h.sent.append((status, code, message))
+
+        return _H()
+
+    def test_loopback_host_without_origin_is_allowed(self):
+        # Non-browser client (e.g. the Qt observer): Host loopback, no Origin.
+        h = self._handler({"Host": "127.0.0.1:8765"})
+        self.assertFalse(h._reject_cross_origin())
+        self.assertEqual(h.sent, [])
+
+    def test_localhost_same_origin_is_allowed(self):
+        h = self._handler({"Host": "localhost:8765", "Origin": "http://localhost:8765"})
+        self.assertFalse(h._reject_cross_origin())
+
+    def test_ipv6_loopback_host_is_allowed(self):
+        h = self._handler({"Host": "[::1]:8765"})
+        self.assertFalse(h._reject_cross_origin())
+
+    def test_dns_rebind_nonloopback_host_is_rejected(self):
+        h = self._handler({"Host": "attacker.example.com:8765"})
+        self.assertTrue(h._reject_cross_origin())
+        self.assertEqual(h.sent[0][0], 403)
+
+    def test_cross_origin_request_is_rejected(self):
+        h = self._handler({"Host": "127.0.0.1:8765", "Origin": "http://attacker.example.com"})
+        self.assertTrue(h._reject_cross_origin())
+        self.assertEqual(h.sent[0][0], 403)
+
+    def test_userinfo_authority_does_not_spoof_loopback(self):
+        # A userinfo-confusion value (real host is after the '@') must not be read as
+        # loopback: http://127.0.0.1:8765@attacker.example.com resolves to attacker.
+        h = self._handler({"Host": "127.0.0.1:8765", "Origin": "http://127.0.0.1:8765@attacker.example.com"})
+        self.assertTrue(h._reject_cross_origin())
+        self.assertEqual(h.sent[0][0], 403)
+
+    def test_subdomain_of_loopback_label_is_rejected(self):
+        h = self._handler({"Host": "127.0.0.1.attacker.example.com:8765"})
+        self.assertTrue(h._reject_cross_origin())
 
 
 from werewolf_eval.observer_server import _sanitize_launcher_error

@@ -55,7 +55,7 @@ QtObject {
         var t = current ? current.type : ""
         if (t === "werewolf_kill") return "wolf"
         if (t === "seer_check") return "seer"
-        if (t === "witch_save" || t === "witch_kill" || t === "witch_pass") return "witch"
+        if (t === "witch_save" || t === "witch_poison" || t === "witch_kill" || t === "witch_pass") return "witch"
         if (t === "player_speech") return "speech"
         if (t === "player_vote" || t === "player_eliminated") return "vote"
         return ""
@@ -146,7 +146,7 @@ QtObject {
     function _durationMs(ev) {
         var t = ev ? (ev.payload ? ev.payload.type : ev.type) : ""
         var base = ({ role_assignment: 1000, werewolf_kill: 1800, seer_check: 1800,
-            witch_save: 1800, witch_kill: 1800, witch_pass: 1500, player_died: 2000,
+            witch_save: 1800, witch_poison: 1800, witch_kill: 1800, witch_pass: 1500, player_died: 2000,
             player_speech: 6000, player_vote: 1200, day_announcement: 1000,
             player_eliminated: 2000, role_revealed: 2000, game_over: 3000 })[t] || 1200
         return base   // base hold time; speed/instant applied via _heldMs accumulation in _pump

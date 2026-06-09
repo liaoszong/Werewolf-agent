@@ -93,7 +93,7 @@ class ObserverServerState:
     # prebuilt ENV launcher (back-compat / fallback); env_key_available records
     # whether the server started with an env key.
     credential_store: CredentialStore = field(default_factory=CredentialStore)
-    live_launcher_factory: Callable[[str], RunLauncher] | None = None
+    live_launcher_factory: Callable[..., RunLauncher] | None = None
     env_key_available: bool = False
     # P2-B-3/B-4: per-seat multi-provider launcher builder. Given the resolved
     # seats + a {provider: ProviderCredential} map, returns a RunLauncher that runs
@@ -138,7 +138,15 @@ def _resolve_live_launcher_for_launch(
     # run never used.
     uniform = len({(str(s.get("provider")), str(s.get("model"))) for s in resolved_seats}) == 1
     if used == {"deepseek"} and uniform and "deepseek" in creds and state.live_launcher_factory is not None:
-        return state.live_launcher_factory(creds["deepseek"].key), None
+        cred = creds["deepseek"]
+        # Forward the client's custom base_url when one was supplied; otherwise
+        # call the legacy single-arg factory so its server-default endpoint stands.
+        launcher = (
+            state.live_launcher_factory(cred.key, cred.base_url)
+            if cred.base_url
+            else state.live_launcher_factory(cred.key)
+        )
+        return launcher, None
     if used == {"deepseek"} and uniform and state.live_launcher is not None:
         return state.live_launcher, None
     if missing:
@@ -367,6 +375,29 @@ def _sanitize_launcher_error(exc: BaseException) -> str:
 # Request handler
 # ---------------------------------------------------------------------------
 
+_LOOPBACK_HOSTNAMES = frozenset({"localhost", "127.0.0.1", "::1"})
+
+
+def _hostname_of(value: str) -> str:
+    """Lowercased hostname from a Host/Origin header value, stripped of scheme
+    and port. Handles ``http://host:port/path``, ``host:port`` and bracketed
+    IPv6 (``[::1]:port``)."""
+    text = value.strip().lower()
+    if "://" in text:
+        text = text.split("://", 1)[1]
+    text = text.split("/", 1)[0]
+    if "@" in text:  # strip userinfo (user:pass@host); the real host is after the '@'
+        text = text.rsplit("@", 1)[1]
+    if text.startswith("["):  # [::1] or [::1]:port
+        return text[1:].split("]", 1)[0]
+    if text.count(":") == 1:  # host:port (a bare IPv6 like ::1 has >1 colon)
+        text = text.rsplit(":", 1)[0]
+    return text
+
+
+def _is_loopback_hostname(value: str) -> bool:
+    return _hostname_of(value) in _LOOPBACK_HOSTNAMES
+
 
 class ObserverRequestHandler(BaseHTTPRequestHandler):
     """Handles observer HTTP requests with JSON/SSE responses.
@@ -417,6 +448,29 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
     def _is_loopback(self) -> bool:
         host = self.client_address[0] if self.client_address else ""
         return host in ("127.0.0.1", "::1")
+
+    def _is_same_origin_local(self) -> bool:
+        """True when a state-changing request is safe to honour: the Host header
+        names a loopback address (defends DNS-rebinding, where a browser sends the
+        attacker's hostname that resolves to 127.0.0.1) and any Origin header is
+        loopback too (defends cross-site POST/DELETE / CSRF). Non-browser clients
+        that omit Host/Origin are unaffected."""
+        host = self.headers.get("Host", "") if self.headers else ""
+        if host and not _is_loopback_hostname(host):
+            return False
+        origin = self.headers.get("Origin") if self.headers else None
+        if origin and not _is_loopback_hostname(origin):
+            return False
+        return True
+
+    def _reject_cross_origin(self) -> bool:
+        """Guard for state-changing endpoints (credential writes, run launches).
+        Sends a 403 and returns True when the request must be rejected for a
+        DNS-rebind / cross-origin reason; returns False to proceed."""
+        if not self._is_same_origin_local():
+            self._send_error_json(403, "forbidden", "cross-origin or non-loopback Host rejected")
+            return True
+        return False
 
     def _get_status(self, run_id: str, run_dir: Path) -> str:
         state = self._get_state()
@@ -815,6 +869,8 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
                 if not self._is_loopback():
                     self._send_error_json(403, "forbidden", "credentials endpoint is loopback-only")
                     return
+                if self._reject_cross_origin():
+                    return
                 status, payload = _credentials_delete_result(
                     self._get_state().credential_store, segments[2]
                 )
@@ -835,6 +891,8 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
             if segments == ["api", "credentials"]:
                 if not self._is_loopback():
                     self._send_error_json(403, "forbidden", "credentials endpoint is loopback-only")
+                    return
+                if self._reject_cross_origin():
                     return
                 content_type = self.headers.get("Content-Type", "")
                 content_length = int(self.headers.get("Content-Length", 0))
@@ -860,6 +918,8 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
                 return
 
             if segments == ["api", "runs"]:
+                if self._reject_cross_origin():
+                    return
                 body = self._read_json_body()
                 if "profile" in body or "profile_name" in body:
                     self._handle_profile_launch(body)
@@ -1020,7 +1080,7 @@ def create_observer_server(
     profiles_dir: Path | None = None,
     live_enabled: bool = False,
     live_launcher: RunLauncher | None = None,
-    live_launcher_factory: Callable[[str], RunLauncher] | None = None,
+    live_launcher_factory: Callable[..., RunLauncher] | None = None,
     env_key_available: bool = False,
     live_max_requests: int = 32,
     live_max_tokens: int = 256,
