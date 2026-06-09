@@ -31,7 +31,15 @@ from werewolf_eval.game_engine import (
 from werewolf_eval.runtime_events import build_god_snapshot, build_role_projection_snapshot
 from werewolf_eval.provider_agent import ProviderActionError
 from werewolf_eval.provider_contract import ProviderRequest
-from werewolf_eval.action_runtime import JointSettler, NightIntents, RuntimeState, rules_v1
+from werewolf_eval.action_runtime import (
+    ActionEnvelope,
+    ActionValidator,
+    JointSettler,
+    NightIntents,
+    RoleAbilityRegistry,
+    RuntimeState,
+    rules_v1,
+)
 
 # The provider request phase used for free-text speeches. The game_log event is
 # still recorded with phase="day"; the distinct request phase only keeps the
@@ -232,8 +240,10 @@ class EmergentGameEngine:
         self._d_counter = 0
         self._alive: set[str] = set(self._players_by_id)
         # Phase-3 swap: night joint resolution delegates to the Agent Action
-        # Runtime's JointSettler (rules_v1) instead of inline death logic.
-        self._settler = JointSettler(rules_v1())
+        # Runtime's JointSettler, and per-action legality to its registry/validator.
+        _ruleset = rules_v1()
+        self._settler = JointSettler(_ruleset)
+        self._validator = ActionValidator(RoleAbilityRegistry(_ruleset))
 
     # ---- small helpers -------------------------------------------------
 
@@ -433,6 +443,27 @@ class EmergentGameEngine:
     def _events_by_id(self) -> dict[str, dict[str, Any]]:
         return {e["event_id"]: e for e in self._events}
 
+    def _runtime_state(self, night_victim: str | None = None) -> RuntimeState:
+        """Read-model for the Action Runtime registry/validator (Phase-3 swap)."""
+        return RuntimeState(
+            alive=frozenset(self._alive),
+            roles={pid: p.role for pid, p in self._players_by_id.items()},
+            night_victim=night_victim,
+        )
+
+    def _action_legal(self, actor: str, role: str, phase: str, action: AgentAction) -> bool:
+        """Validate a returned action's (action, target) via the registry/validator
+        (Phase-3 swap) — byte-equivalent to the prior inline target checks (the
+        target is already alive-gated by ProviderAgent.decide, so the discriminator
+        is the role-specific target_rule the predicate encodes)."""
+        return self._validator.validate_in_state(
+            ActionEnvelope.from_legacy(
+                actor=actor, role=role, phase=phase, action=action.action,
+                target=action.target, reason_summary="", decision_type="", confidence=1.0,
+            ),
+            self._runtime_state(),
+        ).ok
+
     def _provider_action(
         self, player_id: str, phase: str, rnd: int
     ) -> tuple[AgentAction | None, ProviderActionError | Exception | None, dict[str, Any]]:
@@ -520,12 +551,7 @@ class EmergentGameEngine:
                 else:
                     self._record_failure(rnd, "night", wolf, "agent_error", f"{wolf} raised {type(err).__name__}: {err}")
                 continue
-            valid = (
-                action.action == "werewolf_kill"
-                and action.target in self._alive
-                and self._players_by_id.get(action.target) is not None
-                and self._players_by_id[action.target].role != "werewolf"
-            )
+            valid = self._action_legal(wolf, "werewolf", "night", action)
             if not valid:
                 self._record_failure(rnd, "night", wolf, "invalid_action", f"{wolf} proposed invalid kill {action.target}", action.target)
                 self._downgrade_turn(turn, f"engine rejected kill target {action.target}")
@@ -627,7 +653,7 @@ class EmergentGameEngine:
                 self._record_failure(rnd, "night", seer, err.failure.kind, err.failure.reason, err.failure.target)
             else:
                 self._record_failure(rnd, "night", seer, "agent_error", f"{seer} raised {type(err).__name__}: {err}")
-        elif action.action == "seer_check" and action.target in self._alive and action.target != seer:
+        elif self._action_legal(seer, "seer", "night", action):
             target = action.target
         else:
             self._record_failure(rnd, "night", seer, "invalid_action", f"{seer} bad seer_check {action.target}", action.target)
@@ -785,7 +811,7 @@ class EmergentGameEngine:
                     self._record_failure(rnd, "day", voter, err.failure.kind, err.failure.reason, err.failure.target)
                 else:
                     self._record_failure(rnd, "day", voter, "agent_error", f"{voter} raised {type(err).__name__}: {err}")
-            elif action.action == "player_vote" and action.target in self._alive and action.target != voter:
+            elif self._action_legal(voter, self._players_by_id[voter].role, "day_vote", action):
                 target = action.target
             else:
                 self._record_failure(rnd, "day", voter, "invalid_action", f"{voter} bad vote {action.target}", action.target)
