@@ -43,6 +43,7 @@ from werewolf_eval.observer_protocol import (
 )
 from werewolf_eval.credential_store import CredentialStore
 from werewolf_eval.deepseek_launcher import build_multi_provider_launcher
+from werewolf_eval.evaluation_versions import read_manifest_bucket
 from werewolf_eval.llm_providers import ChatProviderConfig
 from werewolf_eval.provider_registry import PROVIDER_REGISTRY, list_models, provider_specs_payload
 from werewolf_eval.seat_agents import ProviderCredential
@@ -502,7 +503,11 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
         with state.lock:
             state.run_status[run_id] = status
         # Persist durably (outside the lock — file I/O) so the status survives a restart.
-        write_run_status(state.runs_dir / run_id, status)
+        write_run_status(
+            state.runs_dir / run_id,
+            status,
+            evaluation_bucket=read_manifest_bucket(state.runs_dir / run_id),
+        )
 
     def _set_error(self, run_id: str, error: str) -> None:
         state = self._get_state()

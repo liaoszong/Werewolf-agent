@@ -35,6 +35,8 @@ from werewolf_eval.provider_contract import (
     ProviderTrace,
     provider_trace_to_dict,
 )
+from werewolf_eval.evaluation_versions import SCORING_VERSION, evaluation_bucket
+from werewolf_eval.prompt_version import PROMPT_VERSION
 from werewolf_eval.run_emergent_deepseek_game import _provider_turns_summary
 from werewolf_eval.runtime_events import RuntimeEventWriter, build_prompt_manifest, read_events_jsonl
 
@@ -132,6 +134,7 @@ def run_emergent_fake_runtime(
     _write_json(out_dir / "provider-trace.json", _collect_trace(game_id, agents))
     _write_json(out_dir / "provider-turns.json", _provider_turns_summary(outcome.provider_turns))
 
+    providers = [a.provider for a in agents.values()]
     manifest = build_prompt_manifest(
         run_id=game_id,
         source_label=FAKE_PROVIDER_SOURCE_LABEL,
@@ -144,6 +147,17 @@ def run_emergent_fake_runtime(
             }
             for p in config.players
         ],
+        evaluation_bucket=evaluation_bucket(
+            rules_version=engine.rules_version,
+            prompt_version=PROMPT_VERSION,
+            scoring_version=SCORING_VERSION,
+        ),
+        # getattr default True is the SAFE-for-live direction but LIES for an
+        # undeclared fake provider — every fake provider class MUST declare
+        # uses_baseline_prompt=False (pinned in test_evaluation_versions.py).
+        prompt_used_by_runtime=any(
+            getattr(p, "uses_baseline_prompt", True) for p in providers
+        ),
     )
     manifest["secrets_redacted"] = True
     writer.write_prompt_manifest(manifest)

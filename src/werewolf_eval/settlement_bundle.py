@@ -1,7 +1,7 @@
 """P2-D settlement bundle builder (pure, eval-ready).
 
 `build_settlement_bundle(game, decision_log) -> dict` produces the
-`p2d.settlement.v1` bundle (spec §5/§6.1):
+`p2d.settlement.v2` bundle (spec §5/§6.1):
 
 - Curtain layer (run_id/game_id/result/players-reveal/board_timeline) depends
   ONLY on the game-log and survives any scoring failure.
@@ -23,10 +23,24 @@ from pathlib import Path
 
 from werewolf_eval.attribution import attribute_game
 from werewolf_eval.decision_log import DecisionLog, load_decision_log
+from werewolf_eval.evaluation_versions import (
+    SCORING_VERSION,
+    UNKNOWN_VERSION,
+    evaluation_bucket as _evaluation_bucket,
+    read_manifest_bucket,
+)
 from werewolf_eval.game_log import GameLog, load_game_log
 from werewolf_eval.scoring import score_game, summarize_metrics
 
-BUNDLE_VERSION = "p2d.settlement.v1"
+BUNDLE_VERSION = "p2d.settlement.v2"
+
+
+def _unknown_bucket() -> dict[str, str]:
+    return _evaluation_bucket(
+        rules_version=UNKNOWN_VERSION,
+        prompt_version=UNKNOWN_VERSION,
+        scoring_version=SCORING_VERSION,
+    )
 
 # Death events that remove a player from the alive set (verified vs the gold
 # game-log §13: night/poison kills surface as `player_died`, day votes as
@@ -126,6 +140,7 @@ def _curtain(
         # review / rubric audit / decision→event traceability. Empty until scored.
         "score_records": [],
         "board_timeline": board,
+        "evaluation_bucket": _unknown_bucket(),
     }
 
 
@@ -159,6 +174,7 @@ def build_settlement_bundle(
     run_id: str | None = None,
     decision_log_status: str = "present",
     seat_meta: dict[str, dict] | None = None,
+    evaluation_bucket: dict[str, str] | None = None,
 ) -> dict:
     board = _board_timeline(game)
     bundle = _curtain(game, board, run_id, seat_meta)
@@ -259,6 +275,9 @@ def build_settlement_bundle(
         }
         for r in score_log.records
     ]
+    bundle["evaluation_bucket"] = (
+        dict(evaluation_bucket) if evaluation_bucket is not None else _unknown_bucket()
+    )
     return bundle
 
 
@@ -356,6 +375,7 @@ def build_settlement_response(
         run_id=run_id,
         decision_log_status=status,
         seat_meta=_load_seat_meta(run_dir),
+        evaluation_bucket=read_manifest_bucket(run_dir),
     )
     # Cache ONLY a COMPLETE bundle: not degraded AND decision-quality present. A
     # degraded bundle (scoring crash) OR a partial one (no decision-log yet) is a

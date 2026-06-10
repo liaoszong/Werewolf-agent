@@ -344,5 +344,11 @@
       ],
       "notes": "Villager p6 voted to eliminate p1, who is revealed as werewolf. Decision g001_d010 visible_refs=present type=inference_based; S5 label=supported_good evidence_alignment=aligned reasoning_consistency=consistent rationale=The final vote cites visible late-game evidence and targets a plausible wolf."
     }
-  ]
+  ],
+  "evaluation_bucket": {
+    "rules_version": "unknown",
+    "prompt_version": "unknown",
+    "scoring_version": "scoring_v1",
+    "comparison_key": "unknown__unknown__scoring_v1"
+  }
 }

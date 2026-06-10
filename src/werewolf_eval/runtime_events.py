@@ -562,6 +562,8 @@ def build_prompt_manifest(
     run_id: str,
     source_label: str,
     agents: list[dict[str, object]],
+    evaluation_bucket: dict[str, str] | None = None,
+    prompt_used_by_runtime: bool | None = None,
 ) -> dict[str, object]:
     """Build a prompt manifest with redaction-safe content and SHA-256 hashes.
 
@@ -572,6 +574,15 @@ def build_prompt_manifest(
     * ``prompt`` (str) — full prompt text; will be hashed and removed
     * ``provider`` (str)
     * ``model`` (str)
+
+    Optional versioning kwargs (spec 2026-06-10-prompt-versioning §4.3):
+
+    * ``evaluation_bucket`` — the leaderboard bucket dict from
+      :func:`werewolf_eval.evaluation_versions.evaluation_bucket`; omitted when
+      not provided (backward-compatible).
+    * ``prompt_used_by_runtime`` — ``True`` if at least one seat provider
+      consumed the declared baseline prompt; ``False`` for fully scripted/fake
+      runners.  Omitted when not provided (backward-compatible).
 
     Returns a manifest dict suitable for ``RuntimeEventWriter.write_prompt_manifest()``.
     """
@@ -603,4 +614,10 @@ def build_prompt_manifest(
         "source_label": source_label,
         "agents": hashed_agents,
     }
+    # Spec 2026-06-10-prompt-versioning §4.3: the tuple lands in run/eval
+    # explanation artifacts, never in byte-frozen canonical game logs.
+    if evaluation_bucket is not None:
+        manifest["evaluation_bucket"] = dict(evaluation_bucket)
+    if prompt_used_by_runtime is not None:
+        manifest["prompt_used_by_runtime"] = bool(prompt_used_by_runtime)
     return redact_secret_values(manifest)  # type: ignore[return-value]

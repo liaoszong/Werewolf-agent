@@ -1,0 +1,41 @@
+[
+  {
+    "prompt_version": "prompt_v1",
+    "base_version": null,
+    "reason": "initial baseline lock — freeze the current rendering as the archived reference anchor",
+    "expected_change": "none (mechanism landing; zero prompt byte change is an acceptance criterion)",
+    "touched_chain": [],
+    "golden_prompt_hashes": {
+      "before": null,
+      "after": {
+        "action_werewolf_night": "3a1a61818b1aeffcb69a62d4468bb9906adff438a08e74b34bcf505a8fc6285e",
+        "action_seer_night": "3fe8213b79421a767bfe2ff6a434ecfa5b2cf2243fb8b7f0481973b75160019e",
+        "action_witch_night": "9166a2596ae1532cb69267eb4788a873b6c966cf4c7d090d136b75d19bc7d8ac",
+        "action_villager_day_vote": "661e90137dbbe21c31fe5afd32dacc5e5f6030a4c02e4b64e2340c731adfbb97",
+        "action_hunter_day_vote": "60c211ffde71494ad78581f0047fbc07b0540b3d0fcc9cf7a83b108e691f689d",
+        "action_hunter_shot": "f20b6bc0055e2d24c73ded7139108320c14f137df07564b96992dc443d976dbd",
+        "speech_villager_day1": "bd8348b1f0842b381190ad979cfbe0baaf543f74b63f85584c106d0161271aab",
+        "speech_werewolf_day1": "9777b3e3755581ab35a2c6e08e2d5137c8d353a1045e489506ac7b0367e08c82",
+        "compose_persona_action": "25cb37a5dfc5ac7dac1564b1a0604409f2c9409f000822ba7fe5a196f9541b23",
+        "obs_villager_day": "f35449c735bcc7bdc16f47ec43460aa07b49d0789647c49fd5672c2012eb8d2e",
+        "obs_werewolf_night": "4ac6d5b4c1246384c4e20ceb4f4eca5798093eb2402324643c1575653096668c",
+        "obs_witch_night_victim": "041e0dcdc9e9256fad23324b0dbdd1c2d4c713a02f31fa60f6920c588b939ccc",
+        "obs_witch_night_no_victim": "4afa82dac87ca797a6e6fa702d4d82f50e3277c435be95fbdce5d3e4bbf8b15f",
+        "obs_hunter_shot": "10055ab3337292e4a0d4f071a317314938a9239633d3f7c809eba2787ec9c720"
+      }
+    },
+    "behavior_evidence": {
+      "status": "not_applicable",
+      "reason_if_not_run": "initial version; no behavior change to evidence"
+    },
+    "blessed_by": "user (spec review 2026-06-10)",
+    "blessed_at": "2026-06-10"
+  },
+  {
+    "schema_addition": "score_log.evaluation_bucket + settlement_bundle.evaluation_bucket (BUNDLE_VERSION p2d.settlement.v2)",
+    "reason": "additive tuple stamp per spec §4.5; s2/s5 gold score-log expectation dicts regenerated (whole-dict assertEqual targets)",
+    "regenerated_fixtures": ["docs/gold-game/s2-score-log.json", "docs/gold-game/s5-score-log.json"],
+    "blessed_by": "subagent-driven execution of plan 2026-06-10-prompt-versioning (Task 9)",
+    "blessed_at": "2026-06-10"
+  }
+]

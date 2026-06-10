@@ -166,6 +166,12 @@ def augment_witch_observation(base_text: str, victim: str | None) -> str:
     return base_text + "\n今晚没有玩家被狼人袭击(无可救目标)。"
 
 
+# Model-visible inline augmentation (byte-locked via tests/golden_prompts —
+# spec 2026-06-10-prompt-versioning §3). Changing this string requires a
+# PROMPT_VERSION bump.
+HUNTER_SHOT_OBSERVATION_SUFFIX = "\n你已出局,作为猎人可开枪带走一名存活玩家,或选择不开枪。"
+
+
 class BudgetExhausted(Exception):
     """Raised internally when the per-game request budget is hit; the run is
     then converted to a fail-closed failed outcome (no complete game_log)."""
@@ -278,6 +284,7 @@ class EmergentGameEngine:
         # rules_v1_1 is a backward-compatible superset (adds the hunter); 4-role games
         # are byte-identical (the hunter role is never queried).
         _ruleset = rules_v1_1()
+        self.rules_version = _ruleset.rules_version
         self._registry = RoleAbilityRegistry(_ruleset)
         self._settler = JointSettler(_ruleset)
         self._validator = ActionValidator(self._registry)
@@ -916,7 +923,7 @@ class EmergentGameEngine:
             observation=obs.to_dict(),
             allowed_actions=["hunter_shoot", "hunter_pass"],
             allowed_targets=sorted(self._alive),
-            observation_text=rendered.text + "\n你已出局,作为猎人可开枪带走一名存活玩家,或选择不开枪。",
+            observation_text=rendered.text + HUNTER_SHOT_OBSERVATION_SUFFIX,
             response_kind="action", max_output_tokens=ACTION_MAX_OUTPUT_TOKENS,
         )
         turn: dict[str, Any] = {

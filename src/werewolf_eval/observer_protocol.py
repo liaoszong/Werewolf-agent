@@ -188,18 +188,31 @@ def _read_status(run_dir: Path) -> str:
 read_run_status = _read_status
 
 
-def write_run_status(run_dir: Path, status: str) -> None:
+def write_run_status(
+    run_dir: Path, status: str, evaluation_bucket: dict[str, str] | None = None
+) -> None:
     """Persist the run status durably so it survives a server restart. The server's
     in-memory run_status dict is lost on bounce, which otherwise makes every prior
     completed run report 'unknown' and become permanently un-settleable (the
     settlement route gates on status=='completed'). Atomic temp+replace; best-effort
-    (never raises into the run thread)."""
+    (never raises into the run thread). A previously stamped evaluation_bucket is
+    preserved across bucket-less rewrites (spec 2026-06-10-prompt-versioning §4.3)."""
     if status not in RUN_STATUS_VALUES:
         return
     try:
+        payload: dict[str, object] = {"status": status}
+        if evaluation_bucket is not None:
+            payload["evaluation_bucket"] = dict(evaluation_bucket)
+        else:
+            try:
+                prev = json.loads((run_dir / _STATUS_FILE).read_text(encoding="utf-8"))
+                if isinstance(prev, dict) and "evaluation_bucket" in prev:
+                    payload["evaluation_bucket"] = prev["evaluation_bucket"]
+            except (OSError, ValueError):
+                pass
         run_dir.mkdir(parents=True, exist_ok=True)
         tmp = run_dir / (_STATUS_FILE + ".tmp")
-        tmp.write_text(json.dumps({"status": status}), encoding="utf-8")
+        tmp.write_text(json.dumps(payload), encoding="utf-8")
         tmp.replace(run_dir / _STATUS_FILE)
     except OSError:
         pass

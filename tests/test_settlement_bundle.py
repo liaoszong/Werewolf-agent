@@ -45,7 +45,7 @@ class TestBuildSettlementBundle(unittest.TestCase):
 
     def test_full_bundle_shape(self):
         bundle = build_settlement_bundle(self._game(), self._decision_log(), run_id="r1")
-        self.assertEqual(bundle["bundle_version"], "p2d.settlement.v1")
+        self.assertEqual(bundle["bundle_version"], "p2d.settlement.v2")
         self.assertEqual(bundle["run_id"], "r1")
         self.assertEqual(bundle["game_id"], self._game().game_id)
         self.assertFalse(bundle["degraded"])
@@ -150,10 +150,16 @@ class TestBuildSettlementBundle(unittest.TestCase):
             self.assertNotIn(forbidden, reason)
 
     def test_secret_free(self):
-        blob = json.dumps(
-            build_settlement_bundle(self._game(), self._decision_log()),
-            ensure_ascii=False,
+        bundle = build_settlement_bundle(self._game(), self._decision_log())
+        # Pop evaluation_bucket and shape-check it explicitly; it legitimately
+        # contains "prompt_version" — scanning the remainder with the full
+        # forbidden list (including bare "prompt") is safe once it is removed.
+        bucket = bundle.pop("evaluation_bucket")
+        self.assertEqual(
+            set(bucket),
+            {"rules_version", "prompt_version", "scoring_version", "comparison_key"},
         )
+        blob = json.dumps(bundle, ensure_ascii=False)
         for forbidden in ["reason_summary", "prompt", "api_key", "Bearer", "sk-", "C:\\", "/src/"]:
             self.assertNotIn(forbidden, blob)
 
@@ -205,6 +211,55 @@ class TestBuildSettlementBundle(unittest.TestCase):
         self.assertFalse(bundle["degraded"])
         self.assertIsNone(bundle["top_attribution"])
         self.assertEqual(bundle["turning_points"], [])
+
+
+class TestSettlementBundleEvaluationBucket(unittest.TestCase):
+    """Spec 2026-06-10-prompt-versioning §4.5: bundle carries evaluation_bucket."""
+
+    def _game(self):
+        return load_game_log(_GAME_LOG_PATH)
+
+    def _decision_log(self):
+        return load_decision_log(_DECISION_LOG_PATH, self._game())
+
+    def test_builder_without_kwarg_stamps_unknown_bucket(self):
+        bundle = build_settlement_bundle(self._game(), self._decision_log())
+        self.assertEqual(
+            bundle["evaluation_bucket"]["comparison_key"],
+            "unknown__unknown__scoring_v1",
+        )
+
+    def test_settle_entry_with_stamped_manifest_carries_real_bucket(self):
+        """build_settlement_response must read the manifest bucket and pass it
+        through; an unknown-tolerant assertion cannot catch wiring failures."""
+        import tempfile
+        import shutil
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            run_dir = Path(tmpdir)
+            # Copy game-log and decision-log so settlement can proceed.
+            shutil.copy(_GAME_LOG_PATH, run_dir / "game-log.json")
+            shutil.copy(_DECISION_LOG_PATH, run_dir / "decision-log.json")
+            # Write a stamped prompt-manifest.json with a real bucket.
+            manifest = {
+                "evaluation_bucket": {
+                    "rules_version": "rules_v1_1",
+                    "prompt_version": "prompt_v1",
+                    "scoring_version": "scoring_v1",
+                    "comparison_key": "rules_v1_1__prompt_v1__scoring_v1",
+                },
+                "agents": [],
+            }
+            (run_dir / "prompt-manifest.json").write_text(
+                json.dumps(manifest), encoding="utf-8"
+            )
+            from werewolf_eval.settlement_bundle import build_settlement_response
+            response = build_settlement_response(run_dir, "completed", "r_test")
+            self.assertTrue(response["available"])
+            self.assertEqual(
+                response["bundle"]["evaluation_bucket"]["comparison_key"],
+                "rules_v1_1__prompt_v1__scoring_v1",
+            )
 
 
 if __name__ == "__main__":

@@ -21,6 +21,8 @@ from werewolf_eval.provider_contract import (
     provider_trace_to_dict,
     ProviderTrace,
 )
+from werewolf_eval.evaluation_versions import SCORING_VERSION, UNKNOWN_VERSION, evaluation_bucket
+from werewolf_eval.prompt_version import PROMPT_VERSION
 from werewolf_eval.runtime_events import (
     RuntimeEventWriter,
     build_prompt_manifest,
@@ -147,6 +149,12 @@ def run_deepseek_consensus_game_with_provider_factory(
                     {"player_id": pid, "provider": "deepseek", "model": manifest_model}
                     for pid in ["p1", "p2", "p3", "p4", "p5", "p6"]
                 ],
+                evaluation_bucket=evaluation_bucket(
+                    rules_version=UNKNOWN_VERSION,  # consensus path predates RulesVariant; honest unknown
+                    prompt_version=PROMPT_VERSION,
+                    scoring_version=SCORING_VERSION,
+                ),
+                prompt_used_by_runtime=True,  # live DeepSeek providers consume the baseline prompt
             )
             manifest["secrets_redacted"] = True
             writer.write_prompt_manifest(manifest)
@@ -214,6 +222,12 @@ def run_deepseek_consensus_game_with_provider_factory(
                 {"player_id": pid, "provider": "deepseek", "model": manifest_model}
                 for pid in ["p1", "p2", "p3", "p4", "p5", "p6"]
             ],
+            evaluation_bucket=evaluation_bucket(
+                rules_version=UNKNOWN_VERSION,  # consensus path predates RulesVariant; honest unknown
+                prompt_version=PROMPT_VERSION,
+                scoring_version=SCORING_VERSION,
+            ),
+            prompt_used_by_runtime=True,  # live DeepSeek providers consume the baseline prompt
         )
         manifest["secrets_redacted"] = True
         writer.write_prompt_manifest(manifest)

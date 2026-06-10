@@ -482,5 +482,34 @@ class MalformedInputRobustnessTests(unittest.TestCase):
         self.assertEqual(p5["vote_accuracy"], 0.0)
 
 
+class ScoreLogBucketTests(unittest.TestCase):
+    def setUp(self) -> None:
+        game = load_game_log(ROOT / "docs/gold-game/g001-game-log.json")
+        decision_log = load_decision_log(ROOT / "docs/gold-game/g001-decision-log.json", game)
+        self.score_log = score_game(game, decision_log=decision_log)
+
+    def test_score_log_dict_default_stamps_unknown_bucket(self) -> None:
+        d = score_log_to_dict(self.score_log)
+        self.assertEqual(
+            d["evaluation_bucket"],
+            {
+                "rules_version": "unknown",
+                "prompt_version": "unknown",
+                "scoring_version": "scoring_v1",
+                "comparison_key": "unknown__unknown__scoring_v1",
+            },
+        )
+
+    def test_score_log_dict_accepts_explicit_bucket(self) -> None:
+        bucket = {
+            "rules_version": "rules_v1_1",
+            "prompt_version": "prompt_v1",
+            "scoring_version": "scoring_v1",
+            "comparison_key": "rules_v1_1__prompt_v1__scoring_v1",
+        }
+        d = score_log_to_dict(self.score_log, evaluation_bucket=bucket)
+        self.assertEqual(d["evaluation_bucket"], bucket)
+
+
 if __name__ == "__main__":
     unittest.main()
