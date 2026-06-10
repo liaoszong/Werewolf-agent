@@ -42,8 +42,9 @@ Item {
         var m = _selected
         if (on) m[runId] = true; else delete m[runId]
         _selected = m                                 // reassign to fire bindings
+        if (Object.keys(_selected).length === 0) selectAllBox.checked = false
     }
-    function _exitSelectMode() { selecting = false; _selected = ({}) }
+    function _exitSelectMode() { selecting = false; _selected = ({}); selectAllBox.checked = false }
 
     function _startBatchDelete() {
         if (_batchActive) return
@@ -209,6 +210,7 @@ Item {
                     // Select-all checkbox — visible when in selection mode,
                     // placed left of the count chip with a small gap.
                     CheckBox {
+                        id: selectAllBox
                         objectName: "selectAllBox"
                         visible: root.selecting
                         anchors.right: countChip.left
@@ -231,7 +233,7 @@ Item {
                         id: selectModeButton
                         objectName: "selectModeButton"
                         anchors.right: countChip.left
-                        anchors.rightMargin: root.selecting ? Theme.space.xl + 20 : Theme.space.sm
+                        anchors.rightMargin: root.selecting ? Theme.space.xl * 2 : Theme.space.sm
                         anchors.verticalCenter: parent.verticalCenter
                         text: root.selecting ? I18n.t("取消", "Cancel") : I18n.t("选择", "Select")
                         variant: "ghost"
@@ -350,7 +352,9 @@ Item {
                                 anchors.leftMargin: (root.selecting ? 36 : 0) + Theme.space.lg
                                 anchors.verticalCenter: parent.verticalCenter
                                 width: Math.max(120, parent.width
-                                    - statusBadge.width - deleteButton.width - reportButton.width - openButton.width - Theme.space.xl * 5
+                                    - statusBadge.width
+                                    - (root.selecting ? 0 : deleteButton.width + reportButton.width + openButton.width + Theme.space.xl * 3)
+                                    - Theme.space.xl * 2
                                     - (root.selecting ? 36 : 0))
                                 elide: Text.ElideRight
                                 text: modelData.run_id || I18n.t("(未命名对局)", "(unnamed run)")
@@ -363,8 +367,8 @@ Item {
 
                             StatusBadge {
                                 id: statusBadge
-                                anchors.right: deleteButton.left
-                                anchors.rightMargin: Theme.space.lg
+                                anchors.right: root.selecting ? parent.right : deleteButton.left
+                                anchors.rightMargin: root.selecting ? Theme.space.md : Theme.space.lg
                                 anchors.verticalCenter: parent.verticalCenter
                                 status: modelData.status || ""
                             }
