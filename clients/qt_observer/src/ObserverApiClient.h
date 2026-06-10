@@ -107,6 +107,7 @@ public slots:
     // forReport=true (history "查看战报") makes the settlement overlay skip the freeze
     // ceremony and open straight to the report; default false = live freeze ceremony.
     Q_INVOKABLE void openRun(const QString &runId, bool forReport = false);
+    Q_INVOKABLE void deleteRun(const QString &runId);
     Q_INVOKABLE void connectStream();
     Q_INVOKABLE void disconnectStream();
     Q_INVOKABLE void refreshAuditLinks();
@@ -165,6 +166,7 @@ signals:
     void providerModelsChanged();                                              // property NOTIFY (provider-agnostic)
     void providerModelsFetched(const QString &provider);                       // a fetch for THIS provider succeeded
     void providerModelsFailed(const QString &provider, const QString &reason); // reason is key-free
+    void deleteRunFinished(const QString &runId, bool ok, const QString &error);
 
 private slots:
     void onStreamReadyRead();
@@ -218,6 +220,7 @@ private:
     QString m_defaultMode = QStringLiteral("fake");
     QString m_currentExecutionMode;
     QString m_initialRunId;
+    QString m_pendingOpenRunId;   // last openRun target; stale async replies are dropped
 
     QNetworkAccessManager *m_network;
     QNetworkReply *m_streamReply;

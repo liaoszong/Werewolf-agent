@@ -29,6 +29,7 @@ QtObject {
     property string layoutPhase: "day"  // "night" | "day" | "voting"
     property bool waiting: false
     readonly property bool atEnd: _cursor >= _ordered.length   // drained (all received events consumed)
+    readonly property int queuedCount: _ordered.length   // total received (de-duped); 0 = nothing arrived yet
 
     // Major phase timeline up to the cursor: ordered unique (round, night|day) pairs. Drives
     // the top progress axis; the LAST entry is the current major phase. (voting is part of day.)
@@ -238,15 +239,16 @@ QtObject {
     function resumeAfterTransition() {            // TheaterView onStopped (gate released)
         _gated = false
         _heldMs = 0
-        if (_ffToEnd && _consumeCurrentPhaseFast())   // keep crossing phases, gated each time
-            _ffToEnd = false
+        if (_ffToEnd) _ffToEnd = !_consumeCurrentPhaseFast(instant)  // ungated if still in instant mode
     }
 
-    // Instantly consume the rest of the CURRENT layoutPhase; at a phase boundary raise the
-    // gate exactly like _pump (set layoutPhase + _gated + emit phaseBoundary) and STOP, so the
-    // layout transition still runs and consumption stays gated (D5). Respects _gated (no-op while
-    // a transition is in flight). Returns true ONLY when it reaches the end of received events.
-    function _consumeCurrentPhaseFast() {
+    // Instantly consume the rest of the CURRENT layoutPhase; at a phase boundary update
+    // layoutPhase and emit phaseBoundary. When ungated=false (gated mode): raise the gate and
+    // STOP so the layout transition still runs (D5 invariant). When ungated=true (instant sweep):
+    // skip the gate and keep consuming through all phase boundaries in one synchronous pass.
+    // Respects _gated (no-op while a transition is in flight). Returns true ONLY when it reaches
+    // the end of received events.
+    function _consumeCurrentPhaseFast(ungated) {
         if (_gated)
             return false
         while (_cursor < _ordered.length) {
@@ -255,11 +257,14 @@ QtObject {
                 reset()
                 return false
             }
-            if (_phaseOf(raw) !== layoutPhase) {      // boundary -> raise gate, emit marker, STOP
+            if (_phaseOf(raw) !== layoutPhase) {      // boundary -> update layout + emit marker
                 layoutPhase = _phaseOf(raw)
-                _gated = true
                 phaseBoundary(layoutPhase, raw.round || 0)
-                return false
+                if (!ungated) {
+                    _gated = true                     // gated: raise gate and stop (D5)
+                    return false
+                }
+                // ungated instant sweep: layoutPhase updated, marker emitted, keep consuming
             }
             _currentRaw = raw
             consumedSeq = _seq(raw)
@@ -270,11 +275,11 @@ QtObject {
         return true
     }
 
-    function seekNextPhase() {                    // skip the rest of this phase -> next phase (gated)
+    function seekNextPhase() {                    // skip the rest of this phase -> next phase (always gated)
         _ffToEnd = false
-        _consumeCurrentPhaseFast()
+        _consumeCurrentPhaseFast(false)
     }
-    function seekQueueEnd() {                      // catch up to the latest received event, gating each transition
-        _ffToEnd = !_consumeCurrentPhaseFast()
+    function seekQueueEnd() {                      // catch up to latest event; ungated in instant mode
+        _ffToEnd = !_consumeCurrentPhaseFast(instant)
     }
 }

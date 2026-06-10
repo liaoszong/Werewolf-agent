@@ -52,6 +52,7 @@ REQUIRED_QML_VIEWS = [
     "qml/components/SeatEditorPanel.qml",
     "qml/components/ModeControl.qml",
     "qml/components/DataSourceChip.qml",
+    "qml/components/ConfirmDialog.qml",
 ]
 
 REQUIRED_OBJECT_NAMES = {
@@ -72,7 +73,9 @@ REQUIRED_OBJECT_NAMES = {
     "qml/LiveCockpitView.qml": ["liveCockpitView", "runStatusBadge", "playerPanelGrid", "eventTimeline", "perspectiveSwitcher", "auditLinksPanel", "providerFailureSummary"],
     "qml/TheaterView.qml": ["theaterView"],
     "qml/SettlementView.qml": ["settlementView"],
-    "qml/HistoryView.qml": ["historyView", "historyRunsList", "historyRefreshButton"],
+    "qml/HistoryView.qml": ["historyView", "historyRunsList", "historyRefreshButton",
+                            "deleteRunButton", "historyConfirmDialog", "historyNoticeBar",
+                            "selectModeButton", "rowSelectBox", "selectAllBox", "batchDeleteButton"],
     "qml/EventPresentationQueue.qml": ["eventQueue"],
     "qml/components/RoleCard.qml": ["roleCard"],
     "qml/components/SeatRing.qml": ["seatRing"],
@@ -89,6 +92,7 @@ REQUIRED_OBJECT_NAMES = {
         "seatEditorPrompt", "seatEditorPersona", "seatEditorTemperature",
         "seatEditorMaxTokens",
     ],
+    "qml/components/ConfirmDialog.qml": ["confirmDialog", "confirmAcceptButton", "confirmCancelButton"],
 }
 
 

@@ -134,6 +134,13 @@ void ObserverApiClient::setCurrentRunId(const QString &runId)
         m_settlementBundle.clear();
         emit settlementBundleChanged();
     }
+    // Report fast-forward stale-queue guard: a new run must not inherit the prior
+    // run's raw event items, so the QML fast-forward check sees an empty queue
+    // until the new run's events actually arrive.
+    if (!m_eventItems.isEmpty()) {
+        m_eventItems.clear();
+        emit eventItemsChanged();
+    }
     // C1-bis: a new run must never inherit the prior run's executed truth — the
     // HUD chip falls back to SYS: SIMULATION until run detail returns a mode.
     resetExecutionMode();
@@ -230,8 +237,35 @@ void ObserverApiClient::startDefaultMatch()
     });
 }
 
+void ObserverApiClient::deleteRun(const QString &runId)
+{
+    if (runId.isEmpty())
+        return;
+    QNetworkRequest req(QUrl(m_baseUrl + QStringLiteral("/api/runs/") + runId));
+    req.setRawHeader("Accept", "application/json");
+    QNetworkReply *reply = m_network->deleteResource(req);
+    connect(reply, &QNetworkReply::finished, this, [this, runId, reply]() {
+        reply->deleteLater();
+        const bool ok = (reply->error() == QNetworkReply::NoError);
+        QString err;
+        if (!ok) {
+            const QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+            err = doc.isObject() ? doc.object().value(QStringLiteral("error")).toString()
+                                 : reply->errorString();
+            if (err.isEmpty())
+                err = reply->errorString();
+        }
+        if (ok && runId == m_currentRunId)
+            setCurrentRunId(QString());   // the theater must not point at a deleted dir
+        emit deleteRunFinished(runId, ok, err);
+        // NO auto-refresh here: QML decides (single delete refreshes per-op;
+        // a batch refreshes ONCE after all deletes finish — spec §4).
+    });
+}
+
 void ObserverApiClient::openRun(const QString &runId, bool forReport)
 {
+    m_pendingOpenRunId = runId;
     // Set the settlement entry mode SYNCHRONOUSLY here (before the async detail
     // request and before navigation) so the theater reads a reliable value when it
     // mounts. Latching it later off the async currentStatus was racy (history opens
@@ -244,6 +278,7 @@ void ObserverApiClient::openRun(const QString &runId, bool forReport)
     QNetworkReply *reply = get(QStringLiteral("/api/runs/") + runId);
     connect(reply, &QNetworkReply::finished, this, [this, runId, reply]() {
         reply->deleteLater();
+        if (runId != m_pendingOpenRunId) return;
         if (reply->error() != QNetworkReply::NoError) {
             setError(reply->errorString());
             resetExecutionMode();   // C1-bis: detail request error → "" (SIMULATION)
@@ -277,8 +312,9 @@ void ObserverApiClient::openRun(const QString &runId, bool forReport)
 
         QNetworkReply *eventsReply = get(
             QStringLiteral("/api/runs/") + runId + QStringLiteral("/events?perspective=") + m_currentPerspective);
-        connect(eventsReply, &QNetworkReply::finished, this, [this, eventsReply]() {
+        connect(eventsReply, &QNetworkReply::finished, this, [this, runId, eventsReply]() {
             eventsReply->deleteLater();
+            if (runId != m_pendingOpenRunId) return;
             if (eventsReply->error() != QNetworkReply::NoError) {
                 setError(eventsReply->errorString());
                 return;

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
 import time
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -306,6 +307,21 @@ def _credentials_delete_result(
         return (400, {"error": "unsupported_provider"})
     store.clear(provider)
     return (200, {"cleared": provider})
+
+
+def _run_delete_result(run_dir: Path, run_id: str, status: str) -> tuple[int, dict[str, object]]:
+    """Pure logic for DELETE /api/runs/{run_id}. An active run (running/queued)
+    is never deleted (409); a missing dir is 404; an rmtree failure (e.g. a
+    Windows file lock) reports 500 — NEVER success on a partial delete."""
+    if status in ("running", "queued"):
+        return (409, {"error": "run_active"})
+    if not run_dir.is_dir():
+        return (404, {"error": "not_found"})
+    try:
+        shutil.rmtree(run_dir)
+    except OSError as exc:
+        return (500, {"error": "delete_failed", "detail": str(exc)})
+    return (200, {"deleted": run_id})
 
 
 def _provider_models_result(
@@ -878,6 +894,26 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
                     self._send_json(200, payload)
                 else:
                     self._send_error_json(status, str(payload.get("error", "bad_request")), "")
+                return
+            if len(segments) == 3 and segments[:2] == ["api", "runs"]:
+                if not self._is_loopback():
+                    self._send_error_json(403, "forbidden", "runs delete is loopback-only")
+                    return
+                if self._reject_cross_origin():
+                    return
+                run_id = segments[2]
+                run_dir = self._run_dir(run_id)          # validate_run_id -> raises on illegal id
+                status_now = self._get_status(run_id, run_dir)   # memory-first, then status.json
+                code, payload = _run_delete_result(run_dir, run_id, status_now)
+                if code == 200:
+                    state = self._get_state()
+                    with state.lock:                      # drop stale in-memory entries
+                        state.run_status.pop(run_id, None)
+                        state.run_errors.pop(run_id, None)
+                    self._send_json(200, payload)
+                else:
+                    self._send_error_json(code, str(payload.get("error", "bad_request")),
+                                          str(payload.get("detail", "")))
                 return
             self._send_error_json(404, "not_found", "unknown endpoint")
         except ObserverProtocolError as exc:

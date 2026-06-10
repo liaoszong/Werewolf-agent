@@ -72,6 +72,7 @@ qt_add_qml_module(appqt_observer
         qml/components/SeatEditorPanel.qml
         qml/components/ModeControl.qml
         qml/components/DataSourceChip.qml
+        qml/components/ConfirmDialog.qml
 )
 
 set_target_properties(appqt_observer PROPERTIES
