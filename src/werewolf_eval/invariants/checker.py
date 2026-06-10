@@ -57,3 +57,34 @@ def check_i1(arts: RunArtifacts) -> list[InvariantViolation]:
 
 
 _ALL_CHECKS.append(check_i1)
+
+
+ACTIVE_ACTION_TYPES = ("werewolf_kill", "seer_check", "witch_save", "witch_poison",
+                       "witch_pass", "player_speech", "player_vote")
+
+
+def _first_death_sequence(arts: RunArtifacts) -> dict[str, int]:
+    dead_at: dict[str, int] = {}
+    for e in sorted(arts.events, key=lambda x: x.get("sequence", 0)):
+        if e.get("type") in DEATH_COMMIT_TYPES:
+            dead_at.setdefault(str(e.get("target")), int(e.get("sequence", 0)))
+    return dead_at
+
+
+def check_i2(arts: RunArtifacts) -> list[InvariantViolation]:
+    """A dead actor produces no ordinary action; the on-death window
+    (hunter_shoot/hunter_pass, absent from ACTIVE_ACTION_TYPES) is exempt."""
+    dead_seq = _first_death_sequence(arts)
+    out: list[InvariantViolation] = []
+    for e in arts.events:
+        if e.get("type") not in ACTIVE_ACTION_TYPES:
+            continue
+        actor = str(e.get("actor"))
+        ds = dead_seq.get(actor)
+        if ds is not None and int(e.get("sequence", 0)) > ds:
+            out.append(InvariantViolation("I2", "error", arts.game_id, (str(e.get("event_id")),),
+                                          f"dead actor {actor} produced {e.get('type')} after death"))
+    return out
+
+
+_ALL_CHECKS.append(check_i2)

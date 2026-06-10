@@ -60,5 +60,35 @@ class TestI1(unittest.TestCase):
         self.assertEqual(len(check_i1(_arts(evs))), 1)
 
 
+from werewolf_eval.invariants.checker import check_i2
+
+
+def _action(eid, actor, etype, seq, rnd=1, phase="night"):
+    return {"event_id": eid, "type": etype, "actor": actor, "target": "p9",
+            "round": rnd, "phase": phase, "visibility": "all", "sequence": seq,
+            "data": {"summary": ""}}
+
+
+class TestI2(unittest.TestCase):
+    def test_live_actor_passes(self):
+        self.assertEqual(check_i2(_arts([_action("e1", "p1", "seer_check", 1)])), [])
+
+    def test_action_after_death_fails(self):
+        evs = [_death("e1", "p1", seq=1), _action("e2", "p1", "seer_check", 2)]
+        v = check_i2(_arts(evs))
+        self.assertEqual(len(v), 1)
+        self.assertEqual(v[0].id, "I2")
+
+    def test_hunter_shot_after_death_is_exempt(self):
+        evs = [_death("e1", "p1", seq=1), _action("e2", "p1", "hunter_shoot", 2)]
+        self.assertEqual(check_i2(_arts(evs)), [])
+
+    def test_vote_after_death_fails(self):
+        evs = [_death("e1", "p1", seq=1), _action("e2", "p1", "player_vote", 2, phase="day")]
+        v = check_i2(_arts(evs))
+        self.assertEqual(len(v), 1)
+        self.assertEqual(v[0].id, "I2")
+
+
 if __name__ == "__main__":
     unittest.main()
