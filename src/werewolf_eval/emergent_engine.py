@@ -41,6 +41,7 @@ from werewolf_eval.action_runtime import (
     RoleAbilityRegistry,
     RuntimeState,
     SeerResolver,
+    VoteResolver,
     rules_v1_1,
 )
 from werewolf_eval.action_runtime.abilities import TARGET_RULES
@@ -596,6 +597,22 @@ class EmergentGameEngine:
             return None
         return self._run_single_turn(SeerResolver(), seers[0], "seer", "night", "night", "night", rnd)
 
+    def _run_vote_round(self, rnd):
+        refs = self._public_refs()
+        tally: dict[str, int] = {}
+        for voter in self._alive_in_seat_order():
+            role = self._players_by_id[voter].role
+            target = self._run_single_turn(VoteResolver(), voter, role, "day_vote", "day", "day", rnd, refs=refs)
+            if target is not None:
+                tally[target] = tally.get(target, 0) + 1
+        if not tally:
+            return None
+        top = max(tally.values())
+        leaders = sorted(t for t, c in tally.items() if c == top)
+        if len(leaders) == 1:
+            return leaders[0]
+        return leaders[self._rng.randrange(len(leaders))]
+
     # ---- win condition -------------------------------------------------
 
     def _win_check(self) -> str | None:
@@ -843,42 +860,6 @@ class EmergentGameEngine:
             turn["kind"] = LIVE_SUCCESS
         self._emit("day", rnd, "player_speech", player_id, "none", "public", text)
 
-    def _resolve_votes(self, rnd: int) -> str | None:
-        refs = self._public_refs()
-        tally: dict[str, int] = {}
-        for voter in self._alive_in_seat_order():
-            target: str | None = None
-            action, err, turn = self._provider_action(voter, "day", rnd)
-            if err is not None:
-                if isinstance(err, ProviderActionError):
-                    self._record_failure(rnd, "day", voter, err.failure.kind, err.failure.reason, err.failure.target)
-                else:
-                    self._record_failure(rnd, "day", voter, "agent_error", f"{voter} raised {type(err).__name__}: {err}")
-            elif self._action_legal(voter, self._players_by_id[voter].role, "day_vote", action):
-                target = action.target
-            else:
-                self._record_failure(rnd, "day", voter, "invalid_action", f"{voter} bad vote {action.target}", action.target)
-                self._downgrade_turn(turn, f"engine rejected vote {action.target}")
-            if target is None:
-                cands = self._alive_in_seat_order(exclude={voter})
-                if not cands:
-                    continue
-                target = self._rng.choice(cands)  # R-29: seeded, not always seat 0
-                dtype = FALLBACK_DECISION_TYPE
-            else:
-                dtype = "inference_based"
-            tally[target] = tally.get(target, 0) + 1
-            self._decision(voter, "single", "day", "player_vote", target, dtype, f"{voter} votes {target}", refs=refs)
-            self._emit("day", rnd, "player_vote", voter, target, "public", f"{voter} votes {target}.")
-
-        if not tally:
-            return None
-        top = max(tally.values())
-        leaders = sorted(t for t, c in tally.items() if c == top)
-        if len(leaders) == 1:
-            return leaders[0]
-        return leaders[self._rng.randrange(len(leaders))]
-
     # ---- death-triggered abilities (hunter v1.1) -----------------------
 
     def _trigger_on_death(self, dead: str, rnd: int, phase: str) -> None:
@@ -1044,7 +1025,7 @@ class EmergentGameEngine:
             for speaker in self._alive_in_seat_order():
                 self._resolve_speech(speaker, rnd)
 
-            eliminated = self._resolve_votes(rnd)
+            eliminated = self._run_vote_round(rnd)
             if eliminated is not None:
                 self._alive.discard(eliminated)
                 role = self._players_by_id[eliminated].role
