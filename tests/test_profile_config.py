@@ -468,5 +468,28 @@ class SeatPersonasValidationTests(unittest.TestCase):
             validate_profile(_valid_profile(seat_personas={"p1": "my api_key=sk-secret"}))
 
 
+class ArtifactEffectiveTemperatureTests(unittest.TestCase):
+    def test_effective_temperature_fills_null_from_policy(self):
+        from werewolf_eval.profile_config import DEFAULT_LIVE_TEMPERATURE
+        art = build_resolved_profile_artifact(_valid_profile(), "run1")
+        for seat in art["seats"]:
+            self.assertIsNone(seat["temperature"])                        # 显式配置值(null)不变
+            self.assertEqual(seat["effective_temperature"], DEFAULT_LIVE_TEMPERATURE)  # additive 留痕
+
+    def test_effective_temperature_uses_explicit_when_set(self):
+        p = _valid_profile(seat_overrides={"p1": {"temperature": 0.3}})
+        art = build_resolved_profile_artifact(p, "run1")
+        by_pid = {s["player_id"]: s for s in art["seats"]}
+        self.assertEqual(by_pid["p1"]["temperature"], 0.3)
+        self.assertEqual(by_pid["p1"]["effective_temperature"], 0.3)
+
+    def test_existing_fields_unchanged_except_additive(self):
+        art = build_resolved_profile_artifact(_valid_profile(), "run1")
+        expected_keys = {"player_id", "role", "team", "provider", "model",
+                         "strategy", "temperature", "max_tokens", "prompt_hash",
+                         "effective_temperature"}
+        self.assertEqual(set(art["seats"][0]), expected_keys)
+
+
 if __name__ == "__main__":
     unittest.main()

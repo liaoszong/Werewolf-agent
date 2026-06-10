@@ -376,7 +376,15 @@ def build_resolved_profile_artifact(
                 "provider": seat_cfg["provider"],
                 "model": seat_cfg["model"],
                 "strategy": seat_cfg["strategy"],
+                # temperature = EXPLICIT configured value (null = unset; filled at build_seat_agents).
                 "temperature": seat_cfg.get("temperature"),
+                # effective_temperature = additive: what the live run actually samples at
+                # (explicit value, else the DEFAULT_LIVE_TEMPERATURE policy). Single-sourced so
+                # old(API default) vs new(0.8) live runs are distinguishable in the artifact.
+                "effective_temperature": (
+                    seat_cfg["temperature"] if seat_cfg.get("temperature") is not None
+                    else DEFAULT_LIVE_TEMPERATURE
+                ),
                 "max_tokens": seat_cfg.get("max_tokens"),
                 "prompt_hash": _hash_text(prompt) if prompt else "",
             }
