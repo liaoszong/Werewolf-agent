@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
 import time
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -306,6 +307,21 @@ def _credentials_delete_result(
         return (400, {"error": "unsupported_provider"})
     store.clear(provider)
     return (200, {"cleared": provider})
+
+
+def _run_delete_result(run_dir: Path, run_id: str, status: str) -> tuple[int, dict[str, object]]:
+    """Pure logic for DELETE /api/runs/{run_id}. An active run (running/queued)
+    is never deleted (409); a missing dir is 404; an rmtree failure (e.g. a
+    Windows file lock) reports 500 — NEVER success on a partial delete."""
+    if status in ("running", "queued"):
+        return (409, {"error": "run_active"})
+    if not run_dir.is_dir():
+        return (404, {"error": "not_found"})
+    try:
+        shutil.rmtree(run_dir)
+    except OSError as exc:
+        return (500, {"error": "delete_failed", "detail": str(exc)})
+    return (200, {"deleted": run_id})
 
 
 def _provider_models_result(
