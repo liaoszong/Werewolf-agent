@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 281
+- Entries: 379
 
 ```text
 ./
@@ -45,14 +45,10 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── PULL_REQUEST_TEMPLATE/
 │   │   ├── implementation.md
 │   │   └── research.md
+│   ├── workflows/
+│   │   └── tests.yml
 │   ├── codex-review-comment.md
 │   └── writing-plan.md
-├── .grill/
-│   └── p2-a-2-live-smoke-and-byo-key-direction.md
-├── .logs/
-│   └── review/
-│       └── latest/
-│           └── review-packet.md
 ├── clients/
 │   └── qt_observer/
 │       ├── qml/
@@ -61,10 +57,12 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       │   │   ├── AppButton.qml
 │       │   │   ├── AppCard.qml
 │       │   │   ├── AuditLinksPanel.qml
+│       │   │   ├── ConfirmDialog.qml
 │       │   │   ├── DataSourceChip.qml
 │       │   │   ├── EmptyState.qml
 │       │   │   ├── EventTimeline.qml
 │       │   │   ├── EvidenceConsole.qml
+│       │   │   ├── GearButton.qml
 │       │   │   ├── GlowDot.qml
 │       │   │   ├── ModeControl.qml
 │       │   │   ├── PerspectiveSwitcher.qml
@@ -89,10 +87,13 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       │   ├── LiveCockpitView.qml
 │       │   ├── MatchSetupView.qml
 │       │   ├── PreflightView.qml
+│       │   ├── ProviderSettingsView.qml
 │       │   ├── SettlementView.qml
 │       │   ├── TheaterView.qml
 │       │   └── Theme.qml
 │       ├── src/
+│       │   ├── CredentialStore.cpp
+│       │   ├── CredentialStore.h
 │       │   ├── ObserverApiClient.cpp
 │       │   ├── ObserverApiClient.h
 │       │   ├── ObserverSseParser.cpp
@@ -105,7 +106,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       └── README.md
 ├── docs/
 │   ├── adr/
-│   │   └── 0001-client-agnostic-live-observer-protocol.md
+│   │   ├── 0001-client-agnostic-live-observer-protocol.md
+│   │   └── 2026-06-09-action-runtime-orchestrator.md
 │   ├── demo/
 │   │   ├── phase1-gold-demo.html
 │   │   ├── phase2-runtime-demo.html
@@ -196,11 +198,28 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   │   ├── 2026-06-05--g3-1-live-deepseek-execution-plan.md
 │   │   │   ├── 2026-06-05--g3-2-qt-live-toggle-plan.md
 │   │   │   ├── 2026-06-06--p2-c-1-theater-view-plan.md
-│   │   │   └── 2026-06-06--p2-d-settlement-screen-plan.md
+│   │   │   ├── 2026-06-06--p2-d-settlement-screen-plan.md
+│   │   │   ├── 2026-06-08--full-health-check.md
+│   │   │   └── 2026-06-08--p2b-byo-key-rework-plan.md
 │   │   └── reviews/
 │   │       ├── 2026-06-01--g1c-project-healthcheck-final.md
 │   │       ├── 2026-06-01--g1c-project-healthcheck.md
-│   │       └── 2026-06-01--project-wide-healthcheck-v2.md
+│   │       ├── 2026-06-01--project-wide-healthcheck-v2.md
+│   │       ├── 2026-06-09-action-runtime-audit-charter.md
+│   │       └── 2026-06-09-action-runtime-audit-REPORT.md
+│   ├── health-check/
+│   │   ├── _baseline/
+│   │   │   ├── baseline.py
+│   │   │   ├── bigfiles.txt
+│   │   │   ├── coverage.txt
+│   │   │   ├── doc-refs.txt
+│   │   │   ├── entrypoint-wiring.txt
+│   │   │   ├── import-refs.txt
+│   │   │   ├── preflight-dirty.txt
+│   │   │   └── vulture.txt
+│   │   ├── 01-risks-bugs.md
+│   │   ├── 02-slimming-candidates.md
+│   │   └── 03-architecture-optimization.md
 │   ├── prs/
 │   │   ├── 2026-05-30--phase2-next-step-research.md
 │   │   └── 2026-05-30--s5-semantic-label-research.md
@@ -214,6 +233,17 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   ├── review-guidelines.md
 │   │   └── review-packet-gate.md
 │   ├── superpowers/
+│   │   ├── plans/
+│   │   │   ├── 2026-06-07-emergent-role-projection-snapshots.md
+│   │   │   ├── 2026-06-07-p2-b-1-byo-key-credential-relay.md
+│   │   │   ├── 2026-06-08-byo-key-provider-presets.md
+│   │   │   ├── 2026-06-09-action-runtime-allowed-actions-swap.md
+│   │   │   ├── 2026-06-09-action-runtime-hunter-v1.1.md
+│   │   │   ├── 2026-06-09-action-runtime-resolver-deletion.md
+│   │   │   ├── 2026-06-09-agent-action-runtime.md
+│   │   │   ├── 2026-06-10-history-run-management.md
+│   │   │   ├── 2026-06-10-p2a-invariant-safety-net.md
+│   │   │   └── 2026-06-10-prompt-versioning.md
 │   │   └── specs/
 │   │       ├── 2026-06-04-g2d-2-qt-setup-ui-design.md
 │   │       ├── 2026-06-04-g2d-prompt-configuration-design.md
@@ -222,10 +252,19 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │       ├── 2026-06-05-p2-a-1-emergent-engine-design.md
 │   │       ├── 2026-06-05-p2-a-2-live-deepseek-emergent-smoke-design.md
 │   │       ├── 2026-06-06-p2-c-1-theater-view-design.md
-│   │       └── 2026-06-06-p2-d-settlement-screen-design.md
+│   │       ├── 2026-06-06-p2-d-settlement-screen-design.md
+│   │       ├── 2026-06-06-p2-observer-emergent-engine-bridge.md
+│   │       ├── 2026-06-07-emergent-role-projection-snapshots-design.md
+│   │       ├── 2026-06-07-p2-b-1-byo-key-credential-relay-design.md
+│   │       ├── 2026-06-08-byo-key-provider-presets-design.md
+│   │       ├── 2026-06-09-agent-action-runtime-architecture-design.md
+│   │       ├── 2026-06-09-p2a-invariant-safety-net-design.md
+│   │       ├── 2026-06-10-history-run-management-and-report-entry-design.md
+│   │       └── 2026-06-10-prompt-versioning-design.md
 │   ├── CHECKPOINT_TEMPLATE.md
 │   ├── EVALUATION_RUBRIC.md
 │   ├── GOLD_DEMO.md
+│   ├── HEALTH_CHECK_2026-06-08.md
 │   ├── PRODUCT_ONE_PAGER.md
 │   ├── PROJECT_MAP.md
 │   ├── RISK_ASSESSMENT_2026-06-06.md
@@ -244,13 +283,33 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       └── evaluate_semantic_labels.py
 ├── src/
 │   └── werewolf_eval/
+│       ├── action_runtime/
+│       │   ├── __init__.py
+│       │   ├── abilities.py
+│       │   ├── envelope.py
+│       │   ├── registry.py
+│       │   ├── ruleset.py
+│       │   ├── settler.py
+│       │   ├── state.py
+│       │   ├── triggers.py
+│       │   ├── turn.py
+│       │   └── validator.py
+│       ├── invariants/
+│       │   ├── __init__.py
+│       │   ├── artifacts.py
+│       │   ├── checker.py
+│       │   ├── fuzz.py
+│       │   ├── guards.py
+│       │   └── visibility_oracle.py
 │       ├── __init__.py
 │       ├── attribute_game.py
 │       ├── attribution.py
 │       ├── consensus_log.py
+│       ├── credential_store.py
 │       ├── decision_log.py
 │       ├── deepseek_launcher.py
 │       ├── deepseek_provider.py
+│       ├── display_labels.py
 │       ├── emergent_engine.py
 │       ├── emergent_fake_script.py
 │       ├── emergent_smoke_check.py
@@ -258,6 +317,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       ├── fake_provider.py
 │       ├── game_engine.py
 │       ├── game_log.py
+│       ├── llm_providers.py
 │       ├── log_bundle.py
 │       ├── observer_protocol.py
 │       ├── observer_server.py
@@ -265,11 +325,13 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       ├── profile_config.py
 │       ├── provider_agent.py
 │       ├── provider_contract.py
+│       ├── provider_registry.py
 │       ├── render_demo.py
 │       ├── render_provider_replay.py
 │       ├── run_deepseek_consensus_game.py
 │       ├── run_deepseek_provider_game.py
 │       ├── run_emergent_deepseek_game.py
+│       ├── run_emergent_fake_runtime.py
 │       ├── run_emergent_game.py
 │       ├── run_fake_provider_game.py
 │       ├── run_g1h_fake_runtime.py
@@ -280,6 +342,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       ├── score_game.py
 │       ├── scoring.py
 │       ├── scripted_game.py
+│       ├── seat_agents.py
 │       ├── semantic_labels.py
 │       ├── settlement_bundle.py
 │       ├── source_labels.py
@@ -290,10 +353,22 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       ├── validate_log_bundle.py
 │       └── validate_semantic_labels.py
 ├── tests/
+│   ├── fixtures/
+│   │   └── emergent_ledger_golden.json
+│   ├── parity_scripts.py
+│   ├── test_action_runtime_hunter.py
+│   ├── test_action_runtime_parity.py
+│   ├── test_action_runtime_registry.py
+│   ├── test_action_runtime_settler.py
+│   ├── test_action_runtime_triggers.py
+│   ├── test_action_runtime_turn.py
+│   ├── test_action_runtime_validator.py
+│   ├── test_anthropic_provider.py
 │   ├── test_attribution.py
 │   ├── test_build_review_packet.py
 │   ├── test_consensus_log.py
 │   ├── test_context_budget.py
+│   ├── test_credential_store.py
 │   ├── test_decision_log.py
 │   ├── test_deepseek_consensus_game.py
 │   ├── test_deepseek_launcher.py
@@ -301,36 +376,63 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── test_deepseek_provider_game.py
 │   ├── test_deepseek_provider.py
 │   ├── test_emergent_engine.py
+│   ├── test_emergent_ledger_golden.py
+│   ├── test_emergent_role_projection.py
 │   ├── test_emergent_smoke_check.py
+│   ├── test_engine_to_scoring_e2e.py
+│   ├── test_event_visibility_invariant.py
 │   ├── test_failure_audit.py
 │   ├── test_fake_provider_game.py
 │   ├── test_fake_provider.py
 │   ├── test_g1h_runtime_spine.py
 │   ├── test_game_engine.py
 │   ├── test_game_log.py
+│   ├── test_invariants_artifacts.py
+│   ├── test_invariants_bad_examples.py
+│   ├── test_invariants_checker.py
+│   ├── test_invariants_e2e.py
+│   ├── test_invariants_engine_wiring.py
+│   ├── test_invariants_fuzz.py
+│   ├── test_invariants_guards.py
 │   ├── test_log_bundle.py
+│   ├── test_multi_provider_launcher.py
+│   ├── test_observer_byo_key_launch.py
+│   ├── test_observer_credentials_endpoint.py
+│   ├── test_observer_emergent_bridge.py
+│   ├── test_observer_models_endpoint.py
 │   ├── test_observer_protocol.py
+│   ├── test_observer_run_delete.py
 │   ├── test_observer_server.py
 │   ├── test_observer_visibility.py
+│   ├── test_openai_provider.py
 │   ├── test_p2a2_live_path.py
 │   ├── test_profile_config.py
 │   ├── test_provider_contract.py
+│   ├── test_provider_registry.py
 │   ├── test_qt_observer_static_contract.py
 │   ├── test_render_demo.py
 │   ├── test_render_provider_replay.py
+│   ├── test_rng_draw_order.py
 │   ├── test_run_emergent_deepseek_game.py
+│   ├── test_run_emergent_fake_runtime.py
 │   ├── test_run_emergent_game.py
 │   ├── test_runtime_events.py
 │   ├── test_scoring.py
 │   ├── test_scripted_game_runner.py
+│   ├── test_seat_agents.py
 │   ├── test_semantic_label_research.py
 │   ├── test_semantic_labels.py
 │   ├── test_settlement_bundle.py
 │   ├── test_settlement_response.py
-│   └── test_source_labels.py
+│   ├── test_source_labels.py
+│   ├── test_visibility_parity.py
+│   └── test_witch_potion_one_shot_sentinel.py
+├── tools/
+│   └── live_check_deepseek.py
 ├── .gitignore
 ├── AGENTS.md
 ├── launch-theater.bat
 ├── launch-theater.py
+├── live-check.bat
 └── README.md
 ```
