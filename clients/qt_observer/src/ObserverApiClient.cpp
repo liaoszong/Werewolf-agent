@@ -134,6 +134,14 @@ void ObserverApiClient::setCurrentRunId(const QString &runId)
         m_settlementBundle.clear();
         emit settlementBundleChanged();
     }
+    // Report fast-forward stale-queue guard: a new run must not inherit the prior
+    // run's raw event items — clearing here ensures eventQueue._ordered.length === 0
+    // when _maybeAutoSeekReport fires on eventItemsChanged, so the auto-seek latch
+    // is not consumed by stale A-run events before B-run events arrive.
+    if (!m_eventItems.isEmpty()) {
+        m_eventItems.clear();
+        emit eventItemsChanged();
+    }
     // C1-bis: a new run must never inherit the prior run's executed truth — the
     // HUD chip falls back to SYS: SIMULATION until run detail returns a mode.
     resetExecutionMode();
