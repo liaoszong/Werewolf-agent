@@ -58,5 +58,20 @@ class LauncherSeatRolesTests(unittest.TestCase):
                          {"p1": "seer", "p2": "villager", "p3": "werewolf", "p4": "witch", "p5": "werewolf", "p6": "villager"})
 
 
+class AlignmentTests(unittest.TestCase):
+    def test_artifact_and_engine_roles_agree_under_shuffle(self):
+        from werewolf_eval.profile_config import build_resolved_profile_artifact, resolve_profile_for_run
+        prof = {"schema_version": "g2d.profile.v1", "name": "t", "template": "default_6p_fake",
+                "role_defaults": {r: {"provider": "fake_deterministic", "model": "none", "prompt": "", "strategy": "default"}
+                                  for r in ("werewolf", "seer", "witch", "villager")},
+                "role_shuffle": {"enabled": True}}
+        rid = "run_align_42"
+        art_roles = {s["player_id"]: s["role"] for s in build_resolved_profile_artifact(prof, rid)["seats"]}
+        live_roles = {s["player_id"]: s["role"] for s in resolve_profile_for_run(prof, run_id=rid)}
+        self.assertEqual(art_roles, live_roles)  # 同 run_id -> artifact 角色 == launcher 喂引擎的角色
+        self.assertEqual(sorted(art_roles.values()),
+                         sorted(["werewolf", "werewolf", "seer", "witch", "villager", "villager"]))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -79,9 +79,11 @@ class MultiProviderLauncherTests(unittest.TestCase):
     def test_launcher_builds_per_seat_agents_and_returns_runner_code(self):
         captured: dict[str, Any] = {}
 
-        def fake_runner(*, game_id, out_dir, provider_factory, model, max_requests_per_game, max_day_rounds):
+        def fake_runner(*, game_id, out_dir, provider_factory, model, max_requests_per_game,
+                        max_day_rounds, seat_roles=None):
             captured["p1_provider"] = provider_factory("p1").provider
             captured["p2_provider"] = provider_factory("p2").provider
+            captured["seat_roles"] = seat_roles
             return 0
 
         launcher = build_multi_provider_launcher(
