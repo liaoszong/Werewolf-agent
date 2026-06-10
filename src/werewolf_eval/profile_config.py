@@ -99,6 +99,18 @@ DEFAULT_ROLE_PROMPTS: dict[str, str] = {
     ),
 }
 
+# Per-seat ROLE-AGNOSTIC personalities seeded into the default profile so same-role seats
+# (e.g. the two wolves) are not clones out of the box. Tone/style ONLY — never role ability
+# or team strategy (that lives in the role contract / role_defaults). Users edit per-seat from here.
+DEFAULT_SEAT_PERSONAS: dict[str, str] = {
+    "p1": "你说话沉稳,偏好用证据和逻辑链推理,不轻易下结论。",
+    "p2": "你性格直率、爱挑头表态,常率先抛出怀疑对象并解释理由。",
+    "p3": "你谨慎克制,先听后说,擅长复盘别人发言里的前后矛盾。",
+    "p4": "你偏感性,善用语气和共情拉拢人心,容易被情绪带动。",
+    "p5": "你话不多但一针见血,倾向用一句简短结论收尾。",
+    "p6": "你表面松弛爱开玩笑,实则暗中观察并记住每个人的反应。",
+}
+
 _SAFE_NAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,255}$")
 _CONFIG_KEYS = frozenset({"provider", "model", "prompt", "strategy", "temperature", "max_tokens"})
 _SECRET_KEY_FRAGMENTS = (
@@ -497,4 +509,5 @@ def build_default_profile(name: str = "default_6p") -> dict:
         "name": name,
         "template": "default_6p_fake",
         "role_defaults": role_defaults,
+        "seat_personas": dict(DEFAULT_SEAT_PERSONAS),
     }

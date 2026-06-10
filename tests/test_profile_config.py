@@ -491,5 +491,23 @@ class ArtifactEffectiveTemperatureTests(unittest.TestCase):
         self.assertEqual(set(art["seats"][0]), expected_keys)
 
 
+class DefaultProfileSeatPersonasTests(unittest.TestCase):
+    def test_default_has_six_distinct_personas(self):
+        sp = build_default_profile()["seat_personas"]
+        self.assertEqual(set(sp), {"p1", "p2", "p3", "p4", "p5", "p6"})
+        self.assertEqual(len(set(sp.values())), 6)  # 互不相同
+
+    def test_default_two_wolves_distinct_resolved_persona(self):
+        p = build_default_profile()  # 默认 6p:p1/p2 = werewolf
+        self.assertNotEqual(_resolve_seat(p, "p1", "werewolf")["prompt"],
+                            _resolve_seat(p, "p2", "werewolf")["prompt"])
+
+    def test_default_validates_and_has_no_seeded_temperature(self):
+        p = build_default_profile()
+        validate_profile(p)  # 不得抛
+        for frag in p["role_defaults"].values():
+            self.assertNotIn("temperature", frag)  # 温度单源于常量,不种进 fake 模板
+
+
 if __name__ == "__main__":
     unittest.main()
