@@ -1377,6 +1377,23 @@ class LiveDispatchTests(TestCase):
         self.assertTrue((rd / "fake.sentinel").exists())
         self.assertFalse((rd / "live.sentinel").exists())
 
+    # 2b. fake + role_shuffle.enabled → 400 (artifact/engine alignment; spec §1.1)
+    def test_fake_mode_with_role_shuffle_is_400(self) -> None:
+        prof = _deepseek_profile()
+        prof["role_shuffle"] = {"enabled": True}
+        body = {"profile": prof, "run_id": "r_fs", "mode": "fake"}
+        h, runs = self._dispatch(body, live_enabled=True, live_launcher_set=True)
+        self.assertEqual(h.responses[-1][0], 400)
+        self.assertEqual(h.responses[-1][1].get("code"), "shuffle_requires_live")
+        self.assertFalse((self._run_dir(runs, "r_fs") / "fake.sentinel").exists())
+
+    def test_mode_omitted_with_role_shuffle_is_400(self) -> None:
+        prof = _deepseek_profile()
+        prof["role_shuffle"] = {"enabled": True}
+        h, runs = self._dispatch({"profile": prof, "run_id": "r_om"}, live_enabled=True, live_launcher_set=True)
+        self.assertEqual(h.responses[-1][0], 400)
+        self.assertEqual(h.responses[-1][1].get("code"), "shuffle_requires_live")
+
     # 3. mode=live, server NOT live-enabled → 403 live_api_disabled, no run_dir
     def test_live_not_enabled_403_disabled_no_run_dir(self) -> None:
         body = {"profile": _deepseek_profile(), "run_id": "r_dis", "mode": "live"}

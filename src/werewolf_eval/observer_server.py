@@ -59,6 +59,7 @@ from werewolf_eval.profile_config import (
     list_profiles,
     load_profile,
     resolve_profile,
+    resolve_profile_for_run,
     validate_profile,
 )
 from werewolf_eval.run_g1h_fake_runtime import run_fake_runtime
@@ -824,17 +825,28 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
             self._send_error_json(400, "invalid_profile", str(exc))
             return
 
-        # SHAPE gate (AFTER validate) — live only. Resolve seats once and reuse
-        # for the launcher resolution (per-seat credential check).
+        # role_shuffle requires the live multi-provider path; fake mode runs a FIXED board and
+        # would mislabel the artifact (artifact would record shuffled roles, engine would not).
+        # Fail closed — no silent fallback (spec §1.1 alignment).
+        if mode != "live" and profile.get("role_shuffle", {}).get("enabled", False):
+            self._send_error_json(
+                400, "shuffle_requires_live",
+                "role_shuffle requires live mode (multi-provider path); fake mode runs a fixed "
+                "board and would mislabel the artifact",
+            )
+            return
+
+        run_id = str(plr["run_id"])
+        # SHAPE gate (AFTER validate) — live only. Resolve seats once (role-shuffle applied via
+        # run_id) and reuse for the launcher resolution (per-seat credential check).
         resolved_seats: list[dict] = []
         if mode == "live":
-            resolved_seats = resolve_profile(profile)
+            resolved_seats = resolve_profile_for_run(profile, run_id=run_id)
             shape_reject = _check_live_profile_shape(resolved_seats)
             if shape_reject is not None:
                 self._send_error_json(*shape_reject)
                 return
 
-        run_id = str(plr["run_id"])
         run_dir = state.runs_dir / run_id
         if run_dir.exists():
             self._send_error_json(409, "conflict", f"Run already exists: {run_id}")
