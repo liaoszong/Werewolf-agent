@@ -29,5 +29,36 @@ class TestVisibilityOracle(unittest.TestCase):
         self.assertEqual(self.idx["p1"]["role_source"], "role_projection_snapshot")
 
 
+from werewolf_eval.invariants.checker import check_i1, InvariantViolation
+from werewolf_eval.invariants.artifacts import RunArtifacts
+
+
+def _arts(events, players=None, turns=None):
+    return RunArtifacts(game_id="g", players=players or [], events=events,
+                        decisions=[], provider_turns=turns or [], result=None)
+
+
+def _death(eid, target, etype="player_died", seq=1, rnd=1, phase="night"):
+    return {"event_id": eid, "type": etype, "actor": "system", "target": target,
+            "round": rnd, "phase": phase, "visibility": "all", "sequence": seq,
+            "data": {"summary": ""}}
+
+
+class TestI1(unittest.TestCase):
+    def test_single_death_passes(self):
+        self.assertEqual(check_i1(_arts([_death("e1", "p3")])), [])
+
+    def test_double_commit_fails(self):
+        v = check_i1(_arts([_death("e1", "p3", seq=1), _death("e2", "p3", seq=2)]))
+        self.assertEqual(len(v), 1)
+        self.assertEqual(v[0].id, "I1")
+        self.assertEqual(set(v[0].event_ids), {"e1", "e2"})
+
+    def test_night_death_then_day_vote_same_player_fails(self):
+        evs = [_death("e1", "p3", "player_died", seq=1),
+               _death("e2", "p3", "player_eliminated", seq=2, phase="day")]
+        self.assertEqual(len(check_i1(_arts(evs))), 1)
+
+
 if __name__ == "__main__":
     unittest.main()
