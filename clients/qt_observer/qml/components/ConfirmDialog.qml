@@ -12,6 +12,7 @@ Popup {
     signal confirmed()
 
     modal: true
+    focus: true
     anchors.centerIn: parent
     width: Math.min(420, parent ? parent.width - Theme.space.xl * 2 : 420)
     padding: Theme.space.lg
@@ -28,6 +29,7 @@ Popup {
             width: root.availableWidth
             text: root.title
             color: Theme.color.text
+            font.family: Theme.font.family
             font.pixelSize: Theme.size.body
             font.weight: Theme.weight.semibold
             wrapMode: Text.Wrap
@@ -36,6 +38,7 @@ Popup {
             width: root.availableWidth
             text: root.message
             color: Theme.color.textMuted
+            font.family: Theme.font.family
             font.pixelSize: Theme.size.caption
             wrapMode: Text.Wrap
         }
