@@ -895,6 +895,26 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
                 else:
                     self._send_error_json(status, str(payload.get("error", "bad_request")), "")
                 return
+            if len(segments) == 3 and segments[:2] == ["api", "runs"]:
+                if not self._is_loopback():
+                    self._send_error_json(403, "forbidden", "runs delete is loopback-only")
+                    return
+                if self._reject_cross_origin():
+                    return
+                run_id = segments[2]
+                run_dir = self._run_dir(run_id)          # validate_run_id -> raises on illegal id
+                status_now = self._get_status(run_id, run_dir)   # memory-first, then status.json
+                code, payload = _run_delete_result(run_dir, run_id, status_now)
+                if code == 200:
+                    state = self._get_state()
+                    with state.lock:                      # drop stale in-memory entries
+                        state.run_status.pop(run_id, None)
+                        state.run_errors.pop(run_id, None)
+                    self._send_json(200, payload)
+                else:
+                    self._send_error_json(code, str(payload.get("error", "bad_request")),
+                                          str(payload.get("detail", "")))
+                return
             self._send_error_json(404, "not_found", "unknown endpoint")
         except ObserverProtocolError as exc:
             self._send_error_json(400, "bad_request", str(exc))
