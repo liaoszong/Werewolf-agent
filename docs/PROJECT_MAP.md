@@ -5,6 +5,7 @@
 > - 规划深度原则:**锁上不锁下**。阶段 + 模块**全部锁定**(很少改,改动即大决策);**工作任务只细化当前模块**;子任务由实现者自动拆(superpowers / spec / writing-plans)。远期模块只画轮廓。
 > - 命名:`P<阶段>-<模块>-<工作任务>`,例如 `P2-A-1`。旧 `G*` 编号的映射见文末「Reconcile」表。
 > - 与其他文档的关系:`ROADMAP.md` 保留工程依赖图与历史记录;`TASKS.md` 跟踪**当前工作任务**的状态与产物;本文件是它们之上的产品框架。三者冲突时,产品阶段以本文件为准。
+> - 除产品阶段外,文末另有「**系统视图(System View)**」:按工程子系统(SYS-xx 编号)组织的正式系统清单,用于讨论各系统的优化/改进/重构。阶段视图回答"做到哪了",系统视图回答"楼是怎么搭的"。
 
 ---
 
@@ -93,6 +94,43 @@
 | P3-C 动态排行榜 | 基于评测/复盘聚合,形成**每角色**的 AI 胜率排行榜(因可换 AI 才有榜)。 |
 
 > 旧 ROADMAP 的 "Phase 4 / G4 评测平台 / L1 真实排行榜" 即并入本阶段并被重构——评测不再是独立平台,而是结算画面的自然延伸。
+
+---
+
+## 系统视图(System View)— 正式系统清单
+
+> **与阶段视图正交的第二维度**(2026-06-10 加入)。按业界标准分法:架构(Architecture)→ 子系统(System)→ 模块(Module)。每个系统给稳定编号 **SYS-xx**,讨论优化/改进/重构时以此为统一词汇。每行给出:业界专业名称(便于检索行业最佳实践)、代码落点、现状与已知债务。
+>
+> 状态图例:✅ 成熟 · 🚧 在建 · 🌱 雏形(有最小实现,待长大)· ⏳ 仅图纸(spec/讨论有,代码无)
+
+### A 组 · 对局核心(Game Core)
+
+| ID | 系统 | 业界专业名称 | 代码落点 | 现状与已知债务 |
+|---|---|---|---|---|
+| **SYS-A1** | 游戏循环与阶段调度 | Game Loop / Phase State Machine;回合制的 Turn Order System | `emergent_engine.py` `_run_inner` | 🌱 夜→昼序列仍写死在主循环;**NightPlan**(夜序数据化 + 狼→女巫信息管道显式化)= 本系统的收口件,⏳ 等第一个夜间新角色(守卫)再落地 |
+| **SYS-A2** | 能力系统 | **Ability System**(对标 Unreal GAS:Ability/Cost/Effect/Activation) | `action_runtime/`(registry·ruleset·validator·envelope·settler)+ 引擎 dispatch | 🚧 **当前主战场**。已完成:registry/validator/settler/猎人(加角色=加数据已证)。在建:②a 删 `_resolve_*`(=Activation 窗口 v1)。⏳ 待建:**CapabilityLedger**(②b,=GAS 的 Cost/Charges,女巫迁移的前提)、**EffectQueue**(=Effects 管线,等狼王/情侣)、DecisionWindow 完整版。小尾巴:加角色还要碰 `profile_config.ALLOWED_ROLES` + `observer_visibility._KNOWN_ROLE_TEAMS` 两处名单 |
+| **SYS-A3** | 夜晚联合结算 | Simultaneous Action Resolution(对标 Diplomacy adjudicator) | `action_runtime/settler.py`(JointSettler) | ✅ 已含奶穿规则表 + guard 钩子(v1.5 守卫即插) |
+| **SYS-A4** | 信息可见性 | Information Visibility / Fog of War;博弈论:Information Set | 引擎 visibility tag + `_build_obs`;observer 侧 `observer_visibility.py`(独立第二实现) | ✅ 双实现互为见证(不变量 I4b 的反循环基础)。债务:observer 私有 tag 只认 seer/witch,新角色专属视野需加分支 |
+| **SYS-A5** | 对局事件日志 | **Event Sourcing**(事件溯源:只追加事件流 + 快照 + 状态可重放) | game-log / decision-log / consensus-log / failure-audit / snapshots / provider-turns | ✅ 教科书式落地。安全网 I7(重放一致性)即本系统的完整性检查 |
+
+### B 组 · 智能体层(Agent Layer)
+
+| ID | 系统 | 业界专业名称 | 代码落点 | 现状与已知债务 |
+|---|---|---|---|---|
+| **SYS-B1** | 记忆与上下文构建 | **Agent Memory / Context Engineering**;分层:工作记忆 → 情景记忆(episodic)→ 语义记忆(semantic) | `render_observation_text` + `augment_witch_observation`(每轮 prompt 组装) | 🌱 现在 = 工作记忆层的最小实现(每轮由可见事件重建上下文)。情景/语义记忆 ⏳ 属增强层,接缝 AgentContextPacket 已留;**任何记忆注入必须带 source ids 过 I4b 可见性检查**(防隐形喂漏,已写进安全网 spec) |
+| **SYS-B2** | 决策协议 | Action Protocol / Structured Output | `action_runtime/envelope.py`(ActionEnvelope)+ strict-JSON;tool-calling 仅作消融轴 | ✅ baseline 统一 strict-JSON 已锁定(评测公平性不变量) |
+| **SYS-B3** | 模型接入网关 | Model Gateway / LLM Provider Abstraction | provider registry + BYO-key + 9 家 OpenAI 兼容预设 | ✅ 主体完成;剩 B5 收尾(per-seat token/成本汇总、退役 deepseek-only env 兜底) |
+| **SYS-B4** | 增强脚手架 | **Agent Scaffolding**(persona / 反思 / 狼频道 / 发言-投票一致性) | manifest 的 `enabled_scaffolds` 字段已留 | ⏳ 仅图纸(另立 spec);边界已锁:脚手架在 ActionEnvelope 上游,baseline 永远裁判 |
+
+### C 组 · 平台与质量面(Platform & Quality)
+
+| ID | 系统 | 业界专业名称 | 代码落点 | 现状与已知债务 |
+|---|---|---|---|---|
+| **SYS-C1** | 评测 | Evaluation Harness;baseline vs ablation(消融) | scoring / attribution / score_records | ✅ P1 原语完整;P3 深化为复盘/排行榜 |
+| **SYS-C2** | 观战与回放 | Replay / Spectator System | observer server(REST/SSE)+ Qt 剧场/结算 | ✅ 主体完成;P3-A 逐人复盘待做 |
+| **SYS-C3** | 质量防线 | 三件套:Differential Testing(差分测试)· **Runtime Verification / Semantic Oracle**(不变量安全网)· Deterministic Simulation Testing(fake 脚本+固定种子,对标 FoundationDB DST) | 差分:②a 的 OLD-oracle gate;安全网:`docs/superpowers/specs/2026-06-09-p2a-invariant-safety-net-design.md`(PLAN-READY);DST:`emergent_fake_script.py` + seed 体系 | 🚧 差分与 DST 已活;安全网(7 不变量 + B1/B4 守卫 + fuzz)= 下一刀,②a 完成后串行落地 |
+
+> **系统间的关键依赖**(讨论重构顺序时用):SYS-A2 的 ledger 是女巫迁移前提;SYS-C3 安全网是 A2 后续所有大刀(ledger/EffectQueue/NightPlan)的护栏,先网后刀;SYS-B1 的情景记忆依赖 SYS-A4 可见性检查(I4b)防泄漏;SYS-A1 的 NightPlan 与 SYS-A2 的 EffectQueue 都等真实角色需求触发,不预建。
 
 ---
 
