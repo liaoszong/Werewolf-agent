@@ -135,6 +135,7 @@ def run_emergent_deepseek_game(
     max_requests_per_game: int = 64,
     max_day_rounds: int = 3,
     source_label: str | None = None,
+    seat_roles: dict[str, str] | None = None,
 ) -> int:
     writer = RuntimeEventWriter(run_id=game_id, out_dir=out_dir)
     agents = {pid: provider_factory(pid) for pid in PLAYER_IDS}
@@ -143,7 +144,7 @@ def run_emergent_deepseek_game(
     provider_name, derived_label = _provider_identity(agents)
     effective_label = source_label or derived_label
     engine = EmergentGameEngine(
-        config=build_emergent_config(game_id=game_id),
+        config=build_emergent_config(game_id=game_id, seat_roles=seat_roles),
         agents=agents,
         seed=seed,
         source_label=effective_label,
