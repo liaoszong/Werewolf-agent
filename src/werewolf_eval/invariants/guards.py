@@ -27,3 +27,12 @@ def assert_prompt_entitled(seat: str, source_event_ids: list[str],
             raise PromptLeakError(
                 f"seat {seat} prompt would source non-entitled event {eid} "
                 f"(visibility={ev.get('visibility')})")
+
+
+def assert_death_commit_once(pid: str, committed: set[str]) -> None:
+    """B4: call immediately before emitting a death-commit event for `pid`. The
+    legal duplicate-CANDIDATE skip (engine's `in self._alive` gate) never reaches
+    here. A duplicate committed EVENT is the hard fail."""
+    if pid in committed:
+        raise DoubleDeathCommitError(f"player {pid} committed dead twice")
+    committed.add(pid)

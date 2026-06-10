@@ -24,5 +24,20 @@ class TestB1(unittest.TestCase):
         assert_prompt_entitled("p2", ["missing"], self.by_id, self.idx)  # no raise
 
 
+from werewolf_eval.invariants.guards import assert_death_commit_once, DoubleDeathCommitError
+
+
+class TestB4(unittest.TestCase):
+    def test_first_commit_ok(self):
+        committed: set[str] = set()
+        assert_death_commit_once("p3", committed)
+        self.assertIn("p3", committed)
+
+    def test_second_commit_raises(self):
+        committed = {"p3"}
+        with self.assertRaises(DoubleDeathCommitError):
+            assert_death_commit_once("p3", committed)
+
+
 if __name__ == "__main__":
     unittest.main()
