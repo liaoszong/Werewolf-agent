@@ -271,6 +271,7 @@ Item {
         if (eventQueue.queuedCount === 0) return                      // rule 2: queue filled
         if (_autoSeekDoneForRun === ObserverClient.currentRunId) return   // rule 3: one-shot
         _autoSeekDoneForRun = ObserverClient.currentRunId
+        eventQueue.setInstant()   // spec §5 "immediately drains": skip per-event holds (same mode as the 瞬时 control)
         eventQueue.seekQueueEnd()
     }
 
