@@ -1,5 +1,14 @@
+import json
+import sys
+import tempfile
 import unittest
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
+
 from werewolf_eval.invariants.artifacts import RunArtifacts
+from werewolf_eval.run_emergent_fake_runtime import run_emergent_fake_runtime
 
 
 class _FakeOutcome:
@@ -33,6 +42,22 @@ class TestRunArtifacts(unittest.TestCase):
             provider_turns = []
         arts = RunArtifacts.from_outcome(Empty())
         self.assertIn("game_log.events", arts.gaps)
+
+
+class TestFakeRunnerProviderTurns(unittest.TestCase):
+    def test_persisted_fake_run_has_provider_turns_json(self):
+        with tempfile.TemporaryDirectory() as d:
+            out_dir = Path(d) / "run"
+            rc = run_emergent_fake_runtime(game_id="pt_test", out_dir=out_dir)
+            self.assertEqual(rc, 0)
+            pt = out_dir / "provider-turns.json"
+            self.assertTrue(pt.is_file(), "fake run must persist provider-turns.json")
+            data = json.loads(pt.read_text(encoding="utf-8"))
+            self.assertIn("turns", data)
+            self.assertTrue(
+                all("observation_source_event_ids" in t for t in data["turns"]),
+                "every turn must have observation_source_event_ids",
+            )
 
 
 if __name__ == "__main__":
