@@ -129,5 +129,31 @@ class TestI4a(unittest.TestCase):
         self.assertEqual(v[0].event_ids, ("e9",))
 
 
+from werewolf_eval.invariants.checker import check_i4b
+
+_I4B_PLAYERS = [
+    {"player_id": "p1", "role": "seer", "team": "villager"},
+    {"player_id": "p2", "role": "villager", "team": "villager"},
+]
+_SEER_EV = {"event_id": "e1", "type": "seer_check", "actor": "p1", "target": "p3",
+            "visibility": "seer", "round": 1, "phase": "night", "sequence": 1,
+            "data": {"summary": ""}}
+
+
+class TestI4b(unittest.TestCase):
+    def test_seer_sourcing_own_check_passes(self):
+        turns = [{"actor": "p1", "request_id": "g_r01_p1", "phase": "night",
+                  "observation_source_event_ids": ["e1"]}]
+        self.assertEqual(check_i4b(_arts([_SEER_EV], players=_I4B_PLAYERS, turns=turns)), [])
+
+    def test_villager_sourcing_seer_event_fails(self):
+        turns = [{"actor": "p2", "request_id": "g_r01_p2", "phase": "day",
+                  "observation_source_event_ids": ["e1"]}]
+        v = check_i4b(_arts([_SEER_EV], players=_I4B_PLAYERS, turns=turns))
+        self.assertEqual(len(v), 1)
+        self.assertEqual(v[0].id, "I4b")
+        self.assertEqual(v[0].event_ids, ("e1",))
+
+
 if __name__ == "__main__":
     unittest.main()

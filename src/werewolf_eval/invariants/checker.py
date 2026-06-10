@@ -118,3 +118,27 @@ def check_prompt_subset(game_id: str, seat: str, prompt_source_ids: list[str],
     return [InvariantViolation("I4a", "error", game_id, (eid,),
                                f"seat {seat} prompt sourced {eid} outside its observation")
             for eid in leaked]
+
+
+def check_i4b(arts: RunArtifacts) -> list[InvariantViolation]:
+    """Every event a seat's prompt was built from must be one that seat could
+    legitimately see — checked by the OBSERVER's independent projection, never
+    the engine's _build_obs. The non-circular leak guard."""
+    seat_index = seat_index_from_players(arts.players)
+    by_id = {str(e.get("event_id")): e for e in arts.events}
+    out: list[InvariantViolation] = []
+    for turn in arts.provider_turns:
+        seat = str(turn.get("actor"))
+        for eid in turn.get("observation_source_event_ids", []):
+            ev = by_id.get(str(eid))
+            if ev is None:
+                continue
+            if not entitled(seat, ev, seat_index):
+                out.append(InvariantViolation(
+                    "I4b", "error", arts.game_id, (str(eid),),
+                    f"seat {seat} prompt sourced non-entitled event {eid} "
+                    f"(visibility={ev.get('visibility')})"))
+    return out
+
+
+_ALL_CHECKS.append(check_i4b)
