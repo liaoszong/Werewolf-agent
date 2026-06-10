@@ -232,7 +232,10 @@ void ObserverApiClient::startDefaultMatch()
 
 void ObserverApiClient::deleteRun(const QString &runId)
 {
+    if (runId.isEmpty())
+        return;
     QNetworkRequest req(QUrl(m_baseUrl + QStringLiteral("/api/runs/") + runId));
+    req.setRawHeader("Accept", "application/json");
     QNetworkReply *reply = m_network->deleteResource(req);
     connect(reply, &QNetworkReply::finished, this, [this, runId, reply]() {
         reply->deleteLater();
