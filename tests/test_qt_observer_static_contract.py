@@ -52,6 +52,7 @@ REQUIRED_QML_VIEWS = [
     "qml/components/SeatEditorPanel.qml",
     "qml/components/ModeControl.qml",
     "qml/components/DataSourceChip.qml",
+    "qml/components/ConfirmDialog.qml",
 ]
 
 REQUIRED_OBJECT_NAMES = {
@@ -89,6 +90,7 @@ REQUIRED_OBJECT_NAMES = {
         "seatEditorPrompt", "seatEditorPersona", "seatEditorTemperature",
         "seatEditorMaxTokens",
     ],
+    "qml/components/ConfirmDialog.qml": ["confirmDialog", "confirmAcceptButton", "confirmCancelButton"],
 }
 
 
