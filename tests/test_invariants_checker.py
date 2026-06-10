@@ -90,5 +90,30 @@ class TestI2(unittest.TestCase):
         self.assertEqual(v[0].id, "I2")
 
 
+from werewolf_eval.invariants.checker import check_i3
+
+
+def _consume(eid, actor, etype, seq):
+    return {"event_id": eid, "type": etype, "actor": actor, "target": "p9",
+            "round": 1, "phase": "night", "visibility": "witch", "sequence": seq,
+            "data": {"summary": ""}}
+
+
+class TestI3(unittest.TestCase):
+    def test_one_each_passes(self):
+        evs = [_consume("e1", "pw", "witch_save", 1), _consume("e2", "pw", "witch_poison", 2)]
+        self.assertEqual(check_i3(_arts(evs)), [])
+
+    def test_second_antidote_fails(self):
+        evs = [_consume("e1", "pw", "witch_save", 1), _consume("e2", "pw", "witch_save", 2)]
+        v = check_i3(_arts(evs))
+        self.assertEqual(len(v), 1)
+        self.assertEqual(v[0].id, "I3")
+
+    def test_two_hunters_one_shot_each_passes(self):
+        evs = [_consume("e1", "ph1", "hunter_shoot", 1), _consume("e2", "ph2", "hunter_shoot", 2)]
+        self.assertEqual(check_i3(_arts(evs)), [])
+
+
 if __name__ == "__main__":
     unittest.main()

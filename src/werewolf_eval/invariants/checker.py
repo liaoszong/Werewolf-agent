@@ -88,3 +88,23 @@ def check_i2(arts: RunArtifacts) -> list[InvariantViolation]:
 
 
 _ALL_CHECKS.append(check_i2)
+
+
+CONSUME_TYPES = ("witch_save", "witch_poison", "hunter_shoot")
+
+
+def check_i3(arts: RunArtifacts) -> list[InvariantViolation]:
+    """Each consumable used <= 1 per (actor, capability)."""
+    by_key: dict[tuple[str, str], list[str]] = {}
+    for e in arts.events:
+        t = str(e.get("type"))
+        if t in CONSUME_TYPES:
+            by_key.setdefault((str(e.get("actor")), t), []).append(str(e.get("event_id")))
+    return [
+        InvariantViolation("I3", "error", arts.game_id, tuple(eids),
+                           f"{actor} used {cap} {len(eids)}x (max 1)")
+        for (actor, cap), eids in by_key.items() if len(eids) > 1
+    ]
+
+
+_ALL_CHECKS.append(check_i3)
