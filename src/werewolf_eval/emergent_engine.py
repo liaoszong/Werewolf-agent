@@ -70,6 +70,13 @@ FALLBACK_DECISION_TYPE = "default"
 # seer). The witch is deferred (inline) until its RuntimeState potion ledger lands (②b), so it
 # is absent here; when it migrates it joins this tuple. Kept as a constant (not derived from
 # seat order) so the order can't silently flip on a re-seated board.
+#
+# WITCH MIGRATION (②b) is BLOCKED on a RuntimeState one-shot potion capability ledger
+# (uses_left/consumed_at_event_id) + threading the night victim into _runtime_state(): routing
+# the witch through validate_in_state today would accept a 2nd potion -> cross-round divergence.
+# Until then the witch stays in _resolve_witch (NOT in _RESOLVERS / this tuple). The one-shot
+# guard is pinned by tests/test_witch_potion_one_shot_sentinel.py (antidote + poison), which go
+# RED the day a witch swap forgets the ledger.
 NIGHT_DISPATCH_ORDER = ("werewolf_kill", "seer_check")
 
 # Per-request output-token caps (P2-A-2): speeches need more than votes/actions.
