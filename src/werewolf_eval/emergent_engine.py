@@ -66,6 +66,12 @@ WITCH_ACTIONS = (WITCH_SAVE, WITCH_POISON, WITCH_PASS)
 
 FALLBACK_DECISION_TYPE = "default"
 
+# Night abilities dispatched via _RESOLVERS, in their byte-load-bearing order (wolf before
+# seer). The witch is deferred (inline) until its RuntimeState potion ledger lands (②b), so it
+# is absent here; when it migrates it joins this tuple. Kept as a constant (not derived from
+# seat order) so the order can't silently flip on a re-seated board.
+NIGHT_DISPATCH_ORDER = ("werewolf_kill", "seer_check")
+
 # Per-request output-token caps (P2-A-2): speeches need more than votes/actions.
 SPEECH_MAX_OUTPUT_TOKENS = 250
 ACTION_MAX_OUTPUT_TOKENS = 120
@@ -266,6 +272,14 @@ class EmergentGameEngine:
         self._registry = RoleAbilityRegistry(_ruleset)
         self._settler = JointSettler(_ruleset)
         self._validator = ActionValidator(self._registry)
+        # Registry-driven action dispatch (Phase-3 ②a). Each migrated ability id maps to a
+        # driver. Night order is explicit DATA (load-bearing: wolf BEFORE seer — both may draw
+        # 0/1 from self._rng). The witch is DEFERRED (inline, ②b) so it is NOT in this map/order.
+        self._RESOLVERS = {
+            "werewolf_kill": self._run_wolf_kill,
+            "seer_check": self._run_seer,
+            "player_vote": self._run_vote_round,
+        }
 
     # ---- small helpers -------------------------------------------------
 
@@ -971,9 +985,13 @@ class EmergentGameEngine:
 
         for rnd in range(1, self._budget.max_day_rounds + 1):
             end_round = rnd
-            # ---- NIGHT ----
-            victim = self._run_wolf_kill(rnd)
-            self._run_seer(rnd)
+            # ---- NIGHT ---- registry-driven dispatch for migrated abilities
+            victim = None
+            for ability_id in NIGHT_DISPATCH_ORDER:
+                result = self._RESOLVERS[ability_id](rnd)
+                if ability_id == "werewolf_kill":
+                    victim = result
+            # witch — DEFERRED inline (BLOCKING: RuntimeState potion ledger pending, ②b)
             saved, poison_target, save_used, poison_used = self._resolve_witch(rnd, victim, save_used, poison_used)
 
             # Night settlement delegates to the Agent Action Runtime's JointSettler
@@ -1008,7 +1026,7 @@ class EmergentGameEngine:
             for speaker in self._alive_in_seat_order():
                 self._resolve_speech(speaker, rnd)
 
-            eliminated = self._run_vote_round(rnd)
+            eliminated = self._RESOLVERS["player_vote"](rnd)
             if eliminated is not None:
                 self._alive.discard(eliminated)
                 role = self._players_by_id[eliminated].role
