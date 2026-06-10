@@ -1,8 +1,9 @@
 """One-click launcher for the Werewolf Theater.
 
-Starts the local observer server (if not already running), creates a fake match and
-waits for it to finish, then opens the Qt client straight into that run's Theater view
-(via the client's --open-run flag).  Close the client window to stop the launcher.
+Starts the local observer server (if not already running), then opens the Qt client to
+its home/history view. It does NOT auto-create a game — start a match yourself from the
+client (e.g. a LIVE game with the deepseek profile). Close the client window to stop the
+launcher.
 
 Double-click ``launch-theater.bat`` (which runs this), or run ``python launch-theater.py``.
 """
@@ -148,26 +149,10 @@ def main() -> None:
             return
 
     try:
-        print("[*] 创建一局 fake 对局…")
-        run = _post("/api/runs", {"template": "default_6p_fake", "mode": "fake"})
-        run_id = str(run.get("run_id", ""))
-        if not run_id:
-            print("!! 未能创建对局。")
-            return
-        print(f"[*] 对局 {run_id} 运行中，等待收口（写出 game-log.json）…")
-        status = ""
-        for _ in range(80):
-            try:
-                detail = _get(f"/api/runs/{run_id}", timeout=2)
-                status = str(detail.get("status", ""))
-                if status in ("completed", "failed"):
-                    break
-            except Exception:
-                pass
-            time.sleep(0.4)
-        print(f"[*] 对局就绪：{run_id}（{status or '?'}）")
-        print("[*] 打开剧场……（关闭客户端窗口即可退出本启动器）")
-        subprocess.run([EXE, "--observer-base-url", BASE, "--open-run", run_id], env=qt_env)
+        # 不再自动创建/跳转 fake 对局。直接打开客户端到主页/历史，由用户自行开局
+        # （例如用 deepseek profile 开 LIVE 局；开了 role_shuffle 的 profile 只能走 live）。
+        print("[*] 打开客户端（主页/历史，不自动建对局）……（关闭客户端窗口即可退出本启动器）")
+        subprocess.run([EXE, "--observer-base-url", BASE], env=qt_env)
     finally:
         if server is not None:
             print("[*] 关闭本启动器启动的服务器。")
