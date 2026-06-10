@@ -24,6 +24,8 @@ from werewolf_eval.provider_contract import ProviderRequest
 
 _ALIVE = ["p1", "p2", "p3", "p4", "p5", "p6"]
 
+# Event payloads are arbitrary narrative fillers for byte-locking the renderer —
+# they are NOT engine-consistent state (e.g. "p2 死亡" while p2 stays in _ALIVE).
 _EVENTS = {
     "e1": {"round": 1, "phase": "night", "data": {"summary": "夜晚开始。"}},
     "e2": {"round": 1, "phase": "day", "data": {"summary": "p2 死亡。"}},

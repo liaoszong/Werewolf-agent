@@ -1,0 +1,5 @@
+你是 p5(身份:villager,阵营:villager)。
+当前:第 1 轮 day 阶段。存活玩家:p1, p2, p3, p4, p5, p6。
+你能看到的事件:
+- (r1 night) 夜晚开始。
+- (r1 day) p2 死亡。
