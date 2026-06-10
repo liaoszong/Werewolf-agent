@@ -257,6 +257,9 @@ def build_multi_provider_launcher(
             default_max_tokens=default_max_tokens,
             transport=transport,
         )
+        # Engine roles come from the resolved seats (role-shuffle is applied upstream in
+        # resolve_profile_for_run). Off -> default roles -> default board (byte-identical).
+        seat_roles = {s["player_id"]: s["role"] for s in resolved_seats}
         code = runner(
             game_id=run_id,
             out_dir=rdir,
@@ -264,6 +267,7 @@ def build_multi_provider_launcher(
             model="",  # per-seat models live on each provider; no single model
             max_requests_per_game=max_requests,
             max_day_rounds=max_day_rounds,
+            seat_roles=seat_roles,
         )
         if code == 0:
             return 0
