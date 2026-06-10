@@ -317,6 +317,7 @@ class SeatPersonasValidationTests(unittest.TestCase):
 
 Run: `NO_PROXY='*' PYTHONPATH=src python -m unittest tests.test_profile_config.SeatPersonasValidationTests -v`
 Expected: FAIL —— `test_valid_seat_personas_pass` 抛 `unexpected top-level keys: ['seat_personas']`。
+> **TDD 注(plan-review 指出)**:`test_secret_like_persona_value_rejected` 会**在实现前就 PASS** —— 因为 `_reject_secret_like_values(profile)`(`:267`)在 `allowed_top` 闸(`:268`)**之前**递归扫全 profile 值,已覆盖 `seat_personas`。这不是 bug;其余 5 个测试照常红。
 
 - [ ] **Step 3: 改 `validate_profile`**(`profile_config.py`)
 
@@ -326,7 +327,7 @@ Expected: FAIL —— `test_valid_seat_personas_pass` 抛 `unexpected top-level 
     allowed_top = {"schema_version", "name", "template", "role_defaults", "seat_overrides", "seat_personas"}
 ```
 
-在 `seat_overrides` 校验块之后(`profile_config.py:297` 那段 `for seat, fragment in seat_overrides.items(): ...` 之后)插入:
+在 `seat_overrides` 校验块整体之后(`profile_config.py` 的 `for seat, fragment in seat_overrides.items(): _check_fragment(...)` 循环体最后一行 `:297` 之后、`counts` 统计 `:298` 之前)插入:
 
 ```python
     # seat_personas: per-seat ROLE-AGNOSTIC personality (tone/style only). MUST NOT encode
@@ -339,10 +340,15 @@ Expected: FAIL —— `test_valid_seat_personas_pass` 抛 `unexpected top-level 
     for sp_seat, persona in seat_personas.items():
         if sp_seat not in DEFAULT_SEAT_IDS:
             raise ProfileValidationError(f"unknown seat id in seat_personas: {sp_seat!r}")
-        if not isinstance(persona, str) or len(persona) > PROMPT_MAX_LEN:
+        if not isinstance(persona, str):
             raise ProfileValidationError(
                 f"seat_personas.{sp_seat} must be a role-agnostic personality string "
-                f"(tone/style only; no role ability or team strategy), max {PROMPT_MAX_LEN} chars"
+                f"(tone/style only; no role ability or team strategy), got {type(persona).__name__}"
+            )
+        if len(persona) > PROMPT_MAX_LEN:
+            raise ProfileValidationError(
+                f"seat_personas.{sp_seat} exceeds {PROMPT_MAX_LEN} chars "
+                f"(role-agnostic personality; tone/style only)"
             )
 ```
 
