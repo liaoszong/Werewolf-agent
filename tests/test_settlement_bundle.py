@@ -150,16 +150,18 @@ class TestBuildSettlementBundle(unittest.TestCase):
             self.assertNotIn(forbidden, reason)
 
     def test_secret_free(self):
-        blob = json.dumps(
-            build_settlement_bundle(self._game(), self._decision_log()),
-            ensure_ascii=False,
+        bundle = build_settlement_bundle(self._game(), self._decision_log())
+        # Pop evaluation_bucket and shape-check it explicitly; it legitimately
+        # contains "prompt_version" — scanning the remainder with the full
+        # forbidden list (including bare "prompt") is safe once it is removed.
+        bucket = bundle.pop("evaluation_bucket")
+        self.assertEqual(
+            set(bucket),
+            {"rules_version", "prompt_version", "scoring_version", "comparison_key"},
         )
-        # "prompt_version" is a legitimate evaluation_bucket key (spec §4.5); check the
-        # whole-word AI-prompt leak indicators instead ("prompt" substring would false-fire).
-        for forbidden in ["reason_summary", "api_key", "Bearer", "sk-", "C:\\", "/src/"]:
+        blob = json.dumps(bundle, ensure_ascii=False)
+        for forbidden in ["reason_summary", "prompt", "api_key", "Bearer", "sk-", "C:\\", "/src/"]:
             self.assertNotIn(forbidden, blob)
-        # Ensure raw AI prompt text / instruction blocks are absent (not just the key).
-        self.assertNotIn('"prompt":', blob)  # a JSON key named exactly "prompt"
 
     def test_deterministic(self):
         a = build_settlement_bundle(self._game(), self._decision_log())
