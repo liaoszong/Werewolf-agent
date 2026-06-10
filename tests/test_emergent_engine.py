@@ -343,5 +343,18 @@ class LivePartialLogTests(unittest.TestCase):
             self.assertFalse((out_dir / "decision-log.json").exists())
 
 
+class BuildEmergentConfigSeatRolesTests(unittest.TestCase):
+    def test_passes_seat_roles(self):
+        from werewolf_eval.emergent_engine import build_emergent_config
+        sr = {"p1": "seer", "p2": "villager", "p3": "werewolf", "p4": "witch", "p5": "werewolf", "p6": "villager"}
+        cfg = build_emergent_config("g", seat_roles=sr)
+        self.assertEqual({p.player_id: p.role for p in cfg.players}["p1"], "seer")
+
+    def test_default_unchanged(self):
+        from werewolf_eval.emergent_engine import build_emergent_config
+        from werewolf_eval.game_engine import build_default_config
+        self.assertEqual(build_emergent_config("g"), build_default_config("g"))
+
+
 if __name__ == "__main__":
     unittest.main()

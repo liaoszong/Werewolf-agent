@@ -229,9 +229,11 @@ class GameOutcome:
         return self.live_success_actions / denom if denom else 1.0
 
 
-def build_emergent_config(game_id: str = "p2a1_emergent_001") -> GameConfig:
-    """Default 6-player board: p1/p2 wolves, p3 seer, p4 witch, p5/p6 villagers."""
-    return build_default_config(game_id=game_id)
+def build_emergent_config(game_id: str = "p2a1_emergent_001", seat_roles: dict[str, str] | None = None) -> GameConfig:
+    """Default 6-player board: p1/p2 wolves, p3 seer, p4 witch, p5/p6 villagers.
+    seat_roles (when given) overrides the per-seat role assignment (multiset preserved
+    upstream); None -> the fixed default board (byte-identical to before)."""
+    return build_default_config(game_id=game_id, seat_roles=seat_roles)
 
 
 def build_emergent_hunter_config(game_id: str = "hunter_v11") -> GameConfig:
