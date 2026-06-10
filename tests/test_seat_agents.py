@@ -133,6 +133,32 @@ class BuildSeatAgentsTests(unittest.TestCase):
         self.assertEqual(agents["p1"].provider.persona, "A")
         self.assertEqual(agents["p2"].provider.persona, "B")
 
+    def test_null_temperature_falls_back_to_default_live_temperature(self):
+        from werewolf_eval.profile_config import DEFAULT_LIVE_TEMPERATURE
+        seats = [_seat("p1", "deepseek", "deepseek-v4-flash", temperature=None)]
+        agents = build_seat_agents(seats, self._creds(), max_requests=64, transport=_multi_shape_transport)
+        agents["p1"].provider.respond(_request("p1"))
+        self.assertEqual(_CALLS[-1]["payload"]["temperature"], DEFAULT_LIVE_TEMPERATURE)
+
+    def test_explicit_seat_temperature_wins(self):
+        seats = [_seat("p1", "deepseek", "deepseek-v4-flash", temperature=0.2)]
+        agents = build_seat_agents(seats, self._creds(), max_requests=64, transport=_multi_shape_transport)
+        agents["p1"].provider.respond(_request("p1"))
+        self.assertEqual(_CALLS[-1]["payload"]["temperature"], 0.2)
+
+    def test_default_temperature_override_param(self):
+        seats = [_seat("p1", "deepseek", "deepseek-v4-flash", temperature=None)]
+        agents = build_seat_agents(seats, self._creds(), max_requests=64,
+                                   default_temperature=0.55, transport=_multi_shape_transport)
+        agents["p1"].provider.respond(_request("p1"))
+        self.assertEqual(_CALLS[-1]["payload"]["temperature"], 0.55)
+
+    def test_fake_seat_still_raises_no_temperature_pipeline(self):
+        # fake 座位本就进不了温度管道:无 credential -> ValueError(锁住现状)
+        seats = [_seat("p1", "fake_deterministic", "none", temperature=None)]
+        with self.assertRaises(ValueError):
+            build_seat_agents(seats, self._creds(), max_requests=64, transport=_multi_shape_transport)
+
 
 if __name__ == "__main__":
     unittest.main()

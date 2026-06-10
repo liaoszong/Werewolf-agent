@@ -18,6 +18,7 @@ from dataclasses import dataclass
 from typing import Mapping
 
 from werewolf_eval.llm_providers import ChatProviderConfig
+from werewolf_eval.profile_config import DEFAULT_LIVE_TEMPERATURE
 from werewolf_eval.provider_agent import ProviderAgent
 from werewolf_eval.provider_registry import build_provider
 
@@ -41,6 +42,7 @@ def build_seat_agents(
     max_requests: int,
     timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS,
     default_max_tokens: int = DEFAULT_MAX_TOKENS,
+    default_temperature: float = DEFAULT_LIVE_TEMPERATURE,
     transport=None,
 ) -> dict[str, ProviderAgent]:
     """Return ``{player_id: ProviderAgent}`` — one independent provider per seat.
@@ -59,6 +61,7 @@ def build_seat_agents(
                 f"no credential for provider {provider_id!r} (seat {pid})"
             )
         seat_max_tokens = seat.get("max_tokens")
+        seat_temperature = seat.get("temperature")
         config = ChatProviderConfig(
             api_key=cred.key,
             base_url=cred.base_url,
@@ -67,7 +70,7 @@ def build_seat_agents(
             max_tokens=seat_max_tokens if seat_max_tokens is not None else default_max_tokens,
             max_requests=max_requests,
             persona_prompt=seat.get("prompt") or "",
-            temperature=seat.get("temperature"),
+            temperature=seat_temperature if seat_temperature is not None else default_temperature,
         )
         provider = build_provider(provider_id, config, transport=transport)
         agents[pid] = ProviderAgent(pid, provider)

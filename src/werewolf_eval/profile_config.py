@@ -70,6 +70,11 @@ DEFAULT_6P_SEAT_ROLES: dict[str, str] = {
 DEFAULT_SEAT_IDS: tuple[str, ...] = tuple(DEFAULT_6P_SEAT_ROLES)
 PROMPT_MAX_LEN = 8000
 
+# Live/default-profile diversity policy (NOT a prompt/rendering policy). Explicit per-seat
+# temperature always wins; a null seat temperature is filled with this at build_seat_agents
+# time. Single source of truth so build_resolved_profile_artifact can record effective_temperature.
+DEFAULT_LIVE_TEMPERATURE = 0.8
+
 # Editable starter personas per role. These are PREPENDED to the machine contract
 # as the per-seat persona (llm_providers.compose_system) — they flavor behavior but
 # never replace the JSON contract. Seeded into the default profile so the per-seat
