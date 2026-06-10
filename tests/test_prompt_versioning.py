@@ -44,5 +44,90 @@ class CanonicalSampleTests(unittest.TestCase):
         self.assertEqual(a, b)
 
 
+from werewolf_eval.prompt_version import PROMPT_VERSION
+
+GOLDEN_ROOT = ROOT / "tests" / "golden_prompts"
+LEDGER_PATH = ROOT / "docs" / "generated-games" / "prompt-version-ledger.json"
+
+
+def _ledger() -> list[dict]:
+    return json.loads(LEDGER_PATH.read_text(encoding="utf-8"))
+
+
+def _current_entry() -> dict:
+    matches = [e for e in _ledger() if e.get("prompt_version") == PROMPT_VERSION]
+    assert len(matches) == 1, f"expected exactly one ledger entry for {PROMPT_VERSION}"
+    return matches[0]
+
+
+class PromptVersionGuardTests(unittest.TestCase):
+    """The three CI rules of spec §5.2 — all hard FAIL, no warnings."""
+
+    def test_rule1_rendered_bytes_match_current_golden(self) -> None:
+        golden_dir = GOLDEN_ROOT / PROMPT_VERSION
+        self.assertTrue(
+            golden_dir.is_dir(),
+            f"no golden dir for {PROMPT_VERSION}: run tools/generate_golden_prompts.py "
+            f"and add a ledger entry (rule 2)",
+        )
+        samples = dict(canonical_prompt_samples())
+        files = {p.stem: p for p in golden_dir.glob("*.txt")}
+        self.assertEqual(
+            sorted(samples), sorted(files),
+            "sample set drifted from golden files — regenerate goldens under a version bump",
+        )
+        for name, text in samples.items():
+            self.assertEqual(
+                files[name].read_bytes(),
+                text.encode("utf-8"),
+                f"RULE 1: rendered prompt bytes changed for '{name}' without a "
+                f"PROMPT_VERSION bump. Any model-visible byte change requires a new "
+                f"prompt_version + regenerated goldens + a ledger entry (no cosmetic "
+                f"exemption).",
+            )
+
+    def test_rule2_ledger_entry_and_hashes_exist_for_current_version(self) -> None:
+        entry = _current_entry()
+        for field in ("reason", "expected_change", "behavior_evidence", "blessed_by", "blessed_at"):
+            self.assertIn(field, entry, f"RULE 2: ledger entry missing '{field}'")
+        after = entry["golden_prompt_hashes"]["after"]
+        samples = dict(canonical_prompt_samples())
+        self.assertEqual(
+            sorted(after), sorted(samples),
+            "RULE 2: ledger golden_prompt_hashes.after does not cover the sample set",
+        )
+        import hashlib
+
+        for name, text in samples.items():
+            self.assertEqual(
+                after[name],
+                hashlib.sha256(text.encode("utf-8")).hexdigest(),
+                f"RULE 2: ledger hash stale for '{name}'",
+            )
+
+    def test_rule2_behavior_evidence_contract(self) -> None:
+        ev = _current_entry()["behavior_evidence"]
+        self.assertIn(ev["status"], ("not_run", "attached", "not_applicable"))
+        if ev["status"] != "attached":
+            self.assertTrue(
+                str(ev.get("reason_if_not_run", "")).strip(),
+                "RULE 2: behavior evidence omitted without a stated reason",
+            )
+
+    def test_rule3_no_meaningless_bump(self) -> None:
+        entry = _current_entry()
+        base = entry.get("base_version")
+        if base is None:
+            self.skipTest("initial version has no base to compare")
+        base_dir = GOLDEN_ROOT / base
+        cur_dir = GOLDEN_ROOT / PROMPT_VERSION
+        base_files = {p.stem: p.read_bytes() for p in base_dir.glob("*.txt")}
+        cur_files = {p.stem: p.read_bytes() for p in cur_dir.glob("*.txt")}
+        self.assertFalse(
+            base_files == cur_files,
+            f"RULE 3: {PROMPT_VERSION} is byte-identical to {base} — meaningless bump",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

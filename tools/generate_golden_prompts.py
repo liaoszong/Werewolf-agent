@@ -3,6 +3,9 @@
 Run from repo root:  python tools/generate_golden_prompts.py
 Prints the sha256 fingerprint map for the ledger's golden_prompt_hashes field.
 Writes bytes directly (no newline translation) — .gitattributes pins LF.
+The hash map pastes into docs/generated-games/prompt-version-ledger.json
+(golden_prompt_hashes.after). Regenerates the CURRENT version's dir only;
+old-version dirs are intentionally retained as archived reference anchors.
 """
 from __future__ import annotations
 
