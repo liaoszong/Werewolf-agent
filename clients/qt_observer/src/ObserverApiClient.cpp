@@ -230,8 +230,32 @@ void ObserverApiClient::startDefaultMatch()
     });
 }
 
+void ObserverApiClient::deleteRun(const QString &runId)
+{
+    QNetworkRequest req(QUrl(m_baseUrl + QStringLiteral("/api/runs/") + runId));
+    QNetworkReply *reply = m_network->deleteResource(req);
+    connect(reply, &QNetworkReply::finished, this, [this, runId, reply]() {
+        reply->deleteLater();
+        const bool ok = (reply->error() == QNetworkReply::NoError);
+        QString err;
+        if (!ok) {
+            const QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+            err = doc.isObject() ? doc.object().value(QStringLiteral("error")).toString()
+                                 : reply->errorString();
+            if (err.isEmpty())
+                err = reply->errorString();
+        }
+        if (ok && runId == m_currentRunId)
+            setCurrentRunId(QString());   // the theater must not point at a deleted dir
+        emit deleteRunFinished(runId, ok, err);
+        // NO auto-refresh here: QML decides (single delete refreshes per-op;
+        // a batch refreshes ONCE after all deletes finish — spec §4).
+    });
+}
+
 void ObserverApiClient::openRun(const QString &runId, bool forReport)
 {
+    m_pendingOpenRunId = runId;
     // Set the settlement entry mode SYNCHRONOUSLY here (before the async detail
     // request and before navigation) so the theater reads a reliable value when it
     // mounts. Latching it later off the async currentStatus was racy (history opens
@@ -244,6 +268,7 @@ void ObserverApiClient::openRun(const QString &runId, bool forReport)
     QNetworkReply *reply = get(QStringLiteral("/api/runs/") + runId);
     connect(reply, &QNetworkReply::finished, this, [this, runId, reply]() {
         reply->deleteLater();
+        if (runId != m_pendingOpenRunId) return;
         if (reply->error() != QNetworkReply::NoError) {
             setError(reply->errorString());
             resetExecutionMode();   // C1-bis: detail request error → "" (SIMULATION)
@@ -277,8 +302,9 @@ void ObserverApiClient::openRun(const QString &runId, bool forReport)
 
         QNetworkReply *eventsReply = get(
             QStringLiteral("/api/runs/") + runId + QStringLiteral("/events?perspective=") + m_currentPerspective);
-        connect(eventsReply, &QNetworkReply::finished, this, [this, eventsReply]() {
+        connect(eventsReply, &QNetworkReply::finished, this, [this, runId, eventsReply]() {
             eventsReply->deleteLater();
+            if (runId != m_pendingOpenRunId) return;
             if (eventsReply->error() != QNetworkReply::NoError) {
                 setError(eventsReply->errorString());
                 return;
