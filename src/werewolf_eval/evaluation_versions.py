@@ -7,11 +7,27 @@ SCORING_VERSION from here — never the reverse.
 """
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 SCORING_VERSION = "scoring_v1"
 
 # Legacy artifacts with no version fields read as "unknown" for every missing
 # component. The unknown bucket is browsable but never rankable (spec §4.5).
 UNKNOWN_VERSION = "unknown"
+
+
+def read_manifest_bucket(run_dir: Path) -> dict[str, str] | None:
+    """The run's stamped bucket, read from prompt-manifest.json (the single
+    source). None for legacy runs without a stamped manifest."""
+    try:
+        manifest = json.loads(
+            (run_dir / "prompt-manifest.json").read_text(encoding="utf-8")
+        )
+        bucket = manifest.get("evaluation_bucket")
+        return dict(bucket) if isinstance(bucket, dict) else None
+    except (OSError, ValueError):
+        return None
 
 
 def evaluation_bucket(

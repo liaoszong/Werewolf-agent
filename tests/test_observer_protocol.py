@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import re
+import tempfile
+import unittest
 import uuid
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -708,3 +710,38 @@ class RuntimeCapabilitiesTests(TestCase):
             text = json.dumps(cap, ensure_ascii=False, sort_keys=True)
             for marker in self._SECRET_MARKERS:
                 self.assertNotIn(marker, text, f"{marker!r} leaked in {text}")
+
+
+BUCKET = {
+    "rules_version": "rules_v1_1",
+    "prompt_version": "prompt_v1",
+    "scoring_version": "scoring_v1",
+    "comparison_key": "rules_v1_1__prompt_v1__scoring_v1",
+}
+
+
+class RunStatusBucketTests(unittest.TestCase):
+    def test_status_carries_bucket_when_provided(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            run_dir = Path(td)
+            write_run_status(run_dir, "completed", evaluation_bucket=BUCKET)
+            payload = json.loads((run_dir / "status.json").read_text(encoding="utf-8"))
+            self.assertEqual(payload["status"], "completed")
+            self.assertEqual(payload["evaluation_bucket"], BUCKET)
+
+    def test_later_write_without_bucket_preserves_it(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            run_dir = Path(td)
+            write_run_status(run_dir, "running", evaluation_bucket=BUCKET)
+            write_run_status(run_dir, "completed")  # no bucket passed
+            payload = json.loads((run_dir / "status.json").read_text(encoding="utf-8"))
+            self.assertEqual(payload["status"], "completed")
+            self.assertEqual(payload["evaluation_bucket"], BUCKET,
+                             "bucket lost on a bucket-less rewrite")
+
+    def test_legacy_write_stays_minimal(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            run_dir = Path(td)
+            write_run_status(run_dir, "completed")
+            payload = json.loads((run_dir / "status.json").read_text(encoding="utf-8"))
+            self.assertEqual(payload, {"status": "completed"})

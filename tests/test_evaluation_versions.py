@@ -119,5 +119,33 @@ class ProviderRuntimeKindTests(unittest.TestCase):
         self.assertFalse(_DeterministicFakeProvider.uses_baseline_prompt)
 
 
+class ReadManifestBucketTests(unittest.TestCase):
+    def test_reads_bucket_from_stamped_manifest(self) -> None:
+        import json
+        import tempfile
+
+        from werewolf_eval.evaluation_versions import read_manifest_bucket
+
+        with tempfile.TemporaryDirectory() as td:
+            run_dir = Path(td)
+            (run_dir / "prompt-manifest.json").write_text(
+                json.dumps({"run_id": "r1", "evaluation_bucket": {
+                    "rules_version": "rules_v1_1", "prompt_version": "prompt_v1",
+                    "scoring_version": "scoring_v1",
+                    "comparison_key": "rules_v1_1__prompt_v1__scoring_v1"}}),
+                encoding="utf-8",
+            )
+            bucket = read_manifest_bucket(run_dir)
+            self.assertEqual(bucket["comparison_key"], "rules_v1_1__prompt_v1__scoring_v1")
+
+    def test_returns_none_for_legacy_or_missing_manifest(self) -> None:
+        import tempfile
+
+        from werewolf_eval.evaluation_versions import read_manifest_bucket
+
+        with tempfile.TemporaryDirectory() as td:
+            self.assertIsNone(read_manifest_bucket(Path(td)))
+
+
 if __name__ == "__main__":
     unittest.main()
