@@ -51,7 +51,21 @@ LEDGER_PATH = ROOT / "docs" / "generated-games" / "prompt-version-ledger.json"
 
 
 def _ledger() -> list[dict]:
-    return json.loads(LEDGER_PATH.read_text(encoding="utf-8"))
+    try:
+        raw = LEDGER_PATH.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise AssertionError(
+            f"RULE 2: ledger file missing/unreadable at {LEDGER_PATH} — every "
+            f"prompt_version requires a blessed ledger entry"
+        ) from exc
+    try:
+        entries = json.loads(raw)
+    except ValueError as exc:
+        raise AssertionError(
+            f"RULE 2: ledger file is not valid JSON at {LEDGER_PATH}"
+        ) from exc
+    assert isinstance(entries, list), "RULE 2: ledger root must be a JSON array"
+    return entries
 
 
 def _current_entry() -> dict:
@@ -88,8 +102,20 @@ class PromptVersionGuardTests(unittest.TestCase):
 
     def test_rule2_ledger_entry_and_hashes_exist_for_current_version(self) -> None:
         entry = _current_entry()
-        for field in ("reason", "expected_change", "behavior_evidence", "blessed_by", "blessed_at"):
+        for field in (
+            "base_version",
+            "reason",
+            "expected_change",
+            "golden_prompt_hashes",
+            "behavior_evidence",
+            "blessed_by",
+            "blessed_at",
+        ):
             self.assertIn(field, entry, f"RULE 2: ledger entry missing '{field}'")
+        self.assertIn(
+            "before", entry["golden_prompt_hashes"],
+            "RULE 2: golden_prompt_hashes must carry an explicit 'before' (null for the initial version)",
+        )
         after = entry["golden_prompt_hashes"]["after"]
         samples = dict(canonical_prompt_samples())
         self.assertEqual(
@@ -123,6 +149,10 @@ class PromptVersionGuardTests(unittest.TestCase):
         cur_dir = GOLDEN_ROOT / PROMPT_VERSION
         base_files = {p.stem: p.read_bytes() for p in base_dir.glob("*.txt")}
         cur_files = {p.stem: p.read_bytes() for p in cur_dir.glob("*.txt")}
+        # Rule 1 is the primary guard for missing/empty golden dirs; assert here too
+        # so rule 3 is self-contained and can't silently pass on an unregenerated bump.
+        self.assertTrue(base_files, f"RULE 3: base golden dir {base_dir} is empty/missing")
+        self.assertTrue(cur_files, f"RULE 3: current golden dir {cur_dir} is empty/missing")
         self.assertFalse(
             base_files == cur_files,
             f"RULE 3: {PROMPT_VERSION} is byte-identical to {base} — meaningless bump",
