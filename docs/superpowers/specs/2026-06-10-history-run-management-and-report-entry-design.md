@@ -62,6 +62,7 @@ The five locked rules:
 2. **Trigger timing.** Fast-forward fires only when ALL hold: run detail loaded ∧ events loaded ∧ `eventQueue` actually populated (`_ordered.length > 0`) ∧ `settlementEntryMode === 1`. NOT in `Component.onCompleted` (events arrive async from `openRun`; a too-early call is a silent no-op).
 3. **One-shot guard.** A `didAutoSeekSettlement` latch **keyed by runId** prevents re-trigger on model refresh, language switch, or component rebuild. Reset only when the active run changes.
 4. **Race protection.** The async events callback must verify the loaded run is still the active run (`activeRunId === loadedRunId`) before touching the queue — clicking run A's report then run B's open must never `seekQueueEnd()` B's queue with A's late-arriving trigger.
+5b. **Ungated instant sweep (user ruling 2026-06-10, Option B).** When the fast-forward runs in INSTANT mode (report entry auto-seek, or explicit 瞬时+跳到最新), phase boundaries are crossed WITHOUT raising the per-phase gate — the queue drains in one pass and the report appears within ~1-2s (screenshot-verified). `seekNextPhase` (下一阶段) keeps its gated single-phase semantics; non-instant seeks keep the gated sweep.
 5. **「打开」untouched.** Open keeps full replay: it never sets `settlementEntry=1` and never calls `seekQueueEnd()`. Resulting UX: 打开 = watch the full replay; 查看战报 = same data, instant jump to the report overlay.
 
 ## 6. Testing & acceptance
