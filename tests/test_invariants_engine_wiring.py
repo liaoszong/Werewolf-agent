@@ -15,11 +15,12 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 import werewolf_eval.emergent_engine as ee
-from werewolf_eval.emergent_engine import EmergentGameEngine, build_emergent_config
+from werewolf_eval.emergent_engine import EmergentGameEngine, build_emergent_config, build_emergent_hunter_config
 from werewolf_eval.emergent_fake_script import (
     build_emergent_fake_agents,
     build_villager_win_script,
     build_werewolf_win_script,
+    build_hunter_night_kill_script,
 )
 from werewolf_eval.invariants.guards import PromptLeakError, DoubleDeathCommitError
 
@@ -106,6 +107,59 @@ class B4DoubleCommitRaises(unittest.TestCase):
         engine = _engine(build_werewolf_win_script())
         outcome = engine.run()
         self.assertEqual(outcome.status, "completed")
+
+
+def _hunter_engine(script, *, seed=0, game_id="wiring_hunter_test"):
+    return EmergentGameEngine(
+        config=build_emergent_hunter_config(game_id=game_id),
+        agents=build_emergent_fake_agents(script),
+        seed=seed,
+    )
+
+
+class HunterGameDoesNotTripGuards(unittest.TestCase):
+    def test_hunter_game_does_not_trip_guards(self) -> None:
+        # Happy-path coverage for the two hunter-specific insertion points:
+        #   B1 at _resolve_hunter_shot (~line 930) — assert_prompt_entitled for the hunter seat
+        #   B4 at _trigger_on_death (~line 898) — assert_death_commit_once for the shot victim
+        # build_hunter_night_kill_script guarantees: hunter p6 dies on night 1 and shoots
+        # wolf p1 — so BOTH insertion points execute on every run.
+        # A typo (wrong variable, guard inside the try) would cause a spurious exception here.
+        engine = _hunter_engine(build_hunter_night_kill_script())
+        try:
+            outcome = engine.run()
+        except (PromptLeakError, DoubleDeathCommitError) as exc:  # pragma: no cover
+            self.fail(f"hunter fake game tripped a guard: {exc!r}")
+        self.assertEqual(outcome.status, "completed")
+        events = outcome.game_log["events"]
+        shots = [e for e in events if e["type"] == "hunter_shoot"]
+        self.assertEqual(len(shots), 1, "expected exactly one hunter_shoot event")
+        self.assertEqual(shots[0]["actor"], "p6")
+        self.assertEqual(shots[0]["target"], "p1")
+
+
+class B1PropagatesAtHunterSite(unittest.TestCase):
+    def test_b1_propagates_at_hunter_site(self) -> None:
+        # HIGH-1 proof for the _resolve_hunter_shot direct-respond site (line ~930).
+        # In build_hunter_night_kill_script the hunter p6 dies on night 1 and is the
+        # ONLY seat whose assert_prompt_entitled call sits inside _resolve_hunter_shot
+        # (wrapped by the `except Exception` at line ~941). If the guard were placed
+        # INSIDE that try, the except would swallow it and run() would complete
+        # silently — this test catches that regression by asserting run() re-raises.
+        orig = ee.assert_prompt_entitled
+
+        def leaky(seat, source_event_ids, events_by_id, seat_index):
+            if seat == "p6":
+                raise PromptLeakError("synthetic leak at hunter shot site for p6")
+            return orig(seat, source_event_ids, events_by_id, seat_index)
+
+        engine = _hunter_engine(build_hunter_night_kill_script())
+        ee.assert_prompt_entitled = leaky
+        try:
+            with self.assertRaises(PromptLeakError):
+                engine.run()
+        finally:
+            ee.assert_prompt_entitled = orig
 
 
 if __name__ == "__main__":
