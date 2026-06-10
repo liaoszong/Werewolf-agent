@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import random
 import re
 from pathlib import Path
 from typing import Any
@@ -294,7 +295,7 @@ def validate_profile(profile: object) -> None:
     # Secret-like keys and values first, so the failure reason is explicit.
     _reject_secret_like_keys(profile)
     _reject_secret_like_values(profile)
-    allowed_top = {"schema_version", "name", "template", "role_defaults", "seat_overrides", "seat_personas"}
+    allowed_top = {"schema_version", "name", "template", "role_defaults", "seat_overrides", "seat_personas", "role_shuffle"}
     extra = set(profile) - allowed_top
     if extra:
         raise ProfileValidationError(f"unexpected top-level keys: {sorted(extra)}")
@@ -344,6 +345,11 @@ def validate_profile(profile: object) -> None:
                 f"seat_personas.{sp_seat} exceeds {PROMPT_MAX_LEN} chars "
                 f"(role-agnostic personality; tone/style only)"
             )
+    role_shuffle = profile.get("role_shuffle", {})
+    if not isinstance(role_shuffle, dict):
+        raise ProfileValidationError("role_shuffle must be an object")
+    if "enabled" in role_shuffle and not isinstance(role_shuffle["enabled"], bool):
+        raise ProfileValidationError("role_shuffle.enabled must be a boolean")
     counts: dict[str, int] = {}
     for role in seat_roles.values():
         counts[role] = counts.get(role, 0) + 1
@@ -361,6 +367,50 @@ def resolve_profile(profile: dict) -> list[dict]:
         _resolve_seat(profile, seat, seat_roles[seat])
         for seat in DEFAULT_SEAT_IDS
     ]
+
+
+def compute_role_shuffle(profile: dict, *, run_id: str | None, shuffle_seed: int | None) -> dict:
+    """Single source of the per-run role shuffle. Returns
+    {enabled, seed, seed_source, seat_roles}. seat_roles preserves the template's canonical
+    multiset; explicit shuffle_seed beats run_id; off -> default (template) layout."""
+    base = _template_seat_roles(profile["template"])  # single source per template
+    enabled = bool(profile.get("role_shuffle", {}).get("enabled", False))
+    if not enabled:
+        return {"enabled": False, "seed": None, "seed_source": None, "seat_roles": dict(base)}
+    if shuffle_seed is not None:
+        seed, seed_source = int(shuffle_seed), "explicit"
+    elif run_id is not None:
+        seed = int.from_bytes(hashlib.sha256(run_id.encode("utf-8")).digest()[:8], "big")
+        seed_source = "run_id"
+    else:
+        seed, seed_source = None, None
+    seat_order = list(base.keys())
+    roles = [base[s] for s in seat_order]
+    if seed is not None:
+        random.Random(seed).shuffle(roles)
+    return {"enabled": True, "seed": seed, "seed_source": seed_source,
+            "seat_roles": dict(zip(seat_order, roles))}
+
+
+def resolve_profile_for_run(profile: dict, *, run_id: str | None = None,
+                            shuffle_seed: int | None = None) -> list[dict]:
+    """Resolve seats for an ACTUAL run, applying role_shuffle. When role_shuffle is
+    enabled a seed (explicit or run_id-derived) is REQUIRED — no silent fallback to the
+    default layout. Off -> identical to resolve_profile (byte-parity)."""
+    info = compute_role_shuffle(profile, run_id=run_id, shuffle_seed=shuffle_seed)
+    if info["enabled"] and info["seed"] is None:
+        raise ProfileValidationError(
+            "role_shuffle enabled but neither shuffle_seed nor run_id provided"
+        )
+    seat_roles = info["seat_roles"]
+    resolved = [_resolve_seat(profile, seat, seat_roles[seat]) for seat in DEFAULT_SEAT_IDS]
+    if info["enabled"]:
+        # shuffle produces NEW (seat,role) combos validate_profile never checked (it only
+        # validated the default mapping). Re-check each — catches e.g. the composed
+        # "new-role strategy + seat personality" exceeding PROMPT_MAX_LEN. No silent pass.
+        for seat_cfg, seat in zip(resolved, DEFAULT_SEAT_IDS):
+            _check_resolved_seat(seat_cfg, seat)
+    return resolved
 
 
 def build_resolved_profile_artifact(

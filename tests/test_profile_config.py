@@ -16,6 +16,7 @@ from werewolf_eval.profile_config import (
     validate_profile,
 )
 from werewolf_eval.profile_config import _resolve_seat  # private: resolve a single seat
+from werewolf_eval.profile_config import compute_role_shuffle, resolve_profile_for_run
 
 
 def _valid_profile(**overrides):
@@ -507,6 +508,63 @@ class DefaultProfileSeatPersonasTests(unittest.TestCase):
         validate_profile(p)  # 不得抛
         for frag in p["role_defaults"].values():
             self.assertNotIn("temperature", frag)  # 温度单源于常量,不种进 fake 模板
+
+
+class RoleShuffleTests(unittest.TestCase):
+    def test_off_returns_default_layout(self):
+        info = compute_role_shuffle(_valid_profile(), run_id="r", shuffle_seed=None)
+        self.assertFalse(info["enabled"])
+        self.assertIsNone(info["seed"])
+        self.assertEqual(info["seat_roles"], {"p1":"werewolf","p2":"werewolf","p3":"seer","p4":"witch","p5":"villager","p6":"villager"})
+
+    def test_on_preserves_multiset(self):
+        info = compute_role_shuffle(_valid_profile(role_shuffle={"enabled": True}), run_id="run_abc", shuffle_seed=None)
+        self.assertTrue(info["enabled"])
+        self.assertEqual(sorted(info["seat_roles"].values()),
+                         sorted(["werewolf","werewolf","seer","witch","villager","villager"]))
+        self.assertEqual(info["seed_source"], "run_id")
+
+    def test_explicit_seed_beats_run_id(self):
+        a = compute_role_shuffle(_valid_profile(role_shuffle={"enabled": True}), run_id="X", shuffle_seed=12345)
+        b = compute_role_shuffle(_valid_profile(role_shuffle={"enabled": True}), run_id="Y", shuffle_seed=12345)
+        self.assertEqual(a["seat_roles"], b["seat_roles"])
+        self.assertEqual(a["seed_source"], "explicit")
+
+    def test_run_id_deterministic_and_varies(self):
+        same1 = compute_role_shuffle(_valid_profile(role_shuffle={"enabled": True}), run_id="same", shuffle_seed=None)
+        same2 = compute_role_shuffle(_valid_profile(role_shuffle={"enabled": True}), run_id="same", shuffle_seed=None)
+        self.assertEqual(same1["seat_roles"], same2["seat_roles"])
+        layouts = {tuple(compute_role_shuffle(_valid_profile(role_shuffle={"enabled": True}), run_id=f"r{i}", shuffle_seed=None)["seat_roles"].items()) for i in range(12)}
+        self.assertGreater(len(layouts), 1)
+
+    def test_enabled_but_no_seed_raises(self):
+        with self.assertRaises(ProfileValidationError):
+            resolve_profile_for_run(_valid_profile(role_shuffle={"enabled": True}), run_id=None, shuffle_seed=None)
+
+    def test_for_run_off_equals_resolve_profile(self):
+        p = _valid_profile()
+        self.assertEqual(resolve_profile_for_run(p, run_id="r"), resolve_profile(p))
+
+    def test_for_run_on_applies_shuffle_roles(self):
+        p = _valid_profile(role_shuffle={"enabled": True})
+        seats = {s["player_id"]: s["role"] for s in resolve_profile_for_run(p, run_id="run_zzz")}
+        self.assertEqual(sorted(seats.values()), sorted(["werewolf","werewolf","seer","witch","villager","villager"]))
+
+    def test_role_shuffle_field_validates(self):
+        validate_profile(_valid_profile(role_shuffle={"enabled": True}))
+        validate_profile(_valid_profile(role_shuffle={"enabled": False}))
+        validate_profile(_valid_profile())
+        with self.assertRaises(ProfileValidationError):
+            validate_profile(_valid_profile(role_shuffle={"enabled": "yes"}))
+        with self.assertRaises(ProfileValidationError):
+            validate_profile(_valid_profile(role_shuffle=["x"]))
+
+    def test_for_run_rechecks_shuffled_combos(self):
+        # SHOULD-FIX 2: resolve_profile_for_run 对洗后每席补跑 _check_resolved_seat。8001 > PROMPT_MAX_LEN(8000)
+        p = _valid_profile(role_shuffle={"enabled": True})
+        p["role_defaults"]["seer"]["prompt"] = "x" * 8001
+        with self.assertRaises(ProfileValidationError):
+            resolve_profile_for_run(p, shuffle_seed=0)
 
 
 if __name__ == "__main__":
