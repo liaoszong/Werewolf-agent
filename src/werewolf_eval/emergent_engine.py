@@ -34,10 +34,16 @@ from werewolf_eval.provider_contract import ProviderRequest
 from werewolf_eval.action_runtime import (
     ActionEnvelope,
     ActionValidator,
+    DecisionWindow,
     JointSettler,
     NightIntents,
+    RngPick,
     RoleAbilityRegistry,
     RuntimeState,
+    SeerResolver,
+    VoteResolver,
+    WolfResolver,
+    WolfWindow,
     rules_v1_1,
 )
 from werewolf_eval.action_runtime.abilities import TARGET_RULES
@@ -59,6 +65,19 @@ WITCH_PASS = "witch_pass"
 WITCH_ACTIONS = (WITCH_SAVE, WITCH_POISON, WITCH_PASS)
 
 FALLBACK_DECISION_TYPE = "default"
+
+# Night abilities dispatched via _RESOLVERS, in their byte-load-bearing order (wolf before
+# seer). The witch is deferred (inline) until its RuntimeState potion ledger lands (②b), so it
+# is absent here; when it migrates it joins this tuple. Kept as a constant (not derived from
+# seat order) so the order can't silently flip on a re-seated board.
+#
+# WITCH MIGRATION (②b) is BLOCKED on a RuntimeState one-shot potion capability ledger
+# (uses_left/consumed_at_event_id) + threading the night victim into _runtime_state(): routing
+# the witch through validate_in_state today would accept a 2nd potion -> cross-round divergence.
+# Until then the witch stays in _resolve_witch (NOT in _RESOLVERS / this tuple). The one-shot
+# guard is pinned by tests/test_witch_potion_one_shot_sentinel.py (antidote + poison), which go
+# RED the day a witch swap forgets the ledger.
+NIGHT_DISPATCH_ORDER = ("werewolf_kill", "seer_check")
 
 # Per-request output-token caps (P2-A-2): speeches need more than votes/actions.
 SPEECH_MAX_OUTPUT_TOKENS = 250
@@ -260,6 +279,14 @@ class EmergentGameEngine:
         self._registry = RoleAbilityRegistry(_ruleset)
         self._settler = JointSettler(_ruleset)
         self._validator = ActionValidator(self._registry)
+        # Registry-driven action dispatch (Phase-3 ②a). Each migrated ability id maps to a
+        # driver. Night order is explicit DATA (load-bearing: wolf BEFORE seer — both may draw
+        # 0/1 from self._rng). The witch is DEFERRED (inline, ②b) so it is NOT in this map/order.
+        self._RESOLVERS = {
+            "werewolf_kill": self._run_wolf_kill,
+            "seer_check": self._run_seer,
+            "player_vote": self._run_vote_round,
+        }
 
     # ---- small helpers -------------------------------------------------
 
@@ -540,6 +567,75 @@ class EmergentGameEngine:
         turn["source_label"] = None
         turn["token_usage"] = None
 
+    # ---- pure-resolver bridge helpers ---------------------------------
+
+    def _draw(self, pick: "RngPick") -> str:
+        """Perform a resolver's deferred seeded draw against self._rng at the legacy site."""
+        if pick.kind == "choice":
+            return self._rng.choice(list(pick.over))
+        return pick.over[self._rng.randrange(len(pick.over))]
+
+    def _decision_window(self, rnd, actor, role, registry_phase, emit_phase, live_action, refs):
+        return DecisionWindow(
+            rnd=rnd, actor=actor, role=role, emit_phase=emit_phase, registry_phase=registry_phase,
+            alive_seat_order=tuple(self._alive_in_seat_order()),
+            roles={pid: p.role for pid, p in self._players_by_id.items()},
+            public_refs=tuple(refs), live_action=live_action,
+            validator=self._validator, runtime_state=self._runtime_state(),
+        )
+
+    def _run_single_turn(self, resolver, actor, role, registry_phase, emit_phase, request_phase, rnd, refs=()):
+        """Drive ONE strict-path actor turn (seer / one voter) through a pure resolver.
+        Side-effects (provider call, budget, turn dict, err-failure, rng draw, decision, emit)
+        stay here; the resolver only decides. Returns the resolved target, or None on skip."""
+        action, err, turn = self._provider_action(actor, request_phase, rnd)
+        if err is not None:
+            if isinstance(err, ProviderActionError):
+                self._record_failure(rnd, emit_phase, actor, err.failure.kind, err.failure.reason, err.failure.target)
+            else:
+                self._record_failure(rnd, emit_phase, actor, "agent_error", f"{actor} raised {type(err).__name__}: {err}")
+        window = self._decision_window(rnd, actor, role, registry_phase, emit_phase,
+                                       action if err is None else None, refs)
+        adj = resolver.adjudicate(window)
+        if adj.skip:
+            return None  # no-candidates bail. UNREACHABLE in live games (win-check guarantees
+                         # >=1 candidate before any turn). A same-turn invalid-action failure/downgrade
+                         # would be dropped here; legacy recorded it before bailing. Byte-inert (path dead).
+        if adj.failure is not None:
+            self._record_failure(rnd, emit_phase, actor, adj.failure.kind, adj.failure.reason, adj.failure.target)
+        if adj.downgrade_reason is not None:
+            self._downgrade_turn(turn, adj.downgrade_reason)
+        target = adj.accepted_target if adj.rng_pick is None else self._draw(adj.rng_pick)
+        plan = resolver.render(window, target, adj.decision_type)
+        d = plan.decision
+        self._decision(d.actor, d.scope, d.phase, d.action, d.target, d.dtype, d.reason,
+                       refs=list(d.refs) or None, consensus_id=d.consensus_id)
+        e = plan.event
+        self._emit(e.phase, rnd, e.etype, e.actor, e.target, e.visibility, e.summary)
+        return target
+
+    def _run_seer(self, rnd):
+        seers = [pid for pid in self._alive if self._players_by_id[pid].role == "seer"]
+        if not seers:
+            return None
+        return self._run_single_turn(SeerResolver(), seers[0], "seer", "night", "night", "night", rnd)
+
+    def _run_vote_round(self, rnd):
+        refs = self._public_refs()
+        tally: dict[str, int] = {}
+        for voter in self._alive_in_seat_order():
+            role = self._players_by_id[voter].role
+            target = self._run_single_turn(VoteResolver(), voter, role, "day_vote", "day", "day", rnd, refs=refs)
+            if target is not None:
+                tally[target] = tally.get(target, 0) + 1
+        if not tally:
+            return None
+        top = max(tally.values())
+        leaders = sorted(t for t, c in tally.items() if c == top)
+        if len(leaders) == 1:
+            return leaders[0]
+        return leaders[self._rng.randrange(len(leaders))]
+
     # ---- win condition -------------------------------------------------
 
     def _win_check(self) -> str | None:
@@ -553,12 +649,12 @@ class EmergentGameEngine:
 
     # ---- night sub-phases ---------------------------------------------
 
-    def _resolve_wolf_kill(self, rnd: int) -> str | None:
+    def _run_wolf_kill(self, rnd: int) -> str | None:
         wolves = [w for w in self._wolves() if w in self._alive]
         if not wolves:
             return None
         consensus_id = f"{self._game_id}_consensus_r{rnd:02d}"
-        proposals: list[tuple[str, str]] = []  # (wolf, target)
+        proposals: list[tuple[str, str]] = []
         for wolf in wolves:
             action, err, turn = self._provider_action(wolf, "night", rnd)
             if err is not None:
@@ -567,43 +663,24 @@ class EmergentGameEngine:
                 else:
                     self._record_failure(rnd, "night", wolf, "agent_error", f"{wolf} raised {type(err).__name__}: {err}")
                 continue
-            valid = self._action_legal(wolf, "werewolf", "night", action)
-            if not valid:
+            if not self._action_legal(wolf, "werewolf", "night", action):
                 self._record_failure(rnd, "night", wolf, "invalid_action", f"{wolf} proposed invalid kill {action.target}", action.target)
                 self._downgrade_turn(turn, f"engine rejected kill target {action.target}")
                 continue
             proposals.append((wolf, action.target))
-
-        if not proposals:
-            # fallback: kill first alive non-wolf by seat order
-            candidates = [pid for pid in self._seat_order if pid in self._alive and self._players_by_id[pid].role != "werewolf"]
-            if not candidates:
-                return None
-            # R-29: seeded pick (not always seat 0) so provider failures don't
-            # systematically scapegoat the lowest seat. Deterministic per seed.
-            target = self._rng.choice(candidates)
-            self._consensus_entries.append(self._build_consensus_entry(consensus_id, rnd, wolves, target, wolves[0], [], status="coordinator_tie_break"))
-            self._decision(wolves[0], "team", "night", "werewolf_kill", target, FALLBACK_DECISION_TYPE, f"fallback kill {target}", consensus_id=consensus_id)
-            self._emit("night", rnd, "werewolf_kill", wolves[0], target, "werewolf_team", f"Wolf team kills {target}.")
-            return target
-
-        # tally targets, pick max, seeded tie-break among the top
-        counts: dict[str, int] = {}
-        for _, t in proposals:
-            counts[t] = counts.get(t, 0) + 1
-        top = max(counts.values())
-        leaders = sorted(t for t, c in counts.items() if c == top)
-        if len(leaders) == 1:
-            target = leaders[0]
-            status = "consensus" if len(set(t for _, t in proposals)) == 1 else "coordinator_tie_break"
-        else:
-            target = leaders[self._rng.randrange(len(leaders))]
-            status = "coordinator_tie_break"
-        primary = next(w for w, t in proposals if t == target)
-        supporters = [w for w, t in proposals if t == target]
-        self._consensus_entries.append(self._build_consensus_entry(consensus_id, rnd, wolves, target, primary, supporters, status=status))
-        self._decision(primary, "team", "night", "werewolf_kill", target, "team_coordinated", f"wolf team kills {target}", consensus_id=consensus_id)
-        self._emit("night", rnd, "werewolf_kill", primary, target, "werewolf_team", f"Wolf team kills {target}.")
+        candidates = tuple(pid for pid in self._seat_order
+                           if pid in self._alive and self._players_by_id[pid].role != "werewolf")
+        ww = WolfWindow(rnd=rnd, wolves=tuple(wolves), proposals=tuple(proposals),
+                        candidates=candidates, consensus_id=consensus_id)
+        adj = WolfResolver().adjudicate(ww)
+        if adj.skip:
+            return None
+        target = adj.fixed_target if adj.rng_pick is None else self._draw(adj.rng_pick)
+        r = WolfResolver().render(ww, target, adj.is_fallback)
+        self._consensus_entries.append(
+            self._build_consensus_entry(consensus_id, rnd, wolves, target, r.primary, list(r.supporters), status=adj.status))
+        self._decision(r.primary, "team", "night", "werewolf_kill", target, adj.decision_type, r.reason, consensus_id=consensus_id)
+        self._emit("night", rnd, "werewolf_kill", r.primary, target, "werewolf_team", f"Wolf team kills {target}.")
         return target
 
     def _build_consensus_entry(self, consensus_id, rnd, wolves, target, primary, supporters, status):
@@ -656,35 +733,6 @@ class EmergentGameEngine:
                 "resolution_round": 1,
             },
         }
-
-    def _resolve_seer(self, rnd: int) -> None:
-        seers = [pid for pid in self._alive if self._players_by_id[pid].role == "seer"]
-        if not seers:
-            return
-        seer = seers[0]
-        target: str | None = None
-        action, err, turn = self._provider_action(seer, "night", rnd)
-        if err is not None:
-            if isinstance(err, ProviderActionError):
-                self._record_failure(rnd, "night", seer, err.failure.kind, err.failure.reason, err.failure.target)
-            else:
-                self._record_failure(rnd, "night", seer, "agent_error", f"{seer} raised {type(err).__name__}: {err}")
-        elif self._action_legal(seer, "seer", "night", action):
-            target = action.target
-        else:
-            self._record_failure(rnd, "night", seer, "invalid_action", f"{seer} bad seer_check {action.target}", action.target)
-            self._downgrade_turn(turn, f"engine rejected seer_check {action.target}")
-        if target is None:
-            cands = self._alive_in_seat_order(exclude={seer})
-            if not cands:
-                return
-            target = self._rng.choice(cands)  # R-29: seeded, not always seat 0
-            dtype = FALLBACK_DECISION_TYPE
-        else:
-            dtype = "inference_based"
-        result = "werewolf" if self._players_by_id[target].role == "werewolf" else "good"
-        self._decision(seer, "single", "night", "seer_check", target, dtype, f"seer checks {target}")
-        self._emit("night", rnd, "seer_check", seer, target, "seer", f"Seer {seer} checks {target}, result: {result}.")
 
     def _resolve_witch(self, rnd: int, victim: str | None, save_used: bool, poison_used: bool) -> tuple[bool, str | None, bool, bool]:
         """Returns (saved_victim, poison_target, new_save_used, new_poison_used)."""
@@ -816,42 +864,6 @@ class EmergentGameEngine:
             turn["kind"] = LIVE_SUCCESS
         self._emit("day", rnd, "player_speech", player_id, "none", "public", text)
 
-    def _resolve_votes(self, rnd: int) -> str | None:
-        refs = self._public_refs()
-        tally: dict[str, int] = {}
-        for voter in self._alive_in_seat_order():
-            target: str | None = None
-            action, err, turn = self._provider_action(voter, "day", rnd)
-            if err is not None:
-                if isinstance(err, ProviderActionError):
-                    self._record_failure(rnd, "day", voter, err.failure.kind, err.failure.reason, err.failure.target)
-                else:
-                    self._record_failure(rnd, "day", voter, "agent_error", f"{voter} raised {type(err).__name__}: {err}")
-            elif self._action_legal(voter, self._players_by_id[voter].role, "day_vote", action):
-                target = action.target
-            else:
-                self._record_failure(rnd, "day", voter, "invalid_action", f"{voter} bad vote {action.target}", action.target)
-                self._downgrade_turn(turn, f"engine rejected vote {action.target}")
-            if target is None:
-                cands = self._alive_in_seat_order(exclude={voter})
-                if not cands:
-                    continue
-                target = self._rng.choice(cands)  # R-29: seeded, not always seat 0
-                dtype = FALLBACK_DECISION_TYPE
-            else:
-                dtype = "inference_based"
-            tally[target] = tally.get(target, 0) + 1
-            self._decision(voter, "single", "day", "player_vote", target, dtype, f"{voter} votes {target}", refs=refs)
-            self._emit("day", rnd, "player_vote", voter, target, "public", f"{voter} votes {target}.")
-
-        if not tally:
-            return None
-        top = max(tally.values())
-        leaders = sorted(t for t, c in tally.items() if c == top)
-        if len(leaders) == 1:
-            return leaders[0]
-        return leaders[self._rng.randrange(len(leaders))]
-
     # ---- death-triggered abilities (hunter v1.1) -----------------------
 
     def _trigger_on_death(self, dead: str, rnd: int, phase: str) -> None:
@@ -980,9 +992,13 @@ class EmergentGameEngine:
 
         for rnd in range(1, self._budget.max_day_rounds + 1):
             end_round = rnd
-            # ---- NIGHT ----
-            victim = self._resolve_wolf_kill(rnd)
-            self._resolve_seer(rnd)
+            # ---- NIGHT ---- registry-driven dispatch for migrated abilities
+            victim = None
+            for ability_id in NIGHT_DISPATCH_ORDER:
+                result = self._RESOLVERS[ability_id](rnd)
+                if ability_id == "werewolf_kill":
+                    victim = result
+            # witch — DEFERRED inline (BLOCKING: RuntimeState potion ledger pending, ②b)
             saved, poison_target, save_used, poison_used = self._resolve_witch(rnd, victim, save_used, poison_used)
 
             # Night settlement delegates to the Agent Action Runtime's JointSettler
@@ -1017,7 +1033,7 @@ class EmergentGameEngine:
             for speaker in self._alive_in_seat_order():
                 self._resolve_speech(speaker, rnd)
 
-            eliminated = self._resolve_votes(rnd)
+            eliminated = self._RESOLVERS["player_vote"](rnd)
             if eliminated is not None:
                 self._alive.discard(eliminated)
                 role = self._players_by_id[eliminated].role
