@@ -42,6 +42,8 @@ from werewolf_eval.action_runtime import (
     RuntimeState,
     SeerResolver,
     VoteResolver,
+    WolfResolver,
+    WolfWindow,
     rules_v1_1,
 )
 from werewolf_eval.action_runtime.abilities import TARGET_RULES
@@ -626,12 +628,12 @@ class EmergentGameEngine:
 
     # ---- night sub-phases ---------------------------------------------
 
-    def _resolve_wolf_kill(self, rnd: int) -> str | None:
+    def _run_wolf_kill(self, rnd: int) -> str | None:
         wolves = [w for w in self._wolves() if w in self._alive]
         if not wolves:
             return None
         consensus_id = f"{self._game_id}_consensus_r{rnd:02d}"
-        proposals: list[tuple[str, str]] = []  # (wolf, target)
+        proposals: list[tuple[str, str]] = []
         for wolf in wolves:
             action, err, turn = self._provider_action(wolf, "night", rnd)
             if err is not None:
@@ -640,43 +642,24 @@ class EmergentGameEngine:
                 else:
                     self._record_failure(rnd, "night", wolf, "agent_error", f"{wolf} raised {type(err).__name__}: {err}")
                 continue
-            valid = self._action_legal(wolf, "werewolf", "night", action)
-            if not valid:
+            if not self._action_legal(wolf, "werewolf", "night", action):
                 self._record_failure(rnd, "night", wolf, "invalid_action", f"{wolf} proposed invalid kill {action.target}", action.target)
                 self._downgrade_turn(turn, f"engine rejected kill target {action.target}")
                 continue
             proposals.append((wolf, action.target))
-
-        if not proposals:
-            # fallback: kill first alive non-wolf by seat order
-            candidates = [pid for pid in self._seat_order if pid in self._alive and self._players_by_id[pid].role != "werewolf"]
-            if not candidates:
-                return None
-            # R-29: seeded pick (not always seat 0) so provider failures don't
-            # systematically scapegoat the lowest seat. Deterministic per seed.
-            target = self._rng.choice(candidates)
-            self._consensus_entries.append(self._build_consensus_entry(consensus_id, rnd, wolves, target, wolves[0], [], status="coordinator_tie_break"))
-            self._decision(wolves[0], "team", "night", "werewolf_kill", target, FALLBACK_DECISION_TYPE, f"fallback kill {target}", consensus_id=consensus_id)
-            self._emit("night", rnd, "werewolf_kill", wolves[0], target, "werewolf_team", f"Wolf team kills {target}.")
-            return target
-
-        # tally targets, pick max, seeded tie-break among the top
-        counts: dict[str, int] = {}
-        for _, t in proposals:
-            counts[t] = counts.get(t, 0) + 1
-        top = max(counts.values())
-        leaders = sorted(t for t, c in counts.items() if c == top)
-        if len(leaders) == 1:
-            target = leaders[0]
-            status = "consensus" if len(set(t for _, t in proposals)) == 1 else "coordinator_tie_break"
-        else:
-            target = leaders[self._rng.randrange(len(leaders))]
-            status = "coordinator_tie_break"
-        primary = next(w for w, t in proposals if t == target)
-        supporters = [w for w, t in proposals if t == target]
-        self._consensus_entries.append(self._build_consensus_entry(consensus_id, rnd, wolves, target, primary, supporters, status=status))
-        self._decision(primary, "team", "night", "werewolf_kill", target, "team_coordinated", f"wolf team kills {target}", consensus_id=consensus_id)
-        self._emit("night", rnd, "werewolf_kill", primary, target, "werewolf_team", f"Wolf team kills {target}.")
+        candidates = tuple(pid for pid in self._seat_order
+                           if pid in self._alive and self._players_by_id[pid].role != "werewolf")
+        ww = WolfWindow(rnd=rnd, wolves=tuple(wolves), proposals=tuple(proposals),
+                        candidates=candidates, consensus_id=consensus_id)
+        adj = WolfResolver().adjudicate(ww)
+        if adj.skip:
+            return None
+        target = adj.fixed_target if adj.rng_pick is None else self._draw(adj.rng_pick)
+        r = WolfResolver().render(ww, target, adj.is_fallback)
+        self._consensus_entries.append(
+            self._build_consensus_entry(consensus_id, rnd, wolves, target, r.primary, list(r.supporters), status=adj.status))
+        self._decision(r.primary, "team", "night", "werewolf_kill", target, adj.decision_type, r.reason, consensus_id=consensus_id)
+        self._emit("night", rnd, "werewolf_kill", r.primary, target, "werewolf_team", f"Wolf team kills {target}.")
         return target
 
     def _build_consensus_entry(self, consensus_id, rnd, wolves, target, primary, supporters, status):
@@ -989,7 +972,7 @@ class EmergentGameEngine:
         for rnd in range(1, self._budget.max_day_rounds + 1):
             end_round = rnd
             # ---- NIGHT ----
-            victim = self._resolve_wolf_kill(rnd)
+            victim = self._run_wolf_kill(rnd)
             self._run_seer(rnd)
             saved, poison_target, save_used, poison_used = self._resolve_witch(rnd, victim, save_used, poison_used)
 
