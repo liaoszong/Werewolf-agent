@@ -42,7 +42,9 @@ Two user-reported gaps in the 历史对局 (history) page:
 
 ## 4. Part B — HistoryView delete interaction
 
-`ObserverApiClient`: `Q_INVOKABLE void deleteRun(const QString &runId)` → network DELETE → signal `deleteRunFinished(runId, ok, errorCode)`; on success the client refreshes the runs list.
+`ObserverApiClient`: `Q_INVOKABLE void deleteRun(const QString &runId)` → network DELETE → signal `deleteRunFinished(runId, ok, errorCode)`.
+
+**Refresh semantics (single vs batch):** a SINGLE delete refreshes the runs list on success. A BATCH delete does NOT refresh per item — the batch controller aggregates results and refreshes the list ONCE after ALL deletes finish (success or fail). Per-item refresh during a 30-run batch would thrash the UI, break the selection state, and multiply async races.
 
 `HistoryView.qml`:
 - **Per-row delete:** trash icon button at row end. Disabled (greyed) when row status is `running`/`queued`. Click → confirm dialog 「确定删除对局 {run_id}?删除后不可恢复。」 → `deleteRun`.
