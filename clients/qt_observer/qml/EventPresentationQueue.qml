@@ -29,6 +29,7 @@ QtObject {
     property string layoutPhase: "day"  // "night" | "day" | "voting"
     property bool waiting: false
     readonly property bool atEnd: _cursor >= _ordered.length   // drained (all received events consumed)
+    readonly property int queuedCount: _ordered.length   // total received (de-duped); 0 = nothing arrived yet
 
     // Major phase timeline up to the cursor: ordered unique (round, night|day) pairs. Drives
     // the top progress axis; the LAST entry is the current major phase. (voting is part of day.)

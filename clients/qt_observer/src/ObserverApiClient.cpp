@@ -135,9 +135,8 @@ void ObserverApiClient::setCurrentRunId(const QString &runId)
         emit settlementBundleChanged();
     }
     // Report fast-forward stale-queue guard: a new run must not inherit the prior
-    // run's raw event items — clearing here ensures eventQueue._ordered.length === 0
-    // when _maybeAutoSeekReport fires on eventItemsChanged, so the auto-seek latch
-    // is not consumed by stale A-run events before B-run events arrive.
+    // run's raw event items, so the QML fast-forward check sees an empty queue
+    // until the new run's events actually arrive.
     if (!m_eventItems.isEmpty()) {
         m_eventItems.clear();
         emit eventItemsChanged();
