@@ -652,3 +652,27 @@ class GameEngineInjectionTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class BuildDefaultConfigSeatRolesTests(unittest.TestCase):
+    def test_default_is_unchanged(self):
+        from werewolf_eval.game_engine import build_default_config
+        cfg = build_default_config("g")
+        self.assertEqual([(p.player_id, p.role, p.team) for p in cfg.players], [
+            ("p1", "werewolf", "werewolf"), ("p2", "werewolf", "werewolf"),
+            ("p3", "seer", "villager"), ("p4", "witch", "villager"),
+            ("p5", "villager", "villager"), ("p6", "villager", "villager")])
+
+    def test_with_seat_roles_shuffled(self):
+        from werewolf_eval.game_engine import build_default_config
+        sr = {"p1": "seer", "p2": "villager", "p3": "werewolf", "p4": "witch", "p5": "werewolf", "p6": "villager"}
+        cfg = build_default_config("g", seat_roles=sr)
+        got = {p.player_id: (p.role, p.team) for p in cfg.players}
+        self.assertEqual(got["p1"], ("seer", "villager"))
+        self.assertEqual(got["p3"], ("werewolf", "werewolf"))
+        self.assertEqual([p.player_id for p in cfg.players], ["p1", "p2", "p3", "p4", "p5", "p6"])
+
+    def test_seat_roles_equal_default_is_identical(self):
+        from werewolf_eval.game_engine import build_default_config
+        sr = {"p1": "werewolf", "p2": "werewolf", "p3": "seer", "p4": "witch", "p5": "villager", "p6": "villager"}
+        self.assertEqual(build_default_config("g", seat_roles=sr), build_default_config("g"))

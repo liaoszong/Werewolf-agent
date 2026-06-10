@@ -88,16 +88,29 @@ class EngineOutputs:
     failure_audit: dict[str, Any] | None = None
 
 
-def build_default_config(game_id: str = "g1b_mock_001") -> GameConfig:
+_DEFAULT_SEAT_ORDER = ("p1", "p2", "p3", "p4", "p5", "p6")
+
+
+def build_default_config(game_id: str = "g1b_mock_001", seat_roles: dict[str, str] | None = None) -> GameConfig:
+    if seat_roles is None:
+        return GameConfig(
+            game_id=game_id,
+            players=[
+                EnginePlayer("p1", "werewolf", "werewolf"),
+                EnginePlayer("p2", "werewolf", "werewolf"),
+                EnginePlayer("p3", "seer", "villager"),
+                EnginePlayer("p4", "witch", "villager"),
+                EnginePlayer("p5", "villager", "villager"),
+                EnginePlayer("p6", "villager", "villager"),
+            ],
+        )
+    # seat_roles given: per-seat role override (multiset preserved upstream). team derives
+    # from role (werewolf -> werewolf, else villager); seat_roles == default -> identical board.
     return GameConfig(
         game_id=game_id,
         players=[
-            EnginePlayer("p1", "werewolf", "werewolf"),
-            EnginePlayer("p2", "werewolf", "werewolf"),
-            EnginePlayer("p3", "seer", "villager"),
-            EnginePlayer("p4", "witch", "villager"),
-            EnginePlayer("p5", "villager", "villager"),
-            EnginePlayer("p6", "villager", "villager"),
+            EnginePlayer(pid, seat_roles[pid], "werewolf" if seat_roles[pid] == "werewolf" else "villager")
+            for pid in _DEFAULT_SEAT_ORDER
         ],
     )
 
