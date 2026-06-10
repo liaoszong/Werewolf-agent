@@ -46,6 +46,7 @@ Item {
     function _exitSelectMode() { selecting = false; _selected = ({}) }
 
     function _startBatchDelete() {
+        if (_batchActive) return
         _batchQueue = Object.keys(_selected)
         _batchTotal = _batchQueue.length
         _batchFailed = 0
@@ -461,6 +462,7 @@ Item {
                     id: batchDeleteButton
                     objectName: "batchDeleteButton"
                     visible: root.selecting && root.selectedCount > 0
+                    enabled: !root._batchActive
                     anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
                     text: I18n.t("删除所选(", "Delete selected (") + root.selectedCount + ")"
