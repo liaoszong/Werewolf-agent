@@ -218,5 +218,24 @@ class TestI5(unittest.TestCase):
         self.assertEqual(v[0].id, "I5")
 
 
+from werewolf_eval.invariants import check_run
+
+
+class TestCheckRunIntegration(unittest.TestCase):
+    def test_clean_minimal_game_passes(self):
+        players = [{"player_id": "p1", "role": "seer", "team": "villager"},
+                   {"player_id": "p2", "role": "werewolf", "team": "werewolf"}]
+        events = [_cause("e1", "werewolf_kill", "p1", 1), _death("e2", "p1", seq=2)]
+        turns = [{"request_id": "g_r01_p2", "phase": "night", "actor": "p2",
+                  "observation_source_event_ids": ["e1"]}]
+        arts = RunArtifacts(game_id="g", players=players, events=events,
+                            decisions=[], provider_turns=turns, result=None)
+        self.assertEqual(check_run(arts), [])
+
+    def test_artifact_gap_reported_not_raised(self):
+        v = check_run(RunArtifacts("g", [], [], [], [], None, gaps=("game-log.json",)))
+        self.assertTrue(any(x.severity == "artifact_gap" for x in v))
+
+
 if __name__ == "__main__":
     unittest.main()
