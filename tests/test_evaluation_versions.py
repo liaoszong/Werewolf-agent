@@ -66,6 +66,10 @@ class EvaluationVersionsTests(unittest.TestCase):
             elif isinstance(node, ast.ImportFrom):
                 mod = node.module or ""
                 self.assertFalse(mod.startswith("werewolf_eval"), f"forbidden import from: {mod}")
+                self.assertEqual(
+                    node.level, 0,
+                    "forbidden relative import in evaluation_versions (would bypass the package-name check)",
+                )
 
 
 class PromptVersionTests(unittest.TestCase):
@@ -80,6 +84,39 @@ class PromptVersionTests(unittest.TestCase):
         from werewolf_eval.prompt_version import PROMPT_VERSION
 
         self.assertRegex(PROMPT_VERSION, r"^prompt_v\d+$")
+
+
+class ProviderRuntimeKindTests(unittest.TestCase):
+    def test_live_providers_declare_baseline_prompt_use(self) -> None:
+        from werewolf_eval.llm_providers import BaseChatProvider
+
+        self.assertEqual(BaseChatProvider.provider_runtime_kind, "live_model")
+        self.assertTrue(BaseChatProvider.uses_baseline_prompt)
+
+    def test_fake_provider_declares_no_prompt_use(self) -> None:
+        from werewolf_eval.fake_provider import DeterministicFakeProvider
+
+        self.assertEqual(
+            DeterministicFakeProvider.provider_runtime_kind, "fake_deterministic"
+        )
+        self.assertFalse(DeterministicFakeProvider.uses_baseline_prompt)
+
+    def test_deepseek_inherits_live_declaration(self) -> None:
+        from werewolf_eval.deepseek_provider import DeepSeekProvider
+
+        self.assertEqual(DeepSeekProvider.provider_runtime_kind, "live_model")
+        self.assertTrue(DeepSeekProvider.uses_baseline_prompt)
+
+    def test_g1h_private_fake_provider_also_declares(self) -> None:
+        # run_g1h_fake_runtime has its OWN _DeterministicFakeProvider copy class
+        # (no inheritance from the public one). Pin it so the g1h manifest can
+        # never claim prompt_used_by_runtime=True (plan-review finding 3).
+        from werewolf_eval.run_g1h_fake_runtime import _DeterministicFakeProvider
+
+        self.assertEqual(
+            _DeterministicFakeProvider.provider_runtime_kind, "fake_deterministic"
+        )
+        self.assertFalse(_DeterministicFakeProvider.uses_baseline_prompt)
 
 
 if __name__ == "__main__":

@@ -134,6 +134,11 @@ class BaseChatProvider:
     """Shared respond() skeleton, budget/history, and the BYO-key transport-error
     guard. Dialect specifics live in the hooks below."""
 
+    # Spec 2026-06-10-prompt-versioning §4.4: declared mechanism, NOT name-sniffing.
+    # prompt_used_by_runtime is derived from these declarations by runners.
+    provider_runtime_kind = "live_model"
+    uses_baseline_prompt = True
+
     PROVIDER_NAME: str = "base"
     SOURCE_LABEL: str = ""
 

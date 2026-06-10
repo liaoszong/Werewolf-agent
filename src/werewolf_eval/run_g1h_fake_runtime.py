@@ -32,6 +32,10 @@ from werewolf_eval.runtime_events import (
 class _DeterministicFakeProvider:
     """A fake provider that returns deterministic valid-action JSON."""
 
+    # Scripted by (actor, phase, round) keys — never reads the rendered prompt.
+    provider_runtime_kind = "fake_deterministic"
+    uses_baseline_prompt = False
+
     def __init__(self) -> None:
         self._provider_name = "fake_deterministic"
         self._source_label = FAKE_PROVIDER_SOURCE_LABEL

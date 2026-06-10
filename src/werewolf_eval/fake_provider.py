@@ -12,6 +12,10 @@ from werewolf_eval.provider_agent import ProviderAgent
 
 
 class DeterministicFakeProvider:
+    # Scripted by (actor, phase, round) keys — never reads the rendered prompt.
+    provider_runtime_kind = "fake_deterministic"
+    uses_baseline_prompt = False
+
     def __init__(self, script: dict[tuple, str], provider_name: str = "deterministic_fake_provider") -> None:
         self._script = dict(script)
         self._provider_name = provider_name
