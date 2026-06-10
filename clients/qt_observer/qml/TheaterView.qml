@@ -24,6 +24,10 @@ Item {
                     && ObserverClient.currentStatus !== "failed")
                 ObserverClient.connectStream()
         }
+        // Re-open case: if events are already loaded when the view mounts (history entry),
+        // no change signal will fire — check immediately (deferred so queue source binding
+        // has a chance to evaluate first).
+        Qt.callLater(theaterRoot._maybeAutoSeekReport)
     }
 
     // Stage status — never leave the user guessing whether it is waiting or ended.
@@ -252,6 +256,29 @@ Item {
     // SYNCHRONOUSLY at the call site via openRun(forReport) and carried on
     // ObserverClient.settlementEntry — reliable here, unlike the old async-status latch.
     readonly property int settlementEntryMode: ObserverClient.settlementEntry
+
+    // §5 report entry: auto fast-forward the replay queue ONCE per run, only when
+    // (entry==report) ∧ (run completed) ∧ (queue actually populated). 「打开」(entry 0)
+    // never reaches this. Latch is keyed by runId: refresh/language-switch can't
+    // re-trigger; a genuine view rebuild restarts the queue, so re-seeking then is
+    // the CORRECT outcome (jump to the end again), and the fresh latch allows it.
+    property string _autoSeekDoneForRun: ""
+
+    function _maybeAutoSeekReport() {
+        if (ObserverClient.settlementEntry !== 1) return                  // rule 5: open untouched
+        if (ObserverClient.currentStatus !== "completed") return          // rule 1: completed only
+        if (ObserverClient.currentRunId === "") return
+        if (eventQueue._ordered.length === 0) return                      // rule 2: queue filled
+        if (_autoSeekDoneForRun === ObserverClient.currentRunId) return   // rule 3: one-shot
+        _autoSeekDoneForRun = ObserverClient.currentRunId
+        eventQueue.seekQueueEnd()
+    }
+
+    Connections {
+        target: ObserverClient
+        function onEventItemsChanged() { Qt.callLater(theaterRoot._maybeAutoSeekReport) }
+        function onCurrentStatusChanged() { Qt.callLater(theaterRoot._maybeAutoSeekReport) }
+    }
 
     Loader {
         id: settlementLoader
