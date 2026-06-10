@@ -2,8 +2,9 @@
 """Shared adversarial script variants + (matrix, seeds) for the ②a parity gate.
 
 NOT a test module (filename doesn't match `test_*.py`, so discover never collects it). Holds
-only the builders imported by test_emergent_parity_diff.py, test_rng_draw_order.py, and
-test_emergent_ledger_golden.py. Carries NO oracle import -> survives the Task-7 oracle deletion.
+only the builders imported by test_rng_draw_order.py and test_emergent_ledger_golden.py.
+Carries NO oracle import -> it (correctly) survived the Task-7 oracle/diff-gate deletion that
+removed test_emergent_parity_diff.py, which was the original third importer.
 """
 from __future__ import annotations
 
