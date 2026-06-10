@@ -427,8 +427,9 @@ def build_resolved_profile_artifact(
     the server live ``_profile_launcher`` wrapper passes ``"live"``/``"used"``.
     The per-seat ``model`` is the resolved real model — this artifact is the
     authoritative model record (A3)."""
+    info = compute_role_shuffle(profile, run_id=run_id, shuffle_seed=None)
     seats: list[dict[str, Any]] = []
-    for seat_cfg in resolve_profile(profile):
+    for seat_cfg in resolve_profile_for_run(profile, run_id=run_id):
         prompt = seat_cfg.get("prompt") or ""
         seats.append(
             {
@@ -459,6 +460,9 @@ def build_resolved_profile_artifact(
         "execution_mode": execution_mode,
         "live_api": live_api,
         "secrets_redacted": True,
+        "role_shuffle": {
+            "enabled": info["enabled"], "seed": info["seed"], "seed_source": info["seed_source"],
+        },
         "seats": seats,
     }
 

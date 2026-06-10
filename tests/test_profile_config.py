@@ -567,5 +567,27 @@ class RoleShuffleTests(unittest.TestCase):
             resolve_profile_for_run(p, shuffle_seed=0)
 
 
+class ArtifactRoleShuffleTests(unittest.TestCase):
+    def test_off_no_shuffle_block_and_default_roles(self):
+        art = build_resolved_profile_artifact(_valid_profile(), "run1")
+        self.assertEqual(art["role_shuffle"], {"enabled": False, "seed": None, "seed_source": None})
+        roles = {s["player_id"]: s["role"] for s in art["seats"]}
+        self.assertEqual(roles["p1"], "werewolf")
+
+    def test_on_records_seed_and_shuffled_roles(self):
+        art = build_resolved_profile_artifact(_valid_profile(role_shuffle={"enabled": True}), "run_seed_x")
+        self.assertTrue(art["role_shuffle"]["enabled"])
+        self.assertEqual(art["role_shuffle"]["seed_source"], "run_id")
+        self.assertIsInstance(art["role_shuffle"]["seed"], int)
+        roles = sorted(s["role"] for s in art["seats"])
+        self.assertEqual(roles, sorted(["werewolf","werewolf","seer","witch","villager","villager"]))
+
+    def test_artifact_roles_match_resolve_for_run(self):
+        p = _valid_profile(role_shuffle={"enabled": True})
+        art = build_resolved_profile_artifact(p, "run_match")
+        live = {s["player_id"]: s["role"] for s in resolve_profile_for_run(p, run_id="run_match")}
+        self.assertEqual({s["player_id"]: s["role"] for s in art["seats"]}, live)
+
+
 if __name__ == "__main__":
     unittest.main()
