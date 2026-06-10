@@ -108,7 +108,7 @@
 | ID | 系统 | 业界专业名称 | 代码落点 | 现状与已知债务 |
 |---|---|---|---|---|
 | **SYS-A1** | 游戏循环与阶段调度 | Game Loop / Phase State Machine;回合制的 Turn Order System | `emergent_engine.py` `_run_inner` | 🌱 夜→昼序列仍写死在主循环;**NightPlan**(夜序数据化 + 狼→女巫信息管道显式化)= 本系统的收口件,⏳ 等第一个夜间新角色(守卫)再落地 |
-| **SYS-A2** | 能力系统 | **Ability System**(对标 Unreal GAS:Ability/Cost/Effect/Activation) | `action_runtime/`(registry·ruleset·validator·envelope·settler)+ 引擎 dispatch | 🚧 **当前主战场**。已完成:registry/validator/settler/猎人(加角色=加数据已证)。在建:②a 删 `_resolve_*`(=Activation 窗口 v1)。⏳ 待建:**CapabilityLedger**(②b,=GAS 的 Cost/Charges,女巫迁移的前提)、**EffectQueue**(=Effects 管线,等狼王/情侣)、DecisionWindow 完整版。小尾巴:加角色还要碰 `profile_config.ALLOWED_ROLES` + `observer_visibility._KNOWN_ROLE_TEAMS` 两处名单 |
+| **SYS-A2** | 能力系统 | **Ability System**(对标 Unreal GAS:Ability/Cost/Effect/Activation) | `action_runtime/`(registry·ruleset·validator·envelope·settler)+ 引擎 dispatch | 🌱 主体完成(2026-06-10):registry/validator/settler/猎人 + ②a 注册表派发(=Activation 窗口 v1,字节恒等收口)。⏳ 待建:**CapabilityLedger**(②b,=GAS 的 Cost/Charges,女巫迁移的前提)、**EffectQueue**(=Effects 管线,等狼王/情侣)、DecisionWindow 完整版。小尾巴:加角色还要碰 `profile_config.ALLOWED_ROLES` + `observer_visibility._KNOWN_ROLE_TEAMS` 两处名单 |
 | **SYS-A3** | 夜晚联合结算 | Simultaneous Action Resolution(对标 Diplomacy adjudicator) | `action_runtime/settler.py`(JointSettler) | ✅ 已含奶穿规则表 + guard 钩子(v1.5 守卫即插) |
 | **SYS-A4** | 信息可见性 | Information Visibility / Fog of War;博弈论:Information Set | 引擎 visibility tag + `_build_obs`;observer 侧 `observer_visibility.py`(独立第二实现) | ✅ 双实现互为见证(不变量 I4b 的反循环基础)。债务:observer 私有 tag 只认 seer/witch,新角色专属视野需加分支 |
 | **SYS-A5** | 对局事件日志 | **Event Sourcing**(事件溯源:只追加事件流 + 快照 + 状态可重放) | game-log / decision-log / consensus-log / failure-audit / snapshots / provider-turns | ✅ 教科书式落地。安全网 I7(重放一致性)即本系统的完整性检查 |
@@ -128,7 +128,7 @@
 |---|---|---|---|---|
 | **SYS-C1** | 评测 | Evaluation Harness;baseline vs ablation(消融) | scoring / attribution / score_records | ✅ P1 原语完整;P3 深化为复盘/排行榜 |
 | **SYS-C2** | 观战与回放 | Replay / Spectator System | observer server(REST/SSE)+ Qt 剧场/结算 | ✅ 主体完成;P3-A 逐人复盘待做 |
-| **SYS-C3** | 质量防线 | 三件套:Differential Testing(差分测试)· **Runtime Verification / Semantic Oracle**(不变量安全网)· Deterministic Simulation Testing(fake 脚本+固定种子,对标 FoundationDB DST) | 差分:②a 的 OLD-oracle gate;安全网:`docs/superpowers/specs/2026-06-09-p2a-invariant-safety-net-design.md`(PLAN-READY);DST:`emergent_fake_script.py` + seed 体系 | 🚧 差分与 DST 已活;安全网(7 不变量 + B1/B4 守卫 + fuzz)= 下一刀,②a 完成后串行落地 |
+| **SYS-C3** | 质量防线 | 三件套:Differential Testing(差分测试)· **Runtime Verification / Semantic Oracle**(不变量安全网)· Deterministic Simulation Testing(fake 脚本+固定种子,对标 FoundationDB DST) | 差分:②a 的 OLD-oracle gate;安全网:`docs/superpowers/specs/2026-06-09-p2a-invariant-safety-net-design.md`(PLAN-READY);DST:`emergent_fake_script.py` + seed 体系 | ✅ 三件套全部就位(2026-06-10):安全网已合并(`src/werewolf_eval/invariants/`,7 不变量 + B1 防泄漏×4站点 + B4 防双死×3站点 + 50-seed fuzz,字节中立);剩 engine-level fuzz、B2/B3 守卫跟 ledger/EffectQueue |
 
 > **系统间的关键依赖**(讨论重构顺序时用):SYS-A2 的 ledger 是女巫迁移前提;SYS-C3 安全网是 A2 后续所有大刀(ledger/EffectQueue/NightPlan)的护栏,先网后刀;SYS-B1 的情景记忆依赖 SYS-A4 可见性检查(I4b)防泄漏;SYS-A1 的 NightPlan 与 SYS-A2 的 EffectQueue 都等真实角色需求触发,不预建。
 
