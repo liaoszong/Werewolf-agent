@@ -25,6 +25,7 @@ Item {
                 root._pendingDeleteId = ""
             }
         }
+        onClosed: Qt.callLater(function() { root._pendingDeleteId = "" })
     }
 
     // Transient notice (delete failures / batch summary). Auto-hides.
@@ -277,7 +278,6 @@ Item {
                                 variant: "ghost"
                                 enabled: (modelData.status || "") !== "running"
                                          && (modelData.status || "") !== "queued"
-                                opacity: enabled ? 1.0 : 0.35
                                 onClicked: {
                                     root._pendingDeleteId = modelData.run_id
                                     confirmDialog.title = I18n.t("删除对局", "Delete run")
