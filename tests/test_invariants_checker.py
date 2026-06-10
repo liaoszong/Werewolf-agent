@@ -155,7 +155,24 @@ class TestI4b(unittest.TestCase):
         self.assertEqual(v[0].event_ids, ("e1",))
 
 
-from werewolf_eval.invariants.checker import check_i5
+from werewolf_eval.invariants.checker import check_i5, check_i6
+
+
+def _cause(eid, etype, target, seq):
+    return {"event_id": eid, "type": etype, "actor": "x", "target": target,
+            "round": 1, "phase": "night", "visibility": "all", "sequence": seq,
+            "data": {"summary": ""}}
+
+
+class TestI6(unittest.TestCase):
+    def test_death_with_cause_passes(self):
+        evs = [_cause("e1", "werewolf_kill", "p3", 1), _death("e2", "p3", seq=2)]
+        self.assertEqual(check_i6(_arts(evs)), [])
+
+    def test_uncaused_death_fails(self):
+        v = check_i6(_arts([_death("e1", "p4", seq=1)]))
+        self.assertEqual(len(v), 1)
+        self.assertEqual(v[0].id, "I6")
 
 
 class TestI5(unittest.TestCase):

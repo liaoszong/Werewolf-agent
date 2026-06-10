@@ -159,3 +159,31 @@ def check_i5(arts: RunArtifacts) -> list[InvariantViolation]:
 
 
 _ALL_CHECKS.append(check_i5)
+
+
+DEATH_CAUSE_TYPES = ("werewolf_kill", "witch_poison", "hunter_shoot")
+
+
+def check_i6(arts: RunArtifacts) -> list[InvariantViolation]:
+    """WEAK causality: every player_died has an earlier cause event naming the same
+    target. player_eliminated (vote) is exempt. STRICT-I6 rides the EffectQueue."""
+    ordered = sorted(arts.events, key=lambda e: e.get("sequence", 0))
+    out: list[InvariantViolation] = []
+    for e in ordered:
+        if e.get("type") != "player_died":
+            continue
+        tgt = str(e.get("target"))
+        seq = int(e.get("sequence", 0))
+        has_cause = any(
+            int(c.get("sequence", 0)) < seq
+            and c.get("type") in DEATH_CAUSE_TYPES
+            and str(c.get("target")) == tgt
+            for c in ordered
+        )
+        if not has_cause:
+            out.append(InvariantViolation("I6", "error", arts.game_id, (str(e.get("event_id")),),
+                                          f"player_died({tgt}) has no candidate cause event"))
+    return out
+
+
+_ALL_CHECKS.append(check_i6)
