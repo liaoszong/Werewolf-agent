@@ -47,6 +47,7 @@ from werewolf_eval.action_runtime import (
     rules_v1_1,
 )
 from werewolf_eval.action_runtime.abilities import TARGET_RULES
+from werewolf_eval.invariants.guards import assert_prompt_entitled, assert_death_commit_once
 
 # The provider request phase used for free-text speeches. The game_log event is
 # still recorded with phase="day"; the distinct request phase only keeps the
@@ -271,6 +272,7 @@ class EmergentGameEngine:
         self._seq = 0
         self._d_counter = 0
         self._alive: set[str] = set(self._players_by_id)
+        self._death_committed: set[str] = set()
         # Phase-3 swap: night joint resolution delegates to the Agent Action
         # Runtime's JointSettler, and per-action legality to its registry/validator.
         # rules_v1_1 is a backward-compatible superset (adds the hunter); 4-role games
@@ -486,6 +488,16 @@ class EmergentGameEngine:
     def _events_by_id(self) -> dict[str, dict[str, Any]]:
         return {e["event_id"]: e for e in self._events}
 
+    def _b1_seat_index(self):
+        cached = getattr(self, "_b1_seat_index_cache", None)
+        if cached is None:
+            from werewolf_eval.invariants.visibility_oracle import seat_index_from_players
+            cached = seat_index_from_players(
+                [{"player_id": p.player_id, "role": p.role, "team": p.team}
+                 for p in self._config.players])
+            self._b1_seat_index_cache = cached
+        return cached
+
     def _runtime_state(self, night_victim: str | None = None) -> RuntimeState:
         """Read-model for the Action Runtime registry/validator (Phase-3 swap)."""
         return RuntimeState(
@@ -534,6 +546,8 @@ class EmergentGameEngine:
             "token_usage": None,
             "observation_source_event_ids": list(rendered.source_event_ids),
         }
+        assert_prompt_entitled(player_id, list(rendered.source_event_ids),
+                               self._events_by_id(), self._b1_seat_index())
         try:
             action = agent.decide(
                 obs,
@@ -765,6 +779,8 @@ class EmergentGameEngine:
             "observation_source_event_ids": list(rendered.source_event_ids),
         }
         self._provider_turns.append(turn)
+        assert_prompt_entitled(witch, list(rendered.source_event_ids),
+                               self._events_by_id(), self._b1_seat_index())
         action_name = WITCH_PASS
         target: str | None = None
         try:
@@ -842,6 +858,8 @@ class EmergentGameEngine:
             "observation_source_event_ids": list(rendered.source_event_ids),
         }
         self._provider_turns.append(turn)
+        assert_prompt_entitled(player_id, list(rendered.source_event_ids),
+                               self._events_by_id(), self._b1_seat_index())
         text = ""
         try:
             response = provider.respond(request)
@@ -877,6 +895,7 @@ class EmergentGameEngine:
         target = self._resolve_hunter_shot(dead, rnd, phase)
         if target is not None and target in self._alive:
             self._alive.discard(target)
+            assert_death_commit_once(target, self._death_committed)
             self._emit(phase, rnd, "player_died", "system", target, "all",
                        f"{target} was shot by {dead}.")
             self._trigger_on_death(target, rnd, phase)
@@ -908,6 +927,8 @@ class EmergentGameEngine:
             "observation_source_event_ids": list(rendered.source_event_ids),
         }
         self._provider_turns.append(turn)
+        assert_prompt_entitled(hunter, list(rendered.source_event_ids),
+                               self._events_by_id(), self._b1_seat_index())
         action_name, target = "hunter_pass", None
         try:
             response = self._agents[hunter].provider.respond(request)
@@ -1014,6 +1035,7 @@ class EmergentGameEngine:
                 if pid not in self._alive:   # a hunter shot may have already killed a co-victim
                     continue
                 self._alive.discard(pid)
+                assert_death_commit_once(pid, self._death_committed)
                 self._emit("night", rnd, "player_died", "system", pid, "all", f"{pid} died during the night.")
                 self._trigger_on_death(pid, rnd, "night")
 
@@ -1036,6 +1058,7 @@ class EmergentGameEngine:
             eliminated = self._RESOLVERS["player_vote"](rnd)
             if eliminated is not None:
                 self._alive.discard(eliminated)
+                assert_death_commit_once(eliminated, self._death_committed)
                 role = self._players_by_id[eliminated].role
                 self._emit("day", rnd, "player_eliminated", "system", eliminated, "all", f"{eliminated} eliminated by vote.")
                 self._emit("day", rnd, "role_revealed", "system", eliminated, "all", f"{eliminated} revealed as {role}.")

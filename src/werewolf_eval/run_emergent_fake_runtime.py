@@ -35,6 +35,7 @@ from werewolf_eval.provider_contract import (
     ProviderTrace,
     provider_trace_to_dict,
 )
+from werewolf_eval.run_emergent_deepseek_game import _provider_turns_summary
 from werewolf_eval.runtime_events import RuntimeEventWriter, build_prompt_manifest, read_events_jsonl
 
 SCRIPTS = {
@@ -129,6 +130,7 @@ def run_emergent_fake_runtime(
     _write_json(out_dir / "consensus-log.json", outcome.consensus_log)
     _write_json(out_dir / "failure-audit.json", outcome.failure_audit)
     _write_json(out_dir / "provider-trace.json", _collect_trace(game_id, agents))
+    _write_json(out_dir / "provider-turns.json", _provider_turns_summary(outcome.provider_turns))
 
     manifest = build_prompt_manifest(
         run_id=game_id,
