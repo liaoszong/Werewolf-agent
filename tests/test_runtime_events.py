@@ -447,3 +447,29 @@ class RuntimeSnapshotProjectionTests(TestCase):
         self.assertNotEqual(entry["prompt_hash"], "")
         # No prompt key in entry.
         self.assertNotIn("prompt", entry)
+
+
+class PromptManifestBucketTests(TestCase):
+    def test_manifest_carries_bucket_and_flag_when_provided(self) -> None:
+        manifest = build_prompt_manifest(
+            run_id="r1",
+            source_label="[test]",
+            agents=[{"player_id": "p1", "role": "villager"}],
+            evaluation_bucket={
+                "rules_version": "rules_v1_1",
+                "prompt_version": "prompt_v1",
+                "scoring_version": "scoring_v1",
+                "comparison_key": "rules_v1_1__prompt_v1__scoring_v1",
+            },
+            prompt_used_by_runtime=False,
+        )
+        self.assertEqual(manifest["evaluation_bucket"]["comparison_key"],
+                         "rules_v1_1__prompt_v1__scoring_v1")
+        self.assertIs(manifest["prompt_used_by_runtime"], False)
+
+    def test_manifest_back_compat_without_new_kwargs(self) -> None:
+        manifest = build_prompt_manifest(
+            run_id="r1", source_label="[test]", agents=[]
+        )
+        self.assertNotIn("evaluation_bucket", manifest)
+        self.assertNotIn("prompt_used_by_runtime", manifest)

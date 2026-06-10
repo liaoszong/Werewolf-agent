@@ -284,6 +284,7 @@ class EmergentGameEngine:
         # rules_v1_1 is a backward-compatible superset (adds the hunter); 4-role games
         # are byte-identical (the hunter role is never queried).
         _ruleset = rules_v1_1()
+        self.rules_version = _ruleset.rules_version
         self._registry = RoleAbilityRegistry(_ruleset)
         self._settler = JointSettler(_ruleset)
         self._validator = ActionValidator(self._registry)

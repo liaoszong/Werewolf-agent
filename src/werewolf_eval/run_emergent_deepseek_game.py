@@ -30,6 +30,8 @@ from werewolf_eval.provider_contract import (
     provider_trace_to_dict,
     ProviderTrace,
 )
+from werewolf_eval.evaluation_versions import SCORING_VERSION, evaluation_bucket
+from werewolf_eval.prompt_version import PROMPT_VERSION
 from werewolf_eval.runtime_events import RuntimeEventWriter, build_prompt_manifest, redact_secret_values
 
 ProviderFactory = Callable[[str], ProviderAgent]
@@ -160,10 +162,22 @@ def run_emergent_deepseek_game(
     _write_json(out_dir / "provider-turns.json", _provider_turns_summary(outcome.provider_turns))
 
     # MANDATORY spine: prompt-manifest with the REAL per-seat provider/model/persona.
+    providers = [a.provider for a in agents.values()]
     manifest = build_prompt_manifest(
         run_id=game_id,
         source_label=effective_label,
         agents=_seat_manifest_agents(agents, model),
+        evaluation_bucket=evaluation_bucket(
+            rules_version=engine.rules_version,
+            prompt_version=PROMPT_VERSION,
+            scoring_version=SCORING_VERSION,
+        ),
+        # getattr default True is the SAFE-for-live direction but LIES for an
+        # undeclared fake provider — every fake provider class MUST declare
+        # uses_baseline_prompt=False (pinned in test_evaluation_versions.py).
+        prompt_used_by_runtime=any(
+            getattr(p, "uses_baseline_prompt", True) for p in providers
+        ),
     )
     manifest["secrets_redacted"] = True
     writer.write_prompt_manifest(manifest)

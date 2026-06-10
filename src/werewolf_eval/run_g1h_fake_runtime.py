@@ -22,6 +22,8 @@ from werewolf_eval.provider_contract import (
     provider_failure_to_dict,
     provider_trace_to_dict,
 )
+from werewolf_eval.evaluation_versions import SCORING_VERSION, UNKNOWN_VERSION, evaluation_bucket
+from werewolf_eval.prompt_version import PROMPT_VERSION
 from werewolf_eval.runtime_events import (
     RuntimeEventWriter,
     build_prompt_manifest,
@@ -167,6 +169,7 @@ def run_fake_runtime(*, game_id: str, out_dir: Path) -> int:
     }
     _write_json(out_dir / "failure-audit.json", failure_audit)
 
+    providers = [a.provider for a in agents.values()]
     manifest = build_prompt_manifest(
         run_id=game_id,
         source_label=FAKE_PROVIDER_SOURCE_LABEL,
@@ -179,6 +182,17 @@ def run_fake_runtime(*, game_id: str, out_dir: Path) -> int:
             }
             for pid in player_ids
         ],
+        evaluation_bucket=evaluation_bucket(
+            rules_version=UNKNOWN_VERSION,  # G1h GameEngine predates RulesVariant; honest unknown
+            prompt_version=PROMPT_VERSION,
+            scoring_version=SCORING_VERSION,
+        ),
+        # getattr default True is the SAFE-for-live direction but LIES for an
+        # undeclared fake provider — every fake provider class MUST declare
+        # uses_baseline_prompt=False (pinned in test_evaluation_versions.py).
+        prompt_used_by_runtime=any(
+            getattr(p, "uses_baseline_prompt", True) for p in providers
+        ),
     )
     manifest["secrets_redacted"] = True
     writer.write_prompt_manifest(manifest)
