@@ -282,7 +282,7 @@ def validate_profile(profile: object) -> None:
     # Secret-like keys and values first, so the failure reason is explicit.
     _reject_secret_like_keys(profile)
     _reject_secret_like_values(profile)
-    allowed_top = {"schema_version", "name", "template", "role_defaults", "seat_overrides"}
+    allowed_top = {"schema_version", "name", "template", "role_defaults", "seat_overrides", "seat_personas"}
     extra = set(profile) - allowed_top
     if extra:
         raise ProfileValidationError(f"unexpected top-level keys: {sorted(extra)}")
@@ -312,6 +312,26 @@ def validate_profile(profile: object) -> None:
         if seat not in DEFAULT_SEAT_IDS:
             raise ProfileValidationError(f"unknown seat id: {seat!r}")
         _check_fragment(fragment, where=f"seat_overrides.{seat}", required=False)
+    # seat_personas: per-seat ROLE-AGNOSTIC personality (tone/style only). MUST NOT encode
+    # role abilities or team strategy (e.g. "你是狼/夜晚击杀/查验") — those belong to the role
+    # contract; a role-coded persona would clash with the seat's actual role once role-shuffle
+    # lands. Semantics are doc-enforced (not machine-checkable) here + in the field docstring.
+    seat_personas = profile.get("seat_personas", {})
+    if not isinstance(seat_personas, dict):
+        raise ProfileValidationError("seat_personas must be an object")
+    for sp_seat, persona in seat_personas.items():
+        if sp_seat not in DEFAULT_SEAT_IDS:
+            raise ProfileValidationError(f"unknown seat id in seat_personas: {sp_seat!r}")
+        if not isinstance(persona, str):
+            raise ProfileValidationError(
+                f"seat_personas.{sp_seat} must be a role-agnostic personality string "
+                f"(tone/style only; no role ability or team strategy), got {type(persona).__name__}"
+            )
+        if len(persona) > PROMPT_MAX_LEN:
+            raise ProfileValidationError(
+                f"seat_personas.{sp_seat} exceeds {PROMPT_MAX_LEN} chars "
+                f"(role-agnostic personality; tone/style only)"
+            )
     counts: dict[str, int] = {}
     for role in seat_roles.values():
         counts[role] = counts.get(role, 0) + 1

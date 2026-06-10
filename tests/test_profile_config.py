@@ -442,5 +442,31 @@ class ResolveSeatPersonaTests(unittest.TestCase):
         self.assertEqual(_resolve_seat(p, "p1", "werewolf")["prompt"], "OVERRIDE_W\n\nPERSONA_1")
 
 
+class SeatPersonasValidationTests(unittest.TestCase):
+    def test_valid_seat_personas_pass(self):
+        validate_profile(_valid_profile(seat_personas={"p1": "谨慎", "p2": "激进"}))  # 不得抛
+
+    def test_empty_and_absent_pass(self):
+        validate_profile(_valid_profile(seat_personas={}))
+        validate_profile(_valid_profile())  # 无该键
+
+    def test_unknown_seat_id_rejected(self):
+        with self.assertRaises(ProfileValidationError):
+            validate_profile(_valid_profile(seat_personas={"p9": "x"}))
+
+    def test_non_string_persona_rejected(self):
+        with self.assertRaises(ProfileValidationError):
+            validate_profile(_valid_profile(seat_personas={"p1": 123}))
+
+    def test_non_dict_seat_personas_rejected(self):
+        with self.assertRaises(ProfileValidationError):
+            validate_profile(_valid_profile(seat_personas=["p1"]))
+
+    def test_secret_like_persona_value_rejected(self):
+        # _reject_secret_like_values 递归扫到新字段(注:此测试在实现前即 PASS)
+        with self.assertRaises(ProfileValidationError):
+            validate_profile(_valid_profile(seat_personas={"p1": "my api_key=sk-secret"}))
+
+
 if __name__ == "__main__":
     unittest.main()
