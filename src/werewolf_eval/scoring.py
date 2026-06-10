@@ -4,6 +4,7 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 from werewolf_eval.decision_log import Decision, DecisionLog
+from werewolf_eval.evaluation_versions import SCORING_VERSION, UNKNOWN_VERSION, evaluation_bucket as _evaluation_bucket
 from werewolf_eval.game_log import Event, GameLog
 from werewolf_eval.semantic_labels import SemanticLabel, SemanticLabelLog
 
@@ -101,8 +102,23 @@ class MetricsSummary:
     known_rubric_gaps_recorded_not_fixed: list[dict[str, Any]]
 
 
-def score_log_to_dict(score_log: ScoreLog) -> dict[str, Any]:
-    return asdict(score_log)
+def score_log_to_dict(
+    score_log: ScoreLog, *, evaluation_bucket: dict[str, str] | None = None
+) -> dict[str, Any]:
+    d = asdict(score_log)
+    # Spec 2026-06-10-prompt-versioning §4.3/§4.5: score records always carry the
+    # bucket. Callers without version context (re-scoring legacy logs) get the
+    # honest "unknown" stamp — browsable, never rankable.
+    d["evaluation_bucket"] = (
+        dict(evaluation_bucket)
+        if evaluation_bucket is not None
+        else _evaluation_bucket(
+            rules_version=UNKNOWN_VERSION,
+            prompt_version=UNKNOWN_VERSION,
+            scoring_version=SCORING_VERSION,
+        )
+    )
+    return d
 
 
 def metrics_summary_to_dict(summary: MetricsSummary) -> dict[str, Any]:

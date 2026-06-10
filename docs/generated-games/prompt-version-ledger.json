@@ -30,5 +30,12 @@
     },
     "blessed_by": "user (spec review 2026-06-10)",
     "blessed_at": "2026-06-10"
+  },
+  {
+    "schema_addition": "score_log.evaluation_bucket + settlement_bundle.evaluation_bucket (BUNDLE_VERSION p2d.settlement.v2)",
+    "reason": "additive tuple stamp per spec §4.5; s2/s5 gold score-log expectation dicts regenerated (whole-dict assertEqual targets)",
+    "regenerated_fixtures": ["docs/gold-game/s2-score-log.json", "docs/gold-game/s5-score-log.json"],
+    "blessed_by": "subagent-driven execution of plan 2026-06-10-prompt-versioning (Task 9)",
+    "blessed_at": "2026-06-10"
   }
 ]
