@@ -222,13 +222,25 @@ def _resolve_seat(profile: dict, seat: str, role: str) -> dict[str, Any]:
     base = dict(profile["role_defaults"][role])
     override = dict(profile.get("seat_overrides", {}).get(seat, {}))
     merged = {**base, **override}
+    # persona = role strategy (tracks the role; role_defaults.prompt, overridable per-seat)
+    # + per-seat personality (tracks the seat; role-agnostic seat_personas[seat]). Both are
+    # profile config inputs; composed here in the config layer and handed to the unchanged
+    # compose_system. No seat_personas -> prompt == role_strategy (byte-identical to before).
+    role_strategy = merged.get("prompt", "")
+    personality = profile.get("seat_personas", {}).get(seat, "")
+    if not personality:
+        prompt = role_strategy
+    elif not role_strategy:
+        prompt = personality
+    else:
+        prompt = f"{role_strategy}\n\n{personality}"
     return {
         "player_id": seat,
         "role": role,
         "team": ROLE_TEAMS[role],
         "provider": merged.get("provider"),
         "model": merged.get("model"),
-        "prompt": merged.get("prompt", ""),
+        "prompt": prompt,
         "strategy": merged.get("strategy"),
         "temperature": merged.get("temperature"),
         "max_tokens": merged.get("max_tokens"),

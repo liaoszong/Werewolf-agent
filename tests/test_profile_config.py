@@ -15,6 +15,7 @@ from werewolf_eval.profile_config import (
     save_profile,
     validate_profile,
 )
+from werewolf_eval.profile_config import _resolve_seat  # private: resolve a single seat
 
 
 def _valid_profile(**overrides):
@@ -390,6 +391,55 @@ class ProfileSchemaTests(unittest.TestCase):
                "strategy": "default", "prompt": ""}
         with self.assertRaises(ProfileValidationError):
             _check_resolved_seat(bad, "p1")
+
+
+def _rd(prompts):
+    """role_defaults with the given per-role prompt (fake provider)."""
+    return {
+        role: {"provider": "fake_deterministic", "model": "none", "prompt": prompts[role], "strategy": "default"}
+        for role in ("werewolf", "seer", "witch", "villager")
+    }
+
+
+class ResolveSeatPersonaTests(unittest.TestCase):
+    def test_no_seat_personas_is_byte_identical_strategy_only(self):
+        # 组 1 parity:无 seat_personas、温度 null -> prompt == role_strategy、temperature 仍 null
+        p = _valid_profile(role_defaults=_rd(
+            {"werewolf": "STRAT_W", "seer": "STRAT_S", "witch": "STRAT_X", "villager": "STRAT_V"}))
+        seat = _resolve_seat(p, "p1", "werewolf")
+        self.assertEqual(seat["prompt"], "STRAT_W")
+        self.assertIsNone(seat["temperature"])  # 兜底绝不在 _resolve_seat 发生
+
+    def test_persona_appended_after_strategy(self):
+        p = _valid_profile(
+            role_defaults=_rd({"werewolf": "STRAT_W", "seer": "S", "witch": "X", "villager": "V"}),
+            seat_personas={"p1": "PERSONA_1"},
+        )
+        self.assertEqual(_resolve_seat(p, "p1", "werewolf")["prompt"], "STRAT_W\n\nPERSONA_1")
+
+    def test_two_wolves_distinct_persona(self):
+        p = _valid_profile(
+            role_defaults=_rd({"werewolf": "WOLF", "seer": "S", "witch": "X", "villager": "V"}),
+            seat_personas={"p1": "AGGR", "p2": "CALM"},
+        )
+        self.assertNotEqual(_resolve_seat(p, "p1", "werewolf")["prompt"],
+                            _resolve_seat(p, "p2", "werewolf")["prompt"])
+
+    def test_persona_only_when_strategy_empty(self):
+        p = _valid_profile(
+            role_defaults=_rd({"werewolf": "", "seer": "", "witch": "", "villager": ""}),
+            seat_personas={"p1": "ONLY_ME"},
+        )
+        self.assertEqual(_resolve_seat(p, "p1", "werewolf")["prompt"], "ONLY_ME")
+
+    def test_seat_override_prompt_stacks_with_persona(self):
+        # seat_overrides.prompt(覆盖角色策略)+ seat_personas 叠加正交
+        p = _valid_profile(
+            role_defaults=_rd({"werewolf": "ROLE_W", "seer": "S", "witch": "X", "villager": "V"}),
+            seat_overrides={"p1": {"prompt": "OVERRIDE_W"}},
+            seat_personas={"p1": "PERSONA_1"},
+        )
+        self.assertEqual(_resolve_seat(p, "p1", "werewolf")["prompt"], "OVERRIDE_W\n\nPERSONA_1")
 
 
 if __name__ == "__main__":
