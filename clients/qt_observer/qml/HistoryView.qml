@@ -12,20 +12,63 @@ Item {
     Component.onCompleted: ObserverClient.refreshRuns()
 
     // ---- delete plumbing (spec §4) ----
-    property string _pendingDeleteId: ""
-    property bool _batchActive: false                 // Task 6's batch controller sets this
+    property bool _batchActive: false                 // batch controller sets this
+
+    // Unified confirm callback — single and batch both set this before open().
+    property var _onDialogConfirm: null
 
     ConfirmDialog {
         id: confirmDialog
         objectName: "historyConfirmDialog"
         parent: Overlay.overlay
         onConfirmed: {
-            if (root._pendingDeleteId !== "") {
-                ObserverClient.deleteRun(root._pendingDeleteId)
-                root._pendingDeleteId = ""
-            }
+            var act = root._onDialogConfirm
+            root._onDialogConfirm = null
+            if (act) act()
         }
-        onClosed: Qt.callLater(function() { root._pendingDeleteId = "" })
+        onClosed: Qt.callLater(function() { root._onDialogConfirm = null })
+    }
+
+    // ---- batch selection (spec §4) ----
+    property bool selecting: false
+    property var _selected: ({})                     // run_id -> true
+    readonly property int selectedCount: Object.keys(_selected).length
+    property var _batchQueue: []
+    property int _batchTotal: 0
+    property int _batchFailed: 0
+    property var _batchErrors: []
+
+    function _toggleSelected(runId, on) {
+        var m = _selected
+        if (on) m[runId] = true; else delete m[runId]
+        _selected = m                                 // reassign to fire bindings
+    }
+    function _exitSelectMode() { selecting = false; _selected = ({}) }
+
+    function _startBatchDelete() {
+        _batchQueue = Object.keys(_selected)
+        _batchTotal = _batchQueue.length
+        _batchFailed = 0
+        _batchErrors = []
+        _batchActive = true
+        _pumpBatch()
+    }
+    function _pumpBatch() {
+        if (_batchQueue.length === 0) {
+            _batchActive = false
+            var okCount = _batchTotal - _batchFailed
+            noticeBar.show(_batchFailed === 0
+                ? I18n.t("已删除 ", "Deleted ") + okCount + I18n.t(" 局", " runs")
+                : I18n.t("已删除 ", "Deleted ") + okCount + I18n.t(" 局,", " runs, ")
+                  + _batchFailed + I18n.t(" 局失败:", " failed: ") + _batchErrors.join("; "))
+            _exitSelectMode()
+            ObserverClient.refreshRuns()              // batch refreshes ONCE at the end (spec §4)
+            return
+        }
+        var q = _batchQueue
+        var next = q.shift()
+        _batchQueue = q
+        ObserverClient.deleteRun(next)
     }
 
     // Transient notice (delete failures / batch summary). Auto-hides.
@@ -59,7 +102,11 @@ Item {
     Connections {
         target: ObserverClient
         function onDeleteRunFinished(runId, ok, error) {
-            if (root._batchActive) return            // Task 6 owns batch handling
+            if (root._batchActive) {
+                if (!ok) { root._batchFailed += 1; root._batchErrors.push(runId + ": " + error) }
+                root._pumpBatch()                     // sequential: next delete only after this one
+                return
+            }
             if (ok)
                 ObserverClient.refreshRuns()          // SINGLE delete refreshes per-op (spec §4)
             else
@@ -158,7 +205,42 @@ Item {
                         title: I18n.t("对局", "Runs")
                     }
 
+                    // Select-all checkbox — visible when in selection mode,
+                    // placed left of the count chip with a small gap.
+                    CheckBox {
+                        objectName: "selectAllBox"
+                        visible: root.selecting
+                        anchors.right: countChip.left
+                        anchors.rightMargin: Theme.space.sm
+                        anchors.verticalCenter: parent.verticalCenter
+                        onToggled: {
+                            var m = ({})
+                            if (checked)
+                                for (var i = 0; i < ObserverClient.runItems.length; i++) {
+                                    var it = ObserverClient.runItems[i]
+                                    var st = it.status || ""
+                                    if (st !== "running" && st !== "queued") m[it.run_id] = true
+                                }
+                            root._selected = m
+                        }
+                    }
+
+                    // Select / Cancel toggle button, left of count chip.
+                    AppButton {
+                        id: selectModeButton
+                        objectName: "selectModeButton"
+                        anchors.right: countChip.left
+                        anchors.rightMargin: root.selecting ? Theme.space.xl + 20 : Theme.space.sm
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: root.selecting ? I18n.t("取消", "Cancel") : I18n.t("选择", "Select")
+                        variant: "ghost"
+                        visible: ObserverClient.runItems.length > 0
+                        onClicked: root.selecting ? root._exitSelectMode() : root.selecting = true
+                    }
+
+                    // Count chip — anchored to right edge.
                     Rectangle {
+                        id: countChip
                         anchors.right: parent.right
                         anchors.verticalCenter: parent.verticalCenter
                         height: 22
@@ -232,9 +314,23 @@ Item {
 
                             Behavior on color { ColorAnimation { duration: Theme.motion.fast } }
 
+                            // Per-row selection checkbox at the far left, visible in selection mode.
+                            CheckBox {
+                                objectName: "rowSelectBox"
+                                visible: root.selecting
+                                enabled: (modelData.status || "") !== "running"
+                                         && (modelData.status || "") !== "queued"
+                                anchors.left: parent.left
+                                anchors.leftMargin: Theme.space.md
+                                anchors.verticalCenter: parent.verticalCenter
+                                checked: root._selected[modelData.run_id] === true
+                                onToggled: root._toggleSelected(modelData.run_id, checked)
+                            }
+
                             // Status-tinted leading accent bar.
                             Rectangle {
                                 anchors.left: parent.left
+                                anchors.leftMargin: root.selecting ? 36 : 0
                                 anchors.verticalCenter: parent.verticalCenter
                                 width: 3
                                 height: 22
@@ -243,21 +339,25 @@ Item {
                                 opacity: rowHover.hovered ? 1.0 : 0.55
 
                                 Behavior on opacity { NumberAnimation { duration: Theme.motion.fast } }
+                                Behavior on anchors.leftMargin { NumberAnimation { duration: Theme.motion.fast } }
                             }
 
                             // Run id (mono for a precise, trustworthy feel).
                             Text {
                                 id: runIdText
                                 anchors.left: parent.left
-                                anchors.leftMargin: Theme.space.lg
+                                anchors.leftMargin: (root.selecting ? 36 : 0) + Theme.space.lg
                                 anchors.verticalCenter: parent.verticalCenter
                                 width: Math.max(120, parent.width
-                                    - statusBadge.width - deleteButton.width - reportButton.width - openButton.width - Theme.space.xl * 5)
+                                    - statusBadge.width - deleteButton.width - reportButton.width - openButton.width - Theme.space.xl * 5
+                                    - (root.selecting ? 36 : 0))
                                 elide: Text.ElideRight
                                 text: modelData.run_id || I18n.t("(未命名对局)", "(unnamed run)")
                                 color: Theme.color.text
                                 font.family: Theme.font.mono
                                 font.pixelSize: Theme.size.small
+
+                                Behavior on anchors.leftMargin { NumberAnimation { duration: Theme.motion.fast } }
                             }
 
                             StatusBadge {
@@ -276,10 +376,12 @@ Item {
                                 anchors.verticalCenter: parent.verticalCenter
                                 text: I18n.t("删除", "Delete")
                                 variant: "ghost"
+                                visible: !root.selecting
                                 enabled: (modelData.status || "") !== "running"
                                          && (modelData.status || "") !== "queued"
                                 onClicked: {
-                                    root._pendingDeleteId = modelData.run_id
+                                    var rid = modelData.run_id
+                                    root._onDialogConfirm = function() { ObserverClient.deleteRun(rid) }
                                     confirmDialog.title = I18n.t("删除对局", "Delete run")
                                     confirmDialog.message = I18n.t("确定删除对局 ", "Delete run ")
                                         + modelData.run_id
@@ -298,7 +400,7 @@ Item {
                                 anchors.right: openButton.left
                                 anchors.rightMargin: Theme.space.sm
                                 anchors.verticalCenter: parent.verticalCenter
-                                visible: (modelData.status || "") === "completed"
+                                visible: !root.selecting && (modelData.status || "") === "completed"
                                 text: I18n.t("查看战报", "View report")
                                 variant: "secondary"
                                 onClicked: {
@@ -313,6 +415,7 @@ Item {
                                 anchors.right: parent.right
                                 anchors.rightMargin: Theme.space.md
                                 anchors.verticalCenter: parent.verticalCenter
+                                visible: !root.selecting
                                 text: I18n.t("打开", "Open")
                                 variant: "ghost"
                                 onClicked: {
@@ -342,7 +445,7 @@ Item {
                 anchors.bottom: parent.bottom
                 anchors.left: parent.left
                 anchors.right: parent.right
-                height: backButton.implicitHeight
+                height: Math.max(backButton.implicitHeight, batchDeleteButton.implicitHeight)
 
                 AppButton {
                     id: backButton
@@ -351,6 +454,24 @@ Item {
                     text: I18n.t("返回首页", "Back to Home")
                     variant: "ghost"
                     onClicked: root.StackView.view.parent.navigateHome()
+                }
+
+                // Batch delete action — visible in selection mode when ≥1 item selected.
+                AppButton {
+                    id: batchDeleteButton
+                    objectName: "batchDeleteButton"
+                    visible: root.selecting && root.selectedCount > 0
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: I18n.t("删除所选(", "Delete selected (") + root.selectedCount + ")"
+                    variant: "danger"
+                    onClicked: {
+                        root._onDialogConfirm = root._startBatchDelete
+                        confirmDialog.title = I18n.t("批量删除", "Batch delete")
+                        confirmDialog.message = I18n.t("确定删除 ", "Delete ") + root.selectedCount
+                            + I18n.t(" 局?删除后不可恢复。", " runs? This cannot be undone.")
+                        confirmDialog.open()
+                    }
                 }
             }
         }
