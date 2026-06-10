@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
@@ -187,3 +188,30 @@ def check_i6(arts: RunArtifacts) -> list[InvariantViolation]:
 
 
 _ALL_CHECKS.append(check_i6)
+
+
+_REVEAL_ROLE_RE = re.compile(r"revealed as (\w+)")
+
+
+def check_i7(arts: RunArtifacts) -> list[InvariantViolation]:
+    """WEAK final-state consistency: death-commit targets are known players, and
+    role_revealed events (role parsed from summary) match the players map."""
+    roles = {str(p["player_id"]): str(p.get("role")) for p in arts.players}
+    known = set(roles)
+    out: list[InvariantViolation] = []
+    for e in arts.events:
+        t = e.get("type")
+        if t in DEATH_COMMIT_TYPES and arts.players and str(e.get("target")) not in known:
+            out.append(InvariantViolation("I7", "error", arts.game_id, (str(e.get("event_id")),),
+                                          f"death of unknown player {e.get('target')}"))
+        if t == "role_revealed":
+            tgt = str(e.get("target"))
+            m = _REVEAL_ROLE_RE.search(str(e.get("data", {}).get("summary", "")))
+            revealed = m.group(1) if m else ""
+            if revealed and tgt in roles and revealed != roles[tgt]:
+                out.append(InvariantViolation("I7", "error", arts.game_id, (str(e.get("event_id")),),
+                                              f"role_revealed({tgt}={revealed}) != actual {roles[tgt]}"))
+    return out
+
+
+_ALL_CHECKS.append(check_i7)

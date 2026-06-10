@@ -155,13 +155,38 @@ class TestI4b(unittest.TestCase):
         self.assertEqual(v[0].event_ids, ("e1",))
 
 
-from werewolf_eval.invariants.checker import check_i5, check_i6
+from werewolf_eval.invariants.checker import check_i5, check_i6, check_i7
 
 
 def _cause(eid, etype, target, seq):
     return {"event_id": eid, "type": etype, "actor": "x", "target": target,
             "round": 1, "phase": "night", "visibility": "all", "sequence": seq,
             "data": {"summary": ""}}
+
+
+_I7_PLAYERS = [{"player_id": "p1", "role": "seer", "team": "villager"},
+               {"player_id": "p2", "role": "werewolf", "team": "werewolf"}]
+
+
+def _reveal(eid, target, role, seq):
+    return {"event_id": eid, "type": "role_revealed", "actor": "system", "target": target,
+            "round": 1, "phase": "day", "visibility": "all", "sequence": seq,
+            "data": {"summary": f"{target} revealed as {role}.", "visible_info_refs": []}}
+
+
+class TestI7(unittest.TestCase):
+    def test_consistent_chain_passes(self):
+        evs = [_death("e1", "p2", seq=1), _reveal("e2", "p2", "werewolf", 2)]
+        self.assertEqual(check_i7(_arts(evs, players=_I7_PLAYERS)), [])
+
+    def test_death_of_unknown_player_fails(self):
+        v = check_i7(_arts([_death("e1", "p9", seq=1)], players=_I7_PLAYERS))
+        self.assertTrue(any(x.id == "I7" for x in v))
+
+    def test_reveal_wrong_role_fails(self):
+        evs = [_reveal("e2", "p2", "villager", 1)]  # p2 is actually werewolf
+        v = check_i7(_arts(evs, players=_I7_PLAYERS))
+        self.assertTrue(any(x.id == "I7" for x in v))
 
 
 class TestI6(unittest.TestCase):
