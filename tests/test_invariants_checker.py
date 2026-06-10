@@ -115,5 +115,19 @@ class TestI3(unittest.TestCase):
         self.assertEqual(check_i3(_arts(evs)), [])
 
 
+from werewolf_eval.invariants.checker import check_prompt_subset
+
+
+class TestI4a(unittest.TestCase):
+    def test_subset_passes(self):
+        self.assertEqual(check_prompt_subset("g", "p1", ["e1", "e2"], {"e1", "e2", "e3"}), [])
+
+    def test_prompt_outside_observation_fails(self):
+        v = check_prompt_subset("g", "p1", ["e1", "e9"], {"e1", "e2"})
+        self.assertEqual(len(v), 1)
+        self.assertEqual(v[0].id, "I4a")
+        self.assertEqual(v[0].event_ids, ("e9",))
+
+
 if __name__ == "__main__":
     unittest.main()

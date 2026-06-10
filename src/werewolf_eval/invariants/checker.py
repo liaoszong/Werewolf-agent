@@ -108,3 +108,13 @@ def check_i3(arts: RunArtifacts) -> list[InvariantViolation]:
 
 
 _ALL_CHECKS.append(check_i3)
+
+
+def check_prompt_subset(game_id: str, seat: str, prompt_source_ids: list[str],
+                        observation_event_ids: set[str]) -> list[InvariantViolation]:
+    """I4a (in-memory only): prompt sources subset of the seat's observation set.
+    Not in _ALL_CHECKS — its 2nd operand is not persisted on disk."""
+    leaked = [eid for eid in prompt_source_ids if eid not in observation_event_ids]
+    return [InvariantViolation("I4a", "error", game_id, (eid,),
+                               f"seat {seat} prompt sourced {eid} outside its observation")
+            for eid in leaked]
