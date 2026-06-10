@@ -142,3 +142,20 @@ def check_i4b(arts: RunArtifacts) -> list[InvariantViolation]:
 
 
 _ALL_CHECKS.append(check_i4b)
+
+
+def check_i5(arts: RunArtifacts) -> list[InvariantViolation]:
+    """One decision identity settles at most once. Identity = (request_id, phase),
+    NOT request_id alone (the strict path reuses request_id across night/day)."""
+    seen: dict[tuple[str, str], int] = {}
+    for t in arts.provider_turns:
+        key = (str(t.get("request_id")), str(t.get("phase")))
+        seen[key] = seen.get(key, 0) + 1
+    return [
+        InvariantViolation("I5", "error", arts.game_id, (),
+                           f"decision identity (request_id={rid}, phase={ph}) settled {n}x")
+        for (rid, ph), n in seen.items() if n > 1
+    ]
+
+
+_ALL_CHECKS.append(check_i5)

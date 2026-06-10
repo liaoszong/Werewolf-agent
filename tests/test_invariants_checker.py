@@ -155,5 +155,26 @@ class TestI4b(unittest.TestCase):
         self.assertEqual(v[0].event_ids, ("e1",))
 
 
+from werewolf_eval.invariants.checker import check_i5
+
+
+class TestI5(unittest.TestCase):
+    def test_same_request_id_different_phase_passes(self):
+        turns = [{"request_id": "g_r01_p1", "phase": "night", "actor": "p1",
+                  "observation_source_event_ids": []},
+                 {"request_id": "g_r01_p1", "phase": "day", "actor": "p1",
+                  "observation_source_event_ids": []}]
+        self.assertEqual(check_i5(_arts([], turns=turns)), [])
+
+    def test_same_request_id_same_phase_twice_fails(self):
+        turns = [{"request_id": "g_r01_p1", "phase": "night", "actor": "p1",
+                  "observation_source_event_ids": []},
+                 {"request_id": "g_r01_p1", "phase": "night", "actor": "p1",
+                  "observation_source_event_ids": []}]
+        v = check_i5(_arts([], turns=turns))
+        self.assertEqual(len(v), 1)
+        self.assertEqual(v[0].id, "I5")
+
+
 if __name__ == "__main__":
     unittest.main()
