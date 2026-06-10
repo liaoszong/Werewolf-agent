@@ -11,6 +11,61 @@ Item {
 
     Component.onCompleted: ObserverClient.refreshRuns()
 
+    // ---- delete plumbing (spec §4) ----
+    property string _pendingDeleteId: ""
+    property bool _batchActive: false                 // Task 6's batch controller sets this
+
+    ConfirmDialog {
+        id: confirmDialog
+        objectName: "historyConfirmDialog"
+        parent: Overlay.overlay
+        onConfirmed: {
+            if (root._pendingDeleteId !== "") {
+                ObserverClient.deleteRun(root._pendingDeleteId)
+                root._pendingDeleteId = ""
+            }
+        }
+    }
+
+    // Transient notice (delete failures / batch summary). Auto-hides.
+    Rectangle {
+        id: noticeBar
+        objectName: "historyNoticeBar"
+        property string text: ""
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: Theme.space.xl
+        z: 10
+        visible: text !== ""
+        width: noticeLabel.implicitWidth + Theme.space.lg * 2
+        height: noticeLabel.implicitHeight + Theme.space.md * 2
+        radius: Theme.radius.md
+        color: Theme.withAlpha(Theme.color.surface, 0.96)
+        border.width: 1
+        border.color: Theme.color.border
+        Text {
+            id: noticeLabel
+            anchors.centerIn: parent
+            text: noticeBar.text
+            color: Theme.color.text
+            font.family: Theme.font.family
+            font.pixelSize: Theme.size.caption
+        }
+        Timer { id: noticeTimer; interval: 5000; onTriggered: noticeBar.text = "" }
+        function show(msg) { text = msg; noticeTimer.restart() }
+    }
+
+    Connections {
+        target: ObserverClient
+        function onDeleteRunFinished(runId, ok, error) {
+            if (root._batchActive) return            // Task 6 owns batch handling
+            if (ok)
+                ObserverClient.refreshRuns()          // SINGLE delete refreshes per-op (spec §4)
+            else
+                noticeBar.show(I18n.t("删除失败:", "Delete failed: ") + error)
+        }
+    }
+
     // Deep night backdrop so the centered content reads as a focused panel.
     Rectangle {
         anchors.fill: parent
@@ -196,7 +251,7 @@ Item {
                                 anchors.leftMargin: Theme.space.lg
                                 anchors.verticalCenter: parent.verticalCenter
                                 width: Math.max(120, parent.width
-                                    - statusBadge.width - reportButton.width - openButton.width - Theme.space.xl * 4)
+                                    - statusBadge.width - deleteButton.width - reportButton.width - openButton.width - Theme.space.xl * 5)
                                 elide: Text.ElideRight
                                 text: modelData.run_id || I18n.t("(未命名对局)", "(unnamed run)")
                                 color: Theme.color.text
@@ -206,10 +261,31 @@ Item {
 
                             StatusBadge {
                                 id: statusBadge
-                                anchors.right: reportButton.left
+                                anchors.right: deleteButton.left
                                 anchors.rightMargin: Theme.space.lg
                                 anchors.verticalCenter: parent.verticalCenter
                                 status: modelData.status || ""
+                            }
+
+                            AppButton {
+                                id: deleteButton
+                                objectName: "deleteRunButton"
+                                anchors.right: reportButton.visible ? reportButton.left : openButton.left
+                                anchors.rightMargin: Theme.space.sm
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: I18n.t("删除", "Delete")
+                                variant: "ghost"
+                                enabled: (modelData.status || "") !== "running"
+                                         && (modelData.status || "") !== "queued"
+                                opacity: enabled ? 1.0 : 0.35
+                                onClicked: {
+                                    root._pendingDeleteId = modelData.run_id
+                                    confirmDialog.title = I18n.t("删除对局", "Delete run")
+                                    confirmDialog.message = I18n.t("确定删除对局 ", "Delete run ")
+                                        + modelData.run_id
+                                        + I18n.t("?删除后不可恢复。", "? This cannot be undone.")
+                                    confirmDialog.open()
+                                }
                             }
 
                             // P2-D §7.7 — thin "查看战报" entry for finished runs. openRun's
