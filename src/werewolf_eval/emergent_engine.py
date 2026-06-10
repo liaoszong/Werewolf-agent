@@ -34,10 +34,13 @@ from werewolf_eval.provider_contract import ProviderRequest
 from werewolf_eval.action_runtime import (
     ActionEnvelope,
     ActionValidator,
+    DecisionWindow,
     JointSettler,
     NightIntents,
+    RngPick,
     RoleAbilityRegistry,
     RuntimeState,
+    SeerResolver,
     rules_v1_1,
 )
 from werewolf_eval.action_runtime.abilities import TARGET_RULES
@@ -540,6 +543,59 @@ class EmergentGameEngine:
         turn["source_label"] = None
         turn["token_usage"] = None
 
+    # ---- pure-resolver bridge helpers ---------------------------------
+
+    def _draw(self, pick: "RngPick") -> str:
+        """Perform a resolver's deferred seeded draw against self._rng at the legacy site."""
+        if pick.kind == "choice":
+            return self._rng.choice(list(pick.over))
+        return pick.over[self._rng.randrange(len(pick.over))]
+
+    def _decision_window(self, rnd, actor, role, registry_phase, emit_phase, live_action, refs):
+        return DecisionWindow(
+            rnd=rnd, actor=actor, role=role, emit_phase=emit_phase, registry_phase=registry_phase,
+            alive_seat_order=tuple(self._alive_in_seat_order()),
+            roles={pid: p.role for pid, p in self._players_by_id.items()},
+            public_refs=tuple(refs), live_action=live_action,
+            validator=self._validator, runtime_state=self._runtime_state(),
+        )
+
+    def _run_single_turn(self, resolver, actor, role, registry_phase, emit_phase, request_phase, rnd, refs=()):
+        """Drive ONE strict-path actor turn (seer / one voter) through a pure resolver.
+        Side-effects (provider call, budget, turn dict, err-failure, rng draw, decision, emit)
+        stay here; the resolver only decides. Returns the resolved target, or None on skip."""
+        action, err, turn = self._provider_action(actor, request_phase, rnd)
+        if err is not None:
+            if isinstance(err, ProviderActionError):
+                self._record_failure(rnd, emit_phase, actor, err.failure.kind, err.failure.reason, err.failure.target)
+            else:
+                self._record_failure(rnd, emit_phase, actor, "agent_error", f"{actor} raised {type(err).__name__}: {err}")
+        window = self._decision_window(rnd, actor, role, registry_phase, emit_phase,
+                                       action if err is None else None, refs)
+        adj = resolver.adjudicate(window)
+        if adj.skip:
+            return None  # no-candidates bail. UNREACHABLE in live games (win-check guarantees
+                         # >=1 candidate before any turn). A same-turn invalid-action failure/downgrade
+                         # would be dropped here; legacy recorded it before bailing. Byte-inert (path dead).
+        if adj.failure is not None:
+            self._record_failure(rnd, emit_phase, actor, adj.failure.kind, adj.failure.reason, adj.failure.target)
+        if adj.downgrade_reason is not None:
+            self._downgrade_turn(turn, adj.downgrade_reason)
+        target = adj.accepted_target if adj.rng_pick is None else self._draw(adj.rng_pick)
+        plan = resolver.render(window, target, adj.decision_type)
+        d = plan.decision
+        self._decision(d.actor, d.scope, d.phase, d.action, d.target, d.dtype, d.reason,
+                       refs=list(d.refs) or None, consensus_id=d.consensus_id)
+        e = plan.event
+        self._emit(e.phase, rnd, e.etype, e.actor, e.target, e.visibility, e.summary)
+        return target
+
+    def _run_seer(self, rnd):
+        seers = [pid for pid in self._alive if self._players_by_id[pid].role == "seer"]
+        if not seers:
+            return None
+        return self._run_single_turn(SeerResolver(), seers[0], "seer", "night", "night", "night", rnd)
+
     # ---- win condition -------------------------------------------------
 
     def _win_check(self) -> str | None:
@@ -656,35 +712,6 @@ class EmergentGameEngine:
                 "resolution_round": 1,
             },
         }
-
-    def _resolve_seer(self, rnd: int) -> None:
-        seers = [pid for pid in self._alive if self._players_by_id[pid].role == "seer"]
-        if not seers:
-            return
-        seer = seers[0]
-        target: str | None = None
-        action, err, turn = self._provider_action(seer, "night", rnd)
-        if err is not None:
-            if isinstance(err, ProviderActionError):
-                self._record_failure(rnd, "night", seer, err.failure.kind, err.failure.reason, err.failure.target)
-            else:
-                self._record_failure(rnd, "night", seer, "agent_error", f"{seer} raised {type(err).__name__}: {err}")
-        elif self._action_legal(seer, "seer", "night", action):
-            target = action.target
-        else:
-            self._record_failure(rnd, "night", seer, "invalid_action", f"{seer} bad seer_check {action.target}", action.target)
-            self._downgrade_turn(turn, f"engine rejected seer_check {action.target}")
-        if target is None:
-            cands = self._alive_in_seat_order(exclude={seer})
-            if not cands:
-                return
-            target = self._rng.choice(cands)  # R-29: seeded, not always seat 0
-            dtype = FALLBACK_DECISION_TYPE
-        else:
-            dtype = "inference_based"
-        result = "werewolf" if self._players_by_id[target].role == "werewolf" else "good"
-        self._decision(seer, "single", "night", "seer_check", target, dtype, f"seer checks {target}")
-        self._emit("night", rnd, "seer_check", seer, target, "seer", f"Seer {seer} checks {target}, result: {result}.")
 
     def _resolve_witch(self, rnd: int, victim: str | None, save_used: bool, poison_used: bool) -> tuple[bool, str | None, bool, bool]:
         """Returns (saved_victim, poison_target, new_save_used, new_poison_used)."""
@@ -982,7 +1009,7 @@ class EmergentGameEngine:
             end_round = rnd
             # ---- NIGHT ----
             victim = self._resolve_wolf_kill(rnd)
-            self._resolve_seer(rnd)
+            self._run_seer(rnd)
             saved, poison_target, save_used, poison_used = self._resolve_witch(rnd, victim, save_used, poison_used)
 
             # Night settlement delegates to the Agent Action Runtime's JointSettler
