@@ -5,12 +5,16 @@ import argparse
 from werewolf_eval.game_log import load_game_log
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Validate a Werewolf-agent Game Log JSON file.")
     parser.add_argument("path", help="Path to Game Log JSON")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
-    game = load_game_log(args.path)
+    try:
+        game = load_game_log(args.path)
+    except (OSError, ValueError) as exc:
+        print(f"invalid game log: {exc}")
+        return 1
 
     print(f"validated game_id={game.game_id}")
     print(f"source_label={game.source_label}")

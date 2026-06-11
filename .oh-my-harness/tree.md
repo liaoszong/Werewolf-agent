@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 483
+- Entries: 486
 
 ```text
 ./
@@ -216,6 +216,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   │   ├── 2026-06-08--p2b-byo-key-rework-plan.md
 │   │   │   ├── 2026-06-11--foundation-artifacts-pyproject-plan.md
 │   │   │   ├── 2026-06-11--observer-server-split-plan.md
+│   │   │   ├── 2026-06-11--provider-launcher-mechanical-refactor-plan.md
 │   │   │   └── 2026-06-11--sys-a2-role-single-source-plan.md
 │   │   └── reviews/
 │   │       ├── 2026-06-01--g1c-project-healthcheck-final.md
@@ -228,6 +229,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │       ├── 2026-06-11-b1-context-repair-VERDICT.md
 │   │       ├── 2026-06-11-b1-prompt-v2-metrics.json
 │   │       ├── 2026-06-11-b4-prompt-v3-metrics.json
+│   │       ├── 2026-06-11-b4-scaffold-VERDICT.md
 │   │       └── 2026-06-11-baseline-prompt-v1-metrics.json
 │   ├── health-check/
 │   │   ├── _baseline/
@@ -539,6 +541,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── test_settlement_bundle.py
 │   ├── test_settlement_response.py
 │   ├── test_source_labels.py
+│   ├── test_validate_clis.py
 │   ├── test_visibility_parity.py
 │   └── test_witch_potion_one_shot_sentinel.py
 ├── tools/
