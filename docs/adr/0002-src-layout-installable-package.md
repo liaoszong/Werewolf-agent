@@ -12,8 +12,8 @@ The repository has no packaging manifest at all: `git ls-files` has zero hits fo
 `pyproject.toml`, `setup.py`, `setup.cfg`, or `requirements.txt`. The package root
 `src/werewolf_eval/__init__.py` is a clean src-layout package, but it has never been
 declared installable, so the import path is hand-threaded as `PYTHONPATH=src` through
-at least five places: `.github/workflows/tests.yml:23`, `AGENTS.md:85`,
-`live-check.bat:4`, `launch-theater.py:97`, and `tools/live_check_deepseek.py:57`.
+at least five places: `.github/workflows/tests.yml:23`, `AGENTS.md:95`,
+`live-check.bat:4`, `launch-theater.py:98`, and `tools/live_check_deepseek.py:14`.
 
 The 2026-06-08 health check ranked this as Top-10 item #2
 (`docs/HEALTH_CHECK_2026-06-08.md`; details in
