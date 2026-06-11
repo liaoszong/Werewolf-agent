@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 502
+- Entries: 504
 
 ```text
 ./
@@ -119,6 +119,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   ├── 0001-client-agnostic-live-observer-protocol.md
 │   │   ├── 0002-src-layout-installable-package.md
 │   │   ├── 2026-06-09-action-runtime-orchestrator.md
+│   │   ├── 2026-06-11-engine-visibility-single-source.md
 │   │   └── 2026-06-11-role-facts-single-source.md
 │   ├── demo/
 │   │   ├── phase1-gold-demo.html
@@ -213,6 +214,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   │   ├── 2026-06-06--p2-d-settlement-screen-plan.md
 │   │   │   ├── 2026-06-08--full-health-check.md
 │   │   │   ├── 2026-06-08--p2b-byo-key-rework-plan.md
+│   │   │   ├── 2026-06-11--b2-engine-visibility-single-source-plan.md
 │   │   │   ├── 2026-06-11--foundation-artifacts-pyproject-plan.md
 │   │   │   ├── 2026-06-11--l4-guard-arm-plan.md
 │   │   │   ├── 2026-06-11--observer-server-split-plan.md
