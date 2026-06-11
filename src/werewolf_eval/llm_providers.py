@@ -28,6 +28,7 @@ from dataclasses import dataclass
 from typing import Any, Callable
 
 from werewolf_eval.prompt_version import KNOWN_PROMPT_VERSIONS
+from werewolf_eval.prompt_v1 import build_speech_system_prompt
 from werewolf_eval.provider_contract import (
     ANTHROPIC_PROVIDER_SOURCE_LABEL,
     OPENAI_COMPATIBLE_PROVIDER_SOURCE_LABEL,
@@ -104,17 +105,6 @@ def build_action_system_prompt(request: ProviderRequest) -> str:
         f'{{"action":"{example_action}","target":"{example_target}",'
         f'"reason_summary":"your reasoning here","decision_type":"inference_based",'
         f'"confidence":0.9}}'
-    )
-
-
-def build_speech_system_prompt(request: ProviderRequest) -> str:
-    # Free text, NO JSON, NO allowed_actions[0] (which would IndexError for a
-    # speech request with empty allowed_actions).
-    return (
-        f"你是狼人杀里的 {request.actor}(第 {request.round} 轮,白天发言)。"
-        f"请用自然口吻发言,3-5 句或 120-180 字。"
-        f"发言应尽量包含:当前局势判断、你怀疑或相信的对象、一个具体理由、本轮投票倾向。"
-        f"不要使用固定小标题,不要输出 JSON,直接说话。"
     )
 
 

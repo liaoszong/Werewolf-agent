@@ -51,6 +51,7 @@ from werewolf_eval.action_runtime import (
 from werewolf_eval.action_runtime.abilities import TARGET_RULES
 from werewolf_eval.invariants.guards import assert_prompt_entitled, assert_death_commit_once
 from werewolf_eval.prompt_version import KNOWN_PROMPT_VERSIONS
+from werewolf_eval.prompt_v1 import RenderedObservation, render_observation_text
 from werewolf_eval.prompt_v2 import build_board_rules_card, render_observation_text_v2
 from werewolf_eval.prompt_v3 import (
     SCRIBE_MAX_OUTPUT_TOKENS,
@@ -111,60 +112,6 @@ def _fallback_kind_for(failure_kind: str) -> str:
     if failure_kind in ("invalid_action", "parse_failure"):
         return INVALID_FALLBACK
     return ERROR_FALLBACK
-
-
-@dataclass(frozen=True)
-class RenderedObservation:
-    """Readable, ROLE-SAFE observation text for a live provider prompt, plus the
-    exact event ids it was rendered from (for the visibility-no-feed-leak gate)."""
-
-    text: str
-    source_event_ids: list[str]
-
-
-def render_observation_text(
-    obs: AgentObservation, events_by_id: dict[str, dict[str, Any]]
-) -> RenderedObservation:
-    """Render `obs` into readable prompt text. HARD invariant (P2-A-2 gate ①):
-    rendered ONLY from `obs.public_event_ids ∪ obs.private_event_ids` and
-    `obs.known_roles` — never the global event store or global role map. The
-    caller passes `events_by_id`, but this function touches only the ids that
-    already appear in `obs`'s role-filtered ref lists, so a hidden event whose id
-    is not in those lists can never leak in.
-    """
-    visible_ids: list[str] = []
-    seen: set[str] = set()
-    for ref in list(obs.public_event_ids) + list(obs.private_event_ids):
-        if ref not in seen:
-            seen.add(ref)
-            visible_ids.append(ref)
-
-    lines: list[str] = [
-        f"你是 {obs.player_id}(身份:{obs.role},阵营:{obs.team})。",
-        f"当前:第 {obs.round} 轮 {obs.phase} 阶段。存活玩家:{', '.join(obs.alive_players)}。",
-    ]
-    # known_roles comes ONLY from the role-filtered observation (self + wolf
-    # teammates for a wolf), never a global seat-role index / god snapshot.
-    known_others = {pid: role for pid, role in obs.known_roles.items() if pid != obs.player_id}
-    if known_others:
-        lines.append("你已知的身份:" + ", ".join(f"{pid}={role}" for pid, role in sorted(known_others.items())) + "。")
-
-    source_event_ids: list[str] = []
-    event_lines: list[str] = []
-    for ref in visible_ids:
-        event = events_by_id.get(ref)
-        if event is None:
-            continue
-        summary = event.get("data", {}).get("summary", "")
-        if not summary:
-            continue
-        source_event_ids.append(ref)
-        event_lines.append(f"- (r{event.get('round')} {event.get('phase')}) {summary}")
-    if event_lines:
-        lines.append("你能看到的事件:")
-        lines.extend(event_lines)
-
-    return RenderedObservation(text="\n".join(lines), source_event_ids=source_event_ids)
 
 
 def augment_witch_observation(base_text: str, victim: str | None) -> str:
