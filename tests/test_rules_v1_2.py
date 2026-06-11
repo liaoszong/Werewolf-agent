@@ -55,5 +55,13 @@ class ExcludeLastGuardedPredicateTests(unittest.TestCase):
         self.assertTrue(pred(night1, "p5", "p2"))  # 夜1 无上夜目标:全存活合法
 
 
+class AllRulesetsRegistrationTests(unittest.TestCase):
+    def test_v1_2_registered_append_only(self):
+        from werewolf_eval.action_runtime.ruleset import all_rulesets, known_role_teams
+        versions = [rs.rules_version for rs in all_rulesets()]
+        self.assertEqual(versions, ["rules_v1", "rules_v1_1", "rules_v1_2"])
+        self.assertEqual(known_role_teams()["guard"], "villager")
+
+
 if __name__ == "__main__":
     unittest.main()

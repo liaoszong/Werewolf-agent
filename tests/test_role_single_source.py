@@ -33,6 +33,7 @@ class KnownRoleTeamsTest(unittest.TestCase):
                 "witch": "villager",
                 "villager": "villager",
                 "hunter": "villager",
+                "guard": "villager",
             },
         )
         # Insertion order is load-bearing: profile_config.ROLE_TEAMS derives
@@ -40,14 +41,14 @@ class KnownRoleTeamsTest(unittest.TestCase):
         # (profile_config.py:480), where dict order = byte order.
         self.assertEqual(
             list(known_role_teams()),
-            ["werewolf", "seer", "witch", "villager", "hunter"],
+            ["werewolf", "seer", "witch", "villager", "hunter", "guard"],
         )
 
     def test_all_rulesets_is_append_only(self) -> None:
         # Observers must recognize roles from logs of ANY shipped rules version.
         self.assertEqual(
             [rs.rules_version for rs in all_rulesets()],
-            ["rules_v1", "rules_v1_1"],
+            ["rules_v1", "rules_v1_1", "rules_v1_2"],
         )
 
 

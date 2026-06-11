@@ -110,7 +110,7 @@ def all_rulesets() -> tuple[BoardRuleset, ...]:
     """Every ruleset this codebase has ever shipped. APPEND-ONLY: observer-side
     consumers derive role->team knowledge from this union, and must keep
     recognizing roles from logs written under ANY rules version."""
-    return (rules_v1(), rules_v1_1())
+    return (rules_v1(), rules_v1_1(), rules_v1_2())
 
 
 def known_role_teams() -> dict[str, str]:

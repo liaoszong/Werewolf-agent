@@ -13,7 +13,7 @@ from werewolf_eval.action_runtime.ruleset import BoardRuleset
 
 ROLE_NAMES_ZH = {
     "werewolf": "狼人", "seer": "预言家", "witch": "女巫",
-    "villager": "村民", "hunter": "猎人",
+    "villager": "村民", "hunter": "猎人", "guard": "守卫",
 }
 TEAM_NAMES_ZH = {"werewolf": "狼人阵营", "villager": "好人阵营"}
 ABILITY_DESCRIPTIONS = {
@@ -25,6 +25,7 @@ ABILITY_DESCRIPTIONS = {
     "player_vote": "白天投票放逐一名玩家",
     "hunter_shoot": "出局时开枪带走一名存活玩家",
     "hunter_pass": "出局时选择不开枪",
+    "guard_protect": "夜间守护一名玩家,使其免受当晚狼人袭击(可守自己,不可连续两晚守同一人,守护结果不会获得反馈)",
 }
 
 
