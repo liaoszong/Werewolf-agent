@@ -55,6 +55,7 @@ from werewolf_eval.observer.run_manager import (
     _sanitize_launcher_error,
     _schema_payload,
 )
+from werewolf_eval.observer.launch import execute_profile_launch
 from werewolf_eval.observer.sse import stream_run_events
 from werewolf_eval.observer.security import (
     _LOOPBACK_HOSTNAMES,
@@ -423,106 +424,18 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
         return self._run_manager().run_detail_with_reason(run_id, run_dir)
 
     def _handle_profile_launch(self, body: dict[str, object]) -> None:
-        plr = parse_profile_launch_request(body)
-        state = self._get_state()
-        mode = str(plr["mode"])
-
-        # CAPABILITY gate (BEFORE load/validate) — live only.  Capability
-        # precedes validity/shape: an un-provisioned server returns
-        # live_api_disabled/missing_api_key even for a malformed or
-        # non-deepseek profile, and never creates a run_dir.
-        cap_reject = _check_live_capability(state, mode)
-        if cap_reject is not None:
-            self._send_error_json(*cap_reject)
+        """Profile launch — gate sequence + side effects live in
+        ``observer.launch.execute_profile_launch``; this shell only translates
+        the outcome (error → ``_send_error_json``; launch → dispatch through
+        ``self._launch_run_async`` then the 202)."""
+        outcome = execute_profile_launch(self._get_state(), body)
+        if outcome[0] == "error":
+            _, status, code, message = outcome
+            self._send_error_json(status, code, message)  # type: ignore[arg-type]
             return
-
-        if plr["kind"] == "named":
-            ppath = state.profiles_dir / f"{plr['profile_name']}.json"
-            if not ppath.exists():
-                self._send_error_json(404, "not_found", "profile not found")
-                return
-            try:
-                profile = load_profile(ppath)
-            except ProfileValidationError as exc:
-                self._send_error_json(400, "invalid_profile", str(exc))
-                return
-        else:
-            profile = plr["profile"]  # type: ignore[assignment]
-        try:
-            validate_profile(profile)
-        except ProfileValidationError as exc:
-            self._send_error_json(400, "invalid_profile", str(exc))
-            return
-
-        # role_shuffle requires the live multi-provider path; fake mode runs a FIXED board and
-        # would mislabel the artifact (artifact would record shuffled roles, engine would not).
-        # Fail closed — no silent fallback (spec §1.1 alignment).
-        if mode != "live" and profile.get("role_shuffle", {}).get("enabled", False):
-            self._send_error_json(
-                400, "shuffle_requires_live",
-                "role_shuffle requires live mode (multi-provider path); fake mode runs a fixed "
-                "board and would mislabel the artifact",
-            )
-            return
-
-        run_id = str(plr["run_id"])
-        # SHAPE gate (AFTER validate) — live only. Resolve seats once (role-shuffle applied via
-        # run_id) and reuse for the launcher resolution (per-seat credential check).
-        resolved_seats: list[dict] = []
-        if mode == "live":
-            resolved_seats = resolve_profile_for_run(profile, run_id=run_id)
-            shape_reject = _check_live_profile_shape(resolved_seats)
-            if shape_reject is not None:
-                self._send_error_json(*shape_reject)
-                return
-
-        run_dir = state.runs_dir / run_id
-        if run_dir.exists():
-            self._send_error_json(409, "conflict", f"Run already exists: {run_id}")
-            return
-
-        is_live = mode == "live"
-        if is_live:
-            base, live_reject = _resolve_live_launcher_for_launch(state, resolved_seats)
-            if live_reject is not None:
-                self._send_error_json(*live_reject)
-                return
-        else:
-            base = state.launcher
-        run_dir.mkdir(parents=True)
-
-        # Write the resolved-profile (which carries execution_mode) SYNCHRONOUSLY here,
-        # before the async run starts and before the 202 returns. The artifact is built
-        # entirely from launch-time inputs, so the content is identical to writing it
-        # after the run — but writing it up front means the client's immediate openRun
-        # finds execution_mode, so the HUD shows the real live/fake posture DURING the
-        # run (the run-detail execution_mode is read from this file), not only after it
-        # completes. Previously it was written in the launcher thread, which raced the
-        # client's openRun → the HUD was stuck on SIMULATION for the whole live run.
-        artifact = build_resolved_profile_artifact(
-            profile,
-            run_id,
-            execution_mode="live" if is_live else "fake",
-            live_api="used" if is_live else "not_used",
-        )
-        (run_dir / "resolved-profile.json").write_text(
-            json.dumps(artifact, ensure_ascii=False, indent=2, sort_keys=True),
-            encoding="utf-8",
-        )
-
-        def _profile_launcher(rid: str, rdir: Path, base: RunLauncher = base) -> int:
-            return base(rid, rdir)
-
-        self._launch_run_async(run_id, run_dir, _profile_launcher)
-        self._send_json(
-            202,
-            {
-                "run_id": run_id,
-                "profile_name": profile["name"],
-                "mode": plr["mode"],
-                "status": "queued",
-            },
-        )
+        _, run_id, run_dir, launcher, payload = outcome
+        self._launch_run_async(run_id, run_dir, launcher)  # type: ignore[arg-type]
+        self._send_json(202, payload)  # type: ignore[arg-type]
 
     def do_DELETE(self) -> None:
         segments = self._path_segments()
