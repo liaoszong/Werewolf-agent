@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 483
+- Entries: 485
 
 ```text
 ./
@@ -228,6 +228,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │       ├── 2026-06-11-b1-context-repair-VERDICT.md
 │   │       ├── 2026-06-11-b1-prompt-v2-metrics.json
 │   │       ├── 2026-06-11-b4-prompt-v3-metrics.json
+│   │       ├── 2026-06-11-b4-scaffold-VERDICT.md
 │   │       └── 2026-06-11-baseline-prompt-v1-metrics.json
 │   ├── health-check/
 │   │   ├── _baseline/
@@ -290,6 +291,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │       ├── 2026-06-10-history-run-management-and-report-entry-design.md
 │   │       ├── 2026-06-10-prompt-versioning-design.md
 │   │       ├── 2026-06-10-quality-ablation-harness-and-b1-context-design.md
+│   │       ├── 2026-06-11-l4-guard-arm-design.md
 │   │       └── 2026-06-11-sys-b4-claim-ledger-vote-scaffold-design.md
 │   ├── CHECKPOINT_TEMPLATE.md
 │   ├── EVALUATION_RUBRIC.md
