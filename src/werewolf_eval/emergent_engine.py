@@ -53,7 +53,9 @@ from werewolf_eval.prompt_v2 import build_board_rules_card, render_observation_t
 from werewolf_eval.prompt_v3 import (
     SCRIBE_MAX_OUTPUT_TOKENS,
     parse_scribe_claims,
+    render_claim_digest,
     render_scribe_input,
+    render_vote_scaffold,
 )
 
 # The provider request phase used for free-text speeches. The game_log event is
@@ -578,6 +580,12 @@ class EmergentGameEngine:
         obs = self._build_obs(player_id, phase, rnd)
         rendered = self._render_obs(obs)
         agent = self._agents[player_id]
+        obs_text = rendered.text
+        if self.prompt_version == "prompt_v3" and phase == "day":
+            # vote request (the only day-phase action path; hunter uses its own
+            # site): inject digest + comparison program. Input-side ONLY — the
+            # action system prompt / strict-JSON contract is untouched (spec §0).
+            obs_text = f"{obs_text}\n{render_vote_scaffold(self._claim_ledger)}"
         turn: dict[str, Any] = {
             "request_id": f"{self._game_id}_r{rnd:02d}_{player_id}",
             "round": rnd,
@@ -597,7 +605,7 @@ class EmergentGameEngine:
         try:
             action = agent.decide(
                 obs,
-                observation_text=rendered.text,
+                observation_text=obs_text,
                 response_kind="action",
                 max_output_tokens=ACTION_MAX_OUTPUT_TOKENS,
                 prompt_version=self.prompt_version,
@@ -888,6 +896,11 @@ class EmergentGameEngine:
         provider = self._agents[player_id].provider
         obs = self._build_obs(player_id, SPEECH_REQUEST_PHASE, rnd)
         rendered = self._render_obs(obs)
+        obs_text = rendered.text
+        if self.prompt_version == "prompt_v3" and self._claim_ledger:
+            # graded guidance: speeches get the DIGEST only (information symmetry),
+            # never the comparison program (b1 lesson: don't arm wolf fake-claims).
+            obs_text = f"{obs_text}\n{render_claim_digest(self._claim_ledger)}"
         request = ProviderRequest(
             request_id=f"{self._game_id}_r{rnd:02d}_{player_id}_speech",
             game_id=self._game_id,
@@ -897,7 +910,7 @@ class EmergentGameEngine:
             observation=obs.to_dict(),
             allowed_actions=[],
             allowed_targets=[],
-            observation_text=rendered.text,
+            observation_text=obs_text,
             response_kind="speech",
             max_output_tokens=SPEECH_MAX_OUTPUT_TOKENS,
             prompt_version=self.prompt_version,

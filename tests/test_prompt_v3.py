@@ -216,3 +216,60 @@ def test_scribe_failure_preserves_history():
     engine._run_scribe(1)
     assert engine._claim_ledger == [old]               # 失败不清史
     assert engine._provider_turns[-1]["kind"] == "scaffold_fallback"
+
+
+def test_v3_vote_requests_carry_scaffold_and_speech_carry_digest():
+    _, outcome, agents, _ = _run_v3_engine()
+    reqs = [r for a in agents.values() for r in a.provider.requests]
+    votes = [r for r in reqs if r.response_kind == "action" and r.phase == "day"]
+    nights = [r for r in reqs if r.response_kind == "action" and r.phase == "night"]
+    speeches = [r for r in reqs if r.response_kind == "speech"]
+    assert votes and nights and speeches
+    # vote:scaffold 程序必在;r1 投票在 r1 scribe 之后 -> 账本也在
+    assert all("【投票前判断程序】" in r.observation_text for r in votes)
+    assert any("【声称账本】" in r.observation_text for r in votes)
+    # speech:本 fake 脚本只有 1 个 day 轮,r1 发言在任何 scribe 之前 -> 无账本
+    # (speech 注入的正向覆盖在下一个测试,用预填账本的确定性写法——评审修复)
+    assert all("【声称账本】" not in r.observation_text for r in speeches)
+    # speech 不带强比较程序(分级:vote 强 / speech 克制)
+    assert all("【投票前判断程序】" not in r.observation_text for r in speeches)
+    # 夜间动作不注入
+    assert all("【声称账本】" not in r.observation_text and "【投票前判断程序】" not in r.observation_text
+               for r in nights)
+    # 全部请求仍是 v2 结构化观察打底 + 带卡
+    assert all("【你的私有信息】" in r.observation_text for r in votes + speeches)
+    assert all(r.board_card.startswith("【本局规则卡】") for r in votes + speeches + nights)
+
+
+def test_v3_speech_carries_digest_when_ledger_nonempty():
+    # speech 注入的正向覆盖(确定性,不依赖脚本天数):预填账本 -> r1 发言即带账本
+    # (注入条件只看 ledger 非空)
+    agents = build_emergent_fake_agents(build_villager_win_script())
+    scribe = ProviderAgent("scribe", _FakeScribeProvider())
+    engine = EmergentGameEngine(
+        config=build_emergent_config(game_id="v3_predigest"),
+        agents=agents, seed=7,
+        budget=EmergentBudget(max_requests=80, max_day_rounds=3),
+        prompt_version="prompt_v3", scaffold_agent=scribe,
+    )
+    engine._claim_ledger.append({"round": 0, "claimant": "p9", "claim_type": "identity_claim",
+                                 "target": None, "result": "seer", "refutes": None, "source": 1,
+                                 "source_quote": "预填", "uncertain": False})
+    engine.run()
+    reqs = [r for a in agents.values() for r in a.provider.requests]
+    speeches = [r for r in reqs if r.response_kind == "speech"]
+    assert speeches and all("【声称账本】" in r.observation_text for r in speeches)
+    assert all("【投票前判断程序】" not in r.observation_text for r in speeches)
+
+
+def test_v2_and_v1_paths_have_no_v3_injection():
+    for ver in ("prompt_v1", "prompt_v2"):
+        agents = build_emergent_fake_agents(build_villager_win_script())
+        engine = EmergentGameEngine(config=build_emergent_config(game_id=f"nov3_{ver}"),
+                                    agents=agents, seed=7,
+                                    budget=EmergentBudget(max_requests=80, max_day_rounds=3),
+                                    prompt_version=ver)
+        engine.run()
+        reqs = [r for a in agents.values() for r in a.provider.requests]
+        assert all("【投票前判断程序】" not in r.observation_text for r in reqs)
+        assert all("【声称账本】" not in r.observation_text for r in reqs)
