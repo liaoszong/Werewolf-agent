@@ -29,15 +29,18 @@ def test_run_arm_fake_smoke(tmp_path):
 
 import pytest
 
-from werewolf_eval.prompt_version import PROMPT_VERSION
 
-
-def test_run_arm_rejects_unrenderable_prompt_version(tmp_path):
-    # Until the Part-B renderer selector lands, the runtime can only render
-    # PROMPT_VERSION; an arm declaring anything else must hard-fail instead of
-    # silently producing a false-null comparison.
-    arm = Arm(label="v2_arm", prompt_version="prompt_v2", n_games=1, seed_base=7)
+def test_run_arm_rejects_unknown_prompt_version(tmp_path):
+    # Unknown versions hard-fail before any side effects (no silent fallback).
+    arm = Arm(label="bogus_arm", prompt_version="prompt_v99", n_games=1, seed_base=7)
     with pytest.raises(ValueError, match="prompt_version"):
         run_arm(arm, out_root=tmp_path, factory_builder=build_fake_factory)
-    assert not (tmp_path / "v2_arm").exists()   # fail BEFORE any side effects
-    assert PROMPT_VERSION == "prompt_v1"        # guard premise; revisit when this moves
+    assert not (tmp_path / "bogus_arm").exists()
+
+
+def test_run_arm_v2_smoke_threads_version(tmp_path):
+    # prompt_v2 is now a real renderable arm (SYS-B1).
+    arm = Arm(label="v2_smoke", prompt_version="prompt_v2", n_games=1, seed_base=7)
+    result = run_arm(arm, out_root=tmp_path, factory_builder=build_fake_factory)
+    assert result["prompt_version"] == "prompt_v2"
+    assert (tmp_path / "v2_smoke" / "_metrics.json").exists()
