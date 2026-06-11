@@ -114,12 +114,15 @@ def _provider_turns_summary(turns: list[dict]) -> dict:
             total_tokens += int(t["token_usage"].get("total_tokens", 0))
     live_requested = sum(1 for t in turns if t.get("live_requested"))
     live_success = by_kind.get("live_success", 0)
+    # NOTE for B5 per-seat cost accounting: skip actor=="scribe" turns (scaffold, not a seat).
     return {
         "live_requested_actions": live_requested,
         "live_success_actions": live_success,
         "live_success_rate": (live_success / live_requested) if live_requested else 1.0,
         "by_provider_result_kind": by_kind,
         "total_completion_tokens": total_tokens,
+        "player_requests": live_requested,
+        "scaffold_requests": sum(1 for t in turns if t.get("response_kind") == "scaffold"),
         "turns": turns,
     }
 
@@ -136,7 +139,14 @@ def run_emergent_deepseek_game(
     source_label: str | None = None,
     seat_roles: dict[str, str] | None = None,
     prompt_version: str = "prompt_v1",
+    scaffold_provider_factory=None,
 ) -> int:
+    # Fail-loud before any side effects (writer/engine construction).
+    scaffold_agent = None
+    if prompt_version == "prompt_v3":
+        if scaffold_provider_factory is None:
+            raise ValueError("prompt_v3 requires scaffold_provider_factory (scribe provider)")
+        scaffold_agent = scaffold_provider_factory()
     writer = RuntimeEventWriter(run_id=game_id, out_dir=out_dir)
     agents = {pid: provider_factory(pid) for pid in PLAYER_IDS}
     # P2-B-3: run-level identity derived from the seat providers (uniform or mixed);
@@ -151,14 +161,18 @@ def run_emergent_deepseek_game(
         budget=EmergentBudget(max_requests=max_requests_per_game, max_day_rounds=max_day_rounds),
         runtime_events=writer,
         prompt_version=prompt_version,
+        scaffold_agent=scaffold_agent,
     )
     outcome = engine.run()
 
     # provider trace + turns summary are written in BOTH outcomes (live evidence).
+    # Include scribe agent in trace collection so actor="scribe" rows are captured;
+    # _provider_identity keeps using the original player-only agents (identity unaffected).
+    trace_agents = {**agents, "scribe": scaffold_agent} if scaffold_agent is not None else agents
     _write_json(
         out_dir / "provider-trace.json",
         redact_secret_values(
-            _collect_trace(game_id, agents, provider_name=provider_name, source_label=effective_label)
+            _collect_trace(game_id, trace_agents, provider_name=provider_name, source_label=effective_label)
         ),
     )
     _write_json(out_dir / "provider-turns.json", _provider_turns_summary(outcome.provider_turns))
@@ -182,6 +196,8 @@ def run_emergent_deepseek_game(
         ),
     )
     manifest["secrets_redacted"] = True
+    if scaffold_agent is not None:
+        manifest["scaffold_model"] = getattr(scaffold_agent.provider, "model", None)
     writer.write_prompt_manifest(manifest)
 
     if outcome.completed:

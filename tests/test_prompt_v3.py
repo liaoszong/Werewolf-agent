@@ -273,3 +273,44 @@ def test_v2_and_v1_paths_have_no_v3_injection():
         reqs = [r for a in agents.values() for r in a.provider.requests]
         assert all("【投票前判断程序】" not in r.observation_text for r in reqs)
         assert all("【声称账本】" not in r.observation_text for r in reqs)
+
+
+# ------------------------------------------------------------------ Task 6 tests
+from werewolf_eval.run_emergent_deepseek_game import run_emergent_deepseek_game
+
+
+def _fake_factory():
+    agents = build_emergent_fake_agents(build_villager_win_script())
+    return lambda pid: agents[pid]
+
+
+def _fake_scaffold_factory():
+    return ProviderAgent("scribe", _FakeScribeProvider())
+
+
+def test_runner_v3_threads_scribe_and_splits_turn_accounting(tmp_path):
+    run_emergent_deepseek_game(
+        game_id="v3_runner", out_dir=tmp_path, provider_factory=_fake_factory(),
+        model="none", seed=7, max_requests_per_game=80, max_day_rounds=3,
+        prompt_version="prompt_v3", scaffold_provider_factory=_fake_scaffold_factory,
+    )
+    manifest = json.loads((tmp_path / "prompt-manifest.json").read_text(encoding="utf-8"))
+    assert manifest["evaluation_bucket"]["prompt_version"] == "prompt_v3"
+    turns_doc = json.loads((tmp_path / "provider-turns.json").read_text(encoding="utf-8"))
+    # 分列口径(spec §8.4):player vs scaffold
+    assert turns_doc["scaffold_requests"] >= 1
+    assert turns_doc["player_requests"] == turns_doc["live_requested_actions"]
+    # 玩家 live 率不被 scribe 稀释:live_requested 口径不含 scaffold turn
+    sturns = [t for t in turns_doc["turns"] if t.get("response_kind") == "scaffold"]
+    assert sturns and all(t["live_requested"] is False for t in sturns)
+    # trace 单列:scribe 的请求进 provider-trace,actor=scribe
+    trace = json.loads((tmp_path / "provider-trace.json").read_text(encoding="utf-8"))
+    assert any(r.get("actor") == "scribe" for r in trace["requests"])
+
+
+def test_runner_v3_without_scaffold_factory_fails_loud(tmp_path):
+    with pytest.raises(ValueError, match="scaffold"):
+        run_emergent_deepseek_game(
+            game_id="v3_noscribe", out_dir=tmp_path, provider_factory=_fake_factory(),
+            model="none", seed=7, prompt_version="prompt_v3",
+        )
