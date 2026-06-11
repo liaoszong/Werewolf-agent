@@ -25,7 +25,8 @@ import json
 from pathlib import Path
 from typing import Callable, Mapping
 
-from werewolf_eval.deepseek_provider import DeepSeekProvider, DeepSeekProviderConfig
+from werewolf_eval.deepseek_provider import DeepSeekProviderConfig
+from werewolf_eval.provider_registry import build_provider
 from werewolf_eval.provider_agent import ProviderAgent
 from werewolf_eval.run_deepseek_consensus_game import (
     ProviderFactory,
@@ -67,8 +68,10 @@ def build_deepseek_provider_config(
 
 def _default_provider_factory(config: DeepSeekProviderConfig) -> ProviderFactory:
     """One shared ``DeepSeekProvider`` across all seats so ``max_requests`` is a
-    true global budget for the whole game (mirrors ``_build_deepseek_agent``)."""
-    shared_provider = DeepSeekProvider(config)
+    true global budget for the whole game (mirrors ``_build_deepseek_agent``).
+    Built via ``build_provider`` so the registry identity stamp is the single
+    construction path for all live providers (D-4)."""
+    shared_provider = build_provider("deepseek", config)
 
     def factory(player_id: str) -> ProviderAgent:
         return ProviderAgent(player_id, shared_provider)
