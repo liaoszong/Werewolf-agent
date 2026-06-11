@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 468
+- Entries: 483
 
 ```text
 ./
@@ -215,6 +215,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   │   ├── 2026-06-08--full-health-check.md
 │   │   │   ├── 2026-06-08--p2b-byo-key-rework-plan.md
 │   │   │   ├── 2026-06-11--foundation-artifacts-pyproject-plan.md
+│   │   │   ├── 2026-06-11--observer-server-split-plan.md
 │   │   │   └── 2026-06-11--sys-a2-role-single-source-plan.md
 │   │   └── reviews/
 │   │       ├── 2026-06-01--g1c-project-healthcheck-final.md
@@ -336,6 +337,17 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       │   ├── fuzz.py
 │       │   ├── guards.py
 │       │   └── visibility_oracle.py
+│       ├── observer/
+│       │   ├── __init__.py
+│       │   ├── credentials_api.py
+│       │   ├── factory.py
+│       │   ├── handler.py
+│       │   ├── launch.py
+│       │   ├── routes.py
+│       │   ├── run_manager.py
+│       │   ├── security.py
+│       │   ├── sse.py
+│       │   └── state.py
 │       ├── __init__.py
 │       ├── artifacts.py
 │       ├── attribute_game.py
@@ -492,8 +504,12 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── test_observer_emergent_bridge.py
 │   ├── test_observer_models_endpoint.py
 │   ├── test_observer_protocol.py
+│   ├── test_observer_routes.py
 │   ├── test_observer_run_delete.py
+│   ├── test_observer_run_manager.py
+│   ├── test_observer_security.py
 │   ├── test_observer_server.py
+│   ├── test_observer_sse.py
 │   ├── test_observer_visibility.py
 │   ├── test_openai_provider.py
 │   ├── test_p2a2_live_path.py
