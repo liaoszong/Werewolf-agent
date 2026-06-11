@@ -104,6 +104,31 @@ class ProfileRoleTeamsTest(unittest.TestCase):
         )
 
 
+class GateAndOrderSentinelTest(unittest.TestCase):
+    def test_product_gate_is_subset_of_ruleset_roles(self) -> None:
+        # ALLOWED_ROLES is a deliberate explicit allowlist (new roles do NOT
+        # auto-appear in the launch UI) — but it may never invent a role the
+        # ruleset doesn't have.
+        from werewolf_eval import profile_config
+
+        self.assertLessEqual(
+            set(profile_config.ALLOWED_ROLES), set(known_role_teams())
+        )
+
+    def test_night_dispatch_order_is_subset_of_ruleset_night_abilities(self) -> None:
+        # NIGHT_DISPATCH_ORDER stays engine data until NightPlan (SYS-A1);
+        # this sentinel only forbids it referencing an ability the ruleset
+        # doesn't declare as phase:night.
+        from werewolf_eval.emergent_engine import NIGHT_DISPATCH_ORDER
+
+        night_ids = {
+            a.action_id
+            for a in rules_v1_1().abilities
+            if a.trigger == "phase:night"
+        }
+        self.assertLessEqual(set(NIGHT_DISPATCH_ORDER), night_ids)
+
+
 class ColdImportTest(unittest.TestCase):
     """Each entry module must import cleanly as the FIRST import of a fresh
     interpreter. Same-process smoke tests are order-dependent and miss cycles:
