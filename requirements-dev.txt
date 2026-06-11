@@ -1,0 +1,4 @@
+# Dev-only tooling. Runtime stays stdlib-only (pyproject: dependencies = []).
+# Installed by the non-blocking coverage step in .github/workflows/tests.yml.
+# Runner is stdlib unittest — do NOT add pytest here (health-check T-1/P-3).
+coverage>=7.6

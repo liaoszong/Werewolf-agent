@@ -22,3 +22,15 @@ jobs:
         env:
           PYTHONPATH: src
         run: python -m unittest discover -s tests -p "test_*.py"
+      # T-1: report-only coverage (no threshold, never blocks). Reruns the same
+      # stdlib-unittest suite under coverage; config lives in pyproject [tool.coverage].
+      # Read coverage numbers from CI only — locally the loopback-blocked observer
+      # HTTP tests skew them (docs/health-check/03-architecture-optimization.md §T-1).
+      - name: Coverage report (non-blocking)
+        continue-on-error: true
+        env:
+          PYTHONPATH: src
+        run: |
+          pip install -r requirements-dev.txt
+          coverage run -m unittest discover -s tests -p "test_*.py"
+          coverage report

@@ -11,3 +11,11 @@ dependencies = []
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/werewolf_eval"]
+
+# T-1: scope the (report-only) CI coverage step to the package, not tests/.
+[tool.coverage.run]
+source = ["werewolf_eval"]
+
+[tool.coverage.report]
+precision = 1
+sort = "cover"

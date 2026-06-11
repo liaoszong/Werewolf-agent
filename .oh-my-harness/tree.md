@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 512
+- Entries: 516
 
 ```text
 ./
@@ -119,7 +119,9 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   ├── 0001-client-agnostic-live-observer-protocol.md
 │   │   ├── 0002-src-layout-installable-package.md
 │   │   ├── 2026-06-09-action-runtime-orchestrator.md
+│   │   ├── 2026-06-11-byo-key-security-invariants.md
 │   │   ├── 2026-06-11-engine-visibility-single-source.md
+│   │   ├── 2026-06-11-fake-default-live-gate-testing-strategy.md
 │   │   └── 2026-06-11-role-facts-single-source.md
 │   ├── demo/
 │   │   ├── phase1-gold-demo.html
@@ -299,6 +301,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │       ├── 2026-06-10-prompt-versioning-design.md
 │   │       ├── 2026-06-10-quality-ablation-harness-and-b1-context-design.md
 │   │       ├── 2026-06-11-l4-guard-arm-design.md
+│   │       ├── 2026-06-11-sys-b3-b5-closeout-design.md
 │   │       └── 2026-06-11-sys-b4-claim-ledger-vote-scaffold-design.md
 │   ├── CHECKPOINT_TEMPLATE.md
 │   ├── EVALUATION_RUBRIC.md
@@ -582,5 +585,6 @@ Use this file for navigation only. Verify implementation details by reading sour
 ├── live-check.bat
 ├── pyproject.toml
 ├── README.md
-└── README.zh-CN.md
+├── README.zh-CN.md
+└── requirements-dev.txt
 ```
