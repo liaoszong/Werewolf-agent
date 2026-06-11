@@ -49,5 +49,12 @@ class KnownRoleTeamsTest(unittest.TestCase):
         )
 
 
+class ProtocolReExportTest(unittest.TestCase):
+    def test_protocol_table_is_the_ruleset_projection(self) -> None:
+        from werewolf_eval import observer_protocol
+
+        self.assertEqual(observer_protocol.KNOWN_ROLE_TEAMS, known_role_teams())
+
+
 if __name__ == "__main__":
     unittest.main()
