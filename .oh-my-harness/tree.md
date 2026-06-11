@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 461
+- Entries: 462
 
 ```text
 ./
@@ -505,6 +505,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── test_render_provider_replay.py
 │   ├── test_rng_draw_order.py
 │   ├── test_role_shuffle.py
+│   ├── test_role_single_source.py
 │   ├── test_run_emergent_deepseek_game.py
 │   ├── test_run_emergent_fake_runtime.py
 │   ├── test_run_emergent_game.py
