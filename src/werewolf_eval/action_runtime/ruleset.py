@@ -85,6 +85,27 @@ def rules_v1_1() -> BoardRuleset:
     )
 
 
+def rules_v1_2() -> BoardRuleset:
+    """rules_v1_1 + the guard (L4 protective-structure arm, spec 2026-06-11).
+    Versioned superset — does NOT edit rules_v1_1. Boards without a guard behave
+    byte-identically under v1_2 (pinned by test_allowed_actions_pinned + the
+    determinism canary). The guard's no-consecutive-protect rule lives in the
+    exclude_last_guarded target rule, fed by RuntimeState.last_guarded_target —
+    minimal inline state (witch one-shot precedent), NOT a CapabilityLedger."""
+    base = rules_v1_1()
+    guard_abilities = (
+        AbilityDefinition("guard_protect", "phase:night", "exclude_last_guarded", ARITY_ONE, "guard"),
+    )
+    guard = RoleDefinition("guard", "villager", ("guard_protect", "player_vote"))
+    return BoardRuleset(
+        "rules_v1_2",
+        base.roles + (guard,),
+        base.abilities + guard_abilities,
+        dict(base._night_rules),
+        base.death_order_key,
+    )
+
+
 def all_rulesets() -> tuple[BoardRuleset, ...]:
     """Every ruleset this codebase has ever shipped. APPEND-ONLY: observer-side
     consumers derive role->team knowledge from this union, and must keep

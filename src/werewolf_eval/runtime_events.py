@@ -57,6 +57,7 @@ RUNTIME_EVENT_VISIBILITIES: tuple[str, ...] = (
     "all",
     "seer",
     "witch",
+    "guard",
     "werewolf_team",
 )
 

@@ -12,6 +12,9 @@ class RuntimeState:
     alive: frozenset[str]
     roles: dict[str, str]            # player_id -> role
     night_victim: str | None = None  # tonight's pending wolf victim (witch save rule)
+    # last target the guard ACTUALLY protected on the previous guard night —
+    # fallback-chosen targets count (spec §2 patch). None on night 1 / guardless boards.
+    last_guarded_target: str | None = None
 
     def is_wolf(self, pid: str) -> bool:
         return self.roles.get(pid) == "werewolf"
