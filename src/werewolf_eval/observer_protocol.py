@@ -12,6 +12,14 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+from werewolf_eval.action_runtime.ruleset import known_role_teams
+
+# Role -> team facts, derived from the ruleset (the authoritative declaration,
+# ADR 2026-06-11). Re-exported HERE so observer-side modules keep importing
+# protocol constants only (same R-06 discipline as PUBLIC_LIKE_EVENT_VISIBILITIES)
+# and never import action_runtime directly.
+KNOWN_ROLE_TEAMS: dict[str, str] = known_role_teams()
+
 OBSERVER_SERVICE_NAME = "werewolf-observer"
 DEFAULT_FAKE_TEMPLATE = "default_6p_fake"
 DEFAULT_FAKE_MODE = "fake"

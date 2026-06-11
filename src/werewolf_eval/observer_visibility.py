@@ -16,6 +16,7 @@ from typing import Any
 # observer_protocol so the /events,/stream filter and the /projection filter can
 # never drift apart (the duplicate frozensets were the contract-drift seam).
 from werewolf_eval.observer_protocol import (
+    KNOWN_ROLE_TEAMS as _KNOWN_ROLE_TEAMS,
     PUBLIC_EVENT_VISIBILITIES as PUBLIC_LIKE_EVENT_VISIBILITIES,
     WEREWOLF_TEAM_EVENT_VISIBILITIES,
 )
@@ -32,12 +33,8 @@ DEFAULT_PLAYER_IDS: tuple[str, ...] = tuple(f"p{i}" for i in range(1, 7))
 ROLE_SPECIFIC_EVENT_VISIBILITIES: frozenset[str] = frozenset({"seer", "witch"})
 
 _SNAPSHOTS_DIR = "snapshots"
-_KNOWN_ROLE_TEAMS: dict[str, str] = {
-    "villager": "villager",
-    "seer": "villager",
-    "witch": "villager",
-    "werewolf": "werewolf",
-}
+# _KNOWN_ROLE_TEAMS is imported from observer_protocol above (derived from the
+# ruleset, ADR 2026-06-11) — the former literal copy here was drift-prone.
 
 
 class VisibilityProjectionError(ValueError):

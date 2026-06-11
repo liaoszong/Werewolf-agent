@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 466
+- Entries: 468
 
 ```text
 ./
@@ -226,6 +226,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │       ├── 2026-06-10-live-quality-diagnosis.md
 │   │       ├── 2026-06-11-b1-context-repair-VERDICT.md
 │   │       ├── 2026-06-11-b1-prompt-v2-metrics.json
+│   │       ├── 2026-06-11-b4-prompt-v3-metrics.json
 │   │       └── 2026-06-11-baseline-prompt-v1-metrics.json
 │   ├── health-check/
 │   │   ├── _baseline/
@@ -509,6 +510,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── test_render_provider_replay.py
 │   ├── test_rng_draw_order.py
 │   ├── test_role_shuffle.py
+│   ├── test_role_single_source.py
 │   ├── test_run_emergent_deepseek_game.py
 │   ├── test_run_emergent_fake_runtime.py
 │   ├── test_run_emergent_game.py

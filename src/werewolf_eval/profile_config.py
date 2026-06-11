@@ -1,8 +1,9 @@
 """G2d profile configuration helpers.
 
 Pure profile schema, validation, resolution, and resolved-profile artifact
-helpers for the prompt-configuration MVP.  No networking, no game engine,
-no Qt.  Standard library only.
+helpers for the prompt-configuration MVP.  No networking, no Qt; standard
+library plus one in-package import of pure rules data (action_runtime.ruleset,
+the role->team single source per ADR 2026-06-11).
 """
 
 from __future__ import annotations
@@ -13,6 +14,8 @@ import random
 import re
 from pathlib import Path
 from typing import Any
+
+from werewolf_eval.action_runtime.ruleset import known_role_teams
 
 PROFILE_SCHEMA_VERSION = "g2d.profile.v1"
 
@@ -54,11 +57,11 @@ CANONICAL_DEFAULT_6P_ROLES: dict[str, int] = {
     "witch": 1,
     "villager": 2,
 }
+# Derived projection of the single source (ADR 2026-06-11), restricted to the
+# product gate. Iteration follows ruleset declaration order, which keeps the
+# capabilities payload (":480") byte-identical: werewolf, seer, witch, villager.
 ROLE_TEAMS: dict[str, str] = {
-    "werewolf": "werewolf",
-    "seer": "villager",
-    "witch": "villager",
-    "villager": "villager",
+    role: team for role, team in known_role_teams().items() if role in ALLOWED_ROLES
 }
 DEFAULT_6P_SEAT_ROLES: dict[str, str] = {
     "p1": "werewolf",
