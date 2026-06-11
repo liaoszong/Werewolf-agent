@@ -1,59 +1,130 @@
 # Werewolf-agent
 
-AI 狼人杀 client-agnostic live experiment platform。项目目标是让 AI 狼人杀对局可以被实时运行、观察、配置、审计和复盘；评测、回放、报告和 Leaderboard 是建立在同一套结构化运行日志之上的后续能力。
+**A watchable, auditable AI-vs-AI Werewolf (Mafia) arena.**
 
-## 项目背景
+Configure which AI model plays each seat, watch the match unfold live from a god's-eye theater view, then dive into the settlement battle report — every decision, speech, and vote backed by a fully auditable event log.
 
-基于多 Agent 协作框架，构建能够自主完成信息不对称博弈的狼人杀 Agent Team 系统。核心在于多智能体的协作/对抗与交互机制设计：每个 Agent 根据其扮演角色（狼人、预言家、女巫等）拥有独立的目标、策略与行动空间，在严格信息隔离的约束下进行推理、发言与决策。系统需搭建完整的对局引擎，驱动回合流转与胜负裁决，并输出结构化日志以实现全程可观测。加分项为前端观战 UI，支持纯 AI 对战或人机混战，直观呈现多 Agent 的实时博弈过程。
+[简体中文](README.zh-CN.md) | English
 
-### 进阶方向
+---
 
-本项目从方向 **② 评测+复盘** 出发，当前路线已升级为 **client-agnostic live AI Werewolf experiment platform**：先建立可审计、可回放、可实时观察的对局运行基础，再在其上发展多维评测、复盘归因和多模型 Leaderboard。
+## What is this?
 
-| 方向 | 描述 |
-|------|------|
-| ① 通用 Agent | 探索"读懂自己→修改自己→运行自己"的自演化系统，从「通用 Agent」演化为「狼人杀多角色 Agent」 |
-| ② 评测+复盘 | 构建多维可量化评测体系 + 复盘归因 + Leaderboard（本项目的评测基础） |
-| ③ 自进化 Agent | 实现"对局→分析→优化→再对局"自进化循环，使各角色 Agent 在多局迭代中持续提升胜率 |
+Werewolf-agent is a **client-agnostic live AI Werewolf experiment platform**. A Python game engine drives a 6-player social-deduction match where every seat is played by an AI agent under strict information isolation — werewolves don't know the seer, the seer's checks stay private, and prompts are provably built only from events each seat is allowed to see.
 
-## Phase 1 目标
+Matches can run fully offline (deterministic fake provider, the default) or live against real LLM APIs. Every run produces a structured, replayable event stream that powers spectating, settlement reports, history replay, and evaluation.
 
-构建结构化 Game Log + 确定性评测 + 规则归因 + Leaderboard UI demo。
+## Highlights
 
-基于一局已有 6 人狼人杀对局的结构化日志，验证"可量化、可复现、可排序"的评测体系是否成立。
+- **Emergent game engine** — 6 players (2 werewolves, 1 seer, 1 witch, 2 villagers): night kills with wolf consensus, seer checks, witch save/poison, day speeches, votes, executions, win adjudication. Dynamic rounds, no scripts. A hunter role variant ships in the action runtime (`rules_v1_1`).
+- **Bring your own AI** — per-seat provider/model/prompt/temperature configuration. Built-in presets: DeepSeek, OpenAI, Anthropic, plus 9 OpenAI-compatible vendors (Zhipu GLM, Moonshot, Qwen, MiniMax, SiliconFlow, xAI, Gemini, ModelScope, OpenRouter) and fully custom endpoints. API keys stay on your machine; only the local Python server ever calls a provider.
+- **Qt theater client** — live god-view spectating (seat ring, speech theater, evidence console, playback controls), match setup sandbox, in-theater settlement overlay with a scrolling battle report, and a history view for replaying or managing past runs.
+- **Honest by construction** — event-sourced logs (`events.jsonl`, snapshots, prompt manifest, provider traces, failure audits), executed-truth HUD (`LIVE_API` vs `SIMULATION`), visibility projections (God / Public / per-Role), and runtime invariants that fail loudly on information leaks or rule violations.
+- **Evaluation-ready** — deterministic scoring, rule attribution, an ablation harness with per-arm metrics, byte-locked prompt versioning with a revision ledger, differential testing, and seeded deterministic simulation.
+- **Zero-dependency backend** — the entire Python backend uses only the standard library. No `pip install` required to run an offline match.
 
-## 当前状态
+## Architecture
 
-**Phase 1 deterministic MVP、Phase 2 evaluator runtime、G1a-G1h provider-backed audit/replay/event-spine foundation、G2a Local Observer Server / Protocol Control Plane、G2b Qt Observer Cockpit MVP 已完成。** 当前 main 已包含 E1 Game Log parser / validator、E2 deterministic scorer、E3 rule attribution engine、E4 runtime demo HTML exporter、D1 Decision Log runtime input、D2 Decision Log deterministic scoring integration、S4 Consensus Log runtime input、S5 saved semantic-label research harness and scoring integration、G1a scripted deterministic fresh-log runner、G1b deterministic game engine + mock agent contract、G1c wolf consensus + failure recovery、G1d fake-provider contract、G1e DeepSeek provider smoke、G1f DeepSeek consensus smoke、G1g provider replay HTML、G1h Live Runtime Event Spine、G2a Local Observer Server / Protocol Control Plane、G2b Qt Observer Cockpit MVP。
+```text
+YAML run profile (per-seat AI / prompts / role shuffle)
+        │
+        ▼
+Python game engine + agent/provider loop          src/werewolf_eval/
+  · emergent engine, action runtime (ability system)
+  · provider registry (DeepSeek / OpenAI / Anthropic / 9 presets / custom)
+  · invariant safety net, deterministic fake mode
+        │  event sourcing: events.jsonl · snapshots · prompt manifest · provider trace
+        ▼
+Local observer server (REST + SSE, client-agnostic protocol)
+        │
+        ▼
+Qt 6 / QML theater client                         clients/qt_observer/
+  · live spectating · match setup · settlement report · history replay
+```
 
-G1a-G1h 的当前价值是 audit foundation、replay foundation、runtime event spine foundation、log bundle / provider trace / failure audit foundation。G1g 的 HTML replay/report 只是 offline audit artifact，用于审查和复盘 provider-backed 游戏包；它不是 primary UX。G2a 提供了 client-agnostic REST/SSE protocol 作为 observer 边界。G2b 提供了第一个 Qt/QML rich observer cockpit，消费 G2a protocol，支持 Home/Lobby、default match setup、preflight、live cockpit（run status、player cards、event timeline、perspective switcher、audit links）、history/replay。
+The observer protocol is the hard boundary: any client (Qt today, Web later) consumes the same REST/SSE surface and never touches engine internals or provider secrets.
 
-G-track（G2c God/Role View、G2d Prompt Configuration、G3-1/2/3 live execution）均已完成。**项目已进入 Phase 2 重构；当前阶段权威以 `docs/PROJECT_MAP.md` 为准**（活跃前沿:P2-A 涌现引擎、P2-C 剧场观战、P2-D 结算战报)。`docs/ROADMAP.md` / `docs/TASKS.md` 保留 G-track 历史与任务状态。
+## Getting started
 
-Phase 1 不代表真实 AI Agent 对局、真实 Decision Log / Consensus Log 采集、真实多模型 Leaderboard 或真实 `decision_quality_score` 可用。
+### Prerequisites
 
-## 文档索引
+- **Python 3.10+** — no third-party packages needed.
+- **Qt 6.8+ and CMake 3.16+** — only for building the desktop client.
 
-| 文档 | 状态 | 作用 |
-|------|------|------|
-| [ROADMAP](docs/ROADMAP.md) | `CURRENT` | 总路线：G1h / G2 / G3 / G4 live platform route、依赖图、当前优先级 |
-| [PRODUCT_ONE_PAGER](docs/PRODUCT_ONE_PAGER.md) | `CURRENT` | 产品定义：live experiment platform、用户、输入输出、G1h-G4 能力分层 |
-| [ADR 0001](docs/adr/0001-client-agnostic-live-observer-protocol.md) | `CURRENT` | 架构决策：先 event protocol / runtime spine，再 observer server，再 Qt/Web client |
-| [Live Platform Charter](docs/harness/designs/2026-06-03--live-ai-werewolf-experiment-platform-charter.md) | `CURRENT` | Phase A 产品路线 + 系统架构宪章：game-like experience、minimum match/profile seed、visibility trust gate、exit demo、anti-shrinkage gates |
-| [TASKS](docs/TASKS.md) | `CURRENT` | 工程任务状态与候选开发点 |
-| [Qt Observer Cockpit](clients/qt_observer/README.md) | `G2B MVP` | G2b Qt/QML observer client MVP，通过 G2a protocol 展示 Home/Lobby、match setup、preflight、live cockpit、history/replay |
-| [CHECKPOINT_TEMPLATE](docs/CHECKPOINT_TEMPLATE.md) | `ON-DEMAND` | Checkpoint 验收报告模板（非默认上下文） |
-| [EVALUATION_RUBRIC](docs/EVALUATION_RUBRIC.md) | `G4 REFERENCE` | 评分体系事实来源（G4 evaluation platform 阶段启用；G1h-G3 按需参考） |
-| [GOLD_DEMO](docs/GOLD_DEMO.md) | `LEGACY` | Phase 1 deterministic MVP / gold demo 历史记录 |
-| [SPIKES](docs/SPIKES.md) | `ARCHIVED` | Phase 1 spike 验证清单（全部完成，不再更新） |
+### One-click launch (Windows)
 
-## Phase 1 不是
+```bat
+python launch-theater.py
+```
 
-- 真实 AI Agent 对局（无 Decision Log / Consensus Log 真实数据）
-- 叙事型观战系统
-- AI 心理分析系统
-- 完整对局引擎
-- 真实多模型 Leaderboard（只做 UI demo）
-- AI 自进化系统
-- 人机混战系统
-- decision_quality_score 真实可用（Phase 1 无真实 Decision Log，该维度恒为 0）
+Starts the local observer server (if needed), builds/launches the Qt client, and lands on the home view — start a match from there. Edit the `QT_BIN` / `MINGW_BIN` / `CMAKE` constants at the top of `launch-theater.py` to match your Qt installation.
+
+### Manual launch
+
+```powershell
+# 1. Observer server
+$env:PYTHONPATH='src'
+python -m werewolf_eval.run_observer_server --host 127.0.0.1 --port 8765 --runs-dir .runs --allow-live-api
+
+# 2. Build the Qt client
+cmake -S clients/qt_observer -B .tmp/qt-observer-build -DCMAKE_BUILD_TYPE=Debug
+cmake --build .tmp/qt-observer-build --config Debug
+
+# 3. Run it
+.\.tmp\qt-observer-build\appqt_observer.exe --observer-base-url http://127.0.0.1:8765
+```
+
+### Playing with real AI
+
+Offline deterministic mode is the unconditional default and needs no keys. For a live match:
+
+1. Launch the server with `--allow-live-api` (the one-click launcher does this).
+2. In the Qt client, add your provider API key in the settings page (stored locally, masked in UI, never logged or exported).
+3. Arm LIVE mode in match setup and launch. The `SYS: LIVE_API / SIMULATION` HUD chip always shows the executed truth.
+
+`live-check.bat` runs a one-shot real DeepSeek match end-to-end (needs `DEEPSEEK_API_KEY`; incurs real API cost).
+
+### Running tests
+
+```bash
+PYTHONPATH=src python -m unittest discover -s tests -p "test_*.py"
+```
+
+~1,000 tests cover the engine, action runtime, observer protocol, providers, scoring, invariants, and the Qt↔Python static contract. Qt-side tests: `ctest --test-dir .tmp/qt-observer-build`.
+
+## Repository layout
+
+| Path | What lives there |
+|------|------------------|
+| `src/werewolf_eval/` | Python backend: emergent engine, `action_runtime/` (ability system), providers & registry, observer server, event/log schemas + validators, scoring & attribution, `invariants/` safety net, `ablation/` harness |
+| `clients/qt_observer/` | Qt 6 / QML theater client ([client README](clients/qt_observer/README.md)) |
+| `tests/` | Python test suite (80 files) |
+| `tools/`, `scripts/` | Live-check and dev/smoke utilities |
+| `docs/` | Project docs — start at [`PROJECT_MAP.md`](docs/PROJECT_MAP.md) |
+| `launch-theater.py` / `.bat` | One-click server + client launcher |
+
+## Project status & roadmap
+
+| Phase | Scope | Status |
+|-------|-------|--------|
+| **P1 — Data & event foundation** | Log schemas/validation/scoring/attribution, engine & provider contracts, runtime event spine, observer protocol + server | ✅ Done |
+| **P2 — Watchable AI-vs-AI client** | Emergent engine, BYO-key multi-provider setup, live theater UI, settlement report | 🚧 Current (core delivered; final polish in flight) |
+| **P3 — Evaluation · Replay analysis · Leaderboard** | Settlement deepened into per-player review; per-role AI win-rate leaderboard | ⏳ Planned |
+
+[`docs/PROJECT_MAP.md`](docs/PROJECT_MAP.md) is the authoritative product map (phases + system view). Ongoing research (prompt ablation, game balance) is tracked in `docs/harness/`.
+
+## Documentation
+
+| Doc | Role |
+|-----|------|
+| [PROJECT_MAP](docs/PROJECT_MAP.md) | **Authority** — product phases, module status, system view (SYS-xx) |
+| [PRODUCT_ONE_PAGER](docs/PRODUCT_ONE_PAGER.md) | Product definition: users, inputs, outputs, value |
+| [ROADMAP](docs/ROADMAP.md) | Engineering dependency graph + route history |
+| [TASKS](docs/TASKS.md) | Task-level status ledger |
+| [ADRs](docs/adr/) | Architecture decisions (observer protocol, action runtime orchestrator) |
+| [Qt client README](clients/qt_observer/README.md) | Building, running, and testing the theater client |
+| [EVALUATION_RUBRIC](docs/EVALUATION_RUBRIC.md) | Scoring system reference (P3) |
+
+## Background
+
+The project originates from a multi-agent systems exercise: build an AI Werewolf agent team that plays a hidden-information game under strict information isolation, with a complete match engine, structured observability, and a spectator UI. It started from the *evaluation & replay* direction — deterministic scoring over structured logs — and grew into the live experiment platform described above: run first, observe everything, then evaluate on top of the same auditable data.
