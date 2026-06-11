@@ -80,6 +80,27 @@ def aggregate_games(games: list[dict]) -> dict:
     }
 
 
+def aggregate(run_dirs) -> dict:
+    """Read run dirs, drop low-live (RNG) / incomplete / corrupt games, aggregate the valid ones."""
+    run_dirs = [Path(d) for d in run_dirs]
+    valid, invalid = [], 0
+    for d in run_dirs:
+        gl_path = d / "game-log.json"
+        try:
+            if not gl_path.exists() or live_rate(d) < LIVE_RATE_MIN:
+                invalid += 1; continue
+            gl = json.loads(gl_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            invalid += 1; continue
+        if not (gl.get("result") or {}).get("winner"):
+            invalid += 1; continue
+        valid.append(analyze_game_dict(gl))
+    out = aggregate_games(valid)
+    out["n_total"] = len(run_dirs)
+    out["n_invalid_lowlive"] = invalid
+    return out
+
+
 def analyze_game_dict(gl: dict) -> dict:
     roles = {p["player_id"]: p["role"] for p in gl["players"]}
     wolves = {k for k, v in roles.items() if v == "werewolf"}

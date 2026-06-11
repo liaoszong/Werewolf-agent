@@ -1,4 +1,5 @@
-from werewolf_eval.ablation.metrics import classify_event, analyze_game_dict, live_rate_from_turns, aggregate_games
+from pathlib import Path
+from werewolf_eval.ablation.metrics import classify_event, analyze_game_dict, live_rate_from_turns, aggregate_games, aggregate
 
 def _ev(rnd, phase, actor, target, summary):
     return {"round": rnd, "phase": phase, "actor": actor, "target": target, "data": {"summary": summary}}
@@ -64,3 +65,25 @@ def test_aggregate_filters_low_live_and_counts():
     assert agg["wolf_win_rate"] == 0.5
     assert agg["day1_hit"] == 0.5
     assert agg["witch_save_rate"] == 1.0 and agg["witch_poison_rate"] == 0.0
+
+
+FIX = Path(__file__).parent / "fixtures" / "ablation"
+
+def test_aggregate_reads_dirs_and_reports_invalid():
+    run_dirs = sorted(p for p in FIX.iterdir() if p.is_dir())
+    agg = aggregate(run_dirs)
+    assert agg["n_total"] == 3
+    assert agg["n_valid"] == 3              # all three fixtures are real live games (rate >= 0.89)
+    assert agg["n_invalid_lowlive"] == 0
+    assert abs(agg["villager_win_rate"] - 1/3) < 1e-9
+    assert abs(agg["wolf_win_rate"] - 2/3) < 1e-9
+
+def test_aggregate_counts_missing_and_corrupt_dirs_as_invalid(tmp_path):
+    empty = tmp_path / "no_artifacts"; empty.mkdir()
+    corrupt = tmp_path / "corrupt"; corrupt.mkdir()
+    (corrupt / "game-log.json").write_text("{not json", encoding="utf-8")
+    (corrupt / "provider-turns.json").write_text("{not json", encoding="utf-8")
+    agg = aggregate([empty, corrupt])
+    assert agg["n_total"] == 2
+    assert agg["n_valid"] == 0
+    assert agg["n_invalid_lowlive"] == 2

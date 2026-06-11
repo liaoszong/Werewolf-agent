@@ -1,0 +1,371 @@
+{
+  "game_id": "diag_A_seer_p1_0",
+  "source_label": "[DeepSeek API output]",
+  "players": [
+    {
+      "player_id": "p1",
+      "role": "seer",
+      "team": "villager"
+    },
+    {
+      "player_id": "p2",
+      "role": "villager",
+      "team": "villager"
+    },
+    {
+      "player_id": "p3",
+      "role": "witch",
+      "team": "villager"
+    },
+    {
+      "player_id": "p4",
+      "role": "werewolf",
+      "team": "werewolf"
+    },
+    {
+      "player_id": "p5",
+      "role": "werewolf",
+      "team": "werewolf"
+    },
+    {
+      "player_id": "p6",
+      "role": "villager",
+      "team": "villager"
+    }
+  ],
+  "events": [
+    {
+      "event_id": "diag_A_seer_p1_0_e001",
+      "sequence": 1,
+      "round": 0,
+      "phase": "setup",
+      "type": "role_assignment",
+      "actor": "system",
+      "target": "none",
+      "visibility": "public",
+      "data": {
+        "summary": "Roles assigned to all 6 players.",
+        "visible_info_refs": []
+      }
+    },
+    {
+      "event_id": "diag_A_seer_p1_0_e002",
+      "sequence": 2,
+      "round": 1,
+      "phase": "night",
+      "type": "werewolf_kill",
+      "actor": "p4",
+      "target": "p1",
+      "visibility": "werewolf_team",
+      "data": {
+        "summary": "Wolf team kills p1.",
+        "visible_info_refs": []
+      }
+    },
+    {
+      "event_id": "diag_A_seer_p1_0_e003",
+      "sequence": 3,
+      "round": 1,
+      "phase": "night",
+      "type": "seer_check",
+      "actor": "p1",
+      "target": "p2",
+      "visibility": "seer",
+      "data": {
+        "summary": "Seer p1 checks p2, result: good.",
+        "visible_info_refs": []
+      }
+    },
+    {
+      "event_id": "diag_A_seer_p1_0_e004",
+      "sequence": 4,
+      "round": 1,
+      "phase": "night",
+      "type": "witch_save",
+      "actor": "p3",
+      "target": "p1",
+      "visibility": "witch",
+      "data": {
+        "summary": "Witch p3 saves p1.",
+        "visible_info_refs": []
+      }
+    },
+    {
+      "event_id": "diag_A_seer_p1_0_e005",
+      "sequence": 5,
+      "round": 1,
+      "phase": "day",
+      "type": "day_announcement",
+      "actor": "system",
+      "target": "none",
+      "visibility": "public",
+      "data": {
+        "summary": "A peaceful night: nobody died.",
+        "visible_info_refs": []
+      }
+    },
+    {
+      "event_id": "diag_A_seer_p1_0_e006",
+      "sequence": 6,
+      "round": 1,
+      "phase": "day",
+      "type": "player_speech",
+      "actor": "p1",
+      "target": "none",
+      "visibility": "public",
+      "data": {
+        "summary": "大家好，我是1号玩家。昨晚是个平安夜，没人出局，这算是开了一个好头。我个人怀疑p2可能有问题，因为他的发言风格总是模棱两可，感觉藏着点东西。不过这只是初步感觉，我暂时没有确凿证据。这一轮我倾向先听p2多聊几句，再看看其他人的表态，暂时不急着投票。",
+        "visible_info_refs": []
+      }
+    },
+    {
+      "event_id": "diag_A_seer_p1_0_e007",
+      "sequence": 7,
+      "round": 1,
+      "phase": "day",
+      "type": "player_speech",
+      "actor": "p2",
+      "target": "none",
+      "visibility": "public",
+      "data": {
+        "summary": "大家好，我是2号。平安夜确实是个不错的开局，至少我们没亏。不过1号怀疑我，我觉得有点奇怪，因为这才第一轮，大家都没什么信息，怎么就直接点我了？我发言模棱两可？其实第一轮谁不是在试探呢。我反而有点怀疑1号是不是在带节奏、找焦点。这一轮我倾向先听听3号、4号怎么说，看看能不能找到更明确的坏人线索，暂时不会急着投票。",
+        "visible_info_refs": []
+      }
+    },
+    {
+      "event_id": "diag_A_seer_p1_0_e008",
+      "sequence": 8,
+      "round": 1,
+      "phase": "day",
+      "type": "player_speech",
+      "actor": "p3",
+      "target": "none",
+      "visibility": "public",
+      "data": {
+        "summary": "我是3号玩家。平安夜开局挺稳的，至少排除了狼队首刀女巫的可能。1号和2号这轮互相点了，我觉得两边都说得通，但2号说1号带节奏的回应有点太快了，像是提前准备好的。而且1号至少明确给了怀疑对象，2号却说等别人发言，显得有些躲避。这一轮我倾向投2号，看看他的反应是不是更炸毛。当然，我们还是得听听4号、5号、6号的意见，别让狼人带歪了节奏。",
+        "visible_info_refs": []
+      }
+    },
+    {
+      "event_id": "diag_A_seer_p1_0_e009",
+      "sequence": 9,
+      "round": 1,
+      "phase": "day",
+      "type": "player_speech",
+      "actor": "p4",
+      "target": "none",
+      "visibility": "public",
+      "data": {
+        "summary": "大家好，我是4号。平安夜开局确实挺稳的，至少我们没损失。1号和2号互点这事儿，我注意到3号说2号回应太快像是准备的，但我反过来觉得1号直接点p2也有点急，毕竟第一轮信息太少，1号这个怀疑是不是有点强打了？倒是3号，你分析得头头是道，却急着站队投2号，这节奏带得有点明显啊。我暂时偏向于观望p2和p3的后续反应，这轮我倾向先听听5号、6号怎么说，不急着投票。",
+        "visible_info_refs": []
+      }
+    },
+    {
+      "event_id": "diag_A_seer_p1_0_e010",
+      "sequence": 10,
+      "round": 1,
+      "phase": "day",
+      "type": "player_speech",
+      "actor": "p5",
+      "target": "none",
+      "visibility": "public",
+      "data": {
+        "summary": "好了各位，我是5号。平安夜嘛，确实不错，至少咱们没少人。不过我看了一圈，1号和2号互咬，3号急着站队投2号，4号又说3号带节奏，这轮信息量还挺大的。我个人觉得3号的分析有点太急了，才第一轮就说2号回应太快像是准备好的，这判断是不是下得有点早？我反而更想听听6号怎么说，毕竟他还没开口。这一轮我倾向先不急着投票，看看2号和3号的后续反应，别让狼人浑水摸鱼。要我说，先放个观望票，等第二轮再说吧。",
+        "visible_info_refs": []
+      }
+    },
+    {
+      "event_id": "diag_A_seer_p1_0_e011",
+      "sequence": 11,
+      "round": 1,
+      "phase": "day",
+      "type": "player_speech",
+      "actor": "p6",
+      "target": "none",
+      "visibility": "public",
+      "data": {
+        "summary": "平安夜开局挺稳的，至少咱们没少人。我听了1到5号的发言，感觉3号确实有点过于积极了，才第一轮就急着点2号，还分析得那么笃定，像是急着给自己搭个台阶。4号说3号带节奏，我倒觉得这个反问有道理。我目前最怀疑3号，理由就是他太想带队了，反而有点像在隐藏身份。这一轮我倾向投3号，看看他后续怎么解释，别让他把节奏带偏了。",
+        "visible_info_refs": []
+      }
+    },
+    {
+      "event_id": "diag_A_seer_p1_0_e012",
+      "sequence": 12,
+      "round": 1,
+      "phase": "day",
+      "type": "player_vote",
+      "actor": "p1",
+      "target": "p3",
+      "visibility": "public",
+      "data": {
+        "summary": "p1 votes p3.",
+        "visible_info_refs": []
+      }
+    },
+    {
+      "event_id": "diag_A_seer_p1_0_e013",
+      "sequence": 13,
+      "round": 1,
+      "phase": "day",
+      "type": "player_vote",
+      "actor": "p2",
+      "target": "p3",
+      "visibility": "public",
+      "data": {
+        "summary": "p2 votes p3.",
+        "visible_info_refs": []
+      }
+    },
+    {
+      "event_id": "diag_A_seer_p1_0_e014",
+      "sequence": 14,
+      "round": 1,
+      "phase": "day",
+      "type": "player_vote",
+      "actor": "p3",
+      "target": "p1",
+      "visibility": "public",
+      "data": {
+        "summary": "p3 votes p1.",
+        "visible_info_refs": []
+      }
+    },
+    {
+      "event_id": "diag_A_seer_p1_0_e015",
+      "sequence": 15,
+      "round": 1,
+      "phase": "day",
+      "type": "player_vote",
+      "actor": "p4",
+      "target": "p3",
+      "visibility": "public",
+      "data": {
+        "summary": "p4 votes p3.",
+        "visible_info_refs": []
+      }
+    },
+    {
+      "event_id": "diag_A_seer_p1_0_e016",
+      "sequence": 16,
+      "round": 1,
+      "phase": "day",
+      "type": "player_vote",
+      "actor": "p5",
+      "target": "p3",
+      "visibility": "public",
+      "data": {
+        "summary": "p5 votes p3.",
+        "visible_info_refs": []
+      }
+    },
+    {
+      "event_id": "diag_A_seer_p1_0_e017",
+      "sequence": 17,
+      "round": 1,
+      "phase": "day",
+      "type": "player_vote",
+      "actor": "p6",
+      "target": "p3",
+      "visibility": "public",
+      "data": {
+        "summary": "p6 votes p3.",
+        "visible_info_refs": []
+      }
+    },
+    {
+      "event_id": "diag_A_seer_p1_0_e018",
+      "sequence": 18,
+      "round": 1,
+      "phase": "day",
+      "type": "player_eliminated",
+      "actor": "system",
+      "target": "p3",
+      "visibility": "all",
+      "data": {
+        "summary": "p3 eliminated by vote.",
+        "visible_info_refs": []
+      }
+    },
+    {
+      "event_id": "diag_A_seer_p1_0_e019",
+      "sequence": 19,
+      "round": 1,
+      "phase": "day",
+      "type": "role_revealed",
+      "actor": "system",
+      "target": "p3",
+      "visibility": "all",
+      "data": {
+        "summary": "p3 revealed as witch.",
+        "visible_info_refs": []
+      }
+    },
+    {
+      "event_id": "diag_A_seer_p1_0_e020",
+      "sequence": 20,
+      "round": 2,
+      "phase": "night",
+      "type": "werewolf_kill",
+      "actor": "p4",
+      "target": "p1",
+      "visibility": "werewolf_team",
+      "data": {
+        "summary": "Wolf team kills p1.",
+        "visible_info_refs": []
+      }
+    },
+    {
+      "event_id": "diag_A_seer_p1_0_e021",
+      "sequence": 21,
+      "round": 2,
+      "phase": "night",
+      "type": "seer_check",
+      "actor": "p1",
+      "target": "p5",
+      "visibility": "seer",
+      "data": {
+        "summary": "Seer p1 checks p5, result: werewolf.",
+        "visible_info_refs": []
+      }
+    },
+    {
+      "event_id": "diag_A_seer_p1_0_e022",
+      "sequence": 22,
+      "round": 2,
+      "phase": "night",
+      "type": "player_died",
+      "actor": "system",
+      "target": "p1",
+      "visibility": "all",
+      "data": {
+        "summary": "p1 died during the night.",
+        "visible_info_refs": []
+      }
+    },
+    {
+      "event_id": "diag_A_seer_p1_0_e023",
+      "sequence": 23,
+      "round": 2,
+      "phase": "game_end",
+      "type": "game_over",
+      "actor": "system",
+      "target": "werewolf_team",
+      "visibility": "all",
+      "data": {
+        "summary": "Werewolves reached parity. Werewolf team wins.",
+        "visible_info_refs": []
+      }
+    }
+  ],
+  "result": {
+    "winner": "werewolf",
+    "end_round": 2,
+    "survivors": [
+      "p2",
+      "p4",
+      "p5",
+      "p6"
+    ],
+    "end_condition": "werewolves_reach_parity"
+  }
+}
