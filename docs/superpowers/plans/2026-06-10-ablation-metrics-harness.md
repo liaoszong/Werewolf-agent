@@ -183,8 +183,8 @@ def test_analyze_game_dict_basic():
     assert g["verify_wolf_followed"] is True
     # 视觉幻觉词命中
     assert g["has_visual_halluc"] is True
-    # 羊群:5/6 投 p2
-    assert abs(g["herd_share"] - 5/6) < 1e-9
+    # 羊群:5 票中 4 票投 p2(p2 不投票)= 4/5
+    assert abs(g["herd_share"] - 0.8) < 1e-9
 ```
 
 - [ ] **Step 2: 跑测试确认失败**
