@@ -1,5 +1,5 @@
 from pathlib import Path
-from werewolf_eval.ablation.metrics import classify_event, analyze_game_dict, live_rate_from_turns, aggregate_games, aggregate
+from werewolf_eval.ablation.metrics import classify_event, analyze_game_dict, live_rate_from_turns, aggregate_games, aggregate, compare
 
 def _ev(rnd, phase, actor, target, summary):
     return {"round": rnd, "phase": phase, "actor": actor, "target": target, "data": {"summary": summary}}
@@ -87,3 +87,11 @@ def test_aggregate_counts_missing_and_corrupt_dirs_as_invalid(tmp_path):
     assert agg["n_total"] == 2
     assert agg["n_valid"] == 0
     assert agg["n_invalid_lowlive"] == 2
+
+def test_compare_emits_deltas():
+    a = {"label":"baseline","wolf_win_rate":0.78,"day1_hit":0.51,"halluc_visual_speech_rate":0.20}
+    b = {"label":"b1","wolf_win_rate":0.55,"day1_hit":0.66,"halluc_visual_speech_rate":0.04}
+    rows = compare(a, b, keys=["wolf_win_rate","day1_hit","halluc_visual_speech_rate"])
+    d = {r["metric"]: r for r in rows}
+    assert abs(d["wolf_win_rate"]["delta"] - (-0.23)) < 1e-9
+    assert d["day1_hit"]["a"] == 0.51 and d["day1_hit"]["b"] == 0.66

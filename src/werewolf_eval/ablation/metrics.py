@@ -101,6 +101,24 @@ def aggregate(run_dirs) -> dict:
     return out
 
 
+DEFAULT_COMPARE_KEYS = (
+    "n_valid","wolf_win_rate","villager_win_rate","day1_hit","day2_hit",
+    "verify_wolf_followed","witch_save_rate","witch_poison_rate","herding",
+    "halluc_visual_speech_rate","halluc_visual_game_rate","halluc_mechanic_game_rate",
+    "seer_survives_d1_rate","avg_rounds",
+)
+
+
+def compare(a: dict, b: dict, keys=DEFAULT_COMPARE_KEYS) -> list[dict]:
+    """Compare two aggregated metric dicts (armA vs armB), emitting delta rows."""
+    rows = []
+    for k in keys:
+        va, vb = a.get(k), b.get(k)
+        delta = (vb - va) if isinstance(va, (int, float)) and isinstance(vb, (int, float)) else None
+        rows.append({"metric": k, "a": va, "b": vb, "delta": delta})
+    return rows
+
+
 def analyze_game_dict(gl: dict) -> dict:
     roles = {p["player_id"]: p["role"] for p in gl["players"]}
     wolves = {k for k, v in roles.items() if v == "werewolf"}
