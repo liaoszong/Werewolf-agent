@@ -34,8 +34,16 @@ taskkill //F //PID <pid>                        # bash 下双斜杠
 
 ## git 网络(agent shell)
 
-- agent shell 的 `git fetch/push` 默认失败(代理拒 CONNECT 隧道)。**默认规则:本地只 commit/branch,push/merge 让用户在自己终端执行**,之后用户 pull、你核对本地 SHA。
-- 确需 agent 侧推送时有 inline-flags 配方(清 GCM + 显式 http.proxy basic auth),见 memory `werewolf-env-network-test-limits`;**严禁修改/移除系统代理配置**(用户刻意设置)。
+- 裸 `git fetch/push` 失败(GCM 过不了代理、git 不给 CONNECT 带认证),但 **agent 可以推送**。已验证配方(inline 旗标、零持久化、不写盘):
+
+```bash
+git -c credential.helper= -c credential.helper=store \
+    -c http.proxy="$HTTPS_PROXY" -c http.proxyAuthMethod=basic \
+    <ls-remote|fetch|pull|push> origin ...
+```
+
+  空 `credential.helper=` 清掉 GCM 链,`store` 走 `~/.git-credentials`;代理认证**直接取环境变量**,严禁把代理地址/凭据写进任何仓库文件。`gh` 自动读环境代理,PR 操作直接用(已登录 liaoszong)。
+- **严禁修改/移除系统代理配置**(用户刻意设置)。推 main 仍是外发动作:先 `push --dry-run` 看清推什么。
 - GitHub 归档下载走镜像:`curl -sL "https://gh-proxy.com/https://github.com/<owner>/<repo>/archive/refs/heads/main.tar.gz"`。
 
 ## 常见错误
@@ -45,4 +53,4 @@ taskkill //F //PID <pid>                        # bash 下双斜杠
 | 几十个 server 测试 RemoteDisconnected | 没设 NO_PROXY,不是回归 |
 | ModuleNotFoundError: werewolf_eval | 没设 PYTHONPATH=src |
 | 修复后行为没变 | 旧 server 还活着,taskkill by port 清场 |
-| git push 卡死/Proxy CONNECT aborted | agent shell 推不了,交用户终端 |
+| git push 卡死/Proxy CONNECT aborted | 裸 git 没带配方,用上面 inline 旗标 |
