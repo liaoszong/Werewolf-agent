@@ -138,3 +138,81 @@ def test_system_for_routes_scaffold_speech_v3_and_vote_unchanged():
               prompt_version="prompt_v3")
     a1 = _req(response_kind="action", allowed_actions=["player_vote"], allowed_targets=["p1"])
     assert provider._system_for(a3) == build_action_system_prompt(a1)
+
+
+# ------------------------------------------------------------------ Task 4 tests
+import pytest
+from fake_scribe import _FakeScribeProvider
+
+from werewolf_eval.emergent_engine import EmergentBudget, EmergentGameEngine, build_emergent_config
+from werewolf_eval.emergent_fake_script import build_emergent_fake_agents, build_villager_win_script
+from werewolf_eval.provider_agent import ProviderAgent
+
+
+def _run_v3_engine(broken_scribe=False):
+    agents = build_emergent_fake_agents(build_villager_win_script())
+    scribe = ProviderAgent("scribe", _FakeScribeProvider(broken=broken_scribe))
+    engine = EmergentGameEngine(
+        config=build_emergent_config(game_id="v3t"),
+        agents=agents, seed=7,
+        budget=EmergentBudget(max_requests=80, max_day_rounds=3),
+        prompt_version="prompt_v3", scaffold_agent=scribe,
+    )
+    outcome = engine.run()
+    return engine, outcome, agents, scribe
+
+
+def test_v3_requires_scaffold_agent():
+    agents = build_emergent_fake_agents(build_villager_win_script())
+    with pytest.raises(ValueError, match="scaffold_agent"):
+        EmergentGameEngine(config=build_emergent_config(game_id="v3_noscribe"),
+                           agents=agents, seed=7, prompt_version="prompt_v3")
+
+
+def test_scribe_runs_per_day_round_and_fills_ledger():
+    engine, outcome, _, scribe = _run_v3_engine()
+    assert outcome.completed
+    assert len(scribe.provider.requests) >= 1          # 每个 day 轮 1 次
+    req = scribe.provider.requests[0]
+    assert req.response_kind == "scaffold"
+    assert req.temperature == 0.0                      # 低温(spec §3 评审③)
+    assert req.board_card == "" and req.persona_prompt == ""
+    assert engine._claim_ledger and engine._claim_ledger[0]["claimant"] == "p3"
+    assert all("round" in c for c in engine._claim_ledger)
+    # scribe turn 口径:scaffold kind + live_requested=False
+    sturns = [t for t in outcome.provider_turns if t.get("response_kind") == "scaffold"]
+    assert sturns and all(t["kind"] == "scaffold_success" for t in sturns)
+    assert all(t["live_requested"] is False for t in sturns)
+    assert all(t["actor"] == "scribe" for t in sturns)
+
+
+def test_scribe_all_broken_marks_fallback_and_completes():
+    # 失败路径确定性覆盖(fake 脚本只有 1 个 day 轮,flaky 写法是死分支——评审修复):
+    # 全程 broken -> 全部 scaffold_fallback、对局照常完成、账本为空
+    engine, outcome, _, scribe = _run_v3_engine(broken_scribe=True)
+    assert outcome.completed
+    sturns = [t for t in outcome.provider_turns if t.get("response_kind") == "scaffold"]
+    assert sturns and all(t["kind"] == "scaffold_fallback" for t in sturns)
+    assert all(t["fallback_reason"] for t in sturns)
+    assert engine._claim_ledger == []
+
+
+def test_scribe_failure_preserves_history():
+    # 历史保留语义(spec §3 评审修订②/§8.2)确定性单测:预填账本 -> broken scribe
+    # 跑一轮 _run_scribe -> 旧 claims 原样还在(不依赖脚本天数)
+    agents = build_emergent_fake_agents(build_villager_win_script())
+    scribe = ProviderAgent("scribe", _FakeScribeProvider(broken=True))
+    engine = EmergentGameEngine(
+        config=build_emergent_config(game_id="v3_hist"),
+        agents=agents, seed=7,
+        budget=EmergentBudget(max_requests=80, max_day_rounds=3),
+        prompt_version="prompt_v3", scaffold_agent=scribe,
+    )
+    old = {"round": 0, "claimant": "p9", "claim_type": "identity_claim", "target": None,
+           "result": "seer", "refutes": None, "source": 1,
+           "source_quote": "历史条目", "uncertain": False}
+    engine._claim_ledger.append(dict(old))
+    engine._emit("day", 1, "player_speech", "p3", "none", "public", "测试发言。")
+    engine._run_scribe(1)
+    assert engine._claim_ledger == [old]               # 失败不清史
+    assert engine._provider_turns[-1]["kind"] == "scaffold_fallback"
