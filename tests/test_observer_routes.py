@@ -162,5 +162,49 @@ class PostDeleteTableTests(unittest.TestCase):
         self.assertTrue(m[0].same_origin)
 
 
+class FacadeParityTests(unittest.TestCase):
+    """The 25-name import surface of ``werewolf_eval.observer_server`` is a
+    frozen contract: do-not-touch test files and ``run_observer_server`` import
+    these names (public AND underscore-private) from the facade. Pin every one;
+    extend this list when adding names, never prune it."""
+
+    FACADE_NAMES = (
+        "ObserverRequestHandler",
+        "ObserverServerState",
+        "RunLauncher",
+        "create_observer_server",
+        "default_fake_launcher",
+        "_CREDENTIAL_PROVIDERS",
+        "_LOOPBACK_HOSTNAMES",
+        "_PROFILE_NAME_RE",
+        "_build_capabilities_payload",
+        "_check_live_capability",
+        "_check_live_profile_shape",
+        "_credentials_delete_result",
+        "_credentials_post_result",
+        "_hostname_of",
+        "_is_loopback_hostname",
+        "_map_launcher_exit_reason",
+        "_provider_live_posture",
+        "_provider_models_result",
+        "_read_events_jsonl_safe",
+        "_read_execution_mode",
+        "_resolve_live_launcher_for_launch",
+        "_run_delete_result",
+        "_sanitize_launcher_error",
+        "_schema_payload",
+        "_seed_default_profile",
+    )
+
+    def test_all_25_names_importable_from_facade(self) -> None:
+        import werewolf_eval.observer_server as facade
+
+        self.assertEqual(len(self.FACADE_NAMES), 25)
+        for name in self.FACADE_NAMES:
+            self.assertTrue(
+                hasattr(facade, name), f"facade lost re-export: {name}"
+            )
+
+
 if __name__ == "__main__":
     unittest.main()
