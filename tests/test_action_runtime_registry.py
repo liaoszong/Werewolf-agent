@@ -9,7 +9,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from werewolf_eval.action_runtime.abilities import TARGET_RULES
 from werewolf_eval.action_runtime.registry import RoleAbilityRegistry
-from werewolf_eval.action_runtime.ruleset import rules_v1
+from werewolf_eval.action_runtime.ruleset import rules_v1, rules_v1_2
 from werewolf_eval.action_runtime.state import RuntimeState
 
 
@@ -107,6 +107,31 @@ class RegistryParityTests(unittest.TestCase):
         }
         for (role, phase), want in expected.items():
             self.assertEqual(self.reg.allowed_actions(role, phase), want, f"{role}/{phase}")
+
+    def test_allowed_actions_pinned_v1_2_guard_rows(self) -> None:
+        # L4 guard arm: the v1_2 registry adds EXACTLY the guard rows; the 7
+        # original (role, phase) combos stay byte-identical (superset contract).
+        reg = RoleAbilityRegistry(rules_v1_2())
+        self.assertEqual(reg.allowed_actions("guard", "night"), ["guard_protect"])
+        self.assertEqual(reg.allowed_actions("guard", "day_vote"), ["player_vote"])
+        original = {
+            ("werewolf", "night"): ["werewolf_kill"],
+            ("seer", "night"): ["seer_check"],
+            ("witch", "night"): ["witch_save", "witch_poison", "witch_pass"],
+            ("werewolf", "day_vote"): ["player_vote"],
+            ("seer", "day_vote"): ["player_vote"],
+            ("witch", "day_vote"): ["player_vote"],
+            ("villager", "day_vote"): ["player_vote"],
+        }
+        for (role, phase), want in original.items():
+            self.assertEqual(reg.allowed_actions(role, phase), want, f"{role}/{phase}")
+
+    def test_provider_agent_module_registry_knows_guard(self) -> None:
+        # provider_agent's import-time registry must be rules_v1_2 (a guard seat's
+        # decide() derives its allowed_actions from it).
+        from werewolf_eval.provider_agent import _ALLOWED_ACTIONS_REGISTRY
+        self.assertEqual(_ALLOWED_ACTIONS_REGISTRY.allowed_actions("guard", "night"),
+                         ["guard_protect"])
 
     def test_legal_targets_wolf_kill_excludes_wolves(self) -> None:
         s = RuntimeState(
