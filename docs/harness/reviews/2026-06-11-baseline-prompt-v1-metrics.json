@@ -1,0 +1,30 @@
+{
+ "arm": "baseline",
+ "prompt_version": "prompt_v1",
+ "n_games": 45,
+ "metrics": {
+  "n_valid": 45,
+  "wolf_win_rate": 0.7777777777777778,
+  "villager_win_rate": 0.2222222222222222,
+  "day1_hit": 0.4222222222222222,
+  "day2_hit": 0.5,
+  "verify_wolf_followed": 0.5,
+  "verify_wolf_followed_n": 18,
+  "witch_save_rate": 0.9333333333333333,
+  "witch_poison_rate": 0.0,
+  "herding": 0.7190740740740741,
+  "halluc_visual_speech_rate": 0.1239193083573487,
+  "halluc_visual_game_rate": 0.35555555555555557,
+  "halluc_mechanic_game_rate": 0.1111111111111111,
+  "seer_survives_d1_rate": 0.7333333333333333,
+  "avg_rounds": 2.1555555555555554,
+  "night1_kill_dist": {
+   "p1": 31,
+   "p2": 6,
+   "p3": 6,
+   "p4": 2
+  },
+  "n_total": 45,
+  "n_invalid_lowlive": 0
+ }
+}

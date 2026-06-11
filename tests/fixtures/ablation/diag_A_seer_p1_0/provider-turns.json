@@ -1,0 +1,525 @@
+{
+  "live_requested_actions": 19,
+  "live_success_actions": 19,
+  "live_success_rate": 1.0,
+  "by_provider_result_kind": {
+    "live_success": 19
+  },
+  "total_completion_tokens": 14314,
+  "turns": [
+    {
+      "request_id": "diag_A_seer_p1_0_r01_p4",
+      "round": 1,
+      "phase": "night",
+      "actor": "p4",
+      "response_kind": "action",
+      "live_requested": true,
+      "kind": "live_success",
+      "fallback_reason": null,
+      "source_label": "[DeepSeek API output]",
+      "model": "deepseek-v4-flash",
+      "token_usage": {
+        "prompt_tokens": 239,
+        "completion_tokens": 63,
+        "total_tokens": 302
+      },
+      "observation_source_event_ids": [
+        "diag_A_seer_p1_0_e001"
+      ]
+    },
+    {
+      "request_id": "diag_A_seer_p1_0_r01_p5",
+      "round": 1,
+      "phase": "night",
+      "actor": "p5",
+      "response_kind": "action",
+      "live_requested": true,
+      "kind": "live_success",
+      "fallback_reason": null,
+      "source_label": "[DeepSeek API output]",
+      "model": "deepseek-v4-flash",
+      "token_usage": {
+        "prompt_tokens": 239,
+        "completion_tokens": 62,
+        "total_tokens": 301
+      },
+      "observation_source_event_ids": [
+        "diag_A_seer_p1_0_e001"
+      ]
+    },
+    {
+      "request_id": "diag_A_seer_p1_0_r01_p1",
+      "round": 1,
+      "phase": "night",
+      "actor": "p1",
+      "response_kind": "action",
+      "live_requested": true,
+      "kind": "live_success",
+      "fallback_reason": null,
+      "source_label": "[DeepSeek API output]",
+      "model": "deepseek-v4-flash",
+      "token_usage": {
+        "prompt_tokens": 228,
+        "completion_tokens": 39,
+        "total_tokens": 267
+      },
+      "observation_source_event_ids": [
+        "diag_A_seer_p1_0_e001"
+      ]
+    },
+    {
+      "request_id": "diag_A_seer_p1_0_r01_p3_witch",
+      "round": 1,
+      "phase": "night",
+      "actor": "p3",
+      "response_kind": "action",
+      "live_requested": true,
+      "kind": "live_success",
+      "fallback_reason": null,
+      "source_label": "[DeepSeek API output]",
+      "model": "deepseek-v4-flash",
+      "token_usage": {
+        "prompt_tokens": 262,
+        "completion_tokens": 64,
+        "total_tokens": 326
+      },
+      "observation_source_event_ids": [
+        "diag_A_seer_p1_0_e001"
+      ]
+    },
+    {
+      "request_id": "diag_A_seer_p1_0_r01_p1_speech",
+      "round": 1,
+      "phase": "day",
+      "actor": "p1",
+      "response_kind": "speech",
+      "live_requested": true,
+      "kind": "live_success",
+      "fallback_reason": null,
+      "source_label": "[DeepSeek API output]",
+      "model": "deepseek-v4-flash",
+      "token_usage": {
+        "prompt_tokens": 173,
+        "completion_tokens": 78,
+        "total_tokens": 251
+      },
+      "observation_source_event_ids": [
+        "diag_A_seer_p1_0_e001",
+        "diag_A_seer_p1_0_e005",
+        "diag_A_seer_p1_0_e003"
+      ]
+    },
+    {
+      "request_id": "diag_A_seer_p1_0_r01_p2_speech",
+      "round": 1,
+      "phase": "day",
+      "actor": "p2",
+      "response_kind": "speech",
+      "live_requested": true,
+      "kind": "live_success",
+      "fallback_reason": null,
+      "source_label": "[DeepSeek API output]",
+      "model": "deepseek-v4-flash",
+      "token_usage": {
+        "prompt_tokens": 240,
+        "completion_tokens": 98,
+        "total_tokens": 338
+      },
+      "observation_source_event_ids": [
+        "diag_A_seer_p1_0_e001",
+        "diag_A_seer_p1_0_e005",
+        "diag_A_seer_p1_0_e006"
+      ]
+    },
+    {
+      "request_id": "diag_A_seer_p1_0_r01_p3_speech",
+      "round": 1,
+      "phase": "day",
+      "actor": "p3",
+      "response_kind": "speech",
+      "live_requested": true,
+      "kind": "live_success",
+      "fallback_reason": null,
+      "source_label": "[DeepSeek API output]",
+      "model": "deepseek-v4-flash",
+      "token_usage": {
+        "prompt_tokens": 357,
+        "completion_tokens": 115,
+        "total_tokens": 472
+      },
+      "observation_source_event_ids": [
+        "diag_A_seer_p1_0_e001",
+        "diag_A_seer_p1_0_e005",
+        "diag_A_seer_p1_0_e006",
+        "diag_A_seer_p1_0_e007",
+        "diag_A_seer_p1_0_e004"
+      ]
+    },
+    {
+      "request_id": "diag_A_seer_p1_0_r01_p4_speech",
+      "round": 1,
+      "phase": "day",
+      "actor": "p4",
+      "response_kind": "speech",
+      "live_requested": true,
+      "kind": "live_success",
+      "fallback_reason": null,
+      "source_label": "[DeepSeek API output]",
+      "model": "deepseek-v4-flash",
+      "token_usage": {
+        "prompt_tokens": 488,
+        "completion_tokens": 126,
+        "total_tokens": 614
+      },
+      "observation_source_event_ids": [
+        "diag_A_seer_p1_0_e001",
+        "diag_A_seer_p1_0_e005",
+        "diag_A_seer_p1_0_e006",
+        "diag_A_seer_p1_0_e007",
+        "diag_A_seer_p1_0_e008",
+        "diag_A_seer_p1_0_e002"
+      ]
+    },
+    {
+      "request_id": "diag_A_seer_p1_0_r01_p5_speech",
+      "round": 1,
+      "phase": "day",
+      "actor": "p5",
+      "response_kind": "speech",
+      "live_requested": true,
+      "kind": "live_success",
+      "fallback_reason": null,
+      "source_label": "[DeepSeek API output]",
+      "model": "deepseek-v4-flash",
+      "token_usage": {
+        "prompt_tokens": 621,
+        "completion_tokens": 137,
+        "total_tokens": 758
+      },
+      "observation_source_event_ids": [
+        "diag_A_seer_p1_0_e001",
+        "diag_A_seer_p1_0_e005",
+        "diag_A_seer_p1_0_e006",
+        "diag_A_seer_p1_0_e007",
+        "diag_A_seer_p1_0_e008",
+        "diag_A_seer_p1_0_e009",
+        "diag_A_seer_p1_0_e002"
+      ]
+    },
+    {
+      "request_id": "diag_A_seer_p1_0_r01_p6_speech",
+      "round": 1,
+      "phase": "day",
+      "actor": "p6",
+      "response_kind": "speech",
+      "live_requested": true,
+      "kind": "live_success",
+      "fallback_reason": null,
+      "source_label": "[DeepSeek API output]",
+      "model": "deepseek-v4-flash",
+      "token_usage": {
+        "prompt_tokens": 744,
+        "completion_tokens": 110,
+        "total_tokens": 854
+      },
+      "observation_source_event_ids": [
+        "diag_A_seer_p1_0_e001",
+        "diag_A_seer_p1_0_e005",
+        "diag_A_seer_p1_0_e006",
+        "diag_A_seer_p1_0_e007",
+        "diag_A_seer_p1_0_e008",
+        "diag_A_seer_p1_0_e009",
+        "diag_A_seer_p1_0_e010"
+      ]
+    },
+    {
+      "request_id": "diag_A_seer_p1_0_r01_p1",
+      "round": 1,
+      "phase": "day",
+      "actor": "p1",
+      "response_kind": "action",
+      "live_requested": true,
+      "kind": "live_success",
+      "fallback_reason": null,
+      "source_label": "[DeepSeek API output]",
+      "model": "deepseek-v4-flash",
+      "token_usage": {
+        "prompt_tokens": 965,
+        "completion_tokens": 82,
+        "total_tokens": 1047
+      },
+      "observation_source_event_ids": [
+        "diag_A_seer_p1_0_e001",
+        "diag_A_seer_p1_0_e005",
+        "diag_A_seer_p1_0_e006",
+        "diag_A_seer_p1_0_e007",
+        "diag_A_seer_p1_0_e008",
+        "diag_A_seer_p1_0_e009",
+        "diag_A_seer_p1_0_e010",
+        "diag_A_seer_p1_0_e011",
+        "diag_A_seer_p1_0_e003"
+      ]
+    },
+    {
+      "request_id": "diag_A_seer_p1_0_r01_p2",
+      "round": 1,
+      "phase": "day",
+      "actor": "p2",
+      "response_kind": "action",
+      "live_requested": true,
+      "kind": "live_success",
+      "fallback_reason": null,
+      "source_label": "[DeepSeek API output]",
+      "model": "deepseek-v4-flash",
+      "token_usage": {
+        "prompt_tokens": 959,
+        "completion_tokens": 85,
+        "total_tokens": 1044
+      },
+      "observation_source_event_ids": [
+        "diag_A_seer_p1_0_e001",
+        "diag_A_seer_p1_0_e005",
+        "diag_A_seer_p1_0_e006",
+        "diag_A_seer_p1_0_e007",
+        "diag_A_seer_p1_0_e008",
+        "diag_A_seer_p1_0_e009",
+        "diag_A_seer_p1_0_e010",
+        "diag_A_seer_p1_0_e011",
+        "diag_A_seer_p1_0_e012"
+      ]
+    },
+    {
+      "request_id": "diag_A_seer_p1_0_r01_p3",
+      "round": 1,
+      "phase": "day",
+      "actor": "p3",
+      "response_kind": "action",
+      "live_requested": true,
+      "kind": "live_success",
+      "fallback_reason": null,
+      "source_label": "[DeepSeek API output]",
+      "model": "deepseek-v4-flash",
+      "token_usage": {
+        "prompt_tokens": 983,
+        "completion_tokens": 89,
+        "total_tokens": 1072
+      },
+      "observation_source_event_ids": [
+        "diag_A_seer_p1_0_e001",
+        "diag_A_seer_p1_0_e005",
+        "diag_A_seer_p1_0_e006",
+        "diag_A_seer_p1_0_e007",
+        "diag_A_seer_p1_0_e008",
+        "diag_A_seer_p1_0_e009",
+        "diag_A_seer_p1_0_e010",
+        "diag_A_seer_p1_0_e011",
+        "diag_A_seer_p1_0_e012",
+        "diag_A_seer_p1_0_e013",
+        "diag_A_seer_p1_0_e004"
+      ]
+    },
+    {
+      "request_id": "diag_A_seer_p1_0_r01_p4",
+      "round": 1,
+      "phase": "day",
+      "actor": "p4",
+      "response_kind": "action",
+      "live_requested": true,
+      "kind": "live_success",
+      "fallback_reason": null,
+      "source_label": "[DeepSeek API output]",
+      "model": "deepseek-v4-flash",
+      "token_usage": {
+        "prompt_tokens": 1004,
+        "completion_tokens": 75,
+        "total_tokens": 1079
+      },
+      "observation_source_event_ids": [
+        "diag_A_seer_p1_0_e001",
+        "diag_A_seer_p1_0_e005",
+        "diag_A_seer_p1_0_e006",
+        "diag_A_seer_p1_0_e007",
+        "diag_A_seer_p1_0_e008",
+        "diag_A_seer_p1_0_e009",
+        "diag_A_seer_p1_0_e010",
+        "diag_A_seer_p1_0_e011",
+        "diag_A_seer_p1_0_e012",
+        "diag_A_seer_p1_0_e013",
+        "diag_A_seer_p1_0_e014",
+        "diag_A_seer_p1_0_e002"
+      ]
+    },
+    {
+      "request_id": "diag_A_seer_p1_0_r01_p5",
+      "round": 1,
+      "phase": "day",
+      "actor": "p5",
+      "response_kind": "action",
+      "live_requested": true,
+      "kind": "live_success",
+      "fallback_reason": null,
+      "source_label": "[DeepSeek API output]",
+      "model": "deepseek-v4-flash",
+      "token_usage": {
+        "prompt_tokens": 1016,
+        "completion_tokens": 80,
+        "total_tokens": 1096
+      },
+      "observation_source_event_ids": [
+        "diag_A_seer_p1_0_e001",
+        "diag_A_seer_p1_0_e005",
+        "diag_A_seer_p1_0_e006",
+        "diag_A_seer_p1_0_e007",
+        "diag_A_seer_p1_0_e008",
+        "diag_A_seer_p1_0_e009",
+        "diag_A_seer_p1_0_e010",
+        "diag_A_seer_p1_0_e011",
+        "diag_A_seer_p1_0_e012",
+        "diag_A_seer_p1_0_e013",
+        "diag_A_seer_p1_0_e014",
+        "diag_A_seer_p1_0_e015",
+        "diag_A_seer_p1_0_e002"
+      ]
+    },
+    {
+      "request_id": "diag_A_seer_p1_0_r01_p6",
+      "round": 1,
+      "phase": "day",
+      "actor": "p6",
+      "response_kind": "action",
+      "live_requested": true,
+      "kind": "live_success",
+      "fallback_reason": null,
+      "source_label": "[DeepSeek API output]",
+      "model": "deepseek-v4-flash",
+      "token_usage": {
+        "prompt_tokens": 1007,
+        "completion_tokens": 66,
+        "total_tokens": 1073
+      },
+      "observation_source_event_ids": [
+        "diag_A_seer_p1_0_e001",
+        "diag_A_seer_p1_0_e005",
+        "diag_A_seer_p1_0_e006",
+        "diag_A_seer_p1_0_e007",
+        "diag_A_seer_p1_0_e008",
+        "diag_A_seer_p1_0_e009",
+        "diag_A_seer_p1_0_e010",
+        "diag_A_seer_p1_0_e011",
+        "diag_A_seer_p1_0_e012",
+        "diag_A_seer_p1_0_e013",
+        "diag_A_seer_p1_0_e014",
+        "diag_A_seer_p1_0_e015",
+        "diag_A_seer_p1_0_e016"
+      ]
+    },
+    {
+      "request_id": "diag_A_seer_p1_0_r02_p4",
+      "round": 2,
+      "phase": "night",
+      "actor": "p4",
+      "response_kind": "action",
+      "live_requested": true,
+      "kind": "live_success",
+      "fallback_reason": null,
+      "source_label": "[DeepSeek API output]",
+      "model": "deepseek-v4-flash",
+      "token_usage": {
+        "prompt_tokens": 1060,
+        "completion_tokens": 90,
+        "total_tokens": 1150
+      },
+      "observation_source_event_ids": [
+        "diag_A_seer_p1_0_e001",
+        "diag_A_seer_p1_0_e005",
+        "diag_A_seer_p1_0_e006",
+        "diag_A_seer_p1_0_e007",
+        "diag_A_seer_p1_0_e008",
+        "diag_A_seer_p1_0_e009",
+        "diag_A_seer_p1_0_e010",
+        "diag_A_seer_p1_0_e011",
+        "diag_A_seer_p1_0_e012",
+        "diag_A_seer_p1_0_e013",
+        "diag_A_seer_p1_0_e014",
+        "diag_A_seer_p1_0_e015",
+        "diag_A_seer_p1_0_e016",
+        "diag_A_seer_p1_0_e017",
+        "diag_A_seer_p1_0_e018",
+        "diag_A_seer_p1_0_e019",
+        "diag_A_seer_p1_0_e002"
+      ]
+    },
+    {
+      "request_id": "diag_A_seer_p1_0_r02_p5",
+      "round": 2,
+      "phase": "night",
+      "actor": "p5",
+      "response_kind": "action",
+      "live_requested": true,
+      "kind": "live_success",
+      "fallback_reason": null,
+      "source_label": "[DeepSeek API output]",
+      "model": "deepseek-v4-flash",
+      "token_usage": {
+        "prompt_tokens": 1060,
+        "completion_tokens": 79,
+        "total_tokens": 1139
+      },
+      "observation_source_event_ids": [
+        "diag_A_seer_p1_0_e001",
+        "diag_A_seer_p1_0_e005",
+        "diag_A_seer_p1_0_e006",
+        "diag_A_seer_p1_0_e007",
+        "diag_A_seer_p1_0_e008",
+        "diag_A_seer_p1_0_e009",
+        "diag_A_seer_p1_0_e010",
+        "diag_A_seer_p1_0_e011",
+        "diag_A_seer_p1_0_e012",
+        "diag_A_seer_p1_0_e013",
+        "diag_A_seer_p1_0_e014",
+        "diag_A_seer_p1_0_e015",
+        "diag_A_seer_p1_0_e016",
+        "diag_A_seer_p1_0_e017",
+        "diag_A_seer_p1_0_e018",
+        "diag_A_seer_p1_0_e019",
+        "diag_A_seer_p1_0_e002"
+      ]
+    },
+    {
+      "request_id": "diag_A_seer_p1_0_r02_p1",
+      "round": 2,
+      "phase": "night",
+      "actor": "p1",
+      "response_kind": "action",
+      "live_requested": true,
+      "kind": "live_success",
+      "fallback_reason": null,
+      "source_label": "[DeepSeek API output]",
+      "model": "deepseek-v4-flash",
+      "token_usage": {
+        "prompt_tokens": 1055,
+        "completion_tokens": 76,
+        "total_tokens": 1131
+      },
+      "observation_source_event_ids": [
+        "diag_A_seer_p1_0_e001",
+        "diag_A_seer_p1_0_e005",
+        "diag_A_seer_p1_0_e006",
+        "diag_A_seer_p1_0_e007",
+        "diag_A_seer_p1_0_e008",
+        "diag_A_seer_p1_0_e009",
+        "diag_A_seer_p1_0_e010",
+        "diag_A_seer_p1_0_e011",
+        "diag_A_seer_p1_0_e012",
+        "diag_A_seer_p1_0_e013",
+        "diag_A_seer_p1_0_e014",
+        "diag_A_seer_p1_0_e015",
+        "diag_A_seer_p1_0_e016",
+        "diag_A_seer_p1_0_e017",
+        "diag_A_seer_p1_0_e018",
+        "diag_A_seer_p1_0_e019",
+        "diag_A_seer_p1_0_e003"
+      ]
+    }
+  ]
+}
