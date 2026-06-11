@@ -133,16 +133,30 @@ def build_speech_system_prompt_v2(request: ProviderRequest) -> str:
     )
 
 
+def _board_card_has_guard(board_card: str | None) -> bool:
+    """True iff the board card lists the guard as an ON-BOARD role. Keyed to the
+    rules-card role line format ('- 守卫(') — golden-locked, so the marker is
+    stable; the plain substring '守卫' would false-positive on the standard
+    board's '没有守卫或守夜人' line."""
+    return bool(board_card) and "- 守卫(" in board_card
+
+
 def build_speech_system_prompt_v3(request: ProviderRequest) -> str:
     # SYS-B4 §4 graded guidance: speech stays RESTRAINED (the b1 lesson — handing
     # the discrimination program to every seat armed wolf fake-claims). Neutral
     # speech requirements + anti-visual/anti-mechanic line only; the comparison
     # program ships ONLY in the vote scaffold (observation side).
+    # L4: on guard boards the anti-mechanic line must not deny the guard;
+    # non-guard boards keep the EXACT original bytes (golden-locked).
+    if _board_card_has_guard(request.board_card):
+        no_mech = "局内不存在表情、眼神、语气等信息,也没有警长等本局规则卡之外的机制,不要编造。"
+    else:
+        no_mech = "局内不存在表情、眼神、语气等信息,也没有警长、守卫等本局规则卡之外的机制,不要编造。"
     return (
         f"你是狼人杀里的 {request.actor}(第 {request.round} 轮,白天发言)。"
         f"请用自然口吻发言,3-5 句或 120-180 字,不要固定小标题,不要输出 JSON,直接说话。"
         f"发言应包含:当前局势判断、你怀疑或相信的对象、一个具体理由、本轮投票倾向。"
-        f"局内不存在表情、眼神、语气等信息,也没有警长、守卫等本局规则卡之外的机制,不要编造。"
+        f"{no_mech}"
     )
 
 
