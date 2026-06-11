@@ -50,15 +50,12 @@ from werewolf_eval.action_runtime import (
 )
 from werewolf_eval.action_runtime.abilities import TARGET_RULES
 from werewolf_eval.invariants.guards import assert_prompt_entitled, assert_death_commit_once
-from werewolf_eval.prompt_version import KNOWN_PROMPT_VERSIONS
+from werewolf_eval.prompt_renderers import get_renderer
 from werewolf_eval.prompt_v1 import RenderedObservation, render_observation_text
-from werewolf_eval.prompt_v2 import build_board_rules_card, render_observation_text_v2
 from werewolf_eval.prompt_v3 import (
     SCRIBE_MAX_OUTPUT_TOKENS,
     parse_scribe_claims,
-    render_claim_digest,
     render_scribe_input,
-    render_vote_scaffold,
 )
 
 # The provider request phase used for free-text speeches. The game_log event is
@@ -262,22 +259,17 @@ class EmergentGameEngine:
         self._settler = JointSettler(_ruleset)
         self._validator = ActionValidator(self._registry)
         # SYS-B1: runtime-selectable prompt rendering chain (v1 default = legacy
-        # bytes). Fail loud on unknown versions — no silent fallback.
-        if prompt_version not in KNOWN_PROMPT_VERSIONS:
-            raise ValueError(
-                f"unknown prompt_version {prompt_version!r}; known: {KNOWN_PROMPT_VERSIONS}"
-            )
+        # bytes). get_renderer fail-louds on unknown versions — no silent fallback.
+        self._renderer = get_renderer(prompt_version)
         self.prompt_version = prompt_version
-        self._board_card = ""
-        if prompt_version in ("prompt_v2", "prompt_v3"):
-            self._board_card = build_board_rules_card(
-                _ruleset, {p.player_id: p.role for p in config.players}
-            )
-        # SYS-B4: the scribe is NOT a player. prompt_v3 REQUIRES it (no silent
-        # scaffold-less v3); other versions ignore it.
+        self._board_card = self._renderer.board_card(
+            _ruleset, {p.player_id: p.role for p in config.players}
+        )
+        # SYS-B4: the scribe is NOT a player. A scaffold-requiring renderer (v3)
+        # REQUIRES it (no silent scaffold-less run); other versions ignore it.
         self._scaffold_agent = scaffold_agent
-        if prompt_version == "prompt_v3" and scaffold_agent is None:
-            raise ValueError("prompt_v3 requires a scaffold_agent (scribe provider)")
+        if self._renderer.requires_scaffold and scaffold_agent is None:
+            raise ValueError(f"{prompt_version} requires a scaffold_agent (scribe provider)")
         # Cross-round claim ledger; scribe failures NEVER clear it (spec §3 ②).
         self._claim_ledger: list[dict[str, Any]] = []
         # Registry-driven action dispatch (Phase-3 ②a). Each migrated ability id maps to a
@@ -489,10 +481,7 @@ class EmergentGameEngine:
         return {e["event_id"]: e for e in self._events}
 
     def _render_obs(self, obs: AgentObservation) -> RenderedObservation:
-        if self.prompt_version in ("prompt_v2", "prompt_v3"):
-            text, ids = render_observation_text_v2(obs, self._events_by_id())
-            return RenderedObservation(text=text, source_event_ids=ids)
-        return render_observation_text(obs, self._events_by_id())
+        return self._renderer.render_observation(obs, self._events_by_id())
 
     def _b1_seat_index(self):
         cached = getattr(self, "_b1_seat_index_cache", None)
@@ -539,12 +528,11 @@ class EmergentGameEngine:
         obs = self._build_obs(player_id, phase, rnd)
         rendered = self._render_obs(obs)
         agent = self._agents[player_id]
-        obs_text = rendered.text
-        if self.prompt_version == "prompt_v3" and phase == "day":
-            # vote request (the only day-phase action path; hunter uses its own
-            # site): inject digest + comparison program. Input-side ONLY — the
-            # action system prompt / strict-JSON contract is untouched (spec §0).
-            obs_text = f"{obs_text}\n{render_vote_scaffold(self._claim_ledger)}"
+        # vote request (the only day-phase action path; hunter uses its own
+        # site): a scaffold renderer (v3) injects digest + comparison program.
+        # Input-side ONLY — the action system prompt / strict-JSON contract is
+        # untouched (spec §0). Empty suffix for v1/v2 keeps bytes identical.
+        obs_text = rendered.text + self._renderer.action_obs_suffix(phase, self._claim_ledger)
         turn: dict[str, Any] = {
             "request_id": f"{self._game_id}_r{rnd:02d}_{player_id}",
             "round": rnd,
@@ -866,11 +854,10 @@ class EmergentGameEngine:
         provider = self._agents[player_id].provider
         obs = self._build_obs(player_id, SPEECH_REQUEST_PHASE, rnd)
         rendered = self._render_obs(obs)
-        obs_text = rendered.text
-        if self.prompt_version == "prompt_v3" and self._claim_ledger:
-            # graded guidance: speeches get the DIGEST only (information symmetry),
-            # never the comparison program (b1 lesson: don't arm wolf fake-claims).
-            obs_text = f"{obs_text}\n{render_claim_digest(self._claim_ledger)}"
+        # graded guidance: speeches get the DIGEST only (information symmetry),
+        # never the comparison program (b1 lesson: don't arm wolf fake-claims).
+        # Non-v3 renderers return "" — bytes identical.
+        obs_text = rendered.text + self._renderer.speech_obs_suffix(self._claim_ledger)
         request = ProviderRequest(
             request_id=f"{self._game_id}_r{rnd:02d}_{player_id}_speech",
             game_id=self._game_id,
@@ -1144,7 +1131,7 @@ class EmergentGameEngine:
             for speaker in self._alive_in_seat_order():
                 self._resolve_speech(speaker, rnd)
 
-            if self.prompt_version == "prompt_v3":
+            if self._renderer.requires_scaffold:
                 self._run_scribe(rnd)
 
             eliminated = self._RESOLVERS["player_vote"](rnd)
