@@ -8,12 +8,10 @@ from __future__ import annotations
 
 import json
 import re
-import shutil
 import time
-from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from threading import Lock, Thread
+from threading import Thread
 from typing import Callable
 from urllib.parse import parse_qs, unquote, urlparse
 
@@ -22,9 +20,7 @@ from werewolf_eval.observer_protocol import (
     ObserverProtocolError,
     artifact_path,
     build_artifact_registry,
-    build_run_detail,
     build_run_summary,
-    build_runtime_capabilities,
     build_snapshot_registry,
     event_visible_to_perspective,
     filter_events_for_perspective,
@@ -36,10 +32,22 @@ from werewolf_eval.observer_protocol import (
     normalize_perspective,
     parse_launch_request,
     parse_profile_launch_request,
-    read_run_status,
     safe_child_path,
     validate_run_id,
-    write_run_status,
+)
+from werewolf_eval.observer.run_manager import (
+    RunManager,
+    _build_capabilities_payload,
+    _check_live_capability,
+    _check_live_profile_shape,
+    _map_launcher_exit_reason,
+    _provider_live_posture,
+    _read_events_jsonl_safe,
+    _read_execution_mode,
+    _resolve_live_launcher_for_launch,
+    _run_delete_result,
+    _sanitize_launcher_error,
+    _schema_payload,
 )
 from werewolf_eval.observer.security import (
     _LOOPBACK_HOSTNAMES,
@@ -48,12 +56,11 @@ from werewolf_eval.observer.security import (
     is_loopback_client,
     is_same_origin_local,
 )
+from werewolf_eval.observer.state import ObserverServerState, RunLauncher
 from werewolf_eval.credential_store import CredentialStore
 from werewolf_eval.deepseek_launcher import build_multi_provider_launcher
-from werewolf_eval.evaluation_versions import read_manifest_bucket
 from werewolf_eval.llm_providers import ChatProviderConfig
-from werewolf_eval.provider_registry import PROVIDER_REGISTRY, list_models, provider_specs_payload
-from werewolf_eval.seat_agents import ProviderCredential
+from werewolf_eval.provider_registry import PROVIDER_REGISTRY, list_models
 from werewolf_eval.observer_visibility import (
     VisibilityProjectionError,
     build_projection_envelope,
@@ -61,7 +68,6 @@ from werewolf_eval.observer_visibility import (
 from werewolf_eval.profile_config import (
     ProfileValidationError,
     build_default_profile,
-    build_profile_schema,
     build_resolved_profile_artifact,
     list_profiles,
     load_profile,
@@ -71,209 +77,13 @@ from werewolf_eval.profile_config import (
 )
 from werewolf_eval.run_g1h_fake_runtime import run_fake_runtime
 from werewolf_eval.settlement_bundle import build_settlement_response
-from werewolf_eval.runtime_events import (
-    RuntimeEventError,
-    read_events_jsonl,
-    redact_secret_values,
-)
-
-RunLauncher = Callable[[str, Path], int]
+from werewolf_eval.runtime_events import redact_secret_values
 
 _PROFILE_NAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,255}$")
 
 
 def default_fake_launcher(run_id: str, run_dir: Path) -> int:
     return run_fake_runtime(game_id=run_id, out_dir=run_dir)
-
-
-@dataclass
-class ObserverServerState:
-    runs_dir: Path
-    launcher: RunLauncher
-    profiles_dir: Path = field(default_factory=lambda: Path("profiles"))
-    run_status: dict[str, str] = field(default_factory=dict)
-    run_errors: dict[str, str] = field(default_factory=dict)
-    lock: Lock = field(default_factory=Lock)
-    # G3-1 live opt-in: ``live_enabled`` reflects ``--allow-live-api``;
-    # ``live_launcher`` is wired only when an env API key was present at start.
-    live_enabled: bool = False
-    live_launcher: RunLauncher | None = None
-    # P2-B-1 BYO-key: in-memory client credentials + a per-launch live launcher
-    # factory (built from a key at launch). live_launcher above stays as the
-    # prebuilt ENV launcher (back-compat / fallback); env_key_available records
-    # whether the server started with an env key.
-    credential_store: CredentialStore = field(default_factory=CredentialStore)
-    live_launcher_factory: Callable[..., RunLauncher] | None = None
-    env_key_available: bool = False
-    # P2-B-3/B-4: per-seat multi-provider launcher builder. Given the resolved
-    # seats + a {provider: ProviderCredential} map, returns a RunLauncher that runs
-    # the game with each seat on its own provider/model/persona. Injectable so
-    # tests can pass a fake (no network); built with the server live limits in
-    # create_observer_server.
-    multi_provider_launcher_factory: Callable[..., RunLauncher] | None = None
-
-
-def _resolve_live_launcher_for_launch(
-    state: ObserverServerState,
-    resolved_seats: list[dict],
-) -> tuple[RunLauncher | None, tuple[int, str, str] | None]:
-    """Pick the live launcher for THIS launch. P2-B-4 multi-provider:
-
-    1. If EVERY provider used by the seats has a client credential → a per-seat
-       multi-provider launcher (the general path; handles mixed and single-provider).
-    2. Back-compat deepseek-only: client deepseek key via the single-key factory,
-       else the prebuilt env launcher.
-    3. No silent fallback: a seat whose provider lacks a credential → 403.
-
-    Keys flow ONLY into the launcher closures (provider Authorization), never
-    returned."""
-    used = {str(seat.get("provider")) for seat in resolved_seats}
-    creds: dict[str, ProviderCredential] = {}
-    missing: list[str] = []
-    for provider in sorted(used):
-        key = state.credential_store.get(provider)
-        if key:
-            creds[provider] = ProviderCredential(
-                key=key, base_url=state.credential_store.get_base_url(provider) or ""
-            )
-        else:
-            missing.append(provider)
-
-    if not missing and state.multi_provider_launcher_factory is not None:
-        return state.multi_provider_launcher_factory(resolved_seats, creds), None
-    # Back-compat (deepseek-only) paths. The legacy launchers run ONE shared model
-    # for all seats, so they may only serve a UNIFORM profile (single provider +
-    # single model); a mixed-model deepseek profile must go through the multi
-    # launcher above (per-seat) to avoid resolved-profile.json claiming models the
-    # run never used.
-    uniform = len({(str(s.get("provider")), str(s.get("model"))) for s in resolved_seats}) == 1
-    if used == {"deepseek"} and uniform and "deepseek" in creds and state.live_launcher_factory is not None:
-        cred = creds["deepseek"]
-        # Forward the client's custom base_url when one was supplied; otherwise
-        # call the legacy single-arg factory so its server-default endpoint stands.
-        launcher = (
-            state.live_launcher_factory(cred.key, cred.base_url)
-            if cred.base_url
-            else state.live_launcher_factory(cred.key)
-        )
-        return launcher, None
-    if used == {"deepseek"} and uniform and state.live_launcher is not None:
-        return state.live_launcher, None
-    if missing:
-        return None, (
-            403,
-            "missing_provider_credential",
-            f"no credential for provider(s): {', '.join(sorted(set(missing)))}",
-        )
-    return None, (403, "missing_api_key", "no live credential is available")
-
-
-def _check_live_capability(
-    state: ObserverServerState, mode: str
-) -> tuple[int, str, str] | None:
-    """Capability gate for live launches — evaluated BEFORE the profile is
-    loaded/validated, so an un-provisioned server rejects even a malformed or
-    non-deepseek profile with a capability code (never ``invalid_profile`` or a
-    shape error).  Returns ``(status, code, message)`` to reject, or ``None`` to
-    proceed.  Non-live modes always proceed."""
-    if mode != "live":
-        return None
-    if not state.live_enabled:
-        return (403, "live_api_disabled", "live API is not enabled on this server")
-    # BYO-key: a credential is available if the client synced ANY supported
-    # provider key OR the server started with an env key (back-compat). This is a
-    # COARSE gate; the per-seat credential check happens at launcher resolution.
-    has_credential = (
-        any(state.credential_store.has(p) for p in PROVIDER_REGISTRY)
-        or state.env_key_available
-        or state.live_launcher is not None
-    )
-    if not has_credential:
-        return (403, "missing_api_key", "no live credential is available (set one in the client)")
-    return None
-
-
-def _check_live_profile_shape(
-    resolved_seats: list[dict],
-) -> tuple[int, str, str] | None:
-    """Shape gate for live launches — evaluated AFTER validation, only for live
-    mode.  P2-B-3: every seat's provider must be a SUPPORTED live provider (in the
-    registry); ``fake_deterministic`` and unknown providers are rejected. Mixed
-    providers AND mixed models are now allowed (that is the multi-provider feature)
-    — the per-seat credential requirement is enforced at launcher resolution.
-    Returns ``(status, code, message)`` to reject, or ``None`` to proceed."""
-    providers = {seat.get("provider") for seat in resolved_seats}
-    unsupported = providers - set(PROVIDER_REGISTRY)
-    if unsupported:
-        return (
-            400,
-            "unsupported_live_provider",
-            f"live launch does not support provider(s): {', '.join(sorted(str(p) for p in unsupported))}",
-        )
-    return None
-
-
-def _provider_live_posture(
-    state: ObserverServerState, provider: str
-) -> tuple[bool, str | None, str | None]:
-    """Per-provider live posture for the capabilities payload.
-
-    Mirrors ``_check_live_capability`` but scoped to ONE provider so the HUD /
-    arming control can report which providers are actually usable (the head
-    feature: each seat may pick a different AI).  Reason CODES are identical to
-    the launch-time 403 codes:
-
-    * live disabled (global) → ``live_api_disabled`` for every provider.
-    * live enabled but this provider has no credential → ``missing_api_key``.
-      ``deepseek`` additionally counts the legacy env key / prebuilt env launcher
-      (back-compat); other providers are credential-only.
-
-    Never reads or returns a secret."""
-    if not state.live_enabled:
-        return (False, "live_api_disabled", "live API is not enabled on this server")
-    has_credential = state.credential_store.has(provider)
-    if provider == "deepseek":
-        has_credential = (
-            has_credential or state.env_key_available or state.live_launcher is not None
-        )
-    if has_credential:
-        return (True, None, None)
-    return (
-        False,
-        "missing_api_key",
-        f"no credential is available for {provider} (set one in the client)",
-    )
-
-
-def _schema_payload() -> dict[str, object]:
-    """The profile-schema response: the pure validation schema plus the
-    registry-derived provider UI metadata (kept here so profile_config stays
-    registry-free)."""
-    schema = build_profile_schema()
-    schema["provider_specs"] = provider_specs_payload()
-    return schema
-
-
-def _build_capabilities_payload(state: ObserverServerState) -> dict[str, object]:
-    """Derive the read-only ``g3.runtime_capabilities.v1`` payload from the live
-    capability gate, one entry per registered provider.
-
-    Each provider's posture comes from ``_provider_live_posture`` so the
-    ``reason_code`` matches the launch-time 403 code.  The aggregate "is live
-    available at all" (any provider available) equals ``_check_live_capability``
-    proceeding — the client derives that by OR-ing the per-provider ``available``
-    flags.  Read-only: no writes, no provider call, and never a secret."""
-    providers: dict[str, dict[str, object]] = {}
-    for provider in PROVIDER_REGISTRY:
-        available, reason_code, message = _provider_live_posture(state, provider)
-        info: dict[str, object] = {"available": available}
-        if not available:
-            info["reason_code"] = reason_code
-            info["message"] = message
-        providers[provider] = info
-    return build_runtime_capabilities(
-        live_enabled=state.live_enabled, providers=providers
-    )
 
 
 # P2-B-1 r2: credential writes now accept every registry provider (the single
@@ -318,21 +128,6 @@ def _credentials_delete_result(
     return (200, {"cleared": provider})
 
 
-def _run_delete_result(run_dir: Path, run_id: str, status: str) -> tuple[int, dict[str, object]]:
-    """Pure logic for DELETE /api/runs/{run_id}. An active run (running/queued)
-    is never deleted (409); a missing dir is 404; an rmtree failure (e.g. a
-    Windows file lock) reports 500 — NEVER success on a partial delete."""
-    if status in ("running", "queued"):
-        return (409, {"error": "run_active"})
-    if not run_dir.is_dir():
-        return (404, {"error": "not_found"})
-    try:
-        shutil.rmtree(run_dir)
-    except OSError as exc:
-        return (500, {"error": "delete_failed", "detail": str(exc)})
-    return (200, {"deleted": run_id})
-
-
 def _provider_models_result(
     store: "CredentialStore", provider: str, transport=None
 ) -> tuple[int, dict[str, object]]:
@@ -352,48 +147,6 @@ def _provider_models_result(
         # Never surface the upstream message (could carry url/auth); fail closed.
         return (502, {"error": "provider_unavailable"})
     return (200, {"provider": provider, "models": models})
-
-
-def _read_execution_mode(run_dir: Path) -> str | None:
-    """Read ``execution_mode`` from the run's OWN ``resolved-profile.json``.
-
-    Returns the string value when present, else ``None`` (missing/corrupt
-    artifact, or a non-string value → the HUD chip conservatively falls back to
-    ``SYS: SIMULATION``).  Guards JSON/OS errors, never raises, and never exposes
-    a path.  This is a server-local file read, NOT a secret — the Qt client
-    performs no file I/O and consumes this only as a run-detail JSON field."""
-    path = run_dir / "resolved-profile.json"
-    if not path.exists():
-        return None
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
-        return None
-    if isinstance(data, dict):
-        value = data.get("execution_mode")
-        if isinstance(value, str):
-            return value
-    return None
-
-
-def _map_launcher_exit_reason(code: int) -> str:
-    """Map a launcher exit code to a key-free run-status reason (G3-1, A7).
-
-    The live deepseek launcher returns 3 when the request budget was exhausted
-    and 2 on any other provider failure; both fail closed with no secret."""
-    if code == 3:
-        return "budget_exhausted"
-    return "provider_failure"
-
-
-def _sanitize_launcher_error(exc: BaseException) -> str:
-    """Map a launcher EXCEPTION to a key-free canonical reason. Inspects only the
-    exception CLASS and a lowercased 'is this auth?' check on the type/args — never
-    embeds the message (which could carry an Authorization header / key / url)."""
-    text = f"{type(exc).__name__} {exc}".lower()
-    if "401" in text or "unauthor" in text or "forbidden" in text or "invalid api key" in text:
-        return "provider_auth_failed"
-    return "provider_failure"
 
 
 # ---------------------------------------------------------------------------
@@ -465,35 +218,20 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
             return True
         return False
 
+    def _run_manager(self) -> RunManager:
+        return RunManager(self._get_state())
+
     def _get_status(self, run_id: str, run_dir: Path) -> str:
-        state = self._get_state()
-        with state.lock:
-            if run_id in state.run_status:
-                return state.run_status[run_id]
-        # Not in memory (e.g. server restarted since the run finished) -> fall back to
-        # the durable status.json so prior completed runs stay settleable.
-        return read_run_status(run_dir)
+        return self._run_manager().get_status(run_id, run_dir)
 
     def _set_status(self, run_id: str, status: str) -> None:
-        state = self._get_state()
-        with state.lock:
-            state.run_status[run_id] = status
-        # Persist durably (outside the lock — file I/O) so the status survives a restart.
-        write_run_status(
-            state.runs_dir / run_id,
-            status,
-            evaluation_bucket=read_manifest_bucket(state.runs_dir / run_id),
-        )
+        self._run_manager().set_status(run_id, status)
 
     def _set_error(self, run_id: str, error: str) -> None:
-        state = self._get_state()
-        with state.lock:
-            state.run_errors[run_id] = error
+        self._run_manager().set_error(run_id, error)
 
     def _get_error(self, run_id: str) -> str | None:
-        state = self._get_state()
-        with state.lock:
-            return state.run_errors.get(run_id)
+        return self._run_manager().get_error(run_id)
 
     def _run_dir(self, run_id: str) -> Path:
         validate_run_id(run_id)
@@ -726,23 +464,9 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
     def _execute_run(
         self, run_id: str, run_dir: Path, launcher: RunLauncher
     ) -> None:
-        """Run *launcher* synchronously and record status + a key-free reason.
-
-        Always records a canonical run-status reason on failure
-        (``budget_exhausted``/``provider_failure``) — never raw exception text —
-        because the reason is exposed via run detail/list/SSE (A7)."""
-        self._set_status(run_id, "running")
-        try:
-            ret = launcher(run_id, run_dir)
-        except Exception as exc:  # noqa: BLE001
-            self._set_error(run_id, _sanitize_launcher_error(exc))
-            self._set_status(run_id, "failed")
-            return
-        if ret == 0:
-            self._set_status(run_id, "completed")
-        else:
-            self._set_error(run_id, _map_launcher_exit_reason(ret))
-            self._set_status(run_id, "failed")
+        """Run *launcher* synchronously and record status + a key-free reason —
+        see ``RunManager.execute_run`` (A7: canonical reasons, never raw text)."""
+        self._run_manager().execute_run(run_id, run_dir, launcher)
 
     def _launch_run_async(
         self, run_id: str, run_dir: Path, launcher: RunLauncher
@@ -753,20 +477,9 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
         ).start()
 
     def _run_detail_with_reason(self, run_id: str, run_dir: Path) -> dict[str, object]:
-        """Build run detail and attach the key-free run-status reason (if any)
-        plus the executed-truth ``execution_mode`` read from the run's OWN
-        ``resolved-profile.json`` (G3-2).  ``execution_mode`` is the HUD chip's
-        ONLY source of truth; it is omitted when no string value is present so
-        the chip falls back to ``SYS: SIMULATION``."""
-        mem_status = self._get_status(run_id, run_dir)
-        detail = build_run_detail(run_dir, status=mem_status)
-        reason = self._get_error(run_id)
-        if reason is not None:
-            detail["reason"] = reason
-        execution_mode = _read_execution_mode(run_dir)
-        if execution_mode is not None:
-            detail["execution_mode"] = execution_mode
-        return detail
+        """Run detail + key-free reason + executed-truth ``execution_mode`` —
+        see ``RunManager.run_detail_with_reason`` (G3-2)."""
+        return self._run_manager().run_detail_with_reason(run_id, run_dir)
 
     def _handle_profile_launch(self, body: dict[str, object]) -> None:
         plr = parse_profile_launch_request(body)
@@ -895,13 +608,9 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
                     return
                 run_id = segments[2]
                 run_dir = self._run_dir(run_id)          # validate_run_id -> raises on illegal id
-                status_now = self._get_status(run_id, run_dir)   # memory-first, then status.json
-                code, payload = _run_delete_result(run_dir, run_id, status_now)
+                # memory-first status read, delete decision, in-memory eviction
+                code, payload = self._run_manager().delete_run(run_id, run_dir)
                 if code == 200:
-                    state = self._get_state()
-                    with state.lock:                      # drop stale in-memory entries
-                        state.run_status.pop(run_id, None)
-                        state.run_errors.pop(run_id, None)
                     self._send_json(200, payload)
                 else:
                     self._send_error_json(code, str(payload.get("error", "bad_request")),
@@ -1164,24 +873,3 @@ def create_observer_server(
     server = ThreadingHTTPServer((host, port), _BoundHandler)
     server.state = state  # type: ignore[attr-defined]
     return server
-
-
-# ---------------------------------------------------------------------------
-# Event helpers
-# ---------------------------------------------------------------------------
-
-
-def _read_events_jsonl_safe(path: Path) -> list[dict[str, object]]:
-    """Read events via ``read_events_jsonl`` with retry for concurrent access.
-
-    Returns an empty list when the file does not exist or contains
-    invalid/incomplete JSONL (e.g. while a launcher is writing).
-    """
-    if not path.exists():
-        return []
-    for _attempt in range(3):
-        try:
-            return read_events_jsonl(path)  # type: ignore[return-value]
-        except (OSError, RuntimeEventError):
-            time.sleep(0.05)
-    return []
