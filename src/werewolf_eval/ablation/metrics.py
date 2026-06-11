@@ -33,6 +33,53 @@ def classify_event(ev: dict):
     return ("other", actor, tgt, s)
 
 
+def live_rate_from_turns(turns_doc) -> float:
+    turns = turns_doc.get("turns") if isinstance(turns_doc, dict) else turns_doc
+    if not turns: return 0.0
+    return sum(1 for t in turns if t.get("kind") == "live_success") / len(turns)
+
+
+def live_rate(run_dir: Path) -> float:
+    p = Path(run_dir) / "provider-turns.json"
+    if not p.exists(): return 0.0
+    return live_rate_from_turns(json.loads(p.read_text(encoding="utf-8")))
+
+
+def _mean(xs):
+    xs = [x for x in xs if x is not None]
+    return sum(xs) / len(xs) if xs else None
+
+
+def aggregate_games(games: list[dict]) -> dict:
+    """games = analyze_game_dict outputs of VALID (live) games only."""
+    n = len(games)
+    if n == 0: return {"n_valid": 0}
+    def rate(pred): return sum(1 for g in games if pred(g)) / n
+    d1 = [g["d1_majority_is_wolf"] for g in games if g["d1_majority_is_wolf"] is not None]
+    d2 = [g.get("d2_majority_is_wolf") for g in games if g.get("d2_majority_is_wolf") is not None]
+    vwf = [g["verify_wolf_followed"] for g in games if g["verify_wolf_followed"] is not None]
+    tot_sp = sum(g["n_speeches"] for g in games) or 1
+    kill_dist = collections.Counter(g["night1_kill"] for g in games if g["night1_kill"])
+    return {
+        "n_valid": n,
+        "wolf_win_rate": rate(lambda g: g["winner"] == "werewolf"),
+        "villager_win_rate": rate(lambda g: g["winner"] == "villager"),
+        "day1_hit": (sum(d1)/len(d1)) if d1 else None,
+        "day2_hit": (sum(d2)/len(d2)) if d2 else None,
+        "verify_wolf_followed": (sum(vwf)/len(vwf)) if vwf else None,
+        "verify_wolf_followed_n": len(vwf),
+        "witch_save_rate": rate(lambda g: g["witch_save"]),
+        "witch_poison_rate": rate(lambda g: g["witch_poison"]),
+        "herding": _mean([g["herd_share"] for g in games]),
+        "halluc_visual_speech_rate": sum(g["n_visual_speeches"] for g in games) / tot_sp,
+        "halluc_visual_game_rate": rate(lambda g: g["has_visual_halluc"]),
+        "halluc_mechanic_game_rate": rate(lambda g: g["has_mechanic_halluc"]),
+        "seer_survives_d1_rate": rate(lambda g: g["seer_survives_d1"]),
+        "avg_rounds": _mean([g["end_round"] for g in games]),
+        "night1_kill_dist": dict(sorted(kill_dist.items())),
+    }
+
+
 def analyze_game_dict(gl: dict) -> dict:
     roles = {p["player_id"]: p["role"] for p in gl["players"]}
     wolves = {k for k, v in roles.items() if v == "werewolf"}
