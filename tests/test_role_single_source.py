@@ -20,6 +20,7 @@ from werewolf_eval.action_runtime.ruleset import (  # noqa: E402
     all_rulesets,
     known_role_teams,
     rules_v1_1,
+    rules_v1_2,
 )
 
 
@@ -124,7 +125,7 @@ class GateAndOrderSentinelTest(unittest.TestCase):
 
         night_ids = {
             a.action_id
-            for a in rules_v1_1().abilities
+            for a in rules_v1_2().abilities
             if a.trigger == "phase:night"
         }
         self.assertLessEqual(set(NIGHT_DISPATCH_ORDER), night_ids)

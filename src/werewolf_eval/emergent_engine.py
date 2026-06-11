@@ -37,6 +37,7 @@ from werewolf_eval.action_runtime import (
     DecisionWindow,
     JointSettler,
     NightIntents,
+    GuardResolver,
     RngPick,
     RoleAbilityRegistry,
     RuntimeState,
@@ -44,7 +45,7 @@ from werewolf_eval.action_runtime import (
     VoteResolver,
     WolfResolver,
     WolfWindow,
-    rules_v1_1,
+    rules_v1_2,
 )
 from werewolf_eval.action_runtime.abilities import TARGET_RULES
 from werewolf_eval.invariants.guards import assert_prompt_entitled, assert_death_commit_once
@@ -87,7 +88,7 @@ FALLBACK_DECISION_TYPE = "default"
 # Until then the witch stays in _resolve_witch (NOT in _RESOLVERS / this tuple). The one-shot
 # guard is pinned by tests/test_witch_potion_one_shot_sentinel.py (antidote + poison), which go
 # RED the day a witch swap forgets the ledger.
-NIGHT_DISPATCH_ORDER = ("werewolf_kill", "seer_check")
+NIGHT_DISPATCH_ORDER = ("guard_protect", "werewolf_kill", "seer_check")
 
 # Per-request output-token caps (P2-A-2): speeches need more than votes/actions.
 SPEECH_MAX_OUTPUT_TOKENS = 250
@@ -295,11 +296,14 @@ class EmergentGameEngine:
         self._d_counter = 0
         self._alive: set[str] = set(self._players_by_id)
         self._death_committed: set[str] = set()
+        # L4 guard: the guard's previous EFFECTIVE protect target (fallback included,
+        # spec §2 patch) — feeds RuntimeState.last_guarded_target (no-consecutive rule).
+        self._last_guarded: str | None = None
         # Phase-3 swap: night joint resolution delegates to the Agent Action
         # Runtime's JointSettler, and per-action legality to its registry/validator.
-        # rules_v1_1 is a backward-compatible superset (adds the hunter); 4-role games
-        # are byte-identical (the hunter role is never queried).
-        _ruleset = rules_v1_1()
+        # rules_v1_2 is a backward-compatible superset (hunter + guard); boards
+        # without them are byte-identical (those roles are never queried).
+        _ruleset = rules_v1_2()
         self.rules_version = _ruleset.rules_version
         self._registry = RoleAbilityRegistry(_ruleset)
         self._settler = JointSettler(_ruleset)
@@ -327,6 +331,7 @@ class EmergentGameEngine:
         # driver. Night order is explicit DATA (load-bearing: wolf BEFORE seer — both may draw
         # 0/1 from self._rng). The witch is DEFERRED (inline, ②b) so it is NOT in this map/order.
         self._RESOLVERS = {
+            "guard_protect": self._run_guard,
             "werewolf_kill": self._run_wolf_kill,
             "seer_check": self._run_seer,
             "player_vote": self._run_vote_round,
@@ -552,6 +557,7 @@ class EmergentGameEngine:
             alive=frozenset(self._alive),
             roles={pid: p.role for pid, p in self._players_by_id.items()},
             night_victim=night_victim,
+            last_guarded_target=self._last_guarded,
         )
 
     def _action_legal(self, actor: str, role: str, phase: str, action: AgentAction) -> bool:
@@ -689,6 +695,17 @@ class EmergentGameEngine:
         if not seers:
             return None
         return self._run_single_turn(SeerResolver(), seers[0], "seer", "night", "night", "night", rnd)
+
+    def _run_guard(self, rnd):
+        guards = [pid for pid in self._alive if self._players_by_id[pid].role == "guard"]
+        if not guards:
+            return None
+        target = self._run_single_turn(GuardResolver(), guards[0], "guard", "night", "night", "night", rnd)
+        if target is not None:
+            # the ACTUALLY effective protect target (fallback included) drives next
+            # night's exclude_last_guarded — spec §2 patch: not the model's raw intent.
+            self._last_guarded = target
+        return target
 
     def _run_vote_round(self, rnd):
         refs = self._public_refs()
@@ -1130,10 +1147,13 @@ class EmergentGameEngine:
             end_round = rnd
             # ---- NIGHT ---- registry-driven dispatch for migrated abilities
             victim = None
+            guard_target = None
             for ability_id in NIGHT_DISPATCH_ORDER:
                 result = self._RESOLVERS[ability_id](rnd)
                 if ability_id == "werewolf_kill":
                     victim = result
+                elif ability_id == "guard_protect":
+                    guard_target = result
             # witch — DEFERRED inline (BLOCKING: RuntimeState potion ledger pending, ②b)
             saved, poison_target, save_used, poison_used = self._resolve_witch(rnd, victim, save_used, poison_used)
 
@@ -1142,7 +1162,8 @@ class EmergentGameEngine:
             # proven by tests/test_action_runtime_parity.py and the full suite below.
             deaths: list[str] = list(
                 self._settler.resolve_night(
-                    NightIntents(wolf_victim=victim, saved=saved, poison_target=poison_target),
+                    NightIntents(wolf_victim=victim, saved=saved,
+                                 poison_target=poison_target, guard_target=guard_target),
                     self._runtime_state(),
                 ).deaths
             )
