@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from werewolf_eval.role_visibility import private_refs_for_role, public_refs
 from werewolf_eval.runtime_events import (
     build_god_snapshot,
     build_role_projection_snapshot,
@@ -275,20 +276,8 @@ class GameEngine:
                 if p.role == "werewolf":
                     known_roles[pid] = p.role
 
-        public_event_ids: list[str] = []
-        private_event_ids: list[str] = []
-
-        for event in self._events:
-            visibility = event["visibility"]
-            eid = event["event_id"]
-            if visibility in ("public", "all"):
-                public_event_ids.append(eid)
-            if visibility == "all":
-                private_event_ids.append(eid)
-            elif visibility == player.role:
-                private_event_ids.append(eid)
-            elif visibility == "werewolf_team" and player.role == "werewolf":
-                private_event_ids.append(eid)
+        public_event_ids = public_refs(self._events)
+        private_event_ids = private_refs_for_role(self._events, player.role)
 
         return AgentObservation(
             game_id=self._config.game_id,
@@ -417,7 +406,7 @@ class GameEngine:
                 "proposal_id": i + 1,
                 "proposer": wolf_id,
                 "proposed_target": target,
-                "visible_info_refs": [e["event_id"] for e in events if e["visibility"] in ("public", "all")],
+                "visible_info_refs": public_refs(events),
                 "reason_summary": f"{wolf_id} proposes {target}",
                 "confidence": 1.0,
                 "action_round": 1,
@@ -448,7 +437,7 @@ class GameEngine:
             "proposal_id": 1,
             "proposer": primary_proposer,
             "proposed_target": target,
-            "visible_info_refs": [e["event_id"] for e in events if e["visibility"] in ("public", "all")],
+            "visible_info_refs": public_refs(events),
             "reason_summary": f"{primary_proposer} proposes {target}",
             "confidence": 1.0,
             "action_round": 1,
@@ -551,19 +540,10 @@ class GameEngine:
             }
 
         def _public_refs() -> list[str]:
-            return [e["event_id"] for e in events if e["visibility"] in ("public", "all")]
+            return public_refs(events)
 
         def _private_refs_for_role(role: str) -> list[str]:
-            result: list[str] = []
-            for e in events:
-                v = e["visibility"]
-                if v == "all":
-                    result.append(e["event_id"])
-                elif v == role:
-                    result.append(e["event_id"])
-                elif v == "werewolf_team" and role == "werewolf":
-                    result.append(e["event_id"])
-            return result
+            return private_refs_for_role(events, role)
 
         def _private_refs(player_id: str) -> list[str]:
             return _private_refs_for_role(self._players_by_id[player_id].role)
