@@ -18,7 +18,8 @@
 - **vote 请求路径**:`_run_vote_round`(:669)→ `_run_single_turn(VoteResolver(), voter, role, "day_vote", "day", "day", rnd)`(:674)→ `_provider_action(actor, "day", rnd)`(:637)。**`_provider_action` 内 `phase=="day"` ⇔ vote 请求**(夜间动作 phase=="night";hunter 走独立 `_resolve_hunter_shot`)——干净判别子,v3 vote scaffold 注入用它。
 - **`_provider_action`**(:554 起):`rendered = self._render_obs(obs)` 后构造 turn dict、`assert_prompt_entitled`、`agent.decide(obs, observation_text=rendered.text, ...)`。speech 同构(`_resolve_speech` :869 起,直接构造 ProviderRequest)。
 - **`ProviderRequest.temperature` 已存在且请求级覆盖 config**(`provider_contract.py:38`,`_effective_temperature` :178)→ **scribe 低温零 provider-config 改动**,请求带 `temperature=0.0` 即可。
-- **`_build_payload`**(llm_providers:288):`response_kind != "speech"` 即带 `response_format={"type":"json_object"}` → scaffold 请求自动拿 JSON mode,正合需。
+- **`_build_payload`**(llm_providers:288):`response_kind != "speech"` 且 **`INCLUDE_RESPONSE_FORMAT=True`(方言开关:OpenAI-compatible/DeepSeek=True,Anthropic=False)** 时带 `response_format={"type":"json_object"}` → b4 用 DeepSeek,scribe 自动拿 JSON mode;若未来 scribe 配 Anthropic,解析失败率会升、由 coverage 门兜底(评审备注 1)。
+- **fake 脚本只有 1 个 day 轮**(评审查实:`build_villager_win_script` r1 白天投出 p1 后,r2 夜里毒死 p2 直接村胜,无第二个白天)→ **任何依赖"第 2 轮"的测试分支都是死代码**;Task 4/5 的失败路径与正向覆盖全部用确定性写法(broken=True 全程失败 / 预填 `_claim_ledger`),不依赖脚本天数。
 - **`_system_for`**(llm_providers:213):现有 unknown-version 硬门 + speech v1/v2 分支 + else action + board_card 前缀。scaffold 分支插在 kind 判断最前。
 - **`KNOWN_PROMPT_VERSIONS = ("prompt_v1","prompt_v2")`**(prompt_version.py)——加 `"prompt_v3"`;**注意 `tests/test_prompt_v2.py::test_known_versions_and_default_constant_unchanged` 钉死了二元组,该测试须同步更新为三元组**(这是预期更新,不是回归)。
 - **runner**:`run_emergent_deepseek_game(..., prompt_version="prompt_v1")`(:138);`_collect_trace(game_id, agents, ...)` 汇总 agents 的 provider 请求/响应;`_provider_turns_summary`(:109)`live_success_rate = live_success / live_requested`(live_requested 计数只数 `live_requested=True` 的 turn)→ **scribe turn 带 `live_requested=False` 则 runner 口径自动不被稀释**;metrics 的 `live_rate_from_turns` 分母是 `len(turns)` 全量 → **必须显式排除 scaffold turns**(spec §5.2)。
@@ -454,24 +455,22 @@ git commit -m "feat(prompt-v3): scribe system prompt + restrained speech v3 + _s
 
 **Files:**
 - Modify: `src/werewolf_eval/emergent_engine.py`
+- Create: `tests/fake_scribe.py`(共享 stub——评审备注 2:tests/ 无 `__init__.py`,从测试模块互相 import 会双重导入;helper 放独立非 test_ 模块,pytest prepend 模式下 `from fake_scribe import ...` 直接可用)
 - Test: `tests/test_prompt_v3.py`
 
-- [ ] **Step 1: 写失败测试**(fake scribe stub 在测试文件内)
+- [ ] **Step 1: 写失败测试**
+
+先建共享 stub:
 
 ```python
-# 追加到 tests/test_prompt_v3.py
-import pytest
-
-from werewolf_eval.emergent_engine import EmergentBudget, EmergentGameEngine, build_emergent_config
-from werewolf_eval.emergent_fake_script import build_emergent_fake_agents, build_villager_win_script
-from werewolf_eval.provider_agent import ProviderAgent
+# tests/fake_scribe.py
+"""Shared fake scribe provider for prompt_v3 tests (NOT a test module).
+Mimics the BaseChatProvider surface the engine/_collect_trace touch
+(respond / model / requests / responses)."""
 from werewolf_eval.provider_contract import ProviderResponse
 
 
 class _FakeScribeProvider:
-    """Canned scribe: returns a fixed claims JSON (or garbage when broken=True).
-    Mimics the BaseChatProvider surface the engine touches (respond/model/requests)."""
-
     uses_baseline_prompt = False
     provider_runtime_kind = "deterministic_fake"
 
@@ -493,6 +492,18 @@ class _FakeScribeProvider:
                                 token_usage={"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0})
         self.responses.append(resp)
         return resp
+```
+
+测试追加:
+
+```python
+# 追加到 tests/test_prompt_v3.py
+import pytest
+from fake_scribe import _FakeScribeProvider
+
+from werewolf_eval.emergent_engine import EmergentBudget, EmergentGameEngine, build_emergent_config
+from werewolf_eval.emergent_fake_script import build_emergent_fake_agents, build_villager_win_script
+from werewolf_eval.provider_agent import ProviderAgent
 
 
 def _run_v3_engine(broken_scribe=False):
@@ -532,29 +543,36 @@ def test_scribe_runs_per_day_round_and_fills_ledger():
     assert all(t["actor"] == "scribe" for t in sturns)
 
 
-def test_scribe_failure_preserves_history_and_marks_fallback():
-    # 第一轮成功、之后 broken:历史账本必须保留(spec §3 评审修订②)
+def test_scribe_all_broken_marks_fallback_and_completes():
+    # 失败路径确定性覆盖(fake 脚本只有 1 个 day 轮,flaky 写法是死分支——评审修复):
+    # 全程 broken -> 全部 scaffold_fallback、对局照常完成、账本为空
+    engine, outcome, _, scribe = _run_v3_engine(broken_scribe=True)
+    assert outcome.completed
+    sturns = [t for t in outcome.provider_turns if t.get("response_kind") == "scaffold"]
+    assert sturns and all(t["kind"] == "scaffold_fallback" for t in sturns)
+    assert all(t["fallback_reason"] for t in sturns)
+    assert engine._claim_ledger == []
+
+
+def test_scribe_failure_preserves_history():
+    # 历史保留语义(spec §3 评审修订②/§8.2)确定性单测:预填账本 -> broken scribe
+    # 跑一轮 _run_scribe -> 旧 claims 原样还在(不依赖脚本天数)
     agents = build_emergent_fake_agents(build_villager_win_script())
-    scribe_provider = _FakeScribeProvider()
-    orig_respond = scribe_provider.respond
-    calls = {"n": 0}
-    def flaky(request):
-        calls["n"] += 1
-        scribe_provider.broken = calls["n"] >= 2
-        return orig_respond(request)
-    scribe_provider.respond = flaky
-    scribe = ProviderAgent("scribe", scribe_provider)
+    scribe = ProviderAgent("scribe", _FakeScribeProvider(broken=True))
     engine = EmergentGameEngine(
-        config=build_emergent_config(game_id="v3_flaky"),
+        config=build_emergent_config(game_id="v3_hist"),
         agents=agents, seed=7,
         budget=EmergentBudget(max_requests=80, max_day_rounds=3),
         prompt_version="prompt_v3", scaffold_agent=scribe,
     )
-    outcome = engine.run()
-    if calls["n"] >= 2:   # 多于一个 day 轮才有失败样本
-        sturns = [t for t in outcome.provider_turns if t.get("response_kind") == "scaffold"]
-        assert any(t["kind"] == "scaffold_fallback" for t in sturns)
-    assert engine._claim_ledger                        # 第一轮的 claim 还在
+    old = {"round": 0, "claimant": "p9", "claim_type": "identity_claim", "target": None,
+           "result": "seer", "refutes": None, "source": 1,
+           "source_quote": "历史条目", "uncertain": False}
+    engine._claim_ledger.append(dict(old))
+    engine._emit("day", 1, "player_speech", "p3", "none", "public", "测试发言。")
+    engine._run_scribe(1)
+    assert engine._claim_ledger == [old]               # 失败不清史
+    assert engine._provider_turns[-1]["kind"] == "scaffold_fallback"
 ```
 
 - [ ] **Step 2: 跑测试确认失败**
@@ -660,13 +678,13 @@ board card 条件从 `if prompt_version == "prompt_v2":` 改为 `if prompt_versi
 
 - [ ] **Step 4: 跑测试 + 全量回归**
 
-Run: `NO_PROXY='*' PYTHONPATH=src python -m pytest tests/test_prompt_v3.py -q` → PASS (13 passed)
+Run: `NO_PROXY='*' PYTHONPATH=src python -m pytest tests/test_prompt_v3.py -q` → PASS (14 passed)
 Run: `NO_PROXY='*' PYTHONPATH=src python -m pytest tests/ -q` → 全绿(v1/v2 路径零改动;若有 fail 原样报告勿自行"修")
 
 - [ ] **Step 5: 提交**
 
 ```bash
-git add src/werewolf_eval/emergent_engine.py tests/test_prompt_v3.py
+git add src/werewolf_eval/emergent_engine.py tests/fake_scribe.py tests/test_prompt_v3.py
 git commit -m "feat(prompt-v3): claim ledger + per-round scribe call (budget-charged, live_requested=False, history-preserving fallback)"
 ```
 
@@ -693,12 +711,9 @@ def test_v3_vote_requests_carry_scaffold_and_speech_carry_digest():
     # vote:scaffold 程序必在;r1 投票在 r1 scribe 之后 -> 账本也在
     assert all("【投票前判断程序】" in r.observation_text for r in votes)
     assert any("【声称账本】" in r.observation_text for r in votes)
-    # speech:r1 发言在任何 scribe 之前 -> 无账本;r2+ 发言带 r1 账本(若到 r2)
-    r1_speech = [r for r in speeches if r.round == 1]
-    assert all("【声称账本】" not in r.observation_text for r in r1_speech)
-    r2_speech = [r for r in speeches if r.round >= 2]
-    if r2_speech:
-        assert any("【声称账本】" in r.observation_text for r in r2_speech)
+    # speech:本 fake 脚本只有 1 个 day 轮,r1 发言在任何 scribe 之前 -> 无账本
+    # (speech 注入的正向覆盖在下一个测试,用预填账本的确定性写法——评审修复)
+    assert all("【声称账本】" not in r.observation_text for r in speeches)
     # speech 不带强比较程序(分级:vote 强 / speech 克制)
     assert all("【投票前判断程序】" not in r.observation_text for r in speeches)
     # 夜间动作不注入
@@ -707,6 +722,27 @@ def test_v3_vote_requests_carry_scaffold_and_speech_carry_digest():
     # 全部请求仍是 v2 结构化观察打底 + 带卡
     assert all("【你的私有信息】" in r.observation_text for r in votes + speeches)
     assert all(r.board_card.startswith("【本局规则卡】") for r in votes + speeches + nights)
+
+
+def test_v3_speech_carries_digest_when_ledger_nonempty():
+    # speech 注入的正向覆盖(确定性,不依赖脚本天数):预填账本 -> r1 发言即带账本
+    # (注入条件只看 ledger 非空)
+    agents = build_emergent_fake_agents(build_villager_win_script())
+    scribe = ProviderAgent("scribe", _FakeScribeProvider())
+    engine = EmergentGameEngine(
+        config=build_emergent_config(game_id="v3_predigest"),
+        agents=agents, seed=7,
+        budget=EmergentBudget(max_requests=80, max_day_rounds=3),
+        prompt_version="prompt_v3", scaffold_agent=scribe,
+    )
+    engine._claim_ledger.append({"round": 0, "claimant": "p9", "claim_type": "identity_claim",
+                                 "target": None, "result": "seer", "refutes": None, "source": 1,
+                                 "source_quote": "预填", "uncertain": False})
+    engine.run()
+    reqs = [r for a in agents.values() for r in a.provider.requests]
+    speeches = [r for r in reqs if r.response_kind == "speech"]
+    assert speeches and all("【声称账本】" in r.observation_text for r in speeches)
+    assert all("【投票前判断程序】" not in r.observation_text for r in speeches)
 
 
 def test_v2_and_v1_paths_have_no_v3_injection():
@@ -759,7 +795,7 @@ Expected: FAIL(votes 无程序文字)
 
 - [ ] **Step 4: 跑测试 + 全量**
 
-Run: `NO_PROXY='*' PYTHONPATH=src python -m pytest tests/test_prompt_v3.py -q` → PASS (15 passed)
+Run: `NO_PROXY='*' PYTHONPATH=src python -m pytest tests/test_prompt_v3.py -q` → PASS (17 passed)
 Run: `NO_PROXY='*' PYTHONPATH=src python -m pytest tests/ -q` → 全绿
 
 - [ ] **Step 5: 提交**
@@ -854,6 +890,8 @@ Expected: FAIL (TypeError: unexpected keyword argument 'scaffold_provider_factor
 ```
 
 (`live_requested` 变量已有;scaffold turn 的 `live_requested=False` 保证两口径不重叠。)
+
+> 备注(评审落点):① `by_provider_result_kind` 自此会出现 `scaffold_*` 键——现有消费者(emergent_smoke_check 只读 `live_success_rate`)安全;**给 B5 留话:per-seat token/成本统计实现时须跳过 `actor=="scribe"` 的 turn**(在 `_provider_turns_summary` 旁加一行注释)。② nice-to-have(不强制):manifest 的 agents 列表不含 scribe;可在 manifest 加 additive 字段 `scaffold_model`(= scribe provider 的 model)便于审计,做不做由实现者视改动面大小定,做了要在报告里说明。
 
 - [ ] **Step 5: 跑测试 + 全量 → 提交**
 
@@ -1059,7 +1097,7 @@ git commit -m "feat(ablation): seer_voted_out_in_verify_cases — the SYS-B4 fai
 
 ```python
 def test_run_arm_v3_smoke_with_scaffold_factory(tmp_path):
-    from tests.test_prompt_v3 import _FakeScribeProvider
+    from fake_scribe import _FakeScribeProvider
     from werewolf_eval.provider_agent import ProviderAgent
     arm = Arm(label="v3_smoke", prompt_version="prompt_v3", n_games=1, seed_base=7)
     result = run_arm(arm, out_root=tmp_path, factory_builder=build_fake_factory,
@@ -1068,7 +1106,7 @@ def test_run_arm_v3_smoke_with_scaffold_factory(tmp_path):
     assert (tmp_path / "v3_smoke" / "_metrics.json").exists()
 ```
 
-(若 `from tests.test_prompt_v3 import ...` 因路径不可行,把 `_FakeScribeProvider` 提为 `tests/fake_scribe.py` 共享模块并双处 import——执行时按实际情况选,报告里说明。)
+(stub 已在 Task 4 落为共享模块 `tests/fake_scribe.py`;pytest prepend 模式下 tests/ 在 sys.path,`from fake_scribe import ...` 直接可用——评审备注 2。)
 
 `tests/test_prompt_v3_invariants.py`(新):
 
@@ -1082,9 +1120,9 @@ from pathlib import Path
 
 from werewolf_eval.emergent_fake_script import build_emergent_fake_agents, build_villager_win_script
 from werewolf_eval.invariants.checker import check_run
+from fake_scribe import _FakeScribeProvider
 from werewolf_eval.provider_agent import ProviderAgent
 from werewolf_eval.run_emergent_deepseek_game import run_emergent_deepseek_game
-from tests.test_prompt_v3 import _FakeScribeProvider
 
 
 class PromptV3InvariantsTests(unittest.TestCase):
@@ -1245,7 +1283,8 @@ git commit -m "chore(ablation): b4 (prompt_v3) arm metrics snapshot (45 live gam
 
 **1. Spec §8 十条硬门 → Task 映射**:1 live率玩家口径→T7(钉死测试);2 fallback 归类+历史保留→T4(两个测试);3 claim 字段+提取非裁判→T1(解析器测试)+T10(golden 标记);4 budget/turns 分列→T6;5 guidance 分级→T2/T3/T5(speech 无程序、vote 有,三处测试)+T10 golden;6 v3 golden 三类→T10(scribe prompt+input/digest/scaffold 全锁);7 scribe 独立实例+低温+trace 单列→T4(temperature=0 断言)+T6(trace actor=scribe)+T9(每局新建);8 scribe fixture 单测→T1;9 scaffold_coverage+门槛+单列→T7;10 additive 字节安全→T3/T10(golden 守卫 + `git diff --exit-code` v1/v2)。
 **2. Spec 其余覆盖**:§1 失败链指标→T8;§2.2 分层摘要(私有结果已在 v2 obs 私有区,scaffold=账本+程序)→T2/T5;§2.4 契约护栏(action 系统提示 v3==v1 钉死)→T3 test 4;§4 v3 组合(v2 PASS 部分复用:卡+结构化观察零拷贝)→T4(c)/T5;§5 风险 1 scribe 质量→T1 fixture;风险 2/2b→T7;风险 3 跨轮累积→T4;风险 4 I4b→T5 注 + T9 e2e;§6 协议→T11;§7 组件边界一致(prompt_v3 纯函数无 engine import→T1/T2;provider additive→T3)。
-**3. 占位符扫描**:每个代码 step 都有完整代码;T6 Step 1 与 T9 测试 import 路径给了明确 fallback 指令(共享 fake_scribe 模块),非空占位。
+**3. 占位符扫描**:每个代码 step 都有完整代码;fake scribe stub 自 T4 起就是共享模块 `tests/fake_scribe.py`(评审备注 2 落定,无运行时才发现的 import 歧义)。
+**3b. 评审修复已应用(2026-06-11 plan review,APPROVE_WITH_REQUIRED_FIX)**:fake 脚本仅 1 个 day 轮 → T4 flaky 写法与 T5 r2 分支是死代码,已全部替换为确定性写法——失败路径=`broken_scribe=True` 全程(断言全 fallback+完局+空账本);历史保留=预填账本+broken `_run_scribe(1)` 单测;speech 注入正向覆盖=预填账本后 run()。另落:`INCLUDE_RESPONSE_FORMAT` 方言开关措辞修正、B5 跳过 scribe turn 留话、manifest scaffold_model nice-to-have。
 **4. 类型一致性**:`parse_scribe_claims -> list|None`(T1 定义,T4 消费 None=fallback);claim dict 键(T1 输出=T2 渲染消费=T10 fixture);`scaffold_agent`(engine T4)/`scaffold_provider_factory`(runner T6)/`scaffold_factory_builder(arm, api_key) -> () -> ProviderAgent`(harness T9)三层签名一致;`SCAFFOLD_SUCCESS/SCAFFOLD_FALLBACK` 常量(T4)与 metrics 字符串(T7 用 `response_kind=="scaffold"` 判别,不依赖 kind 串)一致;`KNOWN_PROMPT_VERSIONS` 三元组(T3)与 engine/harness 既有 KNOWN 门自动生效(无字符串硬编码新增——engine 的 v2/v3 分支用显式元组 `("prompt_v2","prompt_v3")`,T4(b)(c) 已写)。
 **5. 既有测试影响清单**:`test_known_versions_and_default_constant_unchanged`(T3 更新为三元组,预期);`test_live_rate_from_turns` 既有断言不受影响(无 scaffold turn 的 fixture 口径不变);fixture 聚合测试新增键不破坏(T7/T8 验证)。
 
