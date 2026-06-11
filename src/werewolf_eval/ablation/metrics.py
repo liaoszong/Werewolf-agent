@@ -13,7 +13,9 @@ SCAFFOLD_COVERAGE_MIN = 0.5  # arm purity, spec §5.2b; threshold adjustable, se
 
 def classify_event(ev: dict):
     """-> (kind, actor, target, extra). kind in {kill,check,witch_save,witch_pass,
-    witch_poison,vote,elim,reveal,night_death,speech,other}."""
+    witch_poison,guard,peaceful,vote,elim,reveal,night_death,speech,other}.
+    NOTE: the p\\d patterns match single-digit seats only (p1-p9) — fine for 6p
+    boards; a >9-seat board would silently drop events here."""
     s = (ev.get("data") or {}).get("summary", "") or ""
     actor, tgt, ph = ev.get("actor"), ev.get("target"), ev.get("phase")
     m = re.match(r"Wolf team kills (p\d)", s)
@@ -288,6 +290,9 @@ def analyze_game_dict(gl: dict) -> dict:
         "seer_survives_d1": not (seer_death and seer_death[0] == 1),
         "guard_nights": gn,
         "guard_target_seer_share": (sum(1 for t in guards_by_round.values() if t == seer) / gn) if gn else None,
+        # TARGETING accuracy (守对率): guard target == that night's wolf target.
+        # A milk-pierced night (guard+save -> death) still counts as a hit here —
+        # this measures aiming, NOT survival; read verdict tables accordingly.
         "guard_block_share": (sum(1 for r2, t in guards_by_round.items() if kills.get(r2) == t) / gn) if gn else None,
         "n_peaceful_nights": peaceful,
         "herd_share": sum(shares) / len(shares) if shares else None,

@@ -273,10 +273,11 @@ class EmergentGameEngine:
         self._config = config
         self._players_by_id: dict[str, EnginePlayer] = {p.player_id: p for p in config.players}
         self._seat_order: list[str] = [p.player_id for p in config.players]
-        # R-30: the night resolution assumes ONE seer and ONE witch (seers[0]/
-        # witches[0]); a board with extras would silently deactivate them. Fail loud at
-        # construction instead so an unsupported board can't run a god-view-divergent game.
-        for _special in ("seer", "witch"):
+        # R-30: the night resolution assumes ONE seer, ONE witch and ONE guard
+        # (seers[0]/witches[0]/guards[0]); a board with extras would silently
+        # deactivate them. Fail loud at construction instead so an unsupported
+        # board can't run a god-view-divergent game.
+        for _special in ("seer", "witch", "guard"):
             _count = sum(1 for p in config.players if p.role == _special)
             if _count > 1:
                 raise ValueError(

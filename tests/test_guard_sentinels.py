@@ -183,6 +183,18 @@ class SelfProtectSentinel(unittest.TestCase):
                                      if e["type"] == "guard_protect" and e["round"] == 1])
 
 
+class TwoGuardBoardRejectedSentinel(unittest.TestCase):
+    def test_two_guards_fail_loud_at_construction(self):
+        # R-30 extension: _run_guard uses guards[0]; a 2-guard board would silently
+        # deactivate the second guard -> must be rejected at construction.
+        seats = {"p1": "werewolf", "p2": "werewolf", "p3": "seer",
+                 "p4": "guard", "p5": "guard", "p6": "villager"}
+        with self.assertRaises(ValueError):
+            EmergentGameEngine(
+                config=build_emergent_config(game_id="two_guards", seat_roles=seats),
+                agents=build_emergent_fake_agents({}), seed=0)
+
+
 class GuardBoardV3SmokeSentinel(unittest.TestCase):
     """Full-stack v3 smoke on the guard board — the EXACT l4_guard arm combo
     (prompt_v3 + scribe scaffold + rules_v1_2 + guard board): board-conditional
