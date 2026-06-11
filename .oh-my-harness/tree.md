@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 503
+- Entries: 506
 
 ```text
 ./
@@ -378,6 +378,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       ├── observer_visibility.py
 │       ├── profile_config.py
 │       ├── prompt_goldens.py
+│       ├── prompt_renderers.py
+│       ├── prompt_v1.py
 │       ├── prompt_v2.py
 │       ├── prompt_v3.py
 │       ├── prompt_version.py
@@ -529,6 +531,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── test_openai_provider.py
 │   ├── test_p2a2_live_path.py
 │   ├── test_profile_config.py
+│   ├── test_prompt_renderers.py
 │   ├── test_prompt_v2_invariants.py
 │   ├── test_prompt_v2.py
 │   ├── test_prompt_v3_invariants.py
