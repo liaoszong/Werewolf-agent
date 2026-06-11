@@ -1,3 +1,4 @@
+import pytest
 from collections import Counter
 
 from werewolf_eval.action_runtime.ruleset import rules_v1_1
@@ -165,8 +166,6 @@ def test_system_for_rejects_unknown_version():
         provider._system_for(_speech_req(prompt_version="prompt_v99"))
 
 
-import pytest
-
 from werewolf_eval.emergent_engine import EmergentBudget, EmergentGameEngine, build_emergent_config
 from werewolf_eval.emergent_fake_script import build_emergent_fake_agents, build_villager_win_script
 
@@ -204,3 +203,33 @@ def test_engine_v1_default_requests_unchanged():
     assert all(r.prompt_version == "prompt_v1" for r in reqs)
     assert all(r.board_card == "" for r in reqs)
     assert all("你是 " in r.observation_text for r in reqs)  # v1 渲染首行(contains 同理加固)
+
+
+import json as _json
+from pathlib import Path
+
+from werewolf_eval.run_emergent_deepseek_game import run_emergent_deepseek_game
+
+
+def _fake_factory():
+    agents = build_emergent_fake_agents(build_villager_win_script())
+    return lambda pid: agents[pid]
+
+
+def test_runner_threads_prompt_version_and_stamps_actual(tmp_path):
+    run_emergent_deepseek_game(
+        game_id="v2_runner_smoke", out_dir=tmp_path, provider_factory=_fake_factory(),
+        model="none", seed=7, max_requests_per_game=80, max_day_rounds=3,
+        prompt_version="prompt_v2",
+    )
+    manifest = _json.loads((tmp_path / "prompt-manifest.json").read_text(encoding="utf-8"))
+    assert manifest["evaluation_bucket"]["prompt_version"] == "prompt_v2"
+
+
+def test_runner_default_stamps_v1(tmp_path):
+    run_emergent_deepseek_game(
+        game_id="v1_runner_smoke", out_dir=tmp_path, provider_factory=_fake_factory(),
+        model="none", seed=7, max_requests_per_game=80, max_day_rounds=3,
+    )
+    manifest = _json.loads((tmp_path / "prompt-manifest.json").read_text(encoding="utf-8"))
+    assert manifest["evaluation_bucket"]["prompt_version"] == "prompt_v1"
