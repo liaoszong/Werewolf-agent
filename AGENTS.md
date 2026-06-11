@@ -7,7 +7,7 @@ Telegraph style. Root hard policy only. Read scoped `AGENTS.md` before subtree w
 ## Project Route
 
 - Product direction: client-agnostic live AI Werewolf experiment platform.
-- **The current module/phase is NOT hardcoded here** — read it from `docs/PROJECT_MAP.md` (phase authority). Do not assume an earlier G-track module is the front; as of this writing the active work is Phase 2 (P2-A emergent engine, P2-C theater, P2-D settlement). Qt/QML, observer server, emergent engine and settlement are IN scope.
+- **The current module/phase is NOT hardcoded here** — read it from `docs/PROJECT_MAP.md` (phase authority). Do not assume an earlier G-track module is the front. Qt/QML, observer server, emergent engine and settlement are IN scope.
 - Canonical route facts: `docs/PROJECT_MAP.md` (phases) + `docs/ROADMAP.md` / `docs/TASKS.md` (G-track history + task status).
 - Product entry: `README.md`.
 
