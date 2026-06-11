@@ -28,3 +28,73 @@ def test_rules_card_includes_hunter_on_hunter_board():
     seats = dict(STD_SEATS); seats["p6"] = "hunter"
     card = build_board_rules_card(rules_v1_1(), seats)
     assert "猎人×1" in card and "开枪" in card and "村民×1" in card
+
+
+from werewolf_eval.game_engine import AgentObservation
+from werewolf_eval.prompt_v2 import render_observation_text_v2
+
+
+def _ev(eid, seq, rnd, phase, etype, actor, target, summary):
+    return {"event_id": eid, "sequence": seq, "round": rnd, "phase": phase, "type": etype,
+            "actor": actor, "target": target, "visibility": "public",
+            "data": {"summary": summary}}
+
+
+EVENTS = {
+    "e1": _ev("e1", 1, 1, "night", "seer_check", "p3", "p1", "Seer p3 checks p1, result: werewolf."),
+    "e2": _ev("e2", 2, 1, "day", "day_announcement", "system", "none", "Night fell: p5 died."),
+    "e3": _ev("e3", 3, 1, "day", "player_died", "system", "p5", "p5 died during the night."),
+    "e4": _ev("e4", 4, 1, "day", "player_speech", "p3", "none", "我验了p1,他是狼。"),
+    "e5": _ev("e5", 5, 1, "day", "player_speech", "p1", "none", "p3在说谎,我是好人。"),
+    "e6": _ev("e6", 6, 1, "day", "player_vote", "p3", "p1", "p3 votes p1."),
+    "e7": _ev("e7", 7, 1, "day", "player_vote", "p1", "p3", "p1 votes p3."),
+    "hidden": _ev("hidden", 8, 1, "night", "werewolf_kill", "p1", "p5", "Wolf team kills p5."),
+}
+
+
+def _seer_obs():
+    return AgentObservation(
+        game_id="g", player_id="p3", role="seer", team="villager", phase="day", round=2,
+        alive_players=["p1", "p2", "p3", "p4", "p6"],
+        public_event_ids=["e2", "e3", "e4", "e5", "e6", "e7"],
+        private_event_ids=["e1"],
+        known_roles={"p3": "seer"},
+    )
+
+
+def test_v2_sections_private_facts_speeches_votes():
+    text, ids = render_observation_text_v2(_seer_obs(), EVENTS)
+    # 分区标题齐全且顺序:私有 -> 公开 -> 发言 -> 投票
+    i_priv, i_pub = text.index("【你的私有信息】"), text.index("【公开状态】")
+    i_sp, i_vote = text.index("【发言记录】"), text.index("【投票记录】")
+    assert i_priv < i_pub < i_sp < i_vote
+    # 私有区含验人结果(seer 私有事件),且在私有区内;事件行保留 phase 标注(夜死/放逐可直读)
+    assert "(r1 night) Seer p3 checks p1" in text[i_priv:i_pub]
+    assert "(r1 day) p5 died during the night" in text[i_pub:i_sp]
+    # 发言带说话人标签(修"无主语一坨")
+    assert "p3: 我验了p1" in text and "p1: p3在说谎" in text
+    # 投票矩阵按轮聚合
+    assert "p3→p1" in text and "p1→p3" in text
+    # source ids 覆盖全部被渲染事件
+    assert set(ids) == {"e1", "e2", "e3", "e4", "e5", "e6", "e7"}
+
+
+def test_v2_renders_only_visible_ids_hard_invariant():
+    # "hidden" 在 events_by_id 里但不在 obs 的可见 id 列表 -> 内容/出处都不得出现
+    text, ids = render_observation_text_v2(_seer_obs(), EVENTS)
+    assert "hidden" not in ids
+    assert "Wolf team kills" not in text
+
+
+def test_v2_known_roles_only_others_and_empty_sections_omitted():
+    obs = AgentObservation(
+        game_id="g", player_id="p1", role="werewolf", team="werewolf", phase="night", round=1,
+        alive_players=["p1", "p2", "p3", "p4", "p5", "p6"],
+        public_event_ids=[], private_event_ids=[],
+        known_roles={"p1": "werewolf", "p2": "werewolf"},
+    )
+    text, ids = render_observation_text_v2(obs, EVENTS)
+    assert ids == []
+    assert "p2=werewolf" in text          # 狼队友已知身份保留(与 v1 同语义)
+    assert "【发言记录】" not in text      # 空区整段省略
+    assert "【投票记录】" not in text
