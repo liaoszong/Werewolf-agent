@@ -175,7 +175,9 @@ def compare(a: dict, b: dict, keys=DEFAULT_COMPARE_KEYS) -> list[dict]:
 def seer_claim_rounds(run_dir, seer: str) -> list[int]:
     """Rounds where the TRUE seer publicly claimed (any check_report, or an
     identity_claim whose result mentions 预言), parsed from the scribe turns in
-    provider-trace.json. Non-v3 runs (no scribe) -> []."""
+    provider-trace.json. Real artifact shape (verified on .runs/ablation/b4):
+    {"requests": [{actor, round, request_id, ...}], "responses": [{request_id,
+    raw_content, ...}]} joined on request_id. Non-v3 runs (no scribe) -> []."""
     from werewolf_eval.prompt_v3 import parse_scribe_claims
     p = Path(run_dir) / "provider-trace.json"
     if not p.exists():
@@ -184,18 +186,21 @@ def seer_claim_rounds(run_dir, seer: str) -> list[int]:
         doc = json.loads(p.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
         return []
-    turns = doc.get("provider_turns") if isinstance(doc, dict) else doc
+    if not isinstance(doc, dict):
+        return []
+    raw_by_id = {r.get("request_id"): r.get("raw_content")
+                 for r in (doc.get("responses") or []) if isinstance(r, dict)}
     rounds: set[int] = set()
-    for t in turns or []:
-        if t.get("actor") != "scribe":
+    for req in doc.get("requests") or []:
+        if not isinstance(req, dict) or req.get("actor") != "scribe":
             continue
-        claims = parse_scribe_claims(t.get("raw_content") or "") or []
+        claims = parse_scribe_claims(raw_by_id.get(req.get("request_id")) or "") or []
         for c in claims:
             if c["claimant"] != seer:
                 continue
             if c["claim_type"] == "check_report" or (
                     c["claim_type"] == "identity_claim" and "预言" in str(c.get("result") or "")):
-                rounds.add(int(t.get("round", 0)))
+                rounds.add(int(req.get("round", 0)))
                 break
     return sorted(rounds)
 

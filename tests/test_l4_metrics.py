@@ -80,5 +80,58 @@ class GuardMetricsTests(unittest.TestCase):
         self.assertEqual(agg["seer_night_death_rate"], 0.0)
 
 
+class SeerClaimSurvivalTests(unittest.TestCase):
+    """provider-trace.json in its REAL shape ({requests, responses} joined on
+    request_id — verified against .runs/ablation/b4/b4_000)."""
+
+    def _trace_dir(self, tmp, claims_json, rnd=1):
+        d = Path(tmp)
+        trace = {
+            "game_id": "t", "provider_name": "x", "source_label": "x", "failures": [],
+            "requests": [{"actor": "scribe", "round": rnd, "request_id": f"t_r{rnd:02d}_scribe",
+                          "response_kind": "scaffold", "phase": "day"}],
+            "responses": [{"request_id": f"t_r{rnd:02d}_scribe", "raw_content": claims_json,
+                           "latency_ms": 1, "provider_name": "x", "source_label": "x",
+                           "token_usage": {}}],
+        }
+        (d / "provider-trace.json").write_text(
+            __import__("json").dumps(trace, ensure_ascii=False), encoding="utf-8")
+        return d
+
+    def test_claim_then_night_death_is_false(self):
+        import tempfile
+        from werewolf_eval.ablation.metrics import seer_claim_to_night_survival
+        claims = ('{"claims":[{"claimant":"p3","claim_type":"check_report","target":"p1",'
+                  '"result":"狼人","refutes":null,"source":1,"source_quote":"我验了p1","uncertain":false}]}')
+        with tempfile.TemporaryDirectory() as tmp:
+            d = self._trace_dir(tmp, claims)
+            row = {"seer": "p3", "end_round": 2, "seer_death": [2, "night"]}
+            self.assertIs(seer_claim_to_night_survival(d, row), False)
+
+    def test_claim_then_survival_is_true(self):
+        import tempfile
+        from werewolf_eval.ablation.metrics import seer_claim_to_night_survival
+        claims = ('{"claims":[{"claimant":"p3","claim_type":"identity_claim","target":null,'
+                  '"result":"预言家","refutes":null,"source":1,"source_quote":"我是预言家","uncertain":false}]}')
+        with tempfile.TemporaryDirectory() as tmp:
+            d = self._trace_dir(tmp, claims)
+            row = {"seer": "p3", "end_round": 3, "seer_death": None}
+            self.assertIs(seer_claim_to_night_survival(d, row), True)
+
+    def test_no_claim_or_no_exposure_is_none(self):
+        import tempfile
+        from werewolf_eval.ablation.metrics import seer_claim_to_night_survival
+        with tempfile.TemporaryDirectory() as tmp:
+            d = self._trace_dir(tmp, '{"claims":[]}')
+            self.assertIsNone(seer_claim_to_night_survival(
+                d, {"seer": "p3", "end_round": 2, "seer_death": None}))
+            # 报验在终局轮:没有下一夜 -> 无暴露,不计入分母
+            d2 = self._trace_dir(tmp, '{"claims":[{"claimant":"p3","claim_type":"check_report",'
+                                      '"target":"p1","result":"狼人","refutes":null,"source":1,'
+                                      '"source_quote":"我验了p1","uncertain":false}]}')
+            self.assertIsNone(seer_claim_to_night_survival(
+                d2, {"seer": "p3", "end_round": 1, "seer_death": None}))
+
+
 if __name__ == "__main__":
     unittest.main()

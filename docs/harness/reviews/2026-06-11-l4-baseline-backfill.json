@@ -1,0 +1,48 @@
+{
+ "purpose": "L4 guard arm baseline backfill (spec 2026-06-11-l4-guard-arm §8 prerequisite): seer-survival metric family back-computed on existing b4/b1 raw games before running l4_guard",
+ "source_runs": ".runs/ablation/{b4,b1} (main checkout; paired seeds 1000-1044)",
+ "computed_by": "tools/backfill_seer_claim_metrics.py @ l4-guard-arm branch",
+ "computed_at": "2026-06-11",
+ "cross_validation": {
+  "b4_n_valid": "40 == verdict n_valid 40 (coverage gate reproduced)",
+  "b4_seer_death_rate": "0.825 == verdict 33/40",
+  "b4_wolf_win_rate": "0.875 == verdict 87.5%",
+  "b1_wolf_win_rate": "0.933 == verdict 93.3%",
+  "night_split_note": "seer_night_death_rate=0.325 (13/40) is DEATH-based and internally consistent (13 night + 20 vote = 33 = seer_death_rate*40). Measured on the same 40 valid games: 21 games had a night-kill attempt on the seer, 14 had a witch save on the seer, 13 night deaths landed. The b4 verdict's wording '被夜刀 15 + 被票 20' does not sum to its own 33 and matches none of these measured counts exactly — treat THIS snapshot's death-based family as the canonical baseline for the l4_guard comparison; the verdict's 15 is a prose-level approximation.",
+  "b1_claim_metric_null": "expected — b1 (prompt_v2) has no scribe artifacts, so seer_claim_* is null there; b4 is the primary baseline for the claim-survival metric."
+ },
+ "arms": [
+  {
+   "arm_dir": "b4",
+   "n_valid": 40,
+   "n_total": 45,
+   "seer_death_rate": 0.825,
+   "seer_night_death_rate": 0.325,
+   "seer_claim_to_night_survival_rate": 0.7222222222222222,
+   "seer_claim_to_night_survival_n": 36,
+   "guard_target_seer_rate": null,
+   "guard_success_rate": null,
+   "avg_peaceful_nights": 1.0,
+   "wolf_win_rate": 0.875
+  },
+  {
+   "arm_dir": "b1",
+   "n_valid": 45,
+   "n_total": 45,
+   "seer_death_rate": 0.8,
+   "seer_night_death_rate": 0.3333333333333333,
+   "seer_claim_to_night_survival_rate": null,
+   "seer_claim_to_night_survival_n": 0,
+   "guard_target_seer_rate": null,
+   "guard_success_rate": null,
+   "avg_peaceful_nights": 1.0,
+   "wolf_win_rate": 0.9333333333333333
+  }
+ ],
+ "b4_seer_pressure_detail": {
+  "games_with_night_kill_attempt_on_seer": 21,
+  "games_with_witch_save_on_seer": 14,
+  "seer_night_deaths": 13,
+  "seer_vote_deaths": 20
+ }
+}
