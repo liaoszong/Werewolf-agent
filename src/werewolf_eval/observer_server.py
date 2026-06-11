@@ -41,6 +41,13 @@ from werewolf_eval.observer_protocol import (
     validate_run_id,
     write_run_status,
 )
+from werewolf_eval.observer.security import (
+    _LOOPBACK_HOSTNAMES,
+    _hostname_of,
+    _is_loopback_hostname,
+    is_loopback_client,
+    is_same_origin_local,
+)
 from werewolf_eval.credential_store import CredentialStore
 from werewolf_eval.deepseek_launcher import build_multi_provider_launcher
 from werewolf_eval.evaluation_versions import read_manifest_bucket
@@ -393,29 +400,6 @@ def _sanitize_launcher_error(exc: BaseException) -> str:
 # Request handler
 # ---------------------------------------------------------------------------
 
-_LOOPBACK_HOSTNAMES = frozenset({"localhost", "127.0.0.1", "::1"})
-
-
-def _hostname_of(value: str) -> str:
-    """Lowercased hostname from a Host/Origin header value, stripped of scheme
-    and port. Handles ``http://host:port/path``, ``host:port`` and bracketed
-    IPv6 (``[::1]:port``)."""
-    text = value.strip().lower()
-    if "://" in text:
-        text = text.split("://", 1)[1]
-    text = text.split("/", 1)[0]
-    if "@" in text:  # strip userinfo (user:pass@host); the real host is after the '@'
-        text = text.rsplit("@", 1)[1]
-    if text.startswith("["):  # [::1] or [::1]:port
-        return text[1:].split("]", 1)[0]
-    if text.count(":") == 1:  # host:port (a bare IPv6 like ::1 has >1 colon)
-        text = text.rsplit(":", 1)[0]
-    return text
-
-
-def _is_loopback_hostname(value: str) -> bool:
-    return _hostname_of(value) in _LOOPBACK_HOSTNAMES
-
 
 class ObserverRequestHandler(BaseHTTPRequestHandler):
     """Handles observer HTTP requests with JSON/SSE responses.
@@ -465,21 +449,12 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
 
     def _is_loopback(self) -> bool:
         host = self.client_address[0] if self.client_address else ""
-        return host in ("127.0.0.1", "::1")
+        return is_loopback_client(host)
 
     def _is_same_origin_local(self) -> bool:
-        """True when a state-changing request is safe to honour: the Host header
-        names a loopback address (defends DNS-rebinding, where a browser sends the
-        attacker's hostname that resolves to 127.0.0.1) and any Origin header is
-        loopback too (defends cross-site POST/DELETE / CSRF). Non-browser clients
-        that omit Host/Origin are unaffected."""
-        host = self.headers.get("Host", "") if self.headers else ""
-        if host and not _is_loopback_hostname(host):
-            return False
-        origin = self.headers.get("Origin") if self.headers else None
-        if origin and not _is_loopback_hostname(origin):
-            return False
-        return True
+        """True when a state-changing request is safe to honour (loopback Host,
+        loopback-or-absent Origin) — see ``observer.security.is_same_origin_local``."""
+        return is_same_origin_local(self.headers)
 
     def _reject_cross_origin(self) -> bool:
         """Guard for state-changing endpoints (credential writes, run launches).
