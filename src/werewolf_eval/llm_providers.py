@@ -133,6 +133,36 @@ def build_speech_system_prompt_v2(request: ProviderRequest) -> str:
     )
 
 
+def build_speech_system_prompt_v3(request: ProviderRequest) -> str:
+    # SYS-B4 §4 graded guidance: speech stays RESTRAINED (the b1 lesson — handing
+    # the discrimination program to every seat armed wolf fake-claims). Neutral
+    # speech requirements + anti-visual/anti-mechanic line only; the comparison
+    # program ships ONLY in the vote scaffold (observation side).
+    return (
+        f"你是狼人杀里的 {request.actor}(第 {request.round} 轮,白天发言)。"
+        f"请用自然口吻发言,3-5 句或 120-180 字,不要固定小标题,不要输出 JSON,直接说话。"
+        f"发言应包含:当前局势判断、你怀疑或相信的对象、一个具体理由、本轮投票倾向。"
+        f"局内不存在表情、眼神、语气等信息,也没有警长、守卫等本局规则卡之外的机制,不要编造。"
+    )
+
+
+def build_scribe_system_prompt(request: ProviderRequest) -> str:
+    # SYS-B4 §3 scheme C: the scribe is an EXTRACTION artifact, not a judge.
+    # Strict JSON (the scaffold request rides response_format=json_object on
+    # OpenAI-compatible dialects; Anthropic has no such switch — coverage gate
+    # absorbs any parse-failure delta there).
+    return (
+        "你是狼人杀对局的书记员。你只负责提取,不要判断真假、不要推理谁是狼。"
+        "从下面带编号的发言记录中提取所有身份声称、查验报告与反驳,输出 JSON:"
+        '{"claims":[{"claimant":"pX","claim_type":"identity_claim|check_report|refutation",'
+        '"target":"pX或null","result":"身份或查验结果或null","refutes":"pX或null",'
+        '"source":发言编号,"source_quote":"原文片段","uncertain":true或false}]}。'
+        "规则:claimant 必须是发言者本人;source_quote 必须是该发言的原文片段;"
+        "提取不到明确声称就输出 {\"claims\":[]};语义含糊时照常提取但把 uncertain 设为 true。"
+        "不要输出 JSON 以外的任何内容。"
+    )
+
+
 def compose_system(persona_prompt: str, contract: str) -> str:
     """Prepend the per-seat persona to the machine contract. The contract is kept
     verbatim and is never removed/altered — an empty persona returns it unchanged
@@ -217,8 +247,12 @@ class BaseChatProvider:
             raise ValueError(
                 f"unknown prompt_version {request.prompt_version!r}; known: {KNOWN_PROMPT_VERSIONS}"
             )
-        if request.response_kind == "speech":
-            if request.prompt_version == "prompt_v2":
+        if request.response_kind == "scaffold":
+            contract = build_scribe_system_prompt(request)
+        elif request.response_kind == "speech":
+            if request.prompt_version == "prompt_v3":
+                contract = build_speech_system_prompt_v3(request)
+            elif request.prompt_version == "prompt_v2":
                 contract = build_speech_system_prompt_v2(request)
             else:
                 contract = build_speech_system_prompt(request)

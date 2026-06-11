@@ -50,6 +50,13 @@ from werewolf_eval.action_runtime.abilities import TARGET_RULES
 from werewolf_eval.invariants.guards import assert_prompt_entitled, assert_death_commit_once
 from werewolf_eval.prompt_version import KNOWN_PROMPT_VERSIONS
 from werewolf_eval.prompt_v2 import build_board_rules_card, render_observation_text_v2
+from werewolf_eval.prompt_v3 import (
+    SCRIBE_MAX_OUTPUT_TOKENS,
+    parse_scribe_claims,
+    render_claim_digest,
+    render_scribe_input,
+    render_vote_scaffold,
+)
 
 # The provider request phase used for free-text speeches. The game_log event is
 # still recorded with phase="day"; the distinct request phase only keeps the
@@ -91,6 +98,9 @@ LIVE_SUCCESS = "live_success"
 INVALID_FALLBACK = "invalid_then_fallback"
 TIMEOUT_FALLBACK = "timeout_then_fallback"
 ERROR_FALLBACK = "error_then_fallback"
+# SYS-B4 scaffold turn kinds (never contribute to live_success_rate).
+SCAFFOLD_SUCCESS = "scaffold_success"
+SCAFFOLD_FALLBACK = "scaffold_fallback"
 
 
 def _fallback_kind_for(failure_kind: str) -> str:
@@ -256,6 +266,7 @@ class EmergentGameEngine:
         budget: EmergentBudget | None = None,
         runtime_events: Any | None = None,
         prompt_version: str = "prompt_v1",
+        scaffold_agent: Any | None = None,
     ) -> None:
         self._config = config
         self._players_by_id: dict[str, EnginePlayer] = {p.player_id: p for p in config.players}
@@ -301,10 +312,17 @@ class EmergentGameEngine:
             )
         self.prompt_version = prompt_version
         self._board_card = ""
-        if prompt_version == "prompt_v2":
+        if prompt_version in ("prompt_v2", "prompt_v3"):
             self._board_card = build_board_rules_card(
                 _ruleset, {p.player_id: p.role for p in config.players}
             )
+        # SYS-B4: the scribe is NOT a player. prompt_v3 REQUIRES it (no silent
+        # scaffold-less v3); other versions ignore it.
+        self._scaffold_agent = scaffold_agent
+        if prompt_version == "prompt_v3" and scaffold_agent is None:
+            raise ValueError("prompt_v3 requires a scaffold_agent (scribe provider)")
+        # Cross-round claim ledger; scribe failures NEVER clear it (spec §3 ②).
+        self._claim_ledger: list[dict[str, Any]] = []
         # Registry-driven action dispatch (Phase-3 ②a). Each migrated ability id maps to a
         # driver. Night order is explicit DATA (load-bearing: wolf BEFORE seer — both may draw
         # 0/1 from self._rng). The witch is DEFERRED (inline, ②b) so it is NOT in this map/order.
@@ -513,7 +531,7 @@ class EmergentGameEngine:
         return {e["event_id"]: e for e in self._events}
 
     def _render_obs(self, obs: AgentObservation) -> RenderedObservation:
-        if self.prompt_version == "prompt_v2":
+        if self.prompt_version in ("prompt_v2", "prompt_v3"):
             text, ids = render_observation_text_v2(obs, self._events_by_id())
             return RenderedObservation(text=text, source_event_ids=ids)
         return render_observation_text(obs, self._events_by_id())
@@ -562,6 +580,12 @@ class EmergentGameEngine:
         obs = self._build_obs(player_id, phase, rnd)
         rendered = self._render_obs(obs)
         agent = self._agents[player_id]
+        obs_text = rendered.text
+        if self.prompt_version == "prompt_v3" and phase == "day":
+            # vote request (the only day-phase action path; hunter uses its own
+            # site): inject digest + comparison program. Input-side ONLY — the
+            # action system prompt / strict-JSON contract is untouched (spec §0).
+            obs_text = f"{obs_text}\n{render_vote_scaffold(self._claim_ledger)}"
         turn: dict[str, Any] = {
             "request_id": f"{self._game_id}_r{rnd:02d}_{player_id}",
             "round": rnd,
@@ -581,7 +605,7 @@ class EmergentGameEngine:
         try:
             action = agent.decide(
                 obs,
-                observation_text=rendered.text,
+                observation_text=obs_text,
                 response_kind="action",
                 max_output_tokens=ACTION_MAX_OUTPUT_TOKENS,
                 prompt_version=self.prompt_version,
@@ -872,6 +896,11 @@ class EmergentGameEngine:
         provider = self._agents[player_id].provider
         obs = self._build_obs(player_id, SPEECH_REQUEST_PHASE, rnd)
         rendered = self._render_obs(obs)
+        obs_text = rendered.text
+        if self.prompt_version == "prompt_v3" and self._claim_ledger:
+            # graded guidance: speeches get the DIGEST only (information symmetry),
+            # never the comparison program (b1 lesson: don't arm wolf fake-claims).
+            obs_text = f"{obs_text}\n{render_claim_digest(self._claim_ledger)}"
         request = ProviderRequest(
             request_id=f"{self._game_id}_r{rnd:02d}_{player_id}_speech",
             game_id=self._game_id,
@@ -881,7 +910,7 @@ class EmergentGameEngine:
             observation=obs.to_dict(),
             allowed_actions=[],
             allowed_targets=[],
-            observation_text=rendered.text,
+            observation_text=obs_text,
             response_kind="speech",
             max_output_tokens=SPEECH_MAX_OUTPUT_TOKENS,
             prompt_version=self.prompt_version,
@@ -917,6 +946,54 @@ class EmergentGameEngine:
         else:
             turn["kind"] = LIVE_SUCCESS
         self._emit("day", rnd, "player_speech", player_id, "none", "public", text)
+
+    def _run_scribe(self, rnd: int) -> None:
+        """SYS-B4 scheme C: one extraction call per day round, AFTER speeches and
+        BEFORE the vote. Budget-charged; recorded as a scaffold turn with
+        live_requested=False (never dilutes player live_success_rate). A failed
+        round adds nothing — the cross-round ledger is preserved."""
+        speeches = [(e["actor"], e["data"]["summary"]) for e in self._events
+                    if e["type"] == "player_speech" and e["round"] == rnd]
+        if not speeches:
+            return
+        self._budget.charge()
+        provider = self._scaffold_agent.provider
+        request = ProviderRequest(
+            request_id=f"{self._game_id}_r{rnd:02d}_scribe",
+            game_id=self._game_id, actor="scribe", phase="day", round=rnd,
+            observation={}, allowed_actions=[], allowed_targets=[],
+            observation_text=render_scribe_input(rnd, speeches),
+            response_kind="scaffold", max_output_tokens=SCRIBE_MAX_OUTPUT_TOKENS,
+            temperature=0.0,                       # extraction task: kill nondeterminism
+            prompt_version=self.prompt_version, board_card="",
+        )
+        turn: dict[str, Any] = {
+            "request_id": request.request_id, "round": rnd, "phase": "day", "actor": "scribe",
+            "response_kind": "scaffold", "live_requested": False, "kind": None,
+            "fallback_reason": None, "source_label": None,
+            "model": getattr(provider, "model", None), "token_usage": None,
+            "observation_source_event_ids": [],
+        }
+        self._provider_turns.append(turn)
+        claims = None
+        try:
+            response = provider.respond(request)
+            turn["source_label"] = response.source_label
+            turn["token_usage"] = dict(response.token_usage)
+            claims = parse_scribe_claims(response.raw_content or "")
+        except Exception as exc:  # noqa: BLE001 - scaffold is non-adjudicating; never abort
+            turn["fallback_reason"] = f"scribe provider error: {exc}"
+        if claims is None:
+            turn["kind"] = SCAFFOLD_FALLBACK
+            if not turn["fallback_reason"]:
+                turn["fallback_reason"] = "scribe output unparseable"
+            turn["source_label"] = None
+            turn["token_usage"] = None
+            return                                  # history PRESERVED (spec §3 ②)
+        turn["kind"] = SCAFFOLD_SUCCESS
+        for c in claims:
+            c["round"] = rnd
+        self._claim_ledger.extend(claims)
 
     # ---- death-triggered abilities (hunter v1.1) -----------------------
 
@@ -1092,6 +1169,9 @@ class EmergentGameEngine:
 
             for speaker in self._alive_in_seat_order():
                 self._resolve_speech(speaker, rnd)
+
+            if self.prompt_version == "prompt_v3":
+                self._run_scribe(rnd)
 
             eliminated = self._RESOLVERS["player_vote"](rnd)
             if eliminated is not None:

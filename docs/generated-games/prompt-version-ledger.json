@@ -82,5 +82,36 @@
       "production_default": "DO_NOT_FLIP (PROMPT_VERSION stays prompt_v1)",
       "next": "SYS-B4 Claim Ledger + Vote Scaffold (input-side scaffold; action strict-JSON contract unchanged)"
     }
+  },
+  {
+    "prompt_version": "prompt_v3",
+    "base_version": "prompt_v2",
+    "reason": "SYS-B4 Claim Ledger + Vote Scaffold (scheme C scribe): per-round extraction artifact -> cross-round claim ledger -> digest into speeches, digest+comparison-program into vote requests only; restrained speech contract (graded guidance)",
+    "expected_change": "v3 coexists with v1/v2 at runtime (arm-selected); v1/v2 goldens untouched; targets the b1 failure chain (village votes out its own seer in 70% of verify cases); action strict-JSON contract untouched (spec hard constraint)",
+    "touched_chain": [
+      "prompt_v3.render_scribe_input",
+      "prompt_v3.render_claim_digest",
+      "prompt_v3.render_vote_scaffold",
+      "llm_providers.build_scribe_system_prompt",
+      "llm_providers.build_speech_system_prompt_v3",
+      "llm_providers._system_for(scaffold branch)"
+    ],
+    "golden_prompt_hashes": {
+      "before": null,
+      "after": {
+        "scribe_system_prompt": "21b57638c3299880a41f641e7a2c435080d1f35af3b30937289f9b8e459fd5ce",
+        "scribe_input_round1": "45d5d6283b481cdfc2c94bbb578f62a058581d56726af082b863849a31c20531",
+        "claim_digest_two_claims": "c4d3fb3afeae089a8fc64b2c7b8954829f0c1a21fdd95d1526ab88bc976a4cf9",
+        "vote_scaffold_with_claims": "ee1271bd5253d7af7df5cfc74763918aab5a4388b1c4ae7bef48c33972452d0e",
+        "vote_scaffold_empty_ledger": "0b0c849f68cad68f03d4a7577caf4e3aa95de2f04af9ff98333f90b91ff7dd49",
+        "speech_villager_v3": "b4ead2d81af5aca155c9f49bd0f16591c15cae71499c4bf4d15f1150233ce3ba"
+      }
+    },
+    "behavior_evidence": {
+      "status": "not_run",
+      "reason_if_not_run": "pending ablation arm b4 vs baseline/b1 (plan Task 11)"
+    },
+    "blessed_by": "user (spec 2026-06-11 sys-b4 dual review; plan 2026-06-11-sys-b4-claim-ledger-vote-scaffold)",
+    "blessed_at": "2026-06-11"
   }
 ]

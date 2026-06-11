@@ -6,6 +6,7 @@ from pathlib import Path
 VISUAL_WORDS = ("眼神", "表情", "紧张", "躲闪", "支支吾吾", "语气", "闪躲")
 MECHANIC_WORDS = ("警徽", "警长", "警上", "警下", "守卫", "守夜人")
 LIVE_RATE_MIN = 0.7
+SCAFFOLD_COVERAGE_MIN = 0.5  # arm purity, spec §5.2b; threshold adjustable, separate reporting NOT removable
 
 
 def classify_event(ev: dict):
@@ -35,14 +36,38 @@ def classify_event(ev: dict):
 
 def live_rate_from_turns(turns_doc) -> float:
     turns = turns_doc.get("turns") if isinstance(turns_doc, dict) else turns_doc
-    if not turns: return 0.0
-    return sum(1 for t in turns if t.get("kind") == "live_success") / len(turns)
+    if turns is None:
+        return 0.0
+    player = [t for t in turns if t.get("response_kind") != "scaffold"]
+    if not player:
+        return 0.0
+    return sum(1 for t in player if t.get("kind") == "live_success") / len(player)
 
 
 def live_rate(run_dir: Path) -> float:
     p = Path(run_dir) / "provider-turns.json"
     if not p.exists(): return 0.0
     return live_rate_from_turns(json.loads(p.read_text(encoding="utf-8")))
+
+
+def scaffold_coverage_from_turns(turns_doc):
+    """scaffold_success / scaffold attempts; None when the game ran no scribe
+    (non-v3 arms) so the validity gate is vacuous for them (spec §5.2b)."""
+    turns = turns_doc.get("turns") if isinstance(turns_doc, dict) else (turns_doc or [])
+    attempts = [t for t in turns if t.get("response_kind") == "scaffold"]
+    if not attempts:
+        return None
+    return sum(1 for t in attempts if t.get("kind") == "scaffold_success") / len(attempts)
+
+
+def scaffold_coverage(run_dir) -> float | None:
+    p = Path(run_dir) / "provider-turns.json"
+    if not p.exists():
+        return None
+    try:
+        return scaffold_coverage_from_turns(json.loads(p.read_text(encoding="utf-8")))
+    except (json.JSONDecodeError, OSError):
+        return None
 
 
 def _mean(xs):
@@ -58,6 +83,7 @@ def aggregate_games(games: list[dict]) -> dict:
     d1 = [g["d1_majority_is_wolf"] for g in games if g["d1_majority_is_wolf"] is not None]
     d2 = [g.get("d2_majority_is_wolf") for g in games if g.get("d2_majority_is_wolf") is not None]
     vwf = [g["verify_wolf_followed"] for g in games if g["verify_wolf_followed"] is not None]
+    svo = [g.get("verify_seer_voted_out") for g in games if g.get("verify_seer_voted_out") is not None]
     tot_sp = sum(g["n_speeches"] for g in games) or 1
     kill_dist = collections.Counter(g["night1_kill"] for g in games if g["night1_kill"])
     return {
@@ -68,6 +94,7 @@ def aggregate_games(games: list[dict]) -> dict:
         "day2_hit": (sum(d2)/len(d2)) if d2 else None,
         "verify_wolf_followed": (sum(vwf)/len(vwf)) if vwf else None,
         "verify_wolf_followed_n": len(vwf),
+        "seer_voted_out_in_verify_cases": (sum(svo)/len(svo)) if svo else None,
         "witch_save_rate": rate(lambda g: g["witch_save"]),
         "witch_poison_rate": rate(lambda g: g["witch_poison"]),
         "herding": _mean([g["herd_share"] for g in games]),
@@ -83,12 +110,15 @@ def aggregate_games(games: list[dict]) -> dict:
 def aggregate(run_dirs) -> dict:
     """Read run dirs, drop low-live (RNG) / incomplete / corrupt games, aggregate the valid ones."""
     run_dirs = [Path(d) for d in run_dirs]
-    valid, invalid = [], 0
+    valid, invalid, invalid_scaffold = [], 0, 0
     for d in run_dirs:
         gl_path = d / "game-log.json"
         try:
             if not gl_path.exists() or live_rate(d) < LIVE_RATE_MIN:
                 invalid += 1; continue
+            cov = scaffold_coverage(d)
+            if cov is not None and cov < SCAFFOLD_COVERAGE_MIN:
+                invalid_scaffold += 1; continue
             gl = json.loads(gl_path.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):
             invalid += 1; continue
@@ -96,17 +126,19 @@ def aggregate(run_dirs) -> dict:
             invalid += 1; continue
         row = analyze_game_dict(gl)
         row["run_dir"] = d.name
+        row["scaffold_coverage"] = cov
         valid.append(row)
     out = aggregate_games(valid)
     out["games"] = valid
     out["n_total"] = len(run_dirs)
     out["n_invalid_lowlive"] = invalid
+    out["n_invalid_scaffold"] = invalid_scaffold
     return out
 
 
 DEFAULT_COMPARE_KEYS = (
     "n_valid","wolf_win_rate","villager_win_rate","day1_hit","day2_hit",
-    "verify_wolf_followed","witch_save_rate","witch_poison_rate","herding",
+    "verify_wolf_followed","seer_voted_out_in_verify_cases","witch_save_rate","witch_poison_rate","herding",
     "halluc_visual_speech_rate","halluc_visual_game_rate","halluc_mechanic_game_rate",
     "seer_survives_d1_rate","avg_rounds",
 )
@@ -155,6 +187,11 @@ def analyze_game_dict(gl: dict) -> dict:
     verify_wolf_followed = None
     if seer_chk and seer_chk[1] == "werewolf":
         verify_wolf_followed = (d1 == seer_chk[0])
+    # SYS-B4 failure-chain metric: in a seer-checked-wolf game, did the day-1
+    # majority vote out the TRUE SEER themself? (b1 baseline: 14/20 = 70%.)
+    verify_seer_voted_out = None
+    if seer_chk and seer_chk[1] == "werewolf" and d1 is not None:
+        verify_seer_voted_out = (d1 == seer)
     shares = []
     for r in votes:
         _, n = majority(r)
@@ -170,6 +207,7 @@ def analyze_game_dict(gl: dict) -> dict:
         "d1_total": len(votes.get(1, [])),
         "d2_majority_is_wolf": (majority(2)[0] in wolves) if majority(2)[0] else None,
         "verify_wolf_followed": verify_wolf_followed,
+        "verify_seer_voted_out": verify_seer_voted_out,
         "witch_save": save, "witch_poison": poison,
         "seer_death_cause": seer_death[1] if seer_death else None,
         "seer_survives_d1": not (seer_death and seer_death[0] == 1),

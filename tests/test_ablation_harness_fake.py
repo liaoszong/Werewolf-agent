@@ -44,3 +44,13 @@ def test_run_arm_v2_smoke_threads_version(tmp_path):
     result = run_arm(arm, out_root=tmp_path, factory_builder=build_fake_factory)
     assert result["prompt_version"] == "prompt_v2"
     assert (tmp_path / "v2_smoke" / "_metrics.json").exists()
+
+
+def test_run_arm_v3_smoke_with_scaffold_factory(tmp_path):
+    from fake_scribe import _FakeScribeProvider
+    from werewolf_eval.provider_agent import ProviderAgent
+    arm = Arm(label="v3_smoke", prompt_version="prompt_v3", n_games=1, seed_base=7)
+    result = run_arm(arm, out_root=tmp_path, factory_builder=build_fake_factory,
+                     scaffold_factory_builder=lambda a, k: (lambda: ProviderAgent("scribe", _FakeScribeProvider())))
+    assert result["prompt_version"] == "prompt_v3"
+    assert (tmp_path / "v3_smoke" / "_metrics.json").exists()
