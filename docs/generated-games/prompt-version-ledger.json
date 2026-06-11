@@ -68,10 +68,19 @@
       }
     },
     "behavior_evidence": {
-      "status": "not_run",
-      "reason_if_not_run": "pending ablation arm b1 vs baseline (plan Task 10)"
+      "status": "attached",
+      "evidence": "45-game live ablation b1 vs baseline (paired seeds 1000-1044, n_valid 45/45 both arms; snapshots docs/harness/reviews/2026-06-11-baseline-prompt-v1-metrics.json + docs/harness/reviews/2026-06-11-b1-prompt-v2-metrics.json). Hallucination repair PASS: visual-halluc speech rate 12.4%->2.45% (target <5% met), mechanic-halluc game rate 11.1%->2.2% (no parroting inflation), visual game rate 35.6%->11.1%. Gameplay outcome FAIL/REGRESSED: wolf win 77.8%->93.3% (+15.6pp, opposite of target), day1 hit 42.2%->31.1%, day2 50%->28.6%, verify-wolf-followed 50%->30% (n=20), seer-survives-d1 73.3%->57.8%. Root cause (per-game rows): in 14/20 seer-checked-wolf games the day-1 majority voted out the TRUE SEER; the discrimination guidance armed wolf counter-claims while villagers lack a claim ledger to resolve them -> confirms the SYS-B4 gap (village cannot structurally use seer information)."
     },
     "blessed_by": "user (spec 2026-06-10 quality §3 review; plan 2026-06-11-sys-b1-context-repair)",
-    "blessed_at": "2026-06-11"
+    "blessed_at": "2026-06-11",
+    "arm_status": "frozen_experimental_arm",
+    "arm_label": "b1_context_repair",
+    "verdict": {
+      "infrastructure": "PASS",
+      "hallucination_repair": "PASS",
+      "gameplay_outcome": "FAIL_REGRESSED",
+      "production_default": "DO_NOT_FLIP (PROMPT_VERSION stays prompt_v1)",
+      "next": "SYS-B4 Claim Ledger + Vote Scaffold (input-side scaffold; action strict-JSON contract unchanged)"
+    }
   }
 ]
