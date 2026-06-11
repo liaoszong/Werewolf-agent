@@ -602,7 +602,7 @@ class QtObserverHiddenInfoBoundaryTests(unittest.TestCase):
 class QtObserverReadmeTests(unittest.TestCase):
     def test_readme_documents_mvp_status_and_non_goals(self) -> None:
         content = (QT / "README.md").read_text(encoding="utf-8")
-        self.assertIn("G2b Observer Cockpit MVP", content)
+        self.assertIn("P2 theater client", content)
         self.assertIn("profile setup editor", content)
         self.assertIn("no Web observer client", content)
         self.assertIn("no direct Python runtime binding", content)
