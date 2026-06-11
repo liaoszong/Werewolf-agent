@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 486
+- Entries: 485
 
 ```text
 ./
@@ -148,7 +148,6 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   ├── g1c-wolf-consensus-metrics-summary.json
 │   │   ├── g1c-wolf-consensus-score-log.json
 │   │   ├── g1d-fake-provider-decision-log.json
-│   │   ├── g1d-fake-provider-failure-audit.example.json
 │   │   ├── g1d-fake-provider-game-log.json
 │   │   ├── g1d-fake-provider-metrics-summary.json
 │   │   ├── g1d-fake-provider-provider-trace.json
