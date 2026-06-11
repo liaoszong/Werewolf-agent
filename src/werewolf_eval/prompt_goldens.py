@@ -18,11 +18,14 @@ from werewolf_eval.emergent_engine import (
 from werewolf_eval.game_engine import AgentObservation
 from werewolf_eval.llm_providers import (
     build_action_system_prompt,
+    build_scribe_system_prompt,
     build_speech_system_prompt,
     build_speech_system_prompt_v2,
+    build_speech_system_prompt_v3,
     compose_system,
 )
 from werewolf_eval.prompt_v2 import build_board_rules_card, render_observation_text_v2
+from werewolf_eval.prompt_v3 import render_claim_digest, render_scribe_input, render_vote_scaffold
 from werewolf_eval.provider_contract import ProviderRequest
 
 _ALIVE = ["p1", "p2", "p3", "p4", "p5", "p6"]
@@ -146,6 +149,31 @@ def canonical_prompt_samples_v2() -> list[tuple[str, str]]:
          + HUNTER_SHOT_OBSERVATION_SUFFIX),
         ("compose_full_v2_speech",
          f"{card}\n\n" + compose_system("你是谨慎的分析型玩家。", speech_v2)),
+    ]
+
+
+_CLAIMS_V3 = [
+    {"round": 1, "claimant": "p3", "claim_type": "check_report", "target": "p1",
+     "result": "werewolf", "refutes": None, "source": 1,
+     "source_quote": "昨晚验了p1,他是狼人", "uncertain": False},
+    {"round": 1, "claimant": "p1", "claim_type": "refutation", "target": None,
+     "result": None, "refutes": "p3", "source": 2,
+     "source_quote": "p3在悍跳", "uncertain": True},
+]
+
+
+def canonical_prompt_samples_v3() -> list[tuple[str, str]]:
+    """prompt_v3 golden set — the three spec §8.6 classes: ① scribe prompt+schema,
+    ② claim digest injection text, ③ vote scaffold full text; plus the restrained
+    speech contract and the scribe input rendering."""
+    scaffold_req = _req("scribe", "day", [], [], response_kind="scaffold")
+    return [
+        ("scribe_system_prompt", build_scribe_system_prompt(scaffold_req)),
+        ("scribe_input_round1", render_scribe_input(1, [("p3", "我验了p1,他是狼。"), ("p1", "p3在悍跳。")])),
+        ("claim_digest_two_claims", render_claim_digest(_CLAIMS_V3)),
+        ("vote_scaffold_with_claims", render_vote_scaffold(_CLAIMS_V3)),
+        ("vote_scaffold_empty_ledger", render_vote_scaffold([])),
+        ("speech_villager_v3", build_speech_system_prompt_v3(_req("p5", "day", [], [], response_kind="speech"))),
     ]
 
 

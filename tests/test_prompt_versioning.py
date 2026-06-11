@@ -201,5 +201,49 @@ class PromptV2GuardTests(unittest.TestCase):
         self.assertIn("表态", samples["speech_villager_v2"])
 
 
+from werewolf_eval.prompt_goldens import canonical_prompt_samples_v3
+
+PROMPT_V3 = "prompt_v3"
+
+
+class PromptV3GuardTests(unittest.TestCase):
+    """prompt_v3 coexists with v1/v2; lock its bytes + ledger the same way."""
+
+    def test_v3_rendered_bytes_match_golden(self) -> None:
+        golden_dir = GOLDEN_ROOT / PROMPT_V3
+        self.assertTrue(golden_dir.is_dir(), "missing tests/golden_prompts/prompt_v3")
+        samples = dict(canonical_prompt_samples_v3())
+        files = {p.stem: p for p in golden_dir.glob("*.txt")}
+        self.assertEqual(sorted(samples), sorted(files))
+        for name, text in samples.items():
+            self.assertEqual(files[name].read_bytes(), text.encode("utf-8"),
+                             f"prompt_v3 bytes changed for '{name}' without regen+ledger")
+
+    def test_v3_ledger_entry_hashes(self) -> None:
+        import hashlib
+        matches = [e for e in _ledger() if e.get("prompt_version") == PROMPT_V3]
+        self.assertEqual(len(matches), 1)
+        after = matches[0]["golden_prompt_hashes"]["after"]
+        samples = dict(canonical_prompt_samples_v3())
+        self.assertEqual(sorted(after), sorted(samples))
+        for name, text in samples.items():
+            self.assertEqual(after[name], hashlib.sha256(text.encode("utf-8")).hexdigest())
+
+    def test_v3_carries_b4_markers(self) -> None:
+        # B4 实质标记断言(不做 v2!=v3 恒真比较):scribe=提取非裁判;digest=出处定位;
+        # vote scaffold=程序+护栏;speech v3=克制(无判别词)
+        samples = dict(canonical_prompt_samples_v3())
+        self.assertIn("只负责提取", samples["scribe_system_prompt"])
+        self.assertIn("source_quote", samples["scribe_system_prompt"])
+        self.assertIn("以原文为准", samples["claim_digest_two_claims"])
+        self.assertIn("[不确定]", samples["claim_digest_two_claims"])
+        self.assertIn("【投票前判断程序】", samples["vote_scaffold_with_claims"])
+        self.assertIn("不要因为出现对跳就自动否定先声称者", samples["vote_scaffold_with_claims"])
+        self.assertIn("【投票前判断程序】", samples["vote_scaffold_empty_ledger"])
+        self.assertNotIn("【声称账本】", samples["vote_scaffold_empty_ledger"])
+        self.assertNotIn("对跳", samples["speech_villager_v3"])
+        self.assertNotIn("表态", samples["speech_villager_v3"])
+
+
 if __name__ == "__main__":
     unittest.main()
