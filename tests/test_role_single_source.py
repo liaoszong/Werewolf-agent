@@ -79,6 +79,31 @@ class DerivedCopiesTest(unittest.TestCase):
         )
 
 
+class ProfileRoleTeamsTest(unittest.TestCase):
+    def test_role_teams_is_gated_projection_with_pinned_order(self) -> None:
+        from werewolf_eval import profile_config
+
+        self.assertEqual(
+            profile_config.ROLE_TEAMS,
+            {
+                "werewolf": "werewolf",
+                "seer": "villager",
+                "witch": "villager",
+                "villager": "villager",
+            },
+        )
+        # Pinned insertion order: serialized into the capabilities payload
+        # (profile_config.py:480) — dict order is byte order there.
+        self.assertEqual(
+            list(profile_config.ROLE_TEAMS),
+            ["werewolf", "seer", "witch", "villager"],
+        )
+        # The projection never invents a role outside the product gate.
+        self.assertEqual(
+            set(profile_config.ROLE_TEAMS), set(profile_config.ALLOWED_ROLES)
+        )
+
+
 class ColdImportTest(unittest.TestCase):
     """Each entry module must import cleanly as the FIRST import of a fresh
     interpreter. Same-process smoke tests are order-dependent and miss cycles:
