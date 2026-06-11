@@ -3,12 +3,16 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 379
+- Entries: 461
 
 ```text
 ./
 ├── .agents/
 │   └── skills/
+│       ├── committing-in-shared-worktrees/
+│       │   └── SKILL.md
+│       ├── guarding-prompt-bytes/
+│       │   └── SKILL.md
 │       ├── harness/
 │       │   ├── agents/
 │       │   │   └── openai.yaml
@@ -18,6 +22,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       │   │   └── writing-plan.md
 │       │   └── SKILL.md
 │       ├── receiving-code-review/
+│       │   └── SKILL.md
+│       ├── running-live-games/
 │       │   └── SKILL.md
 │       ├── systematic-debugging/
 │       │   ├── condition-based-waiting-example.ts
@@ -32,11 +38,15 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       │   ├── test-pressure-1.md
 │       │   ├── test-pressure-2.md
 │       │   └── test-pressure-3.md
-│       └── tdd/
-│           ├── LICENSE.upstream
-│           ├── mocking.md
-│           ├── SKILL.md
-│           └── tests.md
+│       ├── tdd/
+│       │   ├── LICENSE.upstream
+│       │   ├── mocking.md
+│       │   ├── SKILL.md
+│       │   └── tests.md
+│       ├── testing-and-process-control/
+│       │   └── SKILL.md
+│       └── verifying-qt-observer-ui/
+│           └── SKILL.md
 ├── .codex/
 │   ├── hooks/
 │   │   └── tree.mjs
@@ -107,7 +117,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 ├── docs/
 │   ├── adr/
 │   │   ├── 0001-client-agnostic-live-observer-protocol.md
-│   │   └── 2026-06-09-action-runtime-orchestrator.md
+│   │   ├── 2026-06-09-action-runtime-orchestrator.md
+│   │   └── 2026-06-11-role-facts-single-source.md
 │   ├── demo/
 │   │   ├── phase1-gold-demo.html
 │   │   ├── phase2-runtime-demo.html
@@ -140,7 +151,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   ├── g1d-fake-provider-game-log.json
 │   │   ├── g1d-fake-provider-metrics-summary.json
 │   │   ├── g1d-fake-provider-provider-trace.json
-│   │   └── g1d-fake-provider-score-log.json
+│   │   ├── g1d-fake-provider-score-log.json
+│   │   └── prompt-version-ledger.json
 │   ├── gold-game/
 │   │   ├── g001-consensus-log.json
 │   │   ├── g001-decision-log.json
@@ -200,13 +212,19 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   │   ├── 2026-06-06--p2-c-1-theater-view-plan.md
 │   │   │   ├── 2026-06-06--p2-d-settlement-screen-plan.md
 │   │   │   ├── 2026-06-08--full-health-check.md
-│   │   │   └── 2026-06-08--p2b-byo-key-rework-plan.md
+│   │   │   ├── 2026-06-08--p2b-byo-key-rework-plan.md
+│   │   │   └── 2026-06-11--sys-a2-role-single-source-plan.md
 │   │   └── reviews/
 │   │       ├── 2026-06-01--g1c-project-healthcheck-final.md
 │   │       ├── 2026-06-01--g1c-project-healthcheck.md
 │   │       ├── 2026-06-01--project-wide-healthcheck-v2.md
 │   │       ├── 2026-06-09-action-runtime-audit-charter.md
-│   │       └── 2026-06-09-action-runtime-audit-REPORT.md
+│   │       ├── 2026-06-09-action-runtime-audit-REPORT.md
+│   │       ├── 2026-06-10-live-game-sameness-and-prompt-leak-investigation.md
+│   │       ├── 2026-06-10-live-quality-diagnosis.md
+│   │       ├── 2026-06-11-b1-context-repair-VERDICT.md
+│   │       ├── 2026-06-11-b1-prompt-v2-metrics.json
+│   │       └── 2026-06-11-baseline-prompt-v1-metrics.json
 │   ├── health-check/
 │   │   ├── _baseline/
 │   │   │   ├── baseline.py
@@ -241,9 +259,14 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   │   ├── 2026-06-09-action-runtime-hunter-v1.1.md
 │   │   │   ├── 2026-06-09-action-runtime-resolver-deletion.md
 │   │   │   ├── 2026-06-09-agent-action-runtime.md
+│   │   │   ├── 2026-06-10-ablation-metrics-harness.md
+│   │   │   ├── 2026-06-10-game-variety.md
 │   │   │   ├── 2026-06-10-history-run-management.md
 │   │   │   ├── 2026-06-10-p2a-invariant-safety-net.md
-│   │   │   └── 2026-06-10-prompt-versioning.md
+│   │   │   ├── 2026-06-10-prompt-versioning.md
+│   │   │   ├── 2026-06-10-role-shuffle.md
+│   │   │   ├── 2026-06-11-sys-b1-context-repair.md
+│   │   │   └── 2026-06-11-sys-b4-claim-ledger-vote-scaffold.md
 │   │   └── specs/
 │   │       ├── 2026-06-04-g2d-2-qt-setup-ui-design.md
 │   │       ├── 2026-06-04-g2d-prompt-configuration-design.md
@@ -259,8 +282,11 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │       ├── 2026-06-08-byo-key-provider-presets-design.md
 │   │       ├── 2026-06-09-agent-action-runtime-architecture-design.md
 │   │       ├── 2026-06-09-p2a-invariant-safety-net-design.md
+│   │       ├── 2026-06-10-game-variety-design.md
 │   │       ├── 2026-06-10-history-run-management-and-report-entry-design.md
-│   │       └── 2026-06-10-prompt-versioning-design.md
+│   │       ├── 2026-06-10-prompt-versioning-design.md
+│   │       ├── 2026-06-10-quality-ablation-harness-and-b1-context-design.md
+│   │       └── 2026-06-11-sys-b4-claim-ledger-vote-scaffold-design.md
 │   ├── CHECKPOINT_TEMPLATE.md
 │   ├── EVALUATION_RUBRIC.md
 │   ├── GOLD_DEMO.md
@@ -283,6 +309,12 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       └── evaluate_semantic_labels.py
 ├── src/
 │   └── werewolf_eval/
+│       ├── ablation/
+│       │   ├── __init__.py
+│       │   ├── __main__.py
+│       │   ├── arms.py
+│       │   ├── harness.py
+│       │   └── metrics.py
 │       ├── action_runtime/
 │       │   ├── __init__.py
 │       │   ├── abilities.py
@@ -313,6 +345,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       ├── emergent_engine.py
 │       ├── emergent_fake_script.py
 │       ├── emergent_smoke_check.py
+│       ├── evaluation_versions.py
 │       ├── failure_audit.py
 │       ├── fake_provider.py
 │       ├── game_engine.py
@@ -323,6 +356,10 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       ├── observer_server.py
 │       ├── observer_visibility.py
 │       ├── profile_config.py
+│       ├── prompt_goldens.py
+│       ├── prompt_v2.py
+│       ├── prompt_v3.py
+│       ├── prompt_version.py
 │       ├── provider_agent.py
 │       ├── provider_contract.py
 │       ├── provider_registry.py
@@ -354,8 +391,56 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       └── validate_semantic_labels.py
 ├── tests/
 │   ├── fixtures/
+│   │   ├── ablation/
+│   │   │   ├── diag_A_seer_p1_0/
+│   │   │   │   ├── game-log.json
+│   │   │   │   └── provider-turns.json
+│   │   │   ├── diag_A_seer_p2_3/
+│   │   │   │   ├── game-log.json
+│   │   │   │   └── provider-turns.json
+│   │   │   └── diag_A_seer_p3_1/
+│   │   │       ├── game-log.json
+│   │   │       └── provider-turns.json
 │   │   └── emergent_ledger_golden.json
+│   ├── golden_prompts/
+│   │   ├── prompt_v1/
+│   │   │   ├── action_hunter_day_vote.txt
+│   │   │   ├── action_hunter_shot.txt
+│   │   │   ├── action_seer_night.txt
+│   │   │   ├── action_villager_day_vote.txt
+│   │   │   ├── action_werewolf_night.txt
+│   │   │   ├── action_witch_night.txt
+│   │   │   ├── compose_persona_action.txt
+│   │   │   ├── obs_hunter_shot.txt
+│   │   │   ├── obs_villager_day.txt
+│   │   │   ├── obs_werewolf_night.txt
+│   │   │   ├── obs_witch_night_no_victim.txt
+│   │   │   ├── obs_witch_night_victim.txt
+│   │   │   ├── speech_villager_day1.txt
+│   │   │   └── speech_werewolf_day1.txt
+│   │   ├── prompt_v2/
+│   │   │   ├── board_card_standard_6p.txt
+│   │   │   ├── compose_full_v2_speech.txt
+│   │   │   ├── obs_v2_hunter_shot.txt
+│   │   │   ├── obs_v2_seer_day.txt
+│   │   │   ├── obs_v2_villager_day.txt
+│   │   │   ├── obs_v2_werewolf_night.txt
+│   │   │   ├── obs_v2_witch_no_victim.txt
+│   │   │   ├── obs_v2_witch_victim.txt
+│   │   │   ├── speech_villager_v2.txt
+│   │   │   └── speech_werewolf_v2.txt
+│   │   └── prompt_v3/
+│   │       ├── claim_digest_two_claims.txt
+│   │       ├── scribe_input_round1.txt
+│   │       ├── scribe_system_prompt.txt
+│   │       ├── speech_villager_v3.txt
+│   │       ├── vote_scaffold_empty_ledger.txt
+│   │       └── vote_scaffold_with_claims.txt
+│   ├── fake_scribe.py
 │   ├── parity_scripts.py
+│   ├── test_ablation_arms.py
+│   ├── test_ablation_harness_fake.py
+│   ├── test_ablation_metrics.py
 │   ├── test_action_runtime_hunter.py
 │   ├── test_action_runtime_parity.py
 │   ├── test_action_runtime_registry.py
@@ -380,6 +465,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── test_emergent_role_projection.py
 │   ├── test_emergent_smoke_check.py
 │   ├── test_engine_to_scoring_e2e.py
+│   ├── test_evaluation_versions.py
 │   ├── test_event_visibility_invariant.py
 │   ├── test_failure_audit.py
 │   ├── test_fake_provider_game.py
@@ -407,12 +493,18 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── test_openai_provider.py
 │   ├── test_p2a2_live_path.py
 │   ├── test_profile_config.py
+│   ├── test_prompt_v2_invariants.py
+│   ├── test_prompt_v2.py
+│   ├── test_prompt_v3_invariants.py
+│   ├── test_prompt_v3.py
+│   ├── test_prompt_versioning.py
 │   ├── test_provider_contract.py
 │   ├── test_provider_registry.py
 │   ├── test_qt_observer_static_contract.py
 │   ├── test_render_demo.py
 │   ├── test_render_provider_replay.py
 │   ├── test_rng_draw_order.py
+│   ├── test_role_shuffle.py
 │   ├── test_run_emergent_deepseek_game.py
 │   ├── test_run_emergent_fake_runtime.py
 │   ├── test_run_emergent_game.py
@@ -428,11 +520,15 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── test_visibility_parity.py
 │   └── test_witch_potion_one_shot_sentinel.py
 ├── tools/
+│   ├── generate_golden_prompts.py
 │   └── live_check_deepseek.py
+├── .gitattributes
 ├── .gitignore
 ├── AGENTS.md
+├── CLAUDE.md
 ├── launch-theater.bat
 ├── launch-theater.py
 ├── live-check.bat
-└── README.md
+├── README.md
+└── README.zh-CN.md
 ```
