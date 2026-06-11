@@ -11,12 +11,14 @@
 - private set: `visibility == "all"`, OR `visibility ==` the seat's role, OR
   `visibility == "werewolf_team"` for werewolf seats
 
-Before this ADR the rule existed as **three engine-side copies**:
+Before this ADR the rule existed as **four engine-side copies**:
 
 1. `game_engine.GameEngine.observation_for` (live/mock per-player observation),
 2. the scripted-arc closures `_public_refs` / `_private_refs_for_role` / `_private_refs`
    inside `game_engine.run_scripted_game` (plus two inline `visible_info_refs`
-   comprehensions of the public predicate),
+   comprehensions of the public predicate, and a fourth full one-pass copy in
+   `_resolve_wolf_consensus`'s `g1f_provider_consensus` branch — found in review;
+   the health-check enumeration had missed it),
 3. `emergent_engine.EmergentGameEngine._public_refs` / `_private_refs` / `_build_obs`.
 
 This is exactly the invariant the P2-A-2 **"no feed leak" hard gate** renders prompts

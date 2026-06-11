@@ -309,19 +309,8 @@ class GameEngine:
                     for pid in wolf_players
                     if pid in alive and self._players_by_id[pid].role == "werewolf"
                 }
-                public_event_ids: list[str] = []
-                private_event_ids: list[str] = []
-                for event in events:
-                    visibility = event["visibility"]
-                    event_id = event["event_id"]
-                    if visibility in ("public", "all"):
-                        public_event_ids.append(event_id)
-                    if visibility == "all":
-                        private_event_ids.append(event_id)
-                    elif visibility == player.role:
-                        private_event_ids.append(event_id)
-                    elif visibility == "werewolf_team" and player.role == "werewolf":
-                        private_event_ids.append(event_id)
+                public_event_ids = public_refs(events)
+                private_event_ids = private_refs_for_role(events, player.role)
 
                 obs = AgentObservation(
                     game_id=game_id,
