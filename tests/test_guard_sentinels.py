@@ -153,6 +153,24 @@ class ConsecutiveRepeatSentinel(unittest.TestCase):
         self.assertNotEqual(protects[1]["target"], "p6")  # 兜底必不连守
 
 
+class BoardRulesVersionSelectionSentinel(unittest.TestCase):
+    """The engine's rules version is BOARD-derived: a blanket v1_2 bump would
+    rewrite the frozen v2/v3 chains' rules-card version line (model-visible bytes)
+    and the manifest stamp for guardless games."""
+
+    def test_guardless_board_keeps_v1_1(self):
+        engine = EmergentGameEngine(
+            config=build_emergent_config(game_id="rules_sel_std"),
+            agents=build_emergent_fake_agents({}), seed=0)
+        self.assertEqual(engine.rules_version, "rules_v1_1")
+
+    def test_guard_board_selects_v1_2(self):
+        engine = EmergentGameEngine(
+            config=build_emergent_config(game_id="rules_sel_guard", seat_roles=SEATS_NO_WITCH),
+            agents=build_emergent_fake_agents({}), seed=0)
+        self.assertEqual(engine.rules_version, "rules_v1_2")
+
+
 class SelfProtectSentinel(unittest.TestCase):
     def test_self_protect_blocks_own_kill(self):
         outcome = _run("guard_self", SEATS_NO_WITCH, build_self_protect_script())

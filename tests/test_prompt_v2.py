@@ -233,3 +233,31 @@ def test_runner_default_stamps_v1(tmp_path):
     )
     manifest = _json.loads((tmp_path / "prompt-manifest.json").read_text(encoding="utf-8"))
     assert manifest["evaluation_bucket"]["prompt_version"] == "prompt_v1"
+
+
+# ---- L4 guard arm: board-conditional rules card (spec §6 byte discipline) ----
+
+from werewolf_eval.action_runtime.ruleset import rules_v1_2
+
+GUARD_SEATS = {"p1": "werewolf", "p2": "werewolf", "p3": "seer",
+               "p4": "witch", "p5": "guard", "p6": "villager"}
+
+
+def test_standard_board_rules_card_bytes_unchanged():
+    # 非守卫板字节恒等(spec §6):「没有守卫或守夜人」原文必须原样保留
+    card = build_board_rules_card(rules_v1_1(), STD_SEATS)
+    assert "没有警长竞选、没有警徽流、没有警上警下之分、没有守卫或守夜人。" in card
+    assert "同守同救" not in card
+    # 同板换 v1_2 渲染只允许版本行不同(引擎按板选 ruleset:无守卫板仍走 v1_1,
+    # 见 emergent_engine 板感知选择;此断言钉住「卡片内容除版本字符串外不漂」)
+    card12 = build_board_rules_card(rules_v1_2(), STD_SEATS)
+    assert card12.replace("rules_v1_2", "rules_v1_1") == card
+
+
+def test_guard_board_rules_card():
+    card = build_board_rules_card(rules_v1_2(), GUARD_SEATS)
+    assert "守卫×1" in card
+    assert "夜间守护一名玩家" in card              # 能力行(数据驱动)
+    assert "同守同救" in card                      # 奶穿规则公示
+    assert "没有守卫或守夜人" not in card           # 假话行必须消失
+    assert "没有警长竞选、没有警徽流、没有警上警下之分。" in card

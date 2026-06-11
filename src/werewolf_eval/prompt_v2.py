@@ -54,10 +54,22 @@ def build_board_rules_card(ruleset: BoardRuleset, seat_roles: dict[str, str]) ->
     lines.append(
         "胜负规则:所有狼人出局→好人阵营胜;狼人数量达到或超过其余存活玩家数→狼人阵营胜。"
     )
-    lines.append(
-        "本局不存在的机制:没有警长竞选、没有警徽流、没有警上警下之分、没有守卫或守夜人。"
-        "上面能力表就是本局的全部机制,不要据不存在的机制推理,也不要在发言中讨论它们。"
-    )
+    if counts.get("guard", 0):
+        # L4 guard board: the no-guard denial line would be FALSE here (mechanism-
+        # hallucination bait). Publish the protect rules incl. 同守同救 instead.
+        lines.append(
+            "守护规则:守卫的守护可挡住当晚狼人袭击;同一名玩家同一晚既被守卫守护又被女巫解药救治,"
+            "仍然死亡(同守同救)。守卫可以守自己,不能连续两晚守同一人,也不会得知守护是否成功。"
+        )
+        lines.append(
+            "本局不存在的机制:没有警长竞选、没有警徽流、没有警上警下之分。"
+            "上面能力表就是本局的全部机制,不要据不存在的机制推理,也不要在发言中讨论它们。"
+        )
+    else:
+        lines.append(
+            "本局不存在的机制:没有警长竞选、没有警徽流、没有警上警下之分、没有守卫或守夜人。"
+            "上面能力表就是本局的全部机制,不要据不存在的机制推理,也不要在发言中讨论它们。"
+        )
     lines.append(
         "重要:这是纯文字推理游戏,不存在表情、眼神、语气、肢体动作等任何视觉或听觉信息;"
         "不得以此类\"观察\"作为推理依据。"

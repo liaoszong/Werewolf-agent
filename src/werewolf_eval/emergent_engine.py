@@ -45,6 +45,7 @@ from werewolf_eval.action_runtime import (
     VoteResolver,
     WolfResolver,
     WolfWindow,
+    rules_v1_1,
     rules_v1_2,
 )
 from werewolf_eval.action_runtime.abilities import TARGET_RULES
@@ -301,9 +302,13 @@ class EmergentGameEngine:
         self._last_guarded: str | None = None
         # Phase-3 swap: night joint resolution delegates to the Agent Action
         # Runtime's JointSettler, and per-action legality to its registry/validator.
-        # rules_v1_2 is a backward-compatible superset (hunter + guard); boards
-        # without them are byte-identical (those roles are never queried).
-        _ruleset = rules_v1_2()
+        # The rules version is BOARD-derived: guard boards run rules_v1_2; every
+        # other board keeps rules_v1_1. Behavior is identical either way (versioned
+        # superset), but the rules CARD prints rules_version into model-visible
+        # bytes — a blanket bump would silently rewrite the frozen v2/v3 chains'
+        # version line (and the manifest stamp), so guardless boards must not move.
+        _board_roles = {p.role for p in config.players}
+        _ruleset = rules_v1_2() if "guard" in _board_roles else rules_v1_1()
         self.rules_version = _ruleset.rules_version
         self._registry = RoleAbilityRegistry(_ruleset)
         self._settler = JointSettler(_ruleset)
