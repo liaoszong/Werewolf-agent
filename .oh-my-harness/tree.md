@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 510
+- Entries: 512
 
 ```text
 ./
@@ -234,7 +234,9 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │       ├── 2026-06-11-b4-prompt-v3-metrics.json
 │   │       ├── 2026-06-11-b4-scaffold-VERDICT.md
 │   │       ├── 2026-06-11-baseline-prompt-v1-metrics.json
-│   │       └── 2026-06-11-l4-baseline-backfill.json
+│   │       ├── 2026-06-11-l4-baseline-backfill.json
+│   │       ├── 2026-06-11-l4-guard-prompt-v3-metrics.json
+│   │       └── 2026-06-11-l4-guard-VERDICT.md
 │   ├── health-check/
 │   │   ├── _baseline/
 │   │   │   ├── baseline.py

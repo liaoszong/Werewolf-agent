@@ -135,7 +135,11 @@
         "speech_villager_v3_guard_board"
       ],
       "blessed_by": "l4-guard-arm plan Task 11 (docs/harness/plans/2026-06-11--l4-guard-arm-plan.md)",
-      "blessed_at": "2026-06-11"
+      "blessed_at": "2026-06-11",
+      "behavior_evidence": {
+        "status": "attached",
+        "evidence": "45-game live ablation l4_guard (prompt_v3 + rules_v1_2 + guard board, paired seeds 1000-1044; n_valid=44 — 0 low-live, 1 dropped by scaffold_coverage gate; all 45 artifact sets pass invariants I1-I7+I4b+I8a/I8b/I8c with ZERO violations; snapshot docs/harness/reviews/2026-06-11-l4-guard-prompt-v3-metrics.json). Wolf win 87.5% (b4) -> 68.2% (-19.3pp, first arm below the 77.8% baseline); all 5 primary criteria met: seer death 82.5% -> 56.8%, claim-to-night-survival 72.2% -> 77.8%, verify-wolf-followed 52.9% -> 64.7% (first past the 60% target), seer-voted-out-in-verify 35.3% -> 23.5%; hallucination gates held (speech 2.96%, mechanic-game 4.55%, board-aware word list). Strong-pass gate (<=65%) missed by 3.2pp. Bottleneck moved to milk-pierce: 12 nights lost to uncoordinated guard+witch double-protection (witch_save_rate 1.0, guard blocked 14 kills, guard-targets-seer only 17%). Verdict: ACCEPTABLE PROGRESS (2026-06-11-l4-guard-VERDICT.md); next arm = witch coordination guidance (prompt_v4 candidate), standard rules unchanged."
+      }
     }
   }
 ]
