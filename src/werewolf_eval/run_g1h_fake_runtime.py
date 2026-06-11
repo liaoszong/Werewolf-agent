@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from werewolf_eval.artifacts import write_json
+from werewolf_eval.artifacts import collect_provider_trace, write_json
 from werewolf_eval.game_engine import GameEngine, build_default_config
 from werewolf_eval.provider_agent import ProviderActionError, ProviderAgent
 from werewolf_eval.provider_contract import (
@@ -76,31 +76,11 @@ def _collect_trace(
     agents: dict[str, Any],
     failures: list[ProviderFailure],
 ) -> ProviderTrace:
-    seen_req: set[str] = set()
-    seen_resp: set[str] = set()
-    all_requests: list[ProviderRequest] = []
-    all_responses: list[ProviderResponse] = []
-
-    for agent in agents.values():
-        if isinstance(agent, ProviderAgent):
-            provider = agent.provider
-            if hasattr(provider, "requests"):
-                for req in provider.requests:
-                    if req.request_id not in seen_req:
-                        seen_req.add(req.request_id)
-                        all_requests.append(req)
-            if hasattr(provider, "responses"):
-                for resp in provider.responses:
-                    if resp.request_id not in seen_resp:
-                        seen_resp.add(resp.request_id)
-                        all_responses.append(resp)
-
-    return ProviderTrace(
-        game_id=game_id,
+    return collect_provider_trace(
+        game_id,
+        agents.values(),
         provider_name="fake_deterministic",
         source_label=FAKE_PROVIDER_SOURCE_LABEL,
-        requests=all_requests,
-        responses=all_responses,
         failures=failures,
     )
 

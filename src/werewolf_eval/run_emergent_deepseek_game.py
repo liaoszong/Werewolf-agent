@@ -20,7 +20,7 @@ import sys
 from pathlib import Path
 from typing import Callable
 
-from werewolf_eval.artifacts import write_json
+from werewolf_eval.artifacts import collect_provider_trace, write_json
 from werewolf_eval.deepseek_provider import DeepSeekProvider, DeepSeekProviderConfig
 from werewolf_eval.emergent_engine import EmergentBudget, EmergentGameEngine, build_emergent_config
 from werewolf_eval.provider_agent import ProviderAgent
@@ -28,7 +28,6 @@ from werewolf_eval.provider_contract import (
     DEEPSEEK_PROVIDER_SOURCE_LABEL,
     MIXED_PROVIDER_SOURCE_LABEL,
     provider_trace_to_dict,
-    ProviderTrace,
 )
 from werewolf_eval.evaluation_versions import SCORING_VERSION, evaluation_bucket
 from werewolf_eval.runtime_events import RuntimeEventWriter, build_prompt_manifest, redact_secret_values
@@ -82,21 +81,13 @@ def _collect_trace(
     provider_name: str,
     source_label: str,
 ) -> dict:
-    seen_req: set[str] = set()
-    seen_resp: set[str] = set()
-    reqs: list = []
-    resps: list = []
-    for agent in agents.values():
-        for r in agent.provider.requests:
-            if r.request_id not in seen_req:
-                seen_req.add(r.request_id)
-                reqs.append(r)
-        for r in agent.provider.responses:
-            if r.request_id not in seen_resp:
-                seen_resp.add(r.request_id)
-                resps.append(r)
     return provider_trace_to_dict(
-        ProviderTrace(game_id=game_id, provider_name=provider_name, source_label=source_label, requests=reqs, responses=resps, failures=[])
+        collect_provider_trace(
+            game_id,
+            agents.values(),
+            provider_name=provider_name,
+            source_label=source_label,
+        )
     )
 
 

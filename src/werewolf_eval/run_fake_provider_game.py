@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 import sys
 
-from werewolf_eval.artifacts import write_json
+from werewolf_eval.artifacts import collect_provider_trace, write_json
 from werewolf_eval.fake_provider import build_default_fake_provider_agent
 from werewolf_eval.game_engine import GameEngine, build_default_config
 from werewolf_eval.provider_agent import ProviderActionError
@@ -22,23 +22,15 @@ def _collect_trace(
     wolf_agent: object,
     failures: list[ProviderFailure],
 ) -> ProviderTrace:
-    from werewolf_eval.provider_agent import ProviderAgent
-
-    all_requests: list = []
-    all_responses: list = []
-
-    for agent in list(agents.values()) + [wolf_agent]:
-        if isinstance(agent, ProviderAgent):
-            all_requests.extend(agent.provider.requests)
-            all_responses.extend(agent.provider.responses)
-
-    return ProviderTrace(
-        game_id=game_id,
+    # dedup=False preserves this runner's historical no-dedup trace collection
+    # (known drift vs the other launchers, deliberately kept as-is).
+    return collect_provider_trace(
+        game_id,
+        list(agents.values()) + [wolf_agent],
         provider_name="deterministic_fake_provider",
         source_label=FAKE_PROVIDER_SOURCE_LABEL,
-        requests=all_requests,
-        responses=all_responses,
         failures=failures,
+        dedup=False,
     )
 
 

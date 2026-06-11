@@ -6,14 +6,13 @@ import sys
 from pathlib import Path
 from typing import Callable
 
-from werewolf_eval.artifacts import write_json
+from werewolf_eval.artifacts import collect_provider_trace, write_json
 from werewolf_eval.deepseek_provider import DeepSeekProvider, DeepSeekProviderConfig
 from werewolf_eval.game_engine import GameEngine, build_default_config
 from werewolf_eval.provider_agent import ProviderActionError, ProviderAgent
 from werewolf_eval.provider_contract import (
     DEEPSEEK_PROVIDER_SOURCE_LABEL,
     ProviderFailure,
-    ProviderRequest,
     provider_failure_to_dict,
     provider_trace_to_dict,
     ProviderTrace,
@@ -27,28 +26,13 @@ def _collect_trace(
     wolf_agent: object,
     failures: list[ProviderFailure],
 ) -> ProviderTrace:
-    seen_req: set[str] = set()
-    seen_resp: set[str] = set()
-    all_requests: list[ProviderRequest] = []
-    all_responses: list = []
-
-    for agent in list(agents.values()) + [wolf_agent]:
-        if isinstance(agent, ProviderAgent):
-            for req in agent.provider.requests:
-                if req.request_id not in seen_req:
-                    seen_req.add(req.request_id)
-                    all_requests.append(req)
-            for resp in agent.provider.responses:
-                if resp.request_id not in seen_resp:
-                    seen_resp.add(resp.request_id)
-                    all_responses.append(resp)
-
-    return ProviderTrace(
-        game_id=game_id,
+    # All agents share one provider instance (global max_requests budget), so
+    # request_id de-dup is load-bearing here, not just belt-and-suspenders.
+    return collect_provider_trace(
+        game_id,
+        list(agents.values()) + [wolf_agent],
         provider_name="deepseek",
         source_label=DEEPSEEK_PROVIDER_SOURCE_LABEL,
-        requests=all_requests,
-        responses=all_responses,
         failures=failures,
     )
 

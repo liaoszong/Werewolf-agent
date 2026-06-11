@@ -21,7 +21,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from werewolf_eval.artifacts import write_json
+from werewolf_eval.artifacts import collect_provider_trace, write_json
 from werewolf_eval.emergent_engine import EmergentBudget, EmergentGameEngine, build_emergent_config
 from werewolf_eval.emergent_fake_script import (
     build_emergent_fake_agents,
@@ -31,7 +31,6 @@ from werewolf_eval.emergent_fake_script import (
 from werewolf_eval.provider_agent import ProviderAgent
 from werewolf_eval.provider_contract import (
     FAKE_PROVIDER_SOURCE_LABEL,
-    ProviderTrace,
     provider_trace_to_dict,
 )
 from werewolf_eval.evaluation_versions import SCORING_VERSION, evaluation_bucket
@@ -53,28 +52,12 @@ def _collect_trace(game_id: str, agents: dict[str, ProviderAgent]) -> dict:
     Each fake agent wraps its own DeterministicFakeProvider, so request_ids never
     collide across seats; the de-dup is belt-and-suspenders. Fake token usage is
     always zero (honesty marker vs the live path)."""
-    seen_req: set[str] = set()
-    seen_resp: set[str] = set()
-    reqs: list = []
-    resps: list = []
-    for agent in agents.values():
-        provider = agent.provider
-        for r in getattr(provider, "requests", []):
-            if r.request_id not in seen_req:
-                seen_req.add(r.request_id)
-                reqs.append(r)
-        for r in getattr(provider, "responses", []):
-            if r.request_id not in seen_resp:
-                seen_resp.add(r.request_id)
-                resps.append(r)
     return provider_trace_to_dict(
-        ProviderTrace(
-            game_id=game_id,
+        collect_provider_trace(
+            game_id,
+            agents.values(),
             provider_name=_FAKE_PROVIDER_NAME,
             source_label=FAKE_PROVIDER_SOURCE_LABEL,
-            requests=reqs,
-            responses=resps,
-            failures=[],
         )
     )
 
