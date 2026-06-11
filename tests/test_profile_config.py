@@ -589,5 +589,16 @@ class ArtifactRoleShuffleTests(unittest.TestCase):
         self.assertEqual({s["player_id"]: s["role"] for s in art["seats"]}, live)
 
 
+class CapabilitiesRolesExposureTests(unittest.TestCase):
+    """Pin the capabilities 'roles' list (profile_config.py 'roles': sorted(ALLOWED_ROLES)).
+    L4 adds the guard; hunter is INTENTIONALLY still excluded (spec §4 — it was
+    never in ALLOWED_ROLES and the guard arm must not smuggle it in)."""
+
+    def test_schema_roles_list_pinned(self):
+        schema = build_profile_schema()
+        self.assertEqual(schema["roles"],
+                         ["guard", "seer", "villager", "werewolf", "witch"])
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -92,13 +92,16 @@ class ProfileRoleTeamsTest(unittest.TestCase):
                 "seer": "villager",
                 "witch": "villager",
                 "villager": "villager",
+                "guard": "villager",
             },
         )
         # Pinned insertion order: serialized into the capabilities payload
-        # (profile_config.py:480) — dict order is byte order there.
+        # (profile_config.py:480) — dict order is byte order there. guard lands
+        # LAST (ruleset declaration order: rules_v1_2 appends it after hunter,
+        # which the gate excludes).
         self.assertEqual(
             list(profile_config.ROLE_TEAMS),
-            ["werewolf", "seer", "witch", "villager"],
+            ["werewolf", "seer", "witch", "villager", "guard"],
         )
         # The projection never invents a role outside the product gate.
         self.assertEqual(
