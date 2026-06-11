@@ -14,7 +14,14 @@ def test_run_arm_fake_smoke(tmp_path):
     result = run_arm(arm, out_root=tmp_path, factory_builder=build_fake_factory)
     assert result["arm"] == "fake_smoke"
     assert result["metrics"]["n_total"] == 2
-    # fake games are not live -> filtered out; must not crash
-    assert "n_valid" in result["metrics"]
+    # Fake turns that return a usable action are recorded kind=="live_success"
+    # (the engine has no fake/live concept), and the villager_win script's
+    # 10/14 valid-action mix => live_rate 0.714 >= LIVE_RATE_MIN, so both fake
+    # games PASS the live filter and enter behavior aggregates. This pins that
+    # populated-aggregate path; the production filter still drops real RNG
+    # fallbacks (timeout_then_fallback/invalid_then_fallback) which are NOT
+    # live_success.
+    assert result["metrics"]["n_valid"] == 2
+    assert result["metrics"]["n_invalid_lowlive"] == 0
     assert (tmp_path / "fake_smoke" / "_metrics.json").exists()
     assert (tmp_path / "fake_smoke" / "_index.jsonl").exists()
