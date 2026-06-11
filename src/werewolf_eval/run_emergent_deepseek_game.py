@@ -21,7 +21,8 @@ from pathlib import Path
 from typing import Callable
 
 from werewolf_eval.artifacts import collect_provider_trace, write_json
-from werewolf_eval.deepseek_provider import DeepSeekProvider, DeepSeekProviderConfig
+from werewolf_eval.deepseek_provider import DeepSeekProviderConfig
+from werewolf_eval.provider_registry import build_provider
 from werewolf_eval.emergent_engine import EmergentBudget, EmergentGameEngine, build_emergent_config
 from werewolf_eval.provider_agent import ProviderAgent
 from werewolf_eval.provider_contract import (
@@ -216,7 +217,7 @@ def _deepseek_factory(api_key: str, base_url: str, model: str, timeout_seconds: 
         api_key=api_key, base_url=base_url, model=model,
         timeout_seconds=timeout_seconds, max_tokens=max_tokens, max_requests=max_requests,
     )
-    shared = DeepSeekProvider(config)
+    shared = build_provider("deepseek", config)
 
     def factory(pid: str) -> ProviderAgent:
         return ProviderAgent(pid, shared)

@@ -223,5 +223,32 @@ class ProviderRegistryTests(unittest.TestCase):
         self.assertTrue(ctx.exception.__suppress_context__)
 
 
+class ProviderConstructionSingleSourceTest(unittest.TestCase):
+    """D-4: build_provider is the only live construction path. A direct
+    DeepSeekProvider(config) call silently skips the registry identity stamp,
+    so registry changes (base-url/source-label) would not reach that path."""
+
+    def test_no_direct_deepseek_provider_construction_in_src(self):
+        from pathlib import Path
+
+        src = Path(__file__).resolve().parents[1] / "src" / "werewolf_eval"
+        allowed = {"deepseek_provider.py", "provider_registry.py"}
+        offenders = sorted(
+            p.name
+            for p in src.rglob("*.py")
+            if p.name not in allowed
+            and "DeepSeekProvider(" in p.read_text(encoding="utf-8")
+        )
+        self.assertEqual(offenders, [])
+
+    def test_build_provider_deepseek_keeps_default_base_url_and_stamp(self):
+        from werewolf_eval.deepseek_provider import DeepSeekProviderConfig
+
+        provider = build_provider("deepseek", DeepSeekProviderConfig(api_key="sk-test-key"))
+        self.assertEqual(provider._config.base_url, "https://api.deepseek.com")
+        self.assertEqual(provider.PROVIDER_NAME, "deepseek")
+        self.assertEqual(provider.SOURCE_LABEL, DEEPSEEK_PROVIDER_SOURCE_LABEL)
+
+
 if __name__ == "__main__":
     unittest.main()

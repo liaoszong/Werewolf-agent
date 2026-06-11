@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from werewolf_eval.llm_providers import (  # re-exported for back-compat
+    ChatProviderConfig,
     OpenAICompatibleProvider,
     Transport,
     _default_transport,
@@ -25,16 +26,13 @@ __all__ = [
 
 
 @dataclass(frozen=True)
-class DeepSeekProviderConfig:
-    api_key: str
+class DeepSeekProviderConfig(ChatProviderConfig):
+    """DeepSeek defaults over the shared ``ChatProviderConfig`` shape (health-check
+    D-3). Field names/order/behavior unchanged — existing tests are the safety net;
+    being a subclass lets ``provider_registry.build_provider`` accept it directly."""
+
     base_url: str = "https://api.deepseek.com"
     model: str = "deepseek-v4-flash"
-    timeout_seconds: int = 30
-    max_tokens: int = 256
-    max_requests: int = 11
-    # P2-B-3 per-seat knobs (additive, no-op defaults).
-    persona_prompt: str = ""
-    temperature: float | None = None
 
 
 class DeepSeekProvider(OpenAICompatibleProvider):

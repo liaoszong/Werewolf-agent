@@ -1,5 +1,10 @@
 """CLI runner for the P2-A-1 emergent Werewolf engine.
 
+LEGACY/log-only: this CLI deliberately does NOT wire the observer runtime spine
+(no events.jsonl/snapshots) — the canonical product path is
+``run_emergent_fake_runtime`` (used by the observer launcher). Kept for quick
+log-only runs and its own regression test (health-check E-5).
+
 Fake-deterministic by default (offline, free, reproducible). Writes the four
 standard logs on a completed game; on a fail-closed outcome (round cap / budget
 exhausted) it writes ONLY the failure audit and exits non-zero — mirroring the

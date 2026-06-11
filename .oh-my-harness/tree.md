@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 501
+- Entries: 502
 
 ```text
 ./
@@ -148,7 +148,6 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   ├── g1c-wolf-consensus-metrics-summary.json
 │   │   ├── g1c-wolf-consensus-score-log.json
 │   │   ├── g1d-fake-provider-decision-log.json
-│   │   ├── g1d-fake-provider-failure-audit.example.json
 │   │   ├── g1d-fake-provider-game-log.json
 │   │   ├── g1d-fake-provider-metrics-summary.json
 │   │   ├── g1d-fake-provider-provider-trace.json
@@ -217,6 +216,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   │   ├── 2026-06-11--foundation-artifacts-pyproject-plan.md
 │   │   │   ├── 2026-06-11--l4-guard-arm-plan.md
 │   │   │   ├── 2026-06-11--observer-server-split-plan.md
+│   │   │   ├── 2026-06-11--provider-launcher-mechanical-refactor-plan.md
 │   │   │   └── 2026-06-11--sys-a2-role-single-source-plan.md
 │   │   └── reviews/
 │   │       ├── 2026-06-01--g1c-project-healthcheck-final.md
@@ -556,6 +556,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── test_settlement_response.py
 │   ├── test_settler_guard_branches.py
 │   ├── test_source_labels.py
+│   ├── test_validate_clis.py
 │   ├── test_visibility_parity.py
 │   └── test_witch_potion_one_shot_sentinel.py
 ├── tools/

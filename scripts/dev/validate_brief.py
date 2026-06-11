@@ -12,6 +12,7 @@ DEFAULT_COMMANDS: list[tuple[str, list[str]]] = [
     ("validate_game_log", [sys.executable, "-m", "werewolf_eval.validate_game_log", "docs/gold-game/g001-game-log.json"]),
     ("validate_decision_log", [sys.executable, "-m", "werewolf_eval.validate_decision_log", "docs/gold-game/g001-decision-log.json", "docs/gold-game/g001-game-log.json"]),
     ("validate_consensus_log", [sys.executable, "-m", "werewolf_eval.validate_consensus_log", "docs/gold-game/g001-consensus-log.json", "docs/gold-game/g001-game-log.json"]),
+    ("validate_failure_audit", [sys.executable, "-m", "werewolf_eval.validate_failure_audit", "docs/generated-games/g1c-wolf-consensus-failure-audit.json", "docs/generated-games/g1c-wolf-consensus-game-log.json"]),
     ("unit_tests", [sys.executable, "-m", "unittest", "discover", "-s", "tests", "-p", "test_*.py"]),
 ]
 

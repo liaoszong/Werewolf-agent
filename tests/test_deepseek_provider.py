@@ -161,3 +161,28 @@ class DeepSeekProviderTests(unittest.TestCase):
         self.assertFalse(any(
             auth_value in str(r) for r in provider.requests
         ))
+
+
+class DeepSeekConfigShapeTest(unittest.TestCase):
+    """D-3: DeepSeekProviderConfig is the shared ChatProviderConfig shape with
+    deepseek defaults — no second 8-field clone to keep in sync."""
+
+    def test_is_chat_provider_config_with_deepseek_defaults(self):
+        import dataclasses
+        from werewolf_eval.llm_providers import ChatProviderConfig
+
+        cfg = DeepSeekProviderConfig(api_key="sk-test-key")
+        self.assertIsInstance(cfg, ChatProviderConfig)
+        self.assertEqual(cfg.base_url, "https://api.deepseek.com")
+        self.assertEqual(cfg.model, "deepseek-v4-flash")
+        self.assertEqual(cfg.timeout_seconds, 30)
+        self.assertEqual(cfg.max_tokens, 256)
+        self.assertEqual(cfg.max_requests, 11)
+        self.assertEqual(cfg.persona_prompt, "")
+        self.assertIsNone(cfg.temperature)
+        self.assertEqual(
+            [f.name for f in dataclasses.fields(cfg)],
+            [f.name for f in dataclasses.fields(ChatProviderConfig)],
+        )
+        with self.assertRaises(dataclasses.FrozenInstanceError):
+            cfg.api_key = "x"

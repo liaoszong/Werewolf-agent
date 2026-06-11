@@ -2,20 +2,20 @@ from __future__ import annotations
 
 import argparse
 
-from werewolf_eval.consensus_log import ConsensusLogValidationError, load_consensus_log
-from werewolf_eval.game_log import GameLogValidationError, load_game_log
+from werewolf_eval.consensus_log import load_consensus_log
+from werewolf_eval.game_log import load_game_log
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Validate a Werewolf-agent Consensus Log JSON file.")
     parser.add_argument("path", help="Path to Consensus Log JSON")
     parser.add_argument("game_log_path", help="Path to Game Log JSON")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     try:
         game = load_game_log(args.game_log_path)
         consensus_log = load_consensus_log(args.path, game)
-    except (ConsensusLogValidationError, GameLogValidationError, OSError, ValueError) as exc:
+    except (OSError, ValueError) as exc:
         print(f"invalid consensus log: {exc}")
         return 1
 
