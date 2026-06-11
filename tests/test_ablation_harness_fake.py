@@ -25,3 +25,19 @@ def test_run_arm_fake_smoke(tmp_path):
     assert result["metrics"]["n_invalid_lowlive"] == 0
     assert (tmp_path / "fake_smoke" / "_metrics.json").exists()
     assert (tmp_path / "fake_smoke" / "_index.jsonl").exists()
+
+
+import pytest
+
+from werewolf_eval.prompt_version import PROMPT_VERSION
+
+
+def test_run_arm_rejects_unrenderable_prompt_version(tmp_path):
+    # Until the Part-B renderer selector lands, the runtime can only render
+    # PROMPT_VERSION; an arm declaring anything else must hard-fail instead of
+    # silently producing a false-null comparison.
+    arm = Arm(label="v2_arm", prompt_version="prompt_v2", n_games=1, seed_base=7)
+    with pytest.raises(ValueError, match="prompt_version"):
+        run_arm(arm, out_root=tmp_path, factory_builder=build_fake_factory)
+    assert not (tmp_path / "v2_arm").exists()   # fail BEFORE any side effects
+    assert PROMPT_VERSION == "prompt_v1"        # guard premise; revisit when this moves

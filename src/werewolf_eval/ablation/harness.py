@@ -7,6 +7,7 @@ from pathlib import Path
 from werewolf_eval.run_emergent_deepseek_game import run_emergent_deepseek_game, _deepseek_factory
 from werewolf_eval.ablation.arms import Arm, layout_for
 from werewolf_eval.ablation.metrics import aggregate
+from werewolf_eval.prompt_version import PROMPT_VERSION
 
 MAX_REQUESTS_PER_GAME = 80   # measured: one game uses ~19-23 requests; ~3x headroom
 
@@ -19,6 +20,11 @@ def _deepseek_factory_builder(arm: Arm, api_key: str):
 
 def run_arm(arm: Arm, out_root: Path, api_key: str | None = None, factory_builder=None) -> dict:
     """factory_builder(arm, api_key) -> ProviderFactory (fresh per game). Defaults to DeepSeek."""
+    if arm.prompt_version != PROMPT_VERSION:
+        raise ValueError(
+            f"prompt_version {arm.prompt_version!r} is not wired into the runner yet "
+            f"(runtime renders {PROMPT_VERSION!r}); the Part-B selector must land first"
+        )
     out_root = Path(out_root)
     arm_dir = out_root / arm.label
     arm_dir.mkdir(parents=True, exist_ok=True)
