@@ -10,6 +10,7 @@ from collections import Counter
 from typing import Any
 
 from werewolf_eval.action_runtime.ruleset import BoardRuleset
+from werewolf_eval.provider_contract import ProviderRequest
 
 ROLE_NAMES_ZH = {
     "werewolf": "狼人", "seer": "预言家", "witch": "女巫",
@@ -153,3 +154,18 @@ def render_observation_text_v2(obs: Any, events_by_id: dict[str, dict[str, Any]]
         for rnd in sorted(votes_by_round, key=lambda x: (x is None, x)):
             lines.append(f"- 第{rnd}轮:" + ", ".join(votes_by_round[rnd]))
     return "\n".join(lines), source_event_ids
+
+
+def build_speech_system_prompt_v2(request: ProviderRequest) -> str:
+    # SYS-B1 §3.3: stance-taking + discrimination structure (NOT "trust the seer" —
+    # a fake-claiming wolf would benefit equally). Free text, NO JSON (same machine
+    # contract as v1 speech).
+    return (
+        f"你是狼人杀里的 {request.actor}(第 {request.round} 轮,白天发言)。"
+        f"请用自然口吻发言,3-5 句或 120-180 字,不要固定小标题,不要输出 JSON,直接说话。"
+        f"发言必须包含:① 当前局势判断;② 对场上已有的硬信息(报身份、报查验结果的发言)"
+        f"逐条明确表态:信或不信,并给出理由;③ 你最怀疑或最相信的对象与一个具体理由;④ 本轮投票倾向。"
+        f"判别提示:报查验的人可能是真预言家,也可能是假冒的狼人;用对跳(是否有人争同一身份)、"
+        f"报点与已公开事实是否矛盾、发言与投票是否一致来检验,而不是默认相信。"
+        f"局内不存在表情、眼神、语气等信息,不要编造此类观察。"
+    )

@@ -29,6 +29,8 @@ from typing import Any, Callable
 
 from werewolf_eval.prompt_version import KNOWN_PROMPT_VERSIONS
 from werewolf_eval.prompt_v1 import build_speech_system_prompt
+from werewolf_eval.prompt_v2 import build_speech_system_prompt_v2
+from werewolf_eval.prompt_v3 import build_speech_system_prompt_v3
 from werewolf_eval.provider_contract import (
     ANTHROPIC_PROVIDER_SOURCE_LABEL,
     OPENAI_COMPATIBLE_PROVIDER_SOURCE_LABEL,
@@ -105,48 +107,6 @@ def build_action_system_prompt(request: ProviderRequest) -> str:
         f'{{"action":"{example_action}","target":"{example_target}",'
         f'"reason_summary":"your reasoning here","decision_type":"inference_based",'
         f'"confidence":0.9}}'
-    )
-
-
-def build_speech_system_prompt_v2(request: ProviderRequest) -> str:
-    # SYS-B1 §3.3: stance-taking + discrimination structure (NOT "trust the seer" —
-    # a fake-claiming wolf would benefit equally). Free text, NO JSON (same machine
-    # contract as v1 speech).
-    return (
-        f"你是狼人杀里的 {request.actor}(第 {request.round} 轮,白天发言)。"
-        f"请用自然口吻发言,3-5 句或 120-180 字,不要固定小标题,不要输出 JSON,直接说话。"
-        f"发言必须包含:① 当前局势判断;② 对场上已有的硬信息(报身份、报查验结果的发言)"
-        f"逐条明确表态:信或不信,并给出理由;③ 你最怀疑或最相信的对象与一个具体理由;④ 本轮投票倾向。"
-        f"判别提示:报查验的人可能是真预言家,也可能是假冒的狼人;用对跳(是否有人争同一身份)、"
-        f"报点与已公开事实是否矛盾、发言与投票是否一致来检验,而不是默认相信。"
-        f"局内不存在表情、眼神、语气等信息,不要编造此类观察。"
-    )
-
-
-def _board_card_has_guard(board_card: str | None) -> bool:
-    """True iff the board card lists the guard as an ON-BOARD role. Keyed to the
-    rules-card role line format ('- 守卫(') — golden-locked, so the marker is
-    stable; the plain substring '守卫' would false-positive on the standard
-    board's '没有守卫或守夜人' line."""
-    return bool(board_card) and "- 守卫(" in board_card
-
-
-def build_speech_system_prompt_v3(request: ProviderRequest) -> str:
-    # SYS-B4 §4 graded guidance: speech stays RESTRAINED (the b1 lesson — handing
-    # the discrimination program to every seat armed wolf fake-claims). Neutral
-    # speech requirements + anti-visual/anti-mechanic line only; the comparison
-    # program ships ONLY in the vote scaffold (observation side).
-    # L4: on guard boards the anti-mechanic line must not deny the guard;
-    # non-guard boards keep the EXACT original bytes (golden-locked).
-    if _board_card_has_guard(request.board_card):
-        no_mech = "局内不存在表情、眼神、语气等信息,也没有警长等本局规则卡之外的机制,不要编造。"
-    else:
-        no_mech = "局内不存在表情、眼神、语气等信息,也没有警长、守卫等本局规则卡之外的机制,不要编造。"
-    return (
-        f"你是狼人杀里的 {request.actor}(第 {request.round} 轮,白天发言)。"
-        f"请用自然口吻发言,3-5 句或 120-180 字,不要固定小标题,不要输出 JSON,直接说话。"
-        f"发言应包含:当前局势判断、你怀疑或相信的对象、一个具体理由、本轮投票倾向。"
-        f"{no_mech}"
     )
 
 

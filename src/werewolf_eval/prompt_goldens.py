@@ -15,19 +15,25 @@ from werewolf_eval.action_runtime.ruleset import rules_v1_1, rules_v1_2
 from werewolf_eval.emergent_engine import (
     HUNTER_SHOT_OBSERVATION_SUFFIX,
     augment_witch_observation,
-    render_observation_text,
 )
 from werewolf_eval.game_engine import AgentObservation
 from werewolf_eval.llm_providers import (
     build_action_system_prompt,
     build_scribe_system_prompt,
-    build_speech_system_prompt,
-    build_speech_system_prompt_v2,
-    build_speech_system_prompt_v3,
     compose_system,
 )
-from werewolf_eval.prompt_v2 import build_board_rules_card, render_observation_text_v2
-from werewolf_eval.prompt_v3 import render_claim_digest, render_scribe_input, render_vote_scaffold
+from werewolf_eval.prompt_v1 import build_speech_system_prompt, render_observation_text
+from werewolf_eval.prompt_v2 import (
+    build_board_rules_card,
+    build_speech_system_prompt_v2,
+    render_observation_text_v2,
+)
+from werewolf_eval.prompt_v3 import (
+    build_speech_system_prompt_v3,
+    render_claim_digest,
+    render_scribe_input,
+    render_vote_scaffold,
+)
 from werewolf_eval.provider_contract import ProviderRequest
 
 _ALIVE = ["p1", "p2", "p3", "p4", "p5", "p6"]
