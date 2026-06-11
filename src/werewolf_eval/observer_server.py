@@ -55,6 +55,7 @@ from werewolf_eval.observer.run_manager import (
     _sanitize_launcher_error,
     _schema_payload,
 )
+from werewolf_eval.observer.sse import stream_run_events
 from werewolf_eval.observer.security import (
     _LOOPBACK_HOSTNAMES,
     _hostname_of,
@@ -661,68 +662,25 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
     def _send_event_stream(
         self, run_id: str, run_dir: Path, perspective: str
     ) -> None:
-        """Serve an SSE event stream with live tailing of events.jsonl."""
+        """Serve an SSE event stream — headers + close_connection here, frame
+        protocol in ``observer.sse.stream_run_events``."""
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream; charset=utf-8")
         self.send_header("Cache-Control", "no-cache")
         self.send_header("Connection", "close")
         self.end_headers()
 
-        sent_count = 0
-        last_size = -1
-        events_path = run_dir / "events.jsonl"
-
-        def _read_new_events() -> list[dict[str, object]]:
-            nonlocal sent_count, last_size
-            # events.jsonl is append-only: skip the (whole-file) read+validate on idle
-            # ticks where the file hasn't grown. Without this gate the SSE loop re-read +
-            # re-validated the entire file every 100ms per connected client, forever
-            # (O(file × clients × 10/s) — quadratic-ish on a long game). (risk appendix)
-            try:
-                size = events_path.stat().st_size
-            except OSError:
-                return []
-            if size == last_size:
-                return []
-            last_size = size
-            all_events = _read_events_jsonl_safe(events_path)
-            new_events = all_events[sent_count:]
-            return new_events
-
-        try:
-            status_sse = format_sse_status(run_id, self._get_status(run_id, run_dir))
-            self.wfile.write(status_sse)
-            self.wfile.flush()
-
-            while True:
-                current_status = self._get_status(run_id, run_dir)
-                new_events = _read_new_events()
-                for event in new_events:
-                    if event_visible_to_perspective(event, perspective):
-                        self.wfile.write(format_sse_event(event))
-                        self.wfile.flush()
-                    sent_count += 1
-
-                if current_status not in ("queued", "running"):
-                    final_events = _read_new_events()
-                    for event in final_events:
-                        if event_visible_to_perspective(event, perspective):
-                            self.wfile.write(format_sse_event(event))
-                            self.wfile.flush()
-                        sent_count += 1
-                    final_sse = format_sse_status(
-                        run_id, current_status, self._get_error(run_id)
-                    )
-                    self.wfile.write(final_sse)
-                    self.wfile.flush()
-                    self.close_connection = True
-                    return
-
-                time.sleep(self._POLL_INTERVAL_S)
-        except (BrokenPipeError, ConnectionResetError):
-            pass
-        except OSError:
-            pass
+        should_close = stream_run_events(
+            self.wfile,
+            run_id=run_id,
+            run_dir=run_dir,
+            perspective=perspective,
+            get_status=lambda: self._get_status(run_id, run_dir),
+            get_error=lambda: self._get_error(run_id),
+            poll_interval=self._POLL_INTERVAL_S,
+        )
+        if should_close:
+            self.close_connection = True
 
 
 # ---------------------------------------------------------------------------
