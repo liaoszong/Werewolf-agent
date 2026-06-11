@@ -36,6 +36,8 @@ Invalid consecutive protect must be rejected by target rule and fall back determ
 
 兜底:guard 决策失败/非法时,确定性兜底从合法目标集(存活 − 上夜所守)中按既有 per-game RNG 规约取目标
 (沿用「兜底 RNG 每局新建」纪律,不复用跨局 provider 预算对象)。
+**兜底选出的目标计入 `last_guarded_target`**:它就是实际生效的守护目标,下一夜不可连守判定与
+I8c 产物断言均按实际生效目标,不按模型原始意图。
 
 ## 3. Rules 层 — `rules_v1_2`(append-only superset)
 
@@ -76,6 +78,8 @@ l4_guard arm 显式选择 rules_v1_2 + guard board。
 - 守卫挡刀成功 → `deaths` 为空 → 走现有「A peaceful night」公告路径(`:1168`),**零新渲染逻辑**。
 - 已知名单面(用户硬边界,直接入 allowlist,不留到 plan 阶段):
   - `profile_config.ALLOWED_ROLES`(`profile_config.py:53`):加 `"guard"`。**不加 hunter**(它现在就不在,保持)。
+    注意暴露面联动:`profile_config.py:482` 的 `"roles": sorted(ALLOWED_ROLES)` 是对外 capabilities/API
+    输出,加 guard 后该列表变化;钉它的静态契约测试的更新预含入 allowlist。
   - `observer_visibility._KNOWN_ROLE_TEAMS`(`observer_visibility.py:19`):经 observer_protocol 从
     `known_role_teams()` 联集派生,`all_rulesets()` 追加后自动覆盖 guard;以哨兵断言确认,不手改副本。
 - 观察/词汇:guard 中英词汇 i18n(SYS-A2 词汇哨兵 ×6 加行);`guard_protect` 事件
@@ -147,6 +151,10 @@ I1-I7 + I4b 照常全跑;coverage 门(`scaffold_coverage<0.5` 剔局)沿用。
 ```
 
 狼胜 ≤65% **不作为唯一硬失败**:若守卫保住预言家但狼胜仅降至 ~70%,定性为有价值的结构改进,进入 cap=4 批次。
+
+**前置步骤(硬)**:`seer_claim_to_night_survival_rate` 与「公开报验后夜间死亡率」b4 跑时未计算,
+无现成对照数。b4 原始局保存在主树 `.runs/ablation/b4/`(b4_000.. 齐全)——**新指标先在 b4 原始局上
+回算出基准值,再跑 guard 臂 45 局**;回算结果入 verdict 对照表。跑完才发现没对照 = plan 级失误。
 
 ## 9. 测试与验收
 
