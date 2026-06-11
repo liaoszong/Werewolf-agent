@@ -163,3 +163,44 @@ def test_system_for_rejects_unknown_version():
     provider = OpenAICompatibleProvider(ChatProviderConfig(api_key="k", base_url="http://x", model="m"))
     with pytest.raises(ValueError, match="prompt_version"):
         provider._system_for(_speech_req(prompt_version="prompt_v99"))
+
+
+import pytest
+
+from werewolf_eval.emergent_engine import EmergentBudget, EmergentGameEngine, build_emergent_config
+from werewolf_eval.emergent_fake_script import build_emergent_fake_agents, build_villager_win_script
+
+
+def _run_engine(prompt_version):
+    agents = build_emergent_fake_agents(build_villager_win_script())
+    engine = EmergentGameEngine(
+        config=build_emergent_config(game_id=f"v2t_{prompt_version}"),
+        agents=agents, seed=7,
+        budget=EmergentBudget(max_requests=80, max_day_rounds=3),
+        prompt_version=prompt_version,
+    )
+    outcome = engine.run()
+    reqs = [r for a in agents.values() for r in a.provider.requests]
+    assert reqs, "fake game produced no provider requests"
+    return outcome, reqs
+
+
+def test_engine_rejects_unknown_prompt_version():
+    with pytest.raises(ValueError, match="prompt_version"):
+        _run_engine("prompt_v99")
+
+
+def test_engine_v2_threads_card_and_structured_text():
+    _, reqs = _run_engine("prompt_v2")
+    assert all(r.prompt_version == "prompt_v2" for r in reqs)
+    assert all(r.board_card.startswith("【本局规则卡】") for r in reqs)
+    # contains 而非 startswith:witch/hunter 路径对渲染文本做"追加"式增补,现状都在
+    # 末尾,但用 contains 防未来前置式增补把断言变脆
+    assert all("【你的私有信息】" in r.observation_text for r in reqs)
+
+
+def test_engine_v1_default_requests_unchanged():
+    _, reqs = _run_engine("prompt_v1")
+    assert all(r.prompt_version == "prompt_v1" for r in reqs)
+    assert all(r.board_card == "" for r in reqs)
+    assert all("你是 " in r.observation_text for r in reqs)  # v1 渲染首行(contains 同理加固)

@@ -85,6 +85,8 @@ class ProviderAgent:
         observation_text: str = "",
         response_kind: str = "action",
         max_output_tokens: int | None = None,
+        prompt_version: str = "prompt_v1",
+        board_card: str = "",
     ) -> AgentAction:
         if isinstance(observation, dict):
             observation = AgentObservation(
@@ -144,6 +146,8 @@ class ProviderAgent:
             observation_text=observation_text,
             response_kind=response_kind,
             max_output_tokens=max_output_tokens,
+            prompt_version=prompt_version,
+            board_card=board_card,
         )
 
         self._emit_provider_event(
