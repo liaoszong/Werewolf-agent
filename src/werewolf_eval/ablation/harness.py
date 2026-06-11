@@ -7,6 +7,7 @@ from pathlib import Path
 from werewolf_eval.run_emergent_deepseek_game import run_emergent_deepseek_game, _deepseek_factory
 from werewolf_eval.ablation.arms import Arm, layout_for
 from werewolf_eval.ablation.metrics import aggregate
+from werewolf_eval.prompt_renderers import get_renderer
 from werewolf_eval.prompt_version import KNOWN_PROMPT_VERSIONS
 
 MAX_REQUESTS_PER_GAME = 80   # measured: one game uses ~19-23 requests; ~3x headroom
@@ -39,7 +40,8 @@ def run_arm(arm: Arm, out_root: Path, api_key: str | None = None, factory_builde
             f"prompt_version {arm.prompt_version!r} is not a known renderer "
             f"(known: {KNOWN_PROMPT_VERSIONS})"
         )
-    if arm.prompt_version == "prompt_v3" and scaffold_factory_builder is None:
+    requires_scaffold = get_renderer(arm.prompt_version).requires_scaffold
+    if requires_scaffold and scaffold_factory_builder is None:
         scaffold_factory_builder = _deepseek_scaffold_factory_builder
     out_root = Path(out_root)
     arm_dir = out_root / arm.label
@@ -62,7 +64,7 @@ def run_arm(arm: Arm, out_root: Path, api_key: str | None = None, factory_builde
                     seat_roles=seat_roles, prompt_version=arm.prompt_version,
                     scaffold_provider_factory=(
                         scaffold_factory_builder(arm, api_key)
-                        if arm.prompt_version == "prompt_v3" else None),
+                        if requires_scaffold else None),
                 )
                 gl = out_dir / "game-log.json"
                 rec["status"] = "completed" if gl.exists() else "failed"
