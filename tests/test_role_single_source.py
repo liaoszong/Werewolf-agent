@@ -56,5 +56,15 @@ class ProtocolReExportTest(unittest.TestCase):
         self.assertEqual(observer_protocol.KNOWN_ROLE_TEAMS, known_role_teams())
 
 
+class DerivedCopiesTest(unittest.TestCase):
+    def test_observer_visibility_table_is_the_protocol_object(self) -> None:
+        from werewolf_eval import observer_protocol, observer_visibility
+
+        self.assertIs(
+            observer_visibility._KNOWN_ROLE_TEAMS,
+            observer_protocol.KNOWN_ROLE_TEAMS,
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
