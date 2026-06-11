@@ -9,6 +9,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # fake_scribe helper
 
 from werewolf_eval.emergent_engine import EmergentGameEngine, build_emergent_config
 from werewolf_eval.emergent_fake_script import (
@@ -180,6 +181,34 @@ class SelfProtectSentinel(unittest.TestCase):
         self.assertEqual(r1_deaths, [])
         self.assertIn(("p4", "p4"), [(e["actor"], e["target"]) for e in events
                                      if e["type"] == "guard_protect" and e["round"] == 1])
+
+
+class GuardBoardV3SmokeSentinel(unittest.TestCase):
+    """Full-stack v3 smoke on the guard board — the EXACT l4_guard arm combo
+    (prompt_v3 + scribe scaffold + rules_v1_2 + guard board): board-conditional
+    rules card, guard night request and scaffold path all compose."""
+
+    def test_v3_guard_board_completes_with_guard_aware_card(self):
+        from fake_scribe import _FakeScribeProvider
+        from werewolf_eval.emergent_engine import EmergentBudget
+        from werewolf_eval.provider_agent import ProviderAgent
+        agents = build_emergent_fake_agents(build_guard_blocks_script())
+        scribe = ProviderAgent("scribe", _FakeScribeProvider())
+        engine = EmergentGameEngine(
+            config=build_emergent_config(game_id="v3_guard_smoke", seat_roles=SEATS_NO_WITCH),
+            agents=agents, seed=0,
+            budget=EmergentBudget(max_requests=80, max_day_rounds=3),
+            prompt_version="prompt_v3", scaffold_agent=scribe,
+        )
+        outcome = engine.run()
+        self.assertEqual(outcome.status, "completed")
+        self.assertEqual(engine.rules_version, "rules_v1_2")
+        self.assertIn("守卫×1", engine._board_card)
+        self.assertIn("同守同救", engine._board_card)
+        self.assertNotIn("没有守卫或守夜人", engine._board_card)
+        protects = [e for e in outcome.game_log["events"] if e["type"] == "guard_protect"]
+        self.assertEqual([e["target"] for e in protects], ["p6", "p5"])
+        self.assertGreaterEqual(len(scribe.provider.requests), 1)  # scribe 跑了
 
 
 if __name__ == "__main__":
