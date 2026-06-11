@@ -108,10 +108,19 @@
       }
     },
     "behavior_evidence": {
-      "status": "not_run",
-      "reason_if_not_run": "pending ablation arm b4 vs baseline/b1 (plan Task 11)"
+      "status": "attached",
+      "evidence": "45-game live ablation b4 vs baseline/b1 (paired seeds 1000-1044; n_valid=40 — 1 low-live + 4 dropped by the scaffold_coverage<0.5 arm-purity gate, valid-game coverage mean 0.938; all 45 artifact sets pass invariants I1-I7+I4b; snapshot docs/harness/reviews/2026-06-11-b4-prompt-v3-metrics.json). Failure chain HALVED: seer-voted-out-in-verify-cases 70% (b1, 14/20) -> 35.3% (6/17; target <30% missed by one game); verify-wolf-followed 30% -> 52.9% (above baseline 50%); day2 hit 28.6% -> 45.5%; herding 0.678 -> 0.617. Hallucination repairs HELD: visual speech 2.47%, visual game 5.0%, mechanic game 5.0% (all within the <=5% no-regress gate). Wolf win 93.3% (b1) -> 87.5%, still above baseline 77.8% (directional gate <=65% NOT met): bottleneck moved — seer died in 33/40 games (15 night-killed + 20 voted), day1 hit stayed 32.5%; 2-wolf parity closes within the 3-round cap before village converts information. Points at Layer 3/4 (board structure / seer survival), not prompt tuning."
     },
     "blessed_by": "user (spec 2026-06-11 sys-b4 dual review; plan 2026-06-11-sys-b4-claim-ledger-vote-scaffold)",
-    "blessed_at": "2026-06-11"
+    "blessed_at": "2026-06-11",
+    "arm_status": "kept_experimental_arm",
+    "arm_label": "b4_scaffold",
+    "verdict": {
+      "infrastructure": "PASS",
+      "mechanism": "PASS (claim ledger + vote scaffold demonstrably fixed the targeted failure chain)",
+      "gameplay_outcome": "PARTIAL_PASS (failure chain halved; win-rate directional gate not met)",
+      "production_default": "DO_NOT_FLIP (PROMPT_VERSION stays prompt_v1)",
+      "next": "Layer 4 board structure (seer survival / board balance) — adjudicated 2026-06-11; NO further B4 prompt tuning"
+    }
   }
 ]
