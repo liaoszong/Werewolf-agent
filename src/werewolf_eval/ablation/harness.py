@@ -18,13 +18,29 @@ def _deepseek_factory_builder(arm: Arm, api_key: str):
                              timeout_seconds=40, max_tokens=256, max_requests=MAX_REQUESTS_PER_GAME)
 
 
-def run_arm(arm: Arm, out_root: Path, api_key: str | None = None, factory_builder=None) -> dict:
-    """factory_builder(arm, api_key) -> ProviderFactory (fresh per game). Defaults to DeepSeek."""
+def _deepseek_scaffold_factory_builder(arm: Arm, api_key: str):
+    # Independent scribe provider instance per game (never a seat's instance:
+    # seat trace/token accounting must stay clean — spec §3 评审③). Low temp is
+    # request-level (the engine stamps temperature=0.0 on scribe requests), so
+    # no provider-config change is needed here.
+    def build():
+        factory = _deepseek_factory(api_key=api_key, base_url=arm.base_url, model=arm.model,
+                                    timeout_seconds=40, max_tokens=512, max_requests=MAX_REQUESTS_PER_GAME)
+        return factory("scribe")
+    return build
+
+
+def run_arm(arm: Arm, out_root: Path, api_key: str | None = None, factory_builder=None,
+            scaffold_factory_builder=None) -> dict:
+    """factory_builder(arm, api_key) -> ProviderFactory (fresh per game). Defaults to DeepSeek.
+    scaffold_factory_builder(arm, api_key) -> (() -> ProviderAgent); prompt_v3 必需,缺省用 DeepSeek scribe 工厂."""
     if arm.prompt_version not in KNOWN_PROMPT_VERSIONS:
         raise ValueError(
             f"prompt_version {arm.prompt_version!r} is not a known renderer "
             f"(known: {KNOWN_PROMPT_VERSIONS})"
         )
+    if arm.prompt_version == "prompt_v3" and scaffold_factory_builder is None:
+        scaffold_factory_builder = _deepseek_scaffold_factory_builder
     out_root = Path(out_root)
     arm_dir = out_root / arm.label
     arm_dir.mkdir(parents=True, exist_ok=True)
@@ -44,6 +60,9 @@ def run_arm(arm: Arm, out_root: Path, api_key: str | None = None, factory_builde
                     model=arm.model, seed=seed,
                     max_requests_per_game=MAX_REQUESTS_PER_GAME, max_day_rounds=3,
                     seat_roles=seat_roles, prompt_version=arm.prompt_version,
+                    scaffold_provider_factory=(
+                        scaffold_factory_builder(arm, api_key)
+                        if arm.prompt_version == "prompt_v3" else None),
                 )
                 gl = out_dir / "game-log.json"
                 rec["status"] = "completed" if gl.exists() else "failed"
