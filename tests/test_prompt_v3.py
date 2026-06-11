@@ -82,3 +82,59 @@ def test_vote_scaffold_has_digest_plus_comparison_program():
     s_empty = render_vote_scaffold([])
     assert "【投票前判断程序】" in s_empty and "【声称账本】" not in s_empty
     assert "本局到目前为止没有可记录的身份声称" in s_empty
+
+
+# ------------------------------------------------------------------ Task 3 tests
+from werewolf_eval.llm_providers import (
+    ChatProviderConfig,
+    OpenAICompatibleProvider,
+    build_action_system_prompt,
+    build_scribe_system_prompt,
+    build_speech_system_prompt_v3,
+)
+from werewolf_eval.prompt_version import KNOWN_PROMPT_VERSIONS
+from werewolf_eval.provider_contract import ProviderRequest
+
+
+def _req(actor="p5", phase="day", allowed_actions=None, allowed_targets=None, **kw):
+    base = dict(request_id="r", game_id="g", actor=actor, phase=phase, round=1,
+                observation={}, allowed_actions=allowed_actions or [],
+                allowed_targets=allowed_targets or [], response_kind="speech")
+    base.update(kw)
+    return ProviderRequest(**base)
+
+
+def test_known_versions_has_v3():
+    assert KNOWN_PROMPT_VERSIONS == ("prompt_v1", "prompt_v2", "prompt_v3")
+
+
+def test_scribe_system_prompt_extraction_not_judgment():
+    text = build_scribe_system_prompt(_req(actor="scribe", response_kind="scaffold",
+                                           prompt_version="prompt_v3"))
+    assert "JSON" in text and "claims" in text
+    assert "source_quote" in text and "uncertain" in text
+    assert "identity_claim" in text and "check_report" in text and "refutation" in text
+    # 提取非裁判:不许下判断
+    assert "只负责提取" in text and "不要判断" in text
+
+
+def test_speech_v3_is_restrained():
+    text = build_speech_system_prompt_v3(_req(prompt_version="prompt_v3"))
+    # 克制:中性发言要求 + 反视觉,无判别程序(spec §4:别教狼悍跳)
+    assert "JSON" in text and "眼神" in text
+    assert "对跳" not in text and "表态" not in text and "信或不信" not in text
+
+
+def test_system_for_routes_scaffold_speech_v3_and_vote_unchanged():
+    provider = OpenAICompatibleProvider(ChatProviderConfig(api_key="k", base_url="http://x", model="m"))
+    # scaffold 分支
+    sc = provider._system_for(_req(actor="scribe", response_kind="scaffold", prompt_version="prompt_v3"))
+    assert sc == build_scribe_system_prompt(_req(actor="scribe", response_kind="scaffold", prompt_version="prompt_v3"))
+    # v3 speech -> 克制版
+    sp = provider._system_for(_req(prompt_version="prompt_v3"))
+    assert sp == build_speech_system_prompt_v3(_req(prompt_version="prompt_v3"))
+    # v3 action(vote)系统提示 = v1 action 契约原文(strict-JSON 一字不动,spec §0)
+    a3 = _req(response_kind="action", allowed_actions=["player_vote"], allowed_targets=["p1"],
+              prompt_version="prompt_v3")
+    a1 = _req(response_kind="action", allowed_actions=["player_vote"], allowed_targets=["p1"])
+    assert provider._system_for(a3) == build_action_system_prompt(a1)

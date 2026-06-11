@@ -15,4 +15,5 @@ PROMPT_VERSION = "prompt_v1"
 # Runtime-selectable prompt renderers (spec 2026-06-10 quality §3.4): prompt_v1
 # stays the default; prompt_v2 (SYS-B1 context repair) coexists and is selected
 # per-arm/per-game. Each version has its own golden dir under tests/golden_prompts/.
-KNOWN_PROMPT_VERSIONS = ("prompt_v1", "prompt_v2")
+# prompt_v3 = SYS-B4 claim-ledger/vote-scaffold chain (scribe + restrained speech).
+KNOWN_PROMPT_VERSIONS = ("prompt_v1", "prompt_v2", "prompt_v3")
