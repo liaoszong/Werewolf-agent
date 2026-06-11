@@ -83,6 +83,7 @@ def aggregate_games(games: list[dict]) -> dict:
     d1 = [g["d1_majority_is_wolf"] for g in games if g["d1_majority_is_wolf"] is not None]
     d2 = [g.get("d2_majority_is_wolf") for g in games if g.get("d2_majority_is_wolf") is not None]
     vwf = [g["verify_wolf_followed"] for g in games if g["verify_wolf_followed"] is not None]
+    svo = [g.get("verify_seer_voted_out") for g in games if g.get("verify_seer_voted_out") is not None]
     tot_sp = sum(g["n_speeches"] for g in games) or 1
     kill_dist = collections.Counter(g["night1_kill"] for g in games if g["night1_kill"])
     return {
@@ -93,6 +94,7 @@ def aggregate_games(games: list[dict]) -> dict:
         "day2_hit": (sum(d2)/len(d2)) if d2 else None,
         "verify_wolf_followed": (sum(vwf)/len(vwf)) if vwf else None,
         "verify_wolf_followed_n": len(vwf),
+        "seer_voted_out_in_verify_cases": (sum(svo)/len(svo)) if svo else None,
         "witch_save_rate": rate(lambda g: g["witch_save"]),
         "witch_poison_rate": rate(lambda g: g["witch_poison"]),
         "herding": _mean([g["herd_share"] for g in games]),
@@ -136,7 +138,7 @@ def aggregate(run_dirs) -> dict:
 
 DEFAULT_COMPARE_KEYS = (
     "n_valid","wolf_win_rate","villager_win_rate","day1_hit","day2_hit",
-    "verify_wolf_followed","witch_save_rate","witch_poison_rate","herding",
+    "verify_wolf_followed","seer_voted_out_in_verify_cases","witch_save_rate","witch_poison_rate","herding",
     "halluc_visual_speech_rate","halluc_visual_game_rate","halluc_mechanic_game_rate",
     "seer_survives_d1_rate","avg_rounds",
 )
@@ -185,6 +187,11 @@ def analyze_game_dict(gl: dict) -> dict:
     verify_wolf_followed = None
     if seer_chk and seer_chk[1] == "werewolf":
         verify_wolf_followed = (d1 == seer_chk[0])
+    # SYS-B4 failure-chain metric: in a seer-checked-wolf game, did the day-1
+    # majority vote out the TRUE SEER themself? (b1 baseline: 14/20 = 70%.)
+    verify_seer_voted_out = None
+    if seer_chk and seer_chk[1] == "werewolf" and d1 is not None:
+        verify_seer_voted_out = (d1 == seer)
     shares = []
     for r in votes:
         _, n = majority(r)
@@ -200,6 +207,7 @@ def analyze_game_dict(gl: dict) -> dict:
         "d1_total": len(votes.get(1, [])),
         "d2_majority_is_wolf": (majority(2)[0] in wolves) if majority(2)[0] else None,
         "verify_wolf_followed": verify_wolf_followed,
+        "verify_seer_voted_out": verify_seer_voted_out,
         "witch_save": save, "witch_poison": poison,
         "seer_death_cause": seer_death[1] if seer_death else None,
         "seer_survives_d1": not (seer_death and seer_death[0] == 1),

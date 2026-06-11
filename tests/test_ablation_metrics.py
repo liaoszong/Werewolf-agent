@@ -137,3 +137,33 @@ def test_aggregate_gates_low_scaffold_coverage(tmp_path):
     assert agg["n_invalid_scaffold"] == 1      # 单列计数(spec §8.9)
     assert agg["n_invalid_lowlive"] == 0
     assert agg["games"][0]["scaffold_coverage"] is None   # good 局非 v3 -> None
+
+
+def test_verify_seer_voted_out_per_game_and_aggregate():
+    # 验狼局,但多数票投向预言家自己(b1 失败链)
+    gl = {
+        "players": [
+            {"player_id":"p1","role":"seer","team":"villager"},
+            {"player_id":"p2","role":"werewolf","team":"werewolf"},
+            {"player_id":"p3","role":"villager","team":"villager"},
+            {"player_id":"p4","role":"witch","team":"villager"},
+            {"player_id":"p5","role":"werewolf","team":"werewolf"},
+            {"player_id":"p6","role":"villager","team":"villager"},
+        ],
+        "result": {"winner":"werewolf","end_round":2},
+        "events": [
+            {"round":1,"phase":"night","actor":"p1","target":"p2","data":{"summary":"Seer p1 checks p2, result: werewolf."}},
+            {"round":1,"phase":"day","actor":"p2","target":"p1","data":{"summary":"p2 votes p1."}},
+            {"round":1,"phase":"day","actor":"p3","target":"p1","data":{"summary":"p3 votes p1."}},
+            {"round":1,"phase":"day","actor":"p5","target":"p1","data":{"summary":"p5 votes p1."}},
+        ],
+    }
+    g = analyze_game_dict(gl)
+    assert g["verify_wolf_followed"] is False
+    assert g["verify_seer_voted_out"] is True          # 验狼局,多数票=预言家自己
+    agg = aggregate_games([g])
+    assert agg["seer_voted_out_in_verify_cases"] == 1.0
+    # 非验狼局 -> None,不进分母
+    g2 = dict(g); g2["verify_seer_voted_out"] = None; g2["verify_wolf_followed"] = None
+    agg2 = aggregate_games([g, g2])
+    assert agg2["seer_voted_out_in_verify_cases"] == 1.0
