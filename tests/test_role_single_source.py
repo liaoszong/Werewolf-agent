@@ -129,6 +129,33 @@ class GateAndOrderSentinelTest(unittest.TestCase):
         self.assertLessEqual(set(NIGHT_DISPATCH_ORDER), night_ids)
 
 
+class VocabCompletenessSentinelTest(unittest.TestCase):
+    """Coverage-only sentinels. The prompt and display vocabularies are
+    deliberately different wordings and must never be merged (prompt bytes are
+    golden-locked); these tests only guarantee no role/team/ability that a
+    ruleset can put on a board is missing a word in either vocabulary."""
+
+    def test_prompt_tables_cover_all_rulesets(self) -> None:
+        from werewolf_eval import prompt_v2
+
+        for rs in all_rulesets():
+            for role_def in rs.roles:
+                self.assertIn(role_def.role, prompt_v2.ROLE_NAMES_ZH)
+                self.assertIn(role_def.team, prompt_v2.TEAM_NAMES_ZH)
+            for ability in rs.abilities:
+                self.assertIn(ability.action_id, prompt_v2.ABILITY_DESCRIPTIONS)
+
+    def test_display_tables_cover_all_rulesets(self) -> None:
+        from werewolf_eval import display_labels
+
+        for rs in all_rulesets():
+            for role_def in rs.roles:
+                self.assertIn(role_def.role, display_labels.ROLE_LABELS)
+                self.assertIn(role_def.team, display_labels.TEAM_LABELS)
+            for ability in rs.abilities:
+                self.assertIn(ability.action_id, display_labels.TYPE_LABELS)
+
+
 class ColdImportTest(unittest.TestCase):
     """Each entry module must import cleanly as the FIRST import of a fresh
     interpreter. Same-process smoke tests are order-dependent and miss cycles:
