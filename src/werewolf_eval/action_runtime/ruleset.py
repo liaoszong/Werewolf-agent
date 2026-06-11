@@ -83,3 +83,30 @@ def rules_v1_1() -> BoardRuleset:
         dict(base._night_rules),
         base.death_order_key,
     )
+
+
+def all_rulesets() -> tuple[BoardRuleset, ...]:
+    """Every ruleset this codebase has ever shipped. APPEND-ONLY: observer-side
+    consumers derive role->team knowledge from this union, and must keep
+    recognizing roles from logs written under ANY rules version."""
+    return (rules_v1(), rules_v1_1())
+
+
+def known_role_teams() -> dict[str, str]:
+    """role -> team, union over all_rulesets(), in declaration order.
+
+    THE single source of role->team facts (ADR 2026-06-11): observer_protocol
+    re-exports this for observer-side modules; profile_config derives its gated
+    ROLE_TEAMS projection from it. A role may not change team across rulesets —
+    fail loud instead of silently picking one."""
+    teams: dict[str, str] = {}
+    for rs in all_rulesets():
+        for role_def in rs.roles:
+            existing = teams.get(role_def.role)
+            if existing is not None and existing != role_def.team:
+                raise ValueError(
+                    f"role {role_def.role!r} maps to both {existing!r} and "
+                    f"{role_def.team!r} across rulesets"
+                )
+            teams[role_def.role] = role_def.team
+    return teams
