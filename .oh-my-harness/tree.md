@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 464
+- Entries: 466
 
 ```text
 ./
@@ -118,7 +118,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── adr/
 │   │   ├── 0001-client-agnostic-live-observer-protocol.md
 │   │   ├── 0002-src-layout-installable-package.md
-│   │   └── 2026-06-09-action-runtime-orchestrator.md
+│   │   ├── 2026-06-09-action-runtime-orchestrator.md
+│   │   └── 2026-06-11-role-facts-single-source.md
 │   ├── demo/
 │   │   ├── phase1-gold-demo.html
 │   │   ├── phase2-runtime-demo.html
@@ -213,7 +214,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   │   ├── 2026-06-06--p2-d-settlement-screen-plan.md
 │   │   │   ├── 2026-06-08--full-health-check.md
 │   │   │   ├── 2026-06-08--p2b-byo-key-rework-plan.md
-│   │   │   └── 2026-06-11--foundation-artifacts-pyproject-plan.md
+│   │   │   ├── 2026-06-11--foundation-artifacts-pyproject-plan.md
+│   │   │   └── 2026-06-11--sys-a2-role-single-source-plan.md
 │   │   └── reviews/
 │   │       ├── 2026-06-01--g1c-project-healthcheck-final.md
 │   │       ├── 2026-06-01--g1c-project-healthcheck.md
