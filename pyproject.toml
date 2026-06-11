@@ -1,0 +1,13 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "werewolf-eval"
+version = "0.1.0"
+description = "Client-agnostic live AI Werewolf experiment platform (evaluation core)"
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/werewolf_eval"]

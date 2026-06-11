@@ -15,12 +15,12 @@ inject a fake-transport DeepSeek provider (no network).
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import sys
 from pathlib import Path
-from typing import Any, Callable
+from typing import Callable
 
+from werewolf_eval.artifacts import collect_provider_trace, write_json
 from werewolf_eval.deepseek_provider import DeepSeekProvider, DeepSeekProviderConfig
 from werewolf_eval.emergent_engine import EmergentBudget, EmergentGameEngine, build_emergent_config
 from werewolf_eval.provider_agent import ProviderAgent
@@ -28,18 +28,12 @@ from werewolf_eval.provider_contract import (
     DEEPSEEK_PROVIDER_SOURCE_LABEL,
     MIXED_PROVIDER_SOURCE_LABEL,
     provider_trace_to_dict,
-    ProviderTrace,
 )
 from werewolf_eval.evaluation_versions import SCORING_VERSION, evaluation_bucket
 from werewolf_eval.runtime_events import RuntimeEventWriter, build_prompt_manifest, redact_secret_values
 
 ProviderFactory = Callable[[str], ProviderAgent]
 PLAYER_IDS = ["p1", "p2", "p3", "p4", "p5", "p6"]
-
-
-def _write_json(path: Path, payload: Any) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
 def _provider_identity(agents: dict[str, ProviderAgent]) -> tuple[str, str]:
@@ -87,21 +81,13 @@ def _collect_trace(
     provider_name: str,
     source_label: str,
 ) -> dict:
-    seen_req: set[str] = set()
-    seen_resp: set[str] = set()
-    reqs: list = []
-    resps: list = []
-    for agent in agents.values():
-        for r in agent.provider.requests:
-            if r.request_id not in seen_req:
-                seen_req.add(r.request_id)
-                reqs.append(r)
-        for r in agent.provider.responses:
-            if r.request_id not in seen_resp:
-                seen_resp.add(r.request_id)
-                resps.append(r)
     return provider_trace_to_dict(
-        ProviderTrace(game_id=game_id, provider_name=provider_name, source_label=source_label, requests=reqs, responses=resps, failures=[])
+        collect_provider_trace(
+            game_id,
+            agents.values(),
+            provider_name=provider_name,
+            source_label=source_label,
+        )
     )
 
 
@@ -169,13 +155,13 @@ def run_emergent_deepseek_game(
     # Include scribe agent in trace collection so actor="scribe" rows are captured;
     # _provider_identity keeps using the original player-only agents (identity unaffected).
     trace_agents = {**agents, "scribe": scaffold_agent} if scaffold_agent is not None else agents
-    _write_json(
+    write_json(
         out_dir / "provider-trace.json",
         redact_secret_values(
             _collect_trace(game_id, trace_agents, provider_name=provider_name, source_label=effective_label)
         ),
     )
-    _write_json(out_dir / "provider-turns.json", _provider_turns_summary(outcome.provider_turns))
+    write_json(out_dir / "provider-turns.json", _provider_turns_summary(outcome.provider_turns))
 
     # MANDATORY spine: prompt-manifest with the REAL per-seat provider/model/persona.
     providers = [a.provider for a in agents.values()]
@@ -201,10 +187,10 @@ def run_emergent_deepseek_game(
     writer.write_prompt_manifest(manifest)
 
     if outcome.completed:
-        _write_json(out_dir / "game-log.json", outcome.game_log)
-        _write_json(out_dir / "decision-log.json", outcome.decision_log)
-        _write_json(out_dir / "consensus-log.json", outcome.consensus_log)
-        _write_json(out_dir / "failure-audit.json", outcome.failure_audit)
+        write_json(out_dir / "game-log.json", outcome.game_log)
+        write_json(out_dir / "decision-log.json", outcome.decision_log)
+        write_json(out_dir / "consensus-log.json", outcome.consensus_log)
+        write_json(out_dir / "failure-audit.json", outcome.failure_audit)
         print(f"emergent_deepseek_game_id={game_id}")
         print(f"status=completed")
         print(f"winner={outcome.game_log['result']['winner']}")
@@ -215,7 +201,7 @@ def run_emergent_deepseek_game(
         return 0
 
     # fail-closed: no complete game log
-    _write_json(out_dir / "failure-audit.json", outcome.failure_audit)
+    write_json(out_dir / "failure-audit.json", outcome.failure_audit)
     print(f"emergent_deepseek_game_id={game_id}")
     print(f"status=failed")
     print(f"end_condition={outcome.end_condition}")

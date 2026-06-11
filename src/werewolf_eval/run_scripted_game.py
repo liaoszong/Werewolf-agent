@@ -5,17 +5,9 @@ canonical product path (`run_observer_server` → `run_g1h_fake_runtime` for fak
 from __future__ import annotations
 
 import argparse
-import json
-from pathlib import Path
 
+from werewolf_eval.artifacts import write_json
 from werewolf_eval.scripted_game import load_scripted_game, run_scripted_game
-
-
-def _write_json(path: str | Path, payload: dict) -> None:
-    Path(path).parent.mkdir(parents=True, exist_ok=True)
-    Path(path).write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
-    )
 
 
 def main() -> int:
@@ -31,9 +23,9 @@ def main() -> int:
     script = load_scripted_game(args.script_path)
     outputs = run_scripted_game(script)
 
-    _write_json(args.game_log_out, outputs.game_log)
-    _write_json(args.decision_log_out, outputs.decision_log)
-    _write_json(args.consensus_log_out, outputs.consensus_log)
+    write_json(args.game_log_out, outputs.game_log)
+    write_json(args.decision_log_out, outputs.decision_log)
+    write_json(args.consensus_log_out, outputs.consensus_log)
 
     print(f"scripted_game_id={outputs.game_log['game_id']}")
     print(f"source_label={outputs.game_log['source_label']}")

@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 461
+- Entries: 466
 
 ```text
 ./
@@ -117,6 +117,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 ├── docs/
 │   ├── adr/
 │   │   ├── 0001-client-agnostic-live-observer-protocol.md
+│   │   ├── 0002-src-layout-installable-package.md
 │   │   ├── 2026-06-09-action-runtime-orchestrator.md
 │   │   └── 2026-06-11-role-facts-single-source.md
 │   ├── demo/
@@ -213,6 +214,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   │   ├── 2026-06-06--p2-d-settlement-screen-plan.md
 │   │   │   ├── 2026-06-08--full-health-check.md
 │   │   │   ├── 2026-06-08--p2b-byo-key-rework-plan.md
+│   │   │   ├── 2026-06-11--foundation-artifacts-pyproject-plan.md
 │   │   │   └── 2026-06-11--sys-a2-role-single-source-plan.md
 │   │   └── reviews/
 │   │       ├── 2026-06-01--g1c-project-healthcheck-final.md
@@ -334,6 +336,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       │   ├── guards.py
 │       │   └── visibility_oracle.py
 │       ├── __init__.py
+│       ├── artifacts.py
 │       ├── attribute_game.py
 │       ├── attribution.py
 │       ├── consensus_log.py
@@ -449,6 +452,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── test_action_runtime_turn.py
 │   ├── test_action_runtime_validator.py
 │   ├── test_anthropic_provider.py
+│   ├── test_artifacts.py
 │   ├── test_attribution.py
 │   ├── test_build_review_packet.py
 │   ├── test_consensus_log.py
@@ -529,6 +533,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 ├── launch-theater.bat
 ├── launch-theater.py
 ├── live-check.bat
+├── pyproject.toml
 ├── README.md
 └── README.zh-CN.md
 ```

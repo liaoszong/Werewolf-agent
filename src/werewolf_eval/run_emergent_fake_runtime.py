@@ -19,10 +19,9 @@ fake source label, and `secrets_redacted=True`.
 from __future__ import annotations
 
 import argparse
-import json
 from pathlib import Path
-from typing import Any
 
+from werewolf_eval.artifacts import collect_provider_trace, write_json
 from werewolf_eval.emergent_engine import EmergentBudget, EmergentGameEngine, build_emergent_config
 from werewolf_eval.emergent_fake_script import (
     build_emergent_fake_agents,
@@ -32,7 +31,6 @@ from werewolf_eval.emergent_fake_script import (
 from werewolf_eval.provider_agent import ProviderAgent
 from werewolf_eval.provider_contract import (
     FAKE_PROVIDER_SOURCE_LABEL,
-    ProviderTrace,
     provider_trace_to_dict,
 )
 from werewolf_eval.evaluation_versions import SCORING_VERSION, evaluation_bucket
@@ -48,39 +46,18 @@ SCRIPTS = {
 _FAKE_PROVIDER_NAME = "deterministic_fake_provider"
 
 
-def _write_json(path: Path, payload: Any) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-
-
 def _collect_trace(game_id: str, agents: dict[str, ProviderAgent]) -> dict:
     """Roll up the per-seat fake provider requests/responses into one trace.
 
     Each fake agent wraps its own DeterministicFakeProvider, so request_ids never
     collide across seats; the de-dup is belt-and-suspenders. Fake token usage is
     always zero (honesty marker vs the live path)."""
-    seen_req: set[str] = set()
-    seen_resp: set[str] = set()
-    reqs: list = []
-    resps: list = []
-    for agent in agents.values():
-        provider = agent.provider
-        for r in getattr(provider, "requests", []):
-            if r.request_id not in seen_req:
-                seen_req.add(r.request_id)
-                reqs.append(r)
-        for r in getattr(provider, "responses", []):
-            if r.request_id not in seen_resp:
-                seen_resp.add(r.request_id)
-                resps.append(r)
     return provider_trace_to_dict(
-        ProviderTrace(
-            game_id=game_id,
+        collect_provider_trace(
+            game_id,
+            agents.values(),
             provider_name=_FAKE_PROVIDER_NAME,
             source_label=FAKE_PROVIDER_SOURCE_LABEL,
-            requests=reqs,
-            responses=resps,
-            failures=[],
         )
     )
 
@@ -117,7 +94,7 @@ def run_emergent_fake_runtime(
 
     if not outcome.completed:
         # fail-closed: never write a complete game/decision/consensus log.
-        _write_json(out_dir / "failure-audit.json", outcome.failure_audit)
+        write_json(out_dir / "failure-audit.json", outcome.failure_audit)
         print(f"emergent_fake_runtime_game_id={game_id}")
         print(f"source_label={FAKE_PROVIDER_SOURCE_LABEL}")
         print(f"status={outcome.status}")
@@ -127,12 +104,12 @@ def run_emergent_fake_runtime(
         print("live_api=not_used")
         return 2
 
-    _write_json(out_dir / "game-log.json", outcome.game_log)
-    _write_json(out_dir / "decision-log.json", outcome.decision_log)
-    _write_json(out_dir / "consensus-log.json", outcome.consensus_log)
-    _write_json(out_dir / "failure-audit.json", outcome.failure_audit)
-    _write_json(out_dir / "provider-trace.json", _collect_trace(game_id, agents))
-    _write_json(out_dir / "provider-turns.json", _provider_turns_summary(outcome.provider_turns))
+    write_json(out_dir / "game-log.json", outcome.game_log)
+    write_json(out_dir / "decision-log.json", outcome.decision_log)
+    write_json(out_dir / "consensus-log.json", outcome.consensus_log)
+    write_json(out_dir / "failure-audit.json", outcome.failure_audit)
+    write_json(out_dir / "provider-trace.json", _collect_trace(game_id, agents))
+    write_json(out_dir / "provider-turns.json", _provider_turns_summary(outcome.provider_turns))
 
     providers = [a.provider for a in agents.values()]
     manifest = build_prompt_manifest(
