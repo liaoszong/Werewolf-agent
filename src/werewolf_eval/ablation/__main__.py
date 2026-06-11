@@ -3,9 +3,11 @@
 from __future__ import annotations
 import argparse, json, os, sys
 from pathlib import Path
-from werewolf_eval.ablation.arms import Arm
+from werewolf_eval.ablation.arms import Arm, CANONICAL_MULTISET, GUARD_MULTISET
 from werewolf_eval.ablation.harness import run_arm
 from werewolf_eval.ablation.metrics import compare
+
+_BOARDS = {"standard": CANONICAL_MULTISET, "guard": GUARD_MULTISET}
 
 
 def _run(a):
@@ -13,7 +15,7 @@ def _run(a):
     if not api_key:
         print(f"missing {a.api_key_env}", file=sys.stderr); return 1
     arm = Arm(label=a.label, prompt_version=a.prompt_version, n_games=a.n,
-              seed_base=a.seed_base, model=a.model)
+              seed_base=a.seed_base, model=a.model, multiset=_BOARDS[a.board])
     res = run_arm(arm, out_root=Path(a.out_root), api_key=api_key)
     print(json.dumps(res["metrics"], ensure_ascii=False, indent=1))
     return 0
@@ -38,6 +40,7 @@ def main(argv=None):
     r.add_argument("--n", type=int, default=45); r.add_argument("--seed-base", dest="seed_base", type=int, default=1000)
     r.add_argument("--model", default="deepseek-v4-flash"); r.add_argument("--out-root", dest="out_root", default=".runs/ablation")
     r.add_argument("--api-key-env", dest="api_key_env", default="DEEPSEEK_API_KEY")
+    r.add_argument("--board", choices=sorted(_BOARDS), default="standard")
     c = sub.add_parser("compare"); c.set_defaults(fn=_compare)
     c.add_argument("arm_a"); c.add_argument("arm_b")
     a = p.parse_args(argv)
