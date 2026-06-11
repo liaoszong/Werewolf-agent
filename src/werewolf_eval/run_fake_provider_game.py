@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import argparse
-import json
 import sys
-from pathlib import Path
 
+from werewolf_eval.artifacts import write_json
 from werewolf_eval.fake_provider import build_default_fake_provider_agent
 from werewolf_eval.game_engine import GameEngine, build_default_config
 from werewolf_eval.provider_agent import ProviderActionError
@@ -15,15 +14,6 @@ from werewolf_eval.provider_contract import (
     provider_trace_to_dict,
     ProviderTrace,
 )
-
-
-def _write_json(path: str, payload: dict) -> None:
-    output_path = Path(path)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
 
 
 def _collect_trace(
@@ -107,7 +97,7 @@ def main() -> int:
         failures.append(exc.failure)
         trace = _collect_trace(args.game_id, agents, wolf_agent, failures)
         trace_payload = provider_trace_to_dict(trace)
-        _write_json(args.provider_trace_out, trace_payload)
+        write_json(args.provider_trace_out, trace_payload)
 
         if args.failure_audit_out:
             failure_audit = {
@@ -115,7 +105,7 @@ def main() -> int:
                 "source_label": FAKE_PROVIDER_SOURCE_LABEL,
                 "failures": [provider_failure_to_dict(f) for f in failures],
             }
-            _write_json(args.failure_audit_out, failure_audit)
+            write_json(args.failure_audit_out, failure_audit)
 
         print(f"fake_provider_game_id={args.game_id}")
         print(f"source_label={FAKE_PROVIDER_SOURCE_LABEL}")
@@ -131,12 +121,12 @@ def main() -> int:
         return 2
 
     # Success path
-    _write_json(args.game_log_out, outputs.game_log)
-    _write_json(args.decision_log_out, outputs.decision_log)
+    write_json(args.game_log_out, outputs.game_log)
+    write_json(args.decision_log_out, outputs.decision_log)
 
     trace = _collect_trace(args.game_id, agents, wolf_agent, [])
     trace_payload = provider_trace_to_dict(trace)
-    _write_json(args.provider_trace_out, trace_payload)
+    write_json(args.provider_trace_out, trace_payload)
 
     if args.failure_audit_out:
         failure_audit = {
@@ -144,7 +134,7 @@ def main() -> int:
             "source_label": FAKE_PROVIDER_SOURCE_LABEL,
             "failures": [],
         }
-        _write_json(args.failure_audit_out, failure_audit)
+        write_json(args.failure_audit_out, failure_audit)
 
     print(f"fake_provider_game_id={args.game_id}")
     print(f"source_label={FAKE_PROVIDER_SOURCE_LABEL}")

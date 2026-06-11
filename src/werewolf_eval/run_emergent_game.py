@@ -12,10 +12,9 @@ Live DeepSeek wiring is intentionally gated and NOT the default; see
 from __future__ import annotations
 
 import argparse
-import json
 import sys
-from pathlib import Path
 
+from werewolf_eval.artifacts import write_json
 from werewolf_eval.emergent_engine import EmergentBudget, EmergentGameEngine, build_emergent_config
 from werewolf_eval.emergent_fake_script import (
     build_emergent_fake_agents,
@@ -28,12 +27,6 @@ SCRIPTS = {
     "villager_win": build_villager_win_script,
     "werewolf_win": build_werewolf_win_script,
 }
-
-
-def _write_json(path: str, payload: dict) -> None:
-    p = Path(path)
-    p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -67,7 +60,7 @@ def main(argv: list[str] | None = None) -> int:
     if not outcome.completed:
         # fail-closed: never write a complete game/decision/consensus log
         if args.failure_audit_out:
-            _write_json(args.failure_audit_out, outcome.failure_audit)
+            write_json(args.failure_audit_out, outcome.failure_audit)
             print("failure_audit=written")
         print("game_log=not_written")
         print("decision_log=not_written")
@@ -81,16 +74,16 @@ def main(argv: list[str] | None = None) -> int:
     print(f"consensuses={len(outcome.consensus_log['consensuses'])}")
     print(f"failures={len(outcome.failure_audit['failures'])}")
     if args.game_log_out:
-        _write_json(args.game_log_out, outcome.game_log)
+        write_json(args.game_log_out, outcome.game_log)
         print("game_log=written")
     if args.decision_log_out:
-        _write_json(args.decision_log_out, outcome.decision_log)
+        write_json(args.decision_log_out, outcome.decision_log)
         print("decision_log=written")
     if args.consensus_log_out:
-        _write_json(args.consensus_log_out, outcome.consensus_log)
+        write_json(args.consensus_log_out, outcome.consensus_log)
         print("consensus_log=written")
     if args.failure_audit_out:
-        _write_json(args.failure_audit_out, outcome.failure_audit)
+        write_json(args.failure_audit_out, outcome.failure_audit)
         print("failure_audit=written")
     return 0
 

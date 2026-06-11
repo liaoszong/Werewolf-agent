@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import sys
 from pathlib import Path
-from typing import Any, Callable
+from typing import Callable
 
+from werewolf_eval.artifacts import write_json
 from werewolf_eval.deepseek_provider import DeepSeekProvider, DeepSeekProviderConfig
 from werewolf_eval.game_engine import GameEngine, build_default_config
 from werewolf_eval.provider_agent import ProviderActionError, ProviderAgent
@@ -19,15 +19,6 @@ from werewolf_eval.provider_contract import (
     ProviderTrace,
 )
 from werewolf_eval.runtime_events import redact_secret_values
-
-
-def _write_json(path: str, payload: dict) -> None:
-    output_path = Path(path)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
 
 
 def _collect_trace(
@@ -89,14 +80,14 @@ def run_deepseek_game_with_provider_factory(
         failures.append(exc.failure)
         trace = _collect_trace(game_id, agents, wolf_agent, failures)
         trace_payload = redact_secret_values(provider_trace_to_dict(trace))
-        _write_json(str(out_dir / "provider-trace.json"), trace_payload)
+        write_json(str(out_dir / "provider-trace.json"), trace_payload)
 
         failure_audit = {
             "game_id": game_id,
             "source_label": DEEPSEEK_PROVIDER_SOURCE_LABEL,
             "failures": [provider_failure_to_dict(f) for f in failures],
         }
-        _write_json(str(out_dir / "failure-audit.json"), failure_audit)
+        write_json(str(out_dir / "failure-audit.json"), failure_audit)
 
         print(f"deepseek_provider_game_id={game_id}")
         print(f"source_label={DEEPSEEK_PROVIDER_SOURCE_LABEL}")
@@ -109,19 +100,19 @@ def run_deepseek_game_with_provider_factory(
         print(f"failure_audit=written")
         return 2
 
-    _write_json(str(out_dir / "game-log.json"), outputs.game_log)
-    _write_json(str(out_dir / "decision-log.json"), outputs.decision_log)
+    write_json(str(out_dir / "game-log.json"), outputs.game_log)
+    write_json(str(out_dir / "decision-log.json"), outputs.decision_log)
 
     trace = _collect_trace(game_id, agents, wolf_agent, [])
     trace_payload = redact_secret_values(provider_trace_to_dict(trace))
-    _write_json(str(out_dir / "provider-trace.json"), trace_payload)
+    write_json(str(out_dir / "provider-trace.json"), trace_payload)
 
     failure_audit = {
         "game_id": game_id,
         "source_label": DEEPSEEK_PROVIDER_SOURCE_LABEL,
         "failures": [],
     }
-    _write_json(str(out_dir / "failure-audit.json"), failure_audit)
+    write_json(str(out_dir / "failure-audit.json"), failure_audit)
 
     print(f"deepseek_provider_game_id={game_id}")
     print(f"source_label={DEEPSEEK_PROVIDER_SOURCE_LABEL}")

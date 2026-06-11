@@ -4,12 +4,12 @@ Requires a DeepSeek API key. See docs/secrets/api-keys.md for setup."""
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import sys
 from pathlib import Path
-from typing import Any, Callable
+from typing import Callable
 
+from werewolf_eval.artifacts import write_json
 from werewolf_eval.deepseek_provider import DeepSeekProvider, DeepSeekProviderConfig
 from werewolf_eval.game_engine import GameEngine, build_default_config
 from werewolf_eval.provider_agent import ProviderActionError, ProviderAgent
@@ -28,15 +28,6 @@ from werewolf_eval.runtime_events import (
     build_prompt_manifest,
     redact_secret_values,
 )
-
-
-def _write_json(path: str, payload: dict) -> None:
-    output_path = Path(path)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
 
 
 def _collect_trace(
@@ -120,14 +111,14 @@ def run_deepseek_consensus_game_with_provider_factory(
         failures.append(exc.failure)
         trace = _collect_trace(game_id, agents, failures)
         trace_payload = redact_secret_values(provider_trace_to_dict(trace))
-        _write_json(str(out_dir / "provider-trace.json"), trace_payload)
+        write_json(str(out_dir / "provider-trace.json"), trace_payload)
 
         failure_audit = {
             "game_id": game_id,
             "source_label": source_label,
             "failures": [provider_failure_to_dict(f) for f in failures],
         }
-        _write_json(str(out_dir / "failure-audit.json"), failure_audit)
+        write_json(str(out_dir / "failure-audit.json"), failure_audit)
 
         if writer is not None:
             writer.emit(
@@ -183,22 +174,22 @@ def run_deepseek_consensus_game_with_provider_factory(
         print(f"failure_audit=written")
         return 2
 
-    _write_json(str(out_dir / "game-log.json"), outputs.game_log)
-    _write_json(str(out_dir / "decision-log.json"), outputs.decision_log)
+    write_json(str(out_dir / "game-log.json"), outputs.game_log)
+    write_json(str(out_dir / "decision-log.json"), outputs.decision_log)
 
     if outputs.consensus_log is not None:
-        _write_json(str(out_dir / "consensus-log.json"), outputs.consensus_log)
+        write_json(str(out_dir / "consensus-log.json"), outputs.consensus_log)
 
     trace = _collect_trace(game_id, agents, [])
     trace_payload = redact_secret_values(provider_trace_to_dict(trace))
-    _write_json(str(out_dir / "provider-trace.json"), trace_payload)
+    write_json(str(out_dir / "provider-trace.json"), trace_payload)
 
     failure_audit = {
         "game_id": game_id,
         "source_label": source_label,
         "failures": [],
     }
-    _write_json(str(out_dir / "failure-audit.json"), failure_audit)
+    write_json(str(out_dir / "failure-audit.json"), failure_audit)
 
     if writer is not None:
         for artifact in ["game-log.json", "decision-log.json", "provider-trace.json", "failure-audit.json"]:

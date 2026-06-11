@@ -11,6 +11,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from werewolf_eval.artifacts import write_json
 from werewolf_eval.game_engine import GameEngine, build_default_config
 from werewolf_eval.provider_agent import ProviderActionError, ProviderAgent
 from werewolf_eval.provider_contract import (
@@ -68,14 +69,6 @@ class _DeterministicFakeProvider:
         )
         self.responses.append(response)
         return response
-
-
-def _write_json(path: Path, payload: Any) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
 
 
 def _collect_trace(
@@ -138,13 +131,13 @@ def run_fake_runtime(*, game_id: str, out_dir: Path) -> int:
     except ProviderActionError as exc:
         failures.append(exc.failure)
         trace = _collect_trace(game_id, agents, failures)
-        _write_json(out_dir / "provider-trace.json", provider_trace_to_dict(trace))
+        write_json(out_dir / "provider-trace.json", provider_trace_to_dict(trace))
         failure_audit = {
             "game_id": game_id,
             "source_label": FAKE_PROVIDER_SOURCE_LABEL,
             "failures": [provider_failure_to_dict(f) for f in failures],
         }
-        _write_json(out_dir / "failure-audit.json", failure_audit)
+        write_json(out_dir / "failure-audit.json", failure_audit)
         print(f"g1h_fake_runtime_game_id={game_id}")
         print(f"source_label={FAKE_PROVIDER_SOURCE_LABEL}")
         print("events_jsonl=written")
@@ -153,21 +146,21 @@ def run_fake_runtime(*, game_id: str, out_dir: Path) -> int:
         print("live_api=not_used")
         return 2
 
-    _write_json(out_dir / "game-log.json", outputs.game_log)
-    _write_json(out_dir / "decision-log.json", outputs.decision_log)
+    write_json(out_dir / "game-log.json", outputs.game_log)
+    write_json(out_dir / "decision-log.json", outputs.decision_log)
 
     if outputs.consensus_log is not None:
-        _write_json(out_dir / "consensus-log.json", outputs.consensus_log)
+        write_json(out_dir / "consensus-log.json", outputs.consensus_log)
 
     trace = _collect_trace(game_id, agents, [])
-    _write_json(out_dir / "provider-trace.json", provider_trace_to_dict(trace))
+    write_json(out_dir / "provider-trace.json", provider_trace_to_dict(trace))
 
     failure_audit = {
         "game_id": game_id,
         "source_label": FAKE_PROVIDER_SOURCE_LABEL,
         "failures": [],
     }
-    _write_json(out_dir / "failure-audit.json", failure_audit)
+    write_json(out_dir / "failure-audit.json", failure_audit)
 
     providers = [a.provider for a in agents.values()]
     manifest = build_prompt_manifest(
