@@ -57,6 +57,7 @@ from werewolf_eval.prompt_v3 import (
     parse_scribe_claims,
     render_scribe_input,
 )
+from werewolf_eval.role_visibility import private_refs_for_role, public_refs
 
 # The provider request phase used for free-text speeches. The game_log event is
 # still recorded with phase="day"; the distinct request phase only keeps the
@@ -296,16 +297,10 @@ class EmergentGameEngine:
         return [pid for pid in self._seat_order if pid in self._alive and pid not in exclude]
 
     def _public_refs(self) -> list[str]:
-        return [e["event_id"] for e in self._events if e["visibility"] in ("public", "all")]
+        return public_refs(self._events)
 
     def _private_refs(self, player_id: str) -> list[str]:
-        role = self._players_by_id[player_id].role
-        refs: list[str] = []
-        for e in self._events:
-            v = e["visibility"]
-            if v == "all" or v == role or (v == "werewolf_team" and role == "werewolf"):
-                refs.append(e["event_id"])
-        return refs
+        return private_refs_for_role(self._events, self._players_by_id[player_id].role)
 
     def _emit(
         self,

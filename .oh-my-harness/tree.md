@@ -119,6 +119,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   ├── 0001-client-agnostic-live-observer-protocol.md
 │   │   ├── 0002-src-layout-installable-package.md
 │   │   ├── 2026-06-09-action-runtime-orchestrator.md
+│   │   ├── 2026-06-11-engine-visibility-single-source.md
 │   │   └── 2026-06-11-role-facts-single-source.md
 │   ├── demo/
 │   │   ├── phase1-gold-demo.html
@@ -213,6 +214,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   │   ├── 2026-06-06--p2-d-settlement-screen-plan.md
 │   │   │   ├── 2026-06-08--full-health-check.md
 │   │   │   ├── 2026-06-08--p2b-byo-key-rework-plan.md
+│   │   │   ├── 2026-06-11--b2-engine-visibility-single-source-plan.md
 │   │   │   ├── 2026-06-11--foundation-artifacts-pyproject-plan.md
 │   │   │   ├── 2026-06-11--l4-guard-arm-plan.md
 │   │   │   ├── 2026-06-11--observer-server-split-plan.md
@@ -388,6 +390,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       ├── provider_registry.py
 │       ├── render_demo.py
 │       ├── render_provider_replay.py
+│       ├── role_visibility.py
 │       ├── run_deepseek_consensus_game.py
 │       ├── run_deepseek_provider_game.py
 │       ├── run_emergent_deepseek_game.py
@@ -546,6 +549,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── test_rng_draw_order.py
 │   ├── test_role_shuffle.py
 │   ├── test_role_single_source.py
+│   ├── test_role_visibility.py
 │   ├── test_rules_v1_2.py
 │   ├── test_run_emergent_deepseek_game.py
 │   ├── test_run_emergent_fake_runtime.py
