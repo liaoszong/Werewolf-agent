@@ -27,7 +27,7 @@ import urllib.request
 from dataclasses import dataclass
 from typing import Any, Callable
 
-from werewolf_eval.prompt_version import KNOWN_PROMPT_VERSIONS
+from werewolf_eval.prompt_renderers import get_renderer
 from werewolf_eval.prompt_v1 import build_speech_system_prompt
 from werewolf_eval.prompt_v2 import build_speech_system_prompt_v2
 from werewolf_eval.prompt_v3 import build_speech_system_prompt_v3
@@ -205,21 +205,14 @@ class BaseChatProvider:
         return min(req, cfg)
 
     def _system_for(self, request: ProviderRequest) -> str:
-        if request.prompt_version not in KNOWN_PROMPT_VERSIONS:
-            # defense in depth: engine/harness already gate this; never silently
-            # render an unknown version as v1.
-            raise ValueError(
-                f"unknown prompt_version {request.prompt_version!r}; known: {KNOWN_PROMPT_VERSIONS}"
-            )
+        # defense in depth: engine/harness already gate this; never silently
+        # render an unknown version as v1 (get_renderer fail-louds for EVERY
+        # response_kind, matching the old up-front check).
+        renderer = get_renderer(request.prompt_version)
         if request.response_kind == "scaffold":
             contract = build_scribe_system_prompt(request)
         elif request.response_kind == "speech":
-            if request.prompt_version == "prompt_v3":
-                contract = build_speech_system_prompt_v3(request)
-            elif request.prompt_version == "prompt_v2":
-                contract = build_speech_system_prompt_v2(request)
-            else:
-                contract = build_speech_system_prompt(request)
+            contract = renderer.speech_contract(request)
         else:
             contract = build_action_system_prompt(request)
         composed = compose_system(self._effective_persona(request), contract)
