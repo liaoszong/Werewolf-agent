@@ -8,6 +8,8 @@ role added to a ruleset can never be missing from a projection table again
 and LEAK its role string to villager observers instead of "unknown")."""
 from __future__ import annotations
 
+import os
+import subprocess
 import sys
 import unittest
 from pathlib import Path
@@ -64,6 +66,47 @@ class DerivedCopiesTest(unittest.TestCase):
             observer_visibility._KNOWN_ROLE_TEAMS,
             observer_protocol.KNOWN_ROLE_TEAMS,
         )
+
+    def test_runtime_events_table_is_the_protocol_object(self) -> None:
+        # runtime_events resolves the table lazily (import-cycle constraint:
+        # action_runtime.__init__ -> turn -> game_engine -> runtime_events),
+        # but the object it returns must BE the protocol table, not a copy.
+        from werewolf_eval import observer_protocol, runtime_events
+
+        self.assertIs(
+            runtime_events._known_role_teams(),
+            observer_protocol.KNOWN_ROLE_TEAMS,
+        )
+
+
+class ColdImportTest(unittest.TestCase):
+    """Each entry module must import cleanly as the FIRST import of a fresh
+    interpreter. Same-process smoke tests are order-dependent and miss cycles:
+    the runtime_events -> observer_protocol -> action_runtime edge is only
+    circular when runtime_events loads first (via game_engine), which a warm
+    sys.modules hides."""
+
+    def test_cold_import_each_entry_module(self) -> None:
+        src = str(Path(__file__).resolve().parents[1] / "src")
+        env = dict(os.environ, PYTHONPATH=src)
+        for module in (
+            "werewolf_eval.game_engine",
+            "werewolf_eval.runtime_events",
+            "werewolf_eval.observer_protocol",
+            "werewolf_eval.observer_visibility",
+            "werewolf_eval.profile_config",
+            "werewolf_eval.emergent_engine",
+            "werewolf_eval.observer_server",
+        ):
+            proc = subprocess.run(
+                [sys.executable, "-c", f"import {module}"],
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(
+                proc.returncode, 0, f"cold import of {module} failed:\n{proc.stderr}"
+            )
 
 
 if __name__ == "__main__":

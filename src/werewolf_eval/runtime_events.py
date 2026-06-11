@@ -452,12 +452,16 @@ class RuntimeEventWriter:
 # Snapshot / projection builders
 # ---------------------------------------------------------------------------
 
-_KNOWN_ROLE_TEAMS: dict[str, str] = {
-    "villager": "villager",
-    "seer": "villager",
-    "witch": "villager",
-    "werewolf": "werewolf",
-}
+def _known_role_teams() -> dict[str, str]:
+    """role -> team facts from observer_protocol (derived from the ruleset,
+    ADR 2026-06-11; the former literal copy here was drift-prone). Resolved at
+    CALL time, not import time: this module sits below game_engine in the
+    import graph, and action_runtime's package __init__ transitively imports
+    game_engine (turn.py) — a module-top import of observer_protocol (which
+    imports action_runtime.ruleset) would be circular."""
+    from werewolf_eval.observer_protocol import KNOWN_ROLE_TEAMS
+
+    return KNOWN_ROLE_TEAMS
 
 
 def _project_known_roles_for_observer(
@@ -475,7 +479,7 @@ def _project_known_roles_for_observer(
     # Non-wolves: hide werewolf roles.
     projected: dict[str, str] = {}
     for pid, role in known_roles.items():
-        team = _KNOWN_ROLE_TEAMS.get(role, "villager")
+        team = _known_role_teams().get(role, "villager")
         if team == "werewolf":
             projected[pid] = "unknown"
         else:
