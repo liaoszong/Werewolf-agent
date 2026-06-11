@@ -98,3 +98,68 @@ def test_v2_known_roles_only_others_and_empty_sections_omitted():
     assert "p2=werewolf" in text          # 狼队友已知身份保留(与 v1 同语义)
     assert "【发言记录】" not in text      # 空区整段省略
     assert "【投票记录】" not in text
+
+
+from werewolf_eval.llm_providers import (
+    ChatProviderConfig,
+    OpenAICompatibleProvider,
+    build_speech_system_prompt,
+    build_speech_system_prompt_v2,
+)
+from werewolf_eval.prompt_version import KNOWN_PROMPT_VERSIONS, PROMPT_VERSION
+from werewolf_eval.provider_contract import ProviderRequest
+
+
+def _speech_req(**kw):
+    base = dict(request_id="r", game_id="g", actor="p5", phase="day", round=1,
+                observation={}, allowed_actions=[], allowed_targets=[],
+                response_kind="speech")
+    base.update(kw)
+    return ProviderRequest(**base)
+
+
+def test_known_versions_and_default_constant_unchanged():
+    assert KNOWN_PROMPT_VERSIONS == ("prompt_v1", "prompt_v2")
+    assert PROMPT_VERSION == "prompt_v1"   # 默认翻转是消融后的独立决策
+
+
+def test_speech_v2_has_stance_and_discrimination_structure():
+    text = build_speech_system_prompt_v2(_speech_req(prompt_version="prompt_v2"))
+    assert "表态" in text and ("信或不信" in text or "信/不信" in text)
+    assert "对跳" in text            # 判别结构,不是"相信预言家"新先验
+    assert "相信预言家" not in text
+    assert "JSON" in text            # 保留机器契约:不要输出 JSON
+    assert "眼神" in text            # 反视觉幻觉
+
+
+def test_system_for_selects_by_prompt_version_and_prepends_card():
+    provider = OpenAICompatibleProvider(ChatProviderConfig(api_key="k", base_url="http://x", model="m"))
+    # v1 默认请求:逐字节与改造前一致(无卡、v1 发言契约)
+    v1 = provider._system_for(_speech_req())
+    assert v1 == build_speech_system_prompt(_speech_req())
+    # v2 发言请求:v2 契约
+    v2 = provider._system_for(_speech_req(prompt_version="prompt_v2"))
+    assert v2 == build_speech_system_prompt_v2(_speech_req(prompt_version="prompt_v2"))
+    # 规则卡置顶(系统提示最前)
+    carded = provider._system_for(_speech_req(prompt_version="prompt_v2", board_card="【本局规则卡】X"))
+    assert carded.startswith("【本局规则卡】X\n\n")
+    assert carded.endswith(v2)
+
+
+def test_action_contract_unchanged_under_v2():
+    from werewolf_eval.llm_providers import build_action_system_prompt
+    a1 = _speech_req(response_kind="action", allowed_actions=["player_vote"], allowed_targets=["p1"])
+    a2 = _speech_req(response_kind="action", allowed_actions=["player_vote"], allowed_targets=["p1"],
+                     prompt_version="prompt_v2")
+    provider = OpenAICompatibleProvider(ChatProviderConfig(api_key="k", base_url="http://x", model="m"))
+    # v2 不改 action 机器契约(JSON 解析链零风险);只有卡会前置
+    assert provider._system_for(a2) == build_action_system_prompt(a1)
+
+
+def test_system_for_rejects_unknown_version():
+    # 纵深防御:engine/harness 已有 KNOWN 硬门;provider 层对漏网的未知版本
+    # 同样 fail-loud,绝不静默降级到 v1(无静默兜底原则)
+    import pytest
+    provider = OpenAICompatibleProvider(ChatProviderConfig(api_key="k", base_url="http://x", model="m"))
+    with pytest.raises(ValueError, match="prompt_version"):
+        provider._system_for(_speech_req(prompt_version="prompt_v99"))

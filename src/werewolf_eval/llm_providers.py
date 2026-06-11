@@ -27,6 +27,7 @@ import urllib.request
 from dataclasses import dataclass
 from typing import Any, Callable
 
+from werewolf_eval.prompt_version import KNOWN_PROMPT_VERSIONS
 from werewolf_eval.provider_contract import (
     ANTHROPIC_PROVIDER_SOURCE_LABEL,
     OPENAI_COMPATIBLE_PROVIDER_SOURCE_LABEL,
@@ -117,6 +118,21 @@ def build_speech_system_prompt(request: ProviderRequest) -> str:
     )
 
 
+def build_speech_system_prompt_v2(request: ProviderRequest) -> str:
+    # SYS-B1 §3.3: stance-taking + discrimination structure (NOT "trust the seer" —
+    # a fake-claiming wolf would benefit equally). Free text, NO JSON (same machine
+    # contract as v1 speech).
+    return (
+        f"你是狼人杀里的 {request.actor}(第 {request.round} 轮,白天发言)。"
+        f"请用自然口吻发言,3-5 句或 120-180 字,不要固定小标题,不要输出 JSON,直接说话。"
+        f"发言必须包含:① 当前局势判断;② 对场上已有的硬信息(报身份、报查验结果的发言)"
+        f"逐条明确表态:信或不信,并给出理由;③ 你最怀疑或最相信的对象与一个具体理由;④ 本轮投票倾向。"
+        f"判别提示:报查验的人可能是真预言家,也可能是假冒的狼人;用对跳(是否有人争同一身份)、"
+        f"报点与已公开事实是否矛盾、发言与投票是否一致来检验,而不是默认相信。"
+        f"局内不存在表情、眼神、语气等信息,不要编造此类观察。"
+    )
+
+
 def compose_system(persona_prompt: str, contract: str) -> str:
     """Prepend the per-seat persona to the machine contract. The contract is kept
     verbatim and is never removed/altered — an empty persona returns it unchanged
@@ -195,11 +211,25 @@ class BaseChatProvider:
         return min(req, cfg)
 
     def _system_for(self, request: ProviderRequest) -> str:
+        if request.prompt_version not in KNOWN_PROMPT_VERSIONS:
+            # defense in depth: engine/harness already gate this; never silently
+            # render an unknown version as v1.
+            raise ValueError(
+                f"unknown prompt_version {request.prompt_version!r}; known: {KNOWN_PROMPT_VERSIONS}"
+            )
         if request.response_kind == "speech":
-            contract = build_speech_system_prompt(request)
+            if request.prompt_version == "prompt_v2":
+                contract = build_speech_system_prompt_v2(request)
+            else:
+                contract = build_speech_system_prompt(request)
         else:
             contract = build_action_system_prompt(request)
-        return compose_system(self._effective_persona(request), contract)
+        composed = compose_system(self._effective_persona(request), contract)
+        if request.board_card:
+            # board rules card tops the system prompt; empty card (all v1
+            # requests) keeps the composed bytes identical to legacy.
+            return f"{request.board_card}\n\n{composed}"
+        return composed
 
     def _user_content(self, request: ProviderRequest) -> str:
         """Readable observation text when the engine provides it (P2-A-2);

@@ -36,6 +36,11 @@ class ProviderRequest:
     # values when set (covers the witch direct-call path too).
     persona_prompt: str = ""
     temperature: float | None = None
+    # SYS-B1 (additive, back-compat): which prompt rendering chain produced this
+    # request ("prompt_v1" default = byte-identical legacy behavior), and the
+    # data-driven board rules card to prepend to the system prompt ("" = none).
+    prompt_version: str = "prompt_v1"
+    board_card: str = ""
 
 
 @dataclass(frozen=True)
