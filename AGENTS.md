@@ -11,6 +11,16 @@ Telegraph style. Root hard policy only. Read scoped `AGENTS.md` before subtree w
 - Canonical route facts: `docs/PROJECT_MAP.md` (phases) + `docs/ROADMAP.md` / `docs/TASKS.md` (G-track history + task status).
 - Product entry: `README.md`.
 
+## Skill Routing
+
+Project runbooks live in `.agents/skills/<name>/SKILL.md`. Read the matching one BEFORE acting on:
+
+- Run tests / stale server / kill process on port / git push from agent shell: `testing-and-process-control`.
+- Any commit in the shared main checkout; starting multi-step implementation: `committing-in-shared-worktrees`.
+- Any model-visible prompt byte change (system prompts, observation renderers): `guarding-prompt-bytes`.
+- Live DeepSeek batches / ablation arms / implausible aggregate metrics: `running-live-games`.
+- qt_observer build / QML changes / blank window / screenshot verification: `verifying-qt-observer-ui`.
+
 ## Default Context
 
 Default reads should be small and current:
