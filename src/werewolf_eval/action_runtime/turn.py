@@ -134,6 +134,37 @@ class SeerResolver:
         )
 
 
+class GuardResolver:
+    """Pure single-actor resolver for guard_protect (L4 guard arm). Mirrors
+    SeerResolver EXCEPT candidates: the guard MAY self-protect and may NOT repeat
+    the previous guard night's target, so fallback candidates derive from
+    runtime_state.last_guarded_target — NOT DecisionWindow.candidates() (which
+    excludes self)."""
+
+    def adjudicate(self, w: DecisionWindow) -> Adjudication:
+        if w.live_action is not None and w.is_legal():
+            return Adjudication(accepted_target=w.live_action.target, decision_type="inference_based")
+        failure = downgrade = None
+        if w.live_action is not None:   # present but illegal (err-path is engine-recorded)
+            tgt = w.live_action.target
+            failure = FailureRow("invalid_action", f"{w.actor} bad guard_protect {tgt}", tgt)
+            downgrade = f"engine rejected guard_protect {tgt}"
+        last = w.runtime_state.last_guarded_target
+        cands = tuple(p for p in w.alive_seat_order if p != last)
+        if not cands:
+            return Adjudication(skip=True)
+        return Adjudication(rng_pick=RngPick("choice", cands), decision_type="default",
+                            failure=failure, downgrade_reason=downgrade)
+
+    def render(self, w: DecisionWindow, target: str, dtype: str) -> EmitPlan:
+        return EmitPlan(
+            decision=DecisionRow(w.actor, "single", "night", "guard_protect", target, dtype,
+                                 f"guard protects {target}"),
+            event=EventRow("night", "guard_protect", w.actor, target, "guard",
+                           f"Guard {w.actor} protects {target}."),
+        )
+
+
 class VoteResolver:
     """Pure port of one voter's turn in _resolve_votes (emergent_engine.py:822-845)."""
 

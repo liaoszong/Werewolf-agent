@@ -11,7 +11,7 @@ from werewolf_eval.invariants.visibility_oracle import entitled, seat_index_from
 
 @dataclass(frozen=True)
 class InvariantViolation:
-    id: str                       # "I1".."I7" or "artifact_gap"
+    id: str                       # "I1".."I8c" or "artifact_gap"
     severity: str                 # "error" | "artifact_gap"
     game_id: str
     event_ids: tuple[str, ...]
@@ -61,7 +61,7 @@ _ALL_CHECKS.append(check_i1)
 
 
 ACTIVE_ACTION_TYPES = ("werewolf_kill", "seer_check", "witch_save", "witch_poison",
-                       "witch_pass", "player_speech", "player_vote")
+                       "witch_pass", "guard_protect", "player_speech", "player_vote")
 
 
 def _first_death_sequence(arts: RunArtifacts) -> dict[str, int]:
@@ -215,3 +215,65 @@ def check_i7(arts: RunArtifacts) -> list[InvariantViolation]:
 
 
 _ALL_CHECKS.append(check_i7)
+
+
+def _guard_night_rows(arts: RunArtifacts) -> dict[int, dict[str, Any]]:
+    """round -> {kill, guard, save, poison targets; died set} for I8 correlation."""
+    rows: dict[int, dict[str, Any]] = {}
+    for e in arts.events:
+        if e.get("phase") != "night":
+            continue
+        r = int(e.get("round", 0))
+        row = rows.setdefault(r, {"kill": None, "guard": None, "save": None,
+                                  "poison": None, "died": set()})
+        t = e.get("type")
+        if t == "werewolf_kill":
+            row["kill"] = str(e.get("target"))
+        elif t == "guard_protect":
+            row["guard"] = str(e.get("target"))
+        elif t == "witch_save":
+            row["save"] = str(e.get("target"))
+        elif t == "witch_poison":
+            row["poison"] = str(e.get("target"))
+        elif t == "player_died":
+            row["died"].add(str(e.get("target")))
+    return rows
+
+
+def check_i8(arts: RunArtifacts) -> list[InvariantViolation]:
+    """I8a: a guard-blocked kill target (no same-target save, no same-target poison)
+    must NOT die that night. I8b: guard+save on the SAME kill target MUST die
+    (guard+save_same_target=death — 奶穿). Spec 2026-06-11 §7 (split branches)."""
+    out: list[InvariantViolation] = []
+    for r, row in sorted(_guard_night_rows(arts).items()):
+        if row["kill"] is None or row["guard"] != row["kill"]:
+            continue
+        same_save = row["save"] == row["kill"]
+        same_poison = row["poison"] == row["kill"]
+        died = row["kill"] in row["died"]
+        if not same_save and not same_poison and died:
+            out.append(InvariantViolation("I8a", "error", arts.game_id, (),
+                       f"r{r}: guard blocked kill on {row['kill']} but they died"))
+        if same_save and not died:
+            out.append(InvariantViolation("I8b", "error", arts.game_id, (),
+                       f"r{r}: guard+save same target {row['kill']} must die (milk-pierce) but survived"))
+    return out
+
+
+_ALL_CHECKS.append(check_i8)
+
+
+def check_i8c(arts: RunArtifacts) -> list[InvariantViolation]:
+    """I8c: no two CONSECUTIVE guard nights protect the same target (actual
+    effective targets — fallback included). Non-adjacent repeats are legal."""
+    seq = sorted((int(e.get("round", 0)), str(e.get("target")))
+                 for e in arts.events if e.get("type") == "guard_protect")
+    out: list[InvariantViolation] = []
+    for (r1, t1), (r2, t2) in zip(seq, seq[1:]):
+        if r2 == r1 + 1 and t1 == t2:
+            out.append(InvariantViolation("I8c", "error", arts.game_id, (),
+                       f"guard protected {t1} on consecutive nights r{r1},r{r2}"))
+    return out
+
+
+_ALL_CHECKS.append(check_i8c)

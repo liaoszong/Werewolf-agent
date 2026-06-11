@@ -25,11 +25,17 @@ def _is_night_victim(s: RuntimeState, actor: str, cand: str) -> bool:
     return cand is not None and cand == s.night_victim
 
 
+def _exclude_last_guarded(s: RuntimeState, actor: str, cand: str) -> bool:
+    # guard may self-protect; may NOT repeat the previous guard night's target.
+    return cand in s.alive and cand != s.last_guarded_target
+
+
 TARGET_RULES: dict[str, TargetPredicate] = {
     "alive_only": _alive_only,
     "exclude_self": _exclude_self,
     "alive_non_wolf": _alive_non_wolf,
     "is_night_victim": _is_night_victim,
+    "exclude_last_guarded": _exclude_last_guarded,
 }
 
 # Target arity per ability (how many targets the envelope must carry).

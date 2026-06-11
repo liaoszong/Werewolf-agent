@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 486
+- Entries: 501
 
 ```text
 ./
@@ -230,7 +230,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │       ├── 2026-06-11-b1-prompt-v2-metrics.json
 │   │       ├── 2026-06-11-b4-prompt-v3-metrics.json
 │   │       ├── 2026-06-11-b4-scaffold-VERDICT.md
-│   │       └── 2026-06-11-baseline-prompt-v1-metrics.json
+│   │       ├── 2026-06-11-baseline-prompt-v1-metrics.json
+│   │       └── 2026-06-11-l4-baseline-backfill.json
 │   ├── health-check/
 │   │   ├── _baseline/
 │   │   │   ├── baseline.py
@@ -449,9 +450,13 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   │   ├── speech_villager_v2.txt
 │   │   │   └── speech_werewolf_v2.txt
 │   │   └── prompt_v3/
+│   │       ├── action_guard_night.txt
+│   │       ├── board_card_guard_6p.txt
 │   │       ├── claim_digest_two_claims.txt
+│   │       ├── obs_v2_guard_night.txt
 │   │       ├── scribe_input_round1.txt
 │   │       ├── scribe_system_prompt.txt
+│   │       ├── speech_villager_v3_guard_board.txt
 │   │       ├── speech_villager_v3.txt
 │   │       ├── vote_scaffold_empty_ledger.txt
 │   │       └── vote_scaffold_with_claims.txt
@@ -493,6 +498,9 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── test_g1h_runtime_spine.py
 │   ├── test_game_engine.py
 │   ├── test_game_log.py
+│   ├── test_guard_resolver.py
+│   ├── test_guard_sentinels.py
+│   ├── test_guard_visibility.py
 │   ├── test_invariants_artifacts.py
 │   ├── test_invariants_bad_examples.py
 │   ├── test_invariants_checker.py
@@ -500,6 +508,9 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── test_invariants_engine_wiring.py
 │   ├── test_invariants_fuzz.py
 │   ├── test_invariants_guards.py
+│   ├── test_invariants_i8.py
+│   ├── test_l4_arm_layout.py
+│   ├── test_l4_metrics.py
 │   ├── test_log_bundle.py
 │   ├── test_multi_provider_launcher.py
 │   ├── test_observer_byo_key_launch.py
@@ -520,6 +531,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── test_prompt_v2_invariants.py
 │   ├── test_prompt_v2.py
 │   ├── test_prompt_v3_invariants.py
+│   ├── test_prompt_v3_speech_guard.py
 │   ├── test_prompt_v3.py
 │   ├── test_prompt_versioning.py
 │   ├── test_provider_contract.py
@@ -530,6 +542,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── test_rng_draw_order.py
 │   ├── test_role_shuffle.py
 │   ├── test_role_single_source.py
+│   ├── test_rules_v1_2.py
 │   ├── test_run_emergent_deepseek_game.py
 │   ├── test_run_emergent_fake_runtime.py
 │   ├── test_run_emergent_game.py
@@ -541,10 +554,12 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── test_semantic_labels.py
 │   ├── test_settlement_bundle.py
 │   ├── test_settlement_response.py
+│   ├── test_settler_guard_branches.py
 │   ├── test_source_labels.py
 │   ├── test_visibility_parity.py
 │   └── test_witch_potion_one_shot_sentinel.py
 ├── tools/
+│   ├── backfill_seer_claim_metrics.py
 │   ├── generate_golden_prompts.py
 │   └── live_check_deepseek.py
 ├── .gitattributes

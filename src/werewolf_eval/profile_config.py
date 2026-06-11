@@ -50,7 +50,7 @@ MAX_TOKENS_MAX: int = 8192
 _NUMERIC_CONFIG_KEYS: frozenset[str] = frozenset({"temperature", "max_tokens"})
 
 ALLOWED_STRATEGIES: frozenset[str] = frozenset({"default", "aggressive", "cautious"})
-ALLOWED_ROLES: frozenset[str] = frozenset({"werewolf", "seer", "witch", "villager"})
+ALLOWED_ROLES: frozenset[str] = frozenset({"werewolf", "seer", "witch", "villager", "guard"})
 CANONICAL_DEFAULT_6P_ROLES: dict[str, int] = {
     "werewolf": 2,
     "seer": 1,
@@ -59,7 +59,7 @@ CANONICAL_DEFAULT_6P_ROLES: dict[str, int] = {
 }
 # Derived projection of the single source (ADR 2026-06-11), restricted to the
 # product gate. Iteration follows ruleset declaration order, which keeps the
-# capabilities payload (":480") byte-identical: werewolf, seer, witch, villager.
+# capabilities payload (":480") stable: werewolf, seer, witch, villager, guard (L4).
 ROLE_TEAMS: dict[str, str] = {
     role: team for role, team in known_role_teams().items() if role in ALLOWED_ROLES
 }

@@ -13,6 +13,7 @@ ROLE_LABELS = {
     "witch": "女巫",
     "villager": "平民",
     "hunter": "猎人",  # rules_v1_1; was missing -> raw token (R-28 class)
+    "guard": "守卫",  # rules_v1_2 (L4 guard arm)
 }
 
 TEAM_LABELS = {
@@ -42,6 +43,7 @@ TYPE_LABELS = {
     "day_announcement": "天亮公告",  # R-28: was missing -> rendered raw English token
     "hunter_shoot": "猎人开枪",  # rules_v1_1; was missing -> raw token (R-28 class)
     "hunter_pass": "猎人弃枪",
+    "guard_protect": "守卫守护",  # rules_v1_2 (L4 guard arm)
     "game_over": "游戏结束",
 }
 

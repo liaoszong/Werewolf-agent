@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from werewolf_eval.action_runtime import RoleAbilityRegistry, rules_v1_1
+from werewolf_eval.action_runtime import RoleAbilityRegistry, rules_v1_2
 from werewolf_eval.game_engine import AgentAction, AgentObservation
 from werewolf_eval.provider_contract import (
     ProviderFailure,
@@ -18,10 +18,11 @@ class ProviderActionError(ValueError):
 
 
 # Single source of allowed actions (replaced the static ALLOWED_ACTIONS_BY_ROLE_PHASE
-# map). decide() reaches only wolf-kill/seer-check/day-vote — the witch and speeches call
-# provider.respond() directly — and the registry returns the identical list (same order)
-# for those, so prompt bytes are unchanged. Built once at import (rules_v1() is pure/cheap).
-_ALLOWED_ACTIONS_REGISTRY = RoleAbilityRegistry(rules_v1_1())
+# map). decide() reaches wolf-kill/seer-check/guard-protect/day-vote — the witch and
+# speeches call provider.respond() directly — and rules_v1_2 is a backward-compatible
+# superset (hunter + guard): boards without them get identical lists (same order), so
+# prompt bytes are unchanged. Built once at import (the ruleset builder is pure/cheap).
+_ALLOWED_ACTIONS_REGISTRY = RoleAbilityRegistry(rules_v1_2())
 # External engine phase -> registry phase. The engine emits 'day' for votes; the registry
 # keys day votes under 'day_vote'. MUST map: an unmapped phase degrades to [] (registry
 # hardening), which would silently reject every vote (contract A / audit B4-1).

@@ -30,7 +30,7 @@ ROLE_PERSPECTIVE_PREFIX = "role:"
 DEFAULT_PLAYER_IDS: tuple[str, ...] = tuple(f"p{i}" for i in range(1, 7))
 # PUBLIC_LIKE_EVENT_VISIBILITIES / WEREWOLF_TEAM_EVENT_VISIBILITIES are imported from
 # observer_protocol above (single source of truth, R-06).
-ROLE_SPECIFIC_EVENT_VISIBILITIES: frozenset[str] = frozenset({"seer", "witch"})
+ROLE_SPECIFIC_EVENT_VISIBILITIES: frozenset[str] = frozenset({"seer", "witch", "guard"})
 
 _SNAPSHOTS_DIR = "snapshots"
 # _KNOWN_ROLE_TEAMS is imported from observer_protocol above (derived from the
@@ -497,6 +497,11 @@ def event_visible_in_projection(
             trusted_role = _trusted_role_for_player(seat_index, role_player)
             if trusted_role == "witch":
                 return True, "witch_event"
+            return False, "hidden"
+        if visibility == "guard":
+            trusted_role = _trusted_role_for_player(seat_index, role_player)
+            if trusted_role == "guard":
+                return True, "guard_event"
             return False, "hidden"
         # werewolf_team only if trusted team is werewolf
         if visibility == "werewolf_team":

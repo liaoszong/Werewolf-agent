@@ -9,7 +9,9 @@ engine state, or the lock becomes nondeterministic.
 """
 from __future__ import annotations
 
-from werewolf_eval.action_runtime.ruleset import rules_v1_1
+from dataclasses import replace
+
+from werewolf_eval.action_runtime.ruleset import rules_v1_1, rules_v1_2
 from werewolf_eval.emergent_engine import (
     HUNTER_SHOT_OBSERVATION_SUFFIX,
     augment_witch_observation,
@@ -75,6 +77,8 @@ def _obs(player_id: str, role: str, team: str, phase: str, known: dict[str, str]
 
 _STD_SEATS = {"p1": "werewolf", "p2": "werewolf", "p3": "seer",
               "p4": "witch", "p5": "villager", "p6": "villager"}
+_GUARD_SEATS = {"p1": "werewolf", "p2": "werewolf", "p3": "seer",
+                "p4": "witch", "p5": "guard", "p6": "villager"}
 
 _EVENTS_V2 = {
     "e1": {"event_id": "e1", "sequence": 1, "round": 1, "phase": "night", "type": "werewolf_kill",
@@ -174,6 +178,15 @@ def canonical_prompt_samples_v3() -> list[tuple[str, str]]:
         ("vote_scaffold_with_claims", render_vote_scaffold(_CLAIMS_V3)),
         ("vote_scaffold_empty_ledger", render_vote_scaffold([])),
         ("speech_villager_v3", build_speech_system_prompt_v3(_req("p5", "day", [], [], response_kind="speech"))),
+        # ---- L4 guard-board additions (spec §6: new samples only; old hashes frozen) ----
+        ("board_card_guard_6p", build_board_rules_card(rules_v1_2(), _GUARD_SEATS)),
+        ("speech_villager_v3_guard_board", build_speech_system_prompt_v3(
+            replace(_req("p6", "day", [], [], response_kind="speech"),
+                    board_card=build_board_rules_card(rules_v1_2(), _GUARD_SEATS)))),
+        ("action_guard_night",
+         build_action_system_prompt(_req("p5", "night", ["guard_protect"], _ALIVE))),
+        ("obs_v2_guard_night",
+         _v2_text("p5", "guard", "villager", "night", {"p5": "guard"}, [])),
     ]
 
 

@@ -5,13 +5,17 @@ from pathlib import Path
 
 VISUAL_WORDS = ("眼神", "表情", "紧张", "躲闪", "支支吾吾", "语气", "闪躲")
 MECHANIC_WORDS = ("警徽", "警长", "警上", "警下", "守卫", "守夜人")
+# 守卫板上「守卫/守夜人」是真实机制,不是幻觉词(L4);非守卫板维持原词表
+GUARD_BOARD_MECHANIC_WORDS = ("警徽", "警长", "警上", "警下")
 LIVE_RATE_MIN = 0.7
 SCAFFOLD_COVERAGE_MIN = 0.5  # arm purity, spec §5.2b; threshold adjustable, separate reporting NOT removable
 
 
 def classify_event(ev: dict):
     """-> (kind, actor, target, extra). kind in {kill,check,witch_save,witch_pass,
-    witch_poison,vote,elim,reveal,night_death,speech,other}."""
+    witch_poison,guard,peaceful,vote,elim,reveal,night_death,speech,other}.
+    NOTE: the p\\d patterns match single-digit seats only (p1-p9) — fine for 6p
+    boards; a >9-seat board would silently drop events here."""
     s = (ev.get("data") or {}).get("summary", "") or ""
     actor, tgt, ph = ev.get("actor"), ev.get("target"), ev.get("phase")
     m = re.match(r"Wolf team kills (p\d)", s)
@@ -28,6 +32,9 @@ def classify_event(ev: dict):
     if "eliminated by vote" in s: return ("elim", "system", tgt, None)
     m = re.search(r"(p\d) revealed as (\w+)", s)
     if m: return ("reveal", m.group(1), None, m.group(2))
+    m = re.match(r"Guard (p\d) protects (p\d)", s)
+    if m: return ("guard", m.group(1), m.group(2), None)
+    if "A peaceful night" in s: return ("peaceful", "system", None, None)
     if "died during the night" in s: return ("night_death", "system", tgt, None)
     if ph == "day" and actor and re.match(r"p\d$", str(actor)) and "votes" not in s:
         return ("speech", actor, None, s)
@@ -104,6 +111,16 @@ def aggregate_games(games: list[dict]) -> dict:
         "seer_survives_d1_rate": rate(lambda g: g["seer_survives_d1"]),
         "avg_rounds": _mean([g["end_round"] for g in games]),
         "night1_kill_dist": dict(sorted(kill_dist.items())),
+        # ---- L4 guard arm + seer-survival family (spec §7) ----
+        "guard_target_seer_rate": _mean([g.get("guard_target_seer_share") for g in games]),
+        "guard_success_rate": _mean([g.get("guard_block_share") for g in games]),
+        "avg_peaceful_nights": _mean([g.get("n_peaceful_nights") for g in games]),
+        "seer_death_rate": rate(lambda g: g.get("seer_death") is not None),
+        "seer_night_death_rate": rate(lambda g: (g.get("seer_death") or [None, None])[1] == "night"),
+        "seer_claim_to_night_survival_rate": _mean(
+            [g.get("seer_claimed_then_survived_night") for g in games]),
+        "seer_claim_to_night_survival_n": sum(
+            1 for g in games if g.get("seer_claimed_then_survived_night") is not None),
     }
 
 
@@ -127,6 +144,7 @@ def aggregate(run_dirs) -> dict:
         row = analyze_game_dict(gl)
         row["run_dir"] = d.name
         row["scaffold_coverage"] = cov
+        row["seer_claimed_then_survived_night"] = seer_claim_to_night_survival(d, row)
         valid.append(row)
     out = aggregate_games(valid)
     out["games"] = valid
@@ -141,6 +159,8 @@ DEFAULT_COMPARE_KEYS = (
     "verify_wolf_followed","seer_voted_out_in_verify_cases","witch_save_rate","witch_poison_rate","herding",
     "halluc_visual_speech_rate","halluc_visual_game_rate","halluc_mechanic_game_rate",
     "seer_survives_d1_rate","avg_rounds",
+    "seer_death_rate","seer_night_death_rate","seer_claim_to_night_survival_rate",
+    "guard_target_seer_rate","guard_success_rate","avg_peaceful_nights",
 )
 
 
@@ -154,6 +174,55 @@ def compare(a: dict, b: dict, keys=DEFAULT_COMPARE_KEYS) -> list[dict]:
     return rows
 
 
+def seer_claim_rounds(run_dir, seer: str) -> list[int]:
+    """Rounds where the TRUE seer publicly claimed (any check_report, or an
+    identity_claim whose result mentions 预言), parsed from the scribe turns in
+    provider-trace.json. Real artifact shape (verified on .runs/ablation/b4):
+    {"requests": [{actor, round, request_id, ...}], "responses": [{request_id,
+    raw_content, ...}]} joined on request_id. Non-v3 runs (no scribe) -> []."""
+    from werewolf_eval.prompt_v3 import parse_scribe_claims
+    p = Path(run_dir) / "provider-trace.json"
+    if not p.exists():
+        return []
+    try:
+        doc = json.loads(p.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return []
+    if not isinstance(doc, dict):
+        return []
+    raw_by_id = {r.get("request_id"): r.get("raw_content")
+                 for r in (doc.get("responses") or []) if isinstance(r, dict)}
+    rounds: set[int] = set()
+    for req in doc.get("requests") or []:
+        if not isinstance(req, dict) or req.get("actor") != "scribe":
+            continue
+        claims = parse_scribe_claims(raw_by_id.get(req.get("request_id")) or "") or []
+        for c in claims:
+            if c["claimant"] != seer:
+                continue
+            if c["claim_type"] == "check_report" or (
+                    c["claim_type"] == "identity_claim" and "预言" in str(c.get("result") or "")):
+                rounds.add(int(req.get("round", 0)))
+                break
+    return sorted(rounds)
+
+
+def seer_claim_to_night_survival(run_dir, row: dict) -> bool | None:
+    """First public seer claim at round r: did the seer survive night r+1?
+    None when no claim, no seer, or the game ended before night r+1 (no exposure)."""
+    seer = row.get("seer")
+    if not seer:
+        return None
+    rounds = seer_claim_rounds(run_dir, seer)
+    if not rounds:
+        return None
+    r = rounds[0]
+    if (row.get("end_round") or 0) <= r:
+        return None
+    sd = row.get("seer_death")
+    return not (sd is not None and int(sd[0]) == r + 1 and sd[1] == "night")
+
+
 def analyze_game_dict(gl: dict) -> dict:
     roles = {p["player_id"]: p["role"] for p in gl["players"]}
     wolves = {k for k, v in roles.items() if v == "werewolf"}
@@ -162,6 +231,8 @@ def analyze_game_dict(gl: dict) -> dict:
     votes = collections.defaultdict(list)   # round -> [(voter,target)]
     speeches = []                            # (round, actor, text)
     kills, checks = {}, {}
+    guards_by_round = {}                     # round -> guard target (L4)
+    peaceful = 0
     save = poison = False
     deaths = []                              # (round, pid, cause)
     for ev in gl["events"]:
@@ -171,6 +242,8 @@ def analyze_game_dict(gl: dict) -> dict:
         elif kind == "check": checks[r] = (t, extra)
         elif kind == "witch_save": save = True
         elif kind == "witch_poison": poison = True
+        elif kind == "guard": guards_by_round[r] = t
+        elif kind == "peaceful": peaceful += 1
         elif kind == "vote": votes[r].append((a, t))
         elif kind == "speech": speeches.append((r, a, extra))
         elif kind == "elim": deaths.append((r, t, "vote"))
@@ -198,6 +271,9 @@ def analyze_game_dict(gl: dict) -> dict:
         tot = len(votes[r])
         if tot: shares.append(n / tot)
     text_all = " ".join(t for _, _, t in speeches)
+    has_guard = "guard" in roles.values()
+    mech_words = GUARD_BOARD_MECHANIC_WORDS if has_guard else MECHANIC_WORDS
+    gn = len(guards_by_round)
     return {
         "roles": roles, "seer": seer, "wolves": sorted(wolves),
         "winner": res.get("winner"), "end_round": res.get("end_round"),
@@ -210,11 +286,19 @@ def analyze_game_dict(gl: dict) -> dict:
         "verify_seer_voted_out": verify_seer_voted_out,
         "witch_save": save, "witch_poison": poison,
         "seer_death_cause": seer_death[1] if seer_death else None,
+        "seer_death": list(seer_death) if seer_death else None,   # (round, cause) — claim 生存回算用
         "seer_survives_d1": not (seer_death and seer_death[0] == 1),
+        "guard_nights": gn,
+        "guard_target_seer_share": (sum(1 for t in guards_by_round.values() if t == seer) / gn) if gn else None,
+        # TARGETING accuracy (守对率): guard target == that night's wolf target.
+        # A milk-pierced night (guard+save -> death) still counts as a hit here —
+        # this measures aiming, NOT survival; read verdict tables accordingly.
+        "guard_block_share": (sum(1 for r2, t in guards_by_round.items() if kills.get(r2) == t) / gn) if gn else None,
+        "n_peaceful_nights": peaceful,
         "herd_share": sum(shares) / len(shares) if shares else None,
         "has_visual_halluc": any(w in text_all for w in VISUAL_WORDS),
-        "has_mechanic_halluc": any(w in text_all for w in MECHANIC_WORDS),
+        "has_mechanic_halluc": any(w in text_all for w in mech_words),
         "n_speeches": len(speeches),
         "n_visual_speeches": sum(1 for _, _, t in speeches if any(w in t for w in VISUAL_WORDS)),
-        "n_mechanic_speeches": sum(1 for _, _, t in speeches if any(w in t for w in MECHANIC_WORDS)),
+        "n_mechanic_speeches": sum(1 for _, _, t in speeches if any(w in t for w in mech_words)),
     }

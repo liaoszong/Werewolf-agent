@@ -20,6 +20,7 @@ from werewolf_eval.action_runtime.ruleset import (  # noqa: E402
     all_rulesets,
     known_role_teams,
     rules_v1_1,
+    rules_v1_2,
 )
 
 
@@ -33,6 +34,7 @@ class KnownRoleTeamsTest(unittest.TestCase):
                 "witch": "villager",
                 "villager": "villager",
                 "hunter": "villager",
+                "guard": "villager",
             },
         )
         # Insertion order is load-bearing: profile_config.ROLE_TEAMS derives
@@ -40,14 +42,14 @@ class KnownRoleTeamsTest(unittest.TestCase):
         # (profile_config.py:480), where dict order = byte order.
         self.assertEqual(
             list(known_role_teams()),
-            ["werewolf", "seer", "witch", "villager", "hunter"],
+            ["werewolf", "seer", "witch", "villager", "hunter", "guard"],
         )
 
     def test_all_rulesets_is_append_only(self) -> None:
         # Observers must recognize roles from logs of ANY shipped rules version.
         self.assertEqual(
             [rs.rules_version for rs in all_rulesets()],
-            ["rules_v1", "rules_v1_1"],
+            ["rules_v1", "rules_v1_1", "rules_v1_2"],
         )
 
 
@@ -90,13 +92,16 @@ class ProfileRoleTeamsTest(unittest.TestCase):
                 "seer": "villager",
                 "witch": "villager",
                 "villager": "villager",
+                "guard": "villager",
             },
         )
         # Pinned insertion order: serialized into the capabilities payload
-        # (profile_config.py:480) — dict order is byte order there.
+        # (profile_config.py:480) — dict order is byte order there. guard lands
+        # LAST (ruleset declaration order: rules_v1_2 appends it after hunter,
+        # which the gate excludes).
         self.assertEqual(
             list(profile_config.ROLE_TEAMS),
-            ["werewolf", "seer", "witch", "villager"],
+            ["werewolf", "seer", "witch", "villager", "guard"],
         )
         # The projection never invents a role outside the product gate.
         self.assertEqual(
@@ -123,7 +128,7 @@ class GateAndOrderSentinelTest(unittest.TestCase):
 
         night_ids = {
             a.action_id
-            for a in rules_v1_1().abilities
+            for a in rules_v1_2().abilities
             if a.trigger == "phase:night"
         }
         self.assertLessEqual(set(NIGHT_DISPATCH_ORDER), night_ids)
