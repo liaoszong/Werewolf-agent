@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 510
+- Entries: 512
 
 ```text
 ./
@@ -215,6 +215,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   │   ├── 2026-06-08--full-health-check.md
 │   │   │   ├── 2026-06-08--p2b-byo-key-rework-plan.md
 │   │   │   ├── 2026-06-11--b2-engine-visibility-single-source-plan.md
+│   │   │   ├── 2026-06-11--b3-scoring-split-plan.md
 │   │   │   ├── 2026-06-11--foundation-artifacts-pyproject-plan.md
 │   │   │   ├── 2026-06-11--l4-guard-arm-plan.md
 │   │   │   ├── 2026-06-11--observer-server-split-plan.md
@@ -234,7 +235,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │       ├── 2026-06-11-b4-prompt-v3-metrics.json
 │   │       ├── 2026-06-11-b4-scaffold-VERDICT.md
 │   │       ├── 2026-06-11-baseline-prompt-v1-metrics.json
-│   │       └── 2026-06-11-l4-baseline-backfill.json
+│   │       ├── 2026-06-11-l4-baseline-backfill.json
+│   │       └── 2026-06-11-l4-guard-prompt-v3-metrics.json
 │   ├── health-check/
 │   │   ├── _baseline/
 │   │   │   ├── baseline.py
