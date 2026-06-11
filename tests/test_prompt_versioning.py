@@ -159,5 +159,47 @@ class PromptVersionGuardTests(unittest.TestCase):
         )
 
 
+from werewolf_eval.prompt_goldens import canonical_prompt_samples_v2
+
+PROMPT_V2 = "prompt_v2"
+
+
+class PromptV2GuardTests(unittest.TestCase):
+    """prompt_v2 coexists with prompt_v1; lock its bytes + ledger the same way."""
+
+    def test_v2_rendered_bytes_match_golden(self) -> None:
+        golden_dir = GOLDEN_ROOT / PROMPT_V2
+        self.assertTrue(golden_dir.is_dir(), "missing tests/golden_prompts/prompt_v2")
+        samples = dict(canonical_prompt_samples_v2())
+        files = {p.stem: p for p in golden_dir.glob("*.txt")}
+        self.assertEqual(sorted(samples), sorted(files))
+        for name, text in samples.items():
+            self.assertEqual(files[name].read_bytes(), text.encode("utf-8"),
+                             f"prompt_v2 bytes changed for '{name}' without regen+ledger")
+
+    def test_v2_ledger_entry_hashes(self) -> None:
+        import hashlib
+        matches = [e for e in _ledger() if e.get("prompt_version") == PROMPT_V2]
+        self.assertEqual(len(matches), 1)
+        after = matches[0]["golden_prompt_hashes"]["after"]
+        samples = dict(canonical_prompt_samples_v2())
+        self.assertEqual(sorted(after), sorted(samples))
+        for name, text in samples.items():
+            self.assertEqual(after[name], hashlib.sha256(text.encode("utf-8")).hexdigest())
+
+    def test_v2_carries_b1_markers(self) -> None:
+        # NOT a v1!=v2 dict compare (sample names differ -> trivially true, zero
+        # discrimination). Lock the B1 substance instead: the card exists, the
+        # structured sections exist, and the full composition is card-topped.
+        samples = dict(canonical_prompt_samples_v2())
+        self.assertIn("【本局规则卡】", samples["board_card_standard_6p"])
+        self.assertIn("不要在发言中讨论", samples["board_card_standard_6p"])
+        for name in ("obs_v2_seer_day", "obs_v2_werewolf_night", "obs_v2_villager_day"):
+            self.assertIn("【你的私有信息】", samples[name])
+            self.assertIn("【发言记录】", samples[name])
+        self.assertTrue(samples["compose_full_v2_speech"].startswith("【本局规则卡】"))
+        self.assertIn("表态", samples["speech_villager_v2"])
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -7,7 +7,7 @@ from pathlib import Path
 from werewolf_eval.run_emergent_deepseek_game import run_emergent_deepseek_game, _deepseek_factory
 from werewolf_eval.ablation.arms import Arm, layout_for
 from werewolf_eval.ablation.metrics import aggregate
-from werewolf_eval.prompt_version import PROMPT_VERSION
+from werewolf_eval.prompt_version import KNOWN_PROMPT_VERSIONS
 
 MAX_REQUESTS_PER_GAME = 80   # measured: one game uses ~19-23 requests; ~3x headroom
 
@@ -20,10 +20,10 @@ def _deepseek_factory_builder(arm: Arm, api_key: str):
 
 def run_arm(arm: Arm, out_root: Path, api_key: str | None = None, factory_builder=None) -> dict:
     """factory_builder(arm, api_key) -> ProviderFactory (fresh per game). Defaults to DeepSeek."""
-    if arm.prompt_version != PROMPT_VERSION:
+    if arm.prompt_version not in KNOWN_PROMPT_VERSIONS:
         raise ValueError(
-            f"prompt_version {arm.prompt_version!r} is not wired into the runner yet "
-            f"(runtime renders {PROMPT_VERSION!r}); the Part-B selector must land first"
+            f"prompt_version {arm.prompt_version!r} is not a known renderer "
+            f"(known: {KNOWN_PROMPT_VERSIONS})"
         )
     out_root = Path(out_root)
     arm_dir = out_root / arm.label
@@ -43,7 +43,7 @@ def run_arm(arm: Arm, out_root: Path, api_key: str | None = None, factory_builde
                     game_id=gid, out_dir=out_dir, provider_factory=factory,
                     model=arm.model, seed=seed,
                     max_requests_per_game=MAX_REQUESTS_PER_GAME, max_day_rounds=3,
-                    seat_roles=seat_roles,
+                    seat_roles=seat_roles, prompt_version=arm.prompt_version,
                 )
                 gl = out_dir / "game-log.json"
                 rec["status"] = "completed" if gl.exists() else "failed"

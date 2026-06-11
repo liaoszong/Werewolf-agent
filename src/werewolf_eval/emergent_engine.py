@@ -48,6 +48,8 @@ from werewolf_eval.action_runtime import (
 )
 from werewolf_eval.action_runtime.abilities import TARGET_RULES
 from werewolf_eval.invariants.guards import assert_prompt_entitled, assert_death_commit_once
+from werewolf_eval.prompt_version import KNOWN_PROMPT_VERSIONS
+from werewolf_eval.prompt_v2 import build_board_rules_card, render_observation_text_v2
 
 # The provider request phase used for free-text speeches. The game_log event is
 # still recorded with phase="day"; the distinct request phase only keeps the
@@ -253,6 +255,7 @@ class EmergentGameEngine:
         source_label: str | None = None,
         budget: EmergentBudget | None = None,
         runtime_events: Any | None = None,
+        prompt_version: str = "prompt_v1",
     ) -> None:
         self._config = config
         self._players_by_id: dict[str, EnginePlayer] = {p.player_id: p for p in config.players}
@@ -290,6 +293,18 @@ class EmergentGameEngine:
         self._registry = RoleAbilityRegistry(_ruleset)
         self._settler = JointSettler(_ruleset)
         self._validator = ActionValidator(self._registry)
+        # SYS-B1: runtime-selectable prompt rendering chain (v1 default = legacy
+        # bytes). Fail loud on unknown versions — no silent fallback.
+        if prompt_version not in KNOWN_PROMPT_VERSIONS:
+            raise ValueError(
+                f"unknown prompt_version {prompt_version!r}; known: {KNOWN_PROMPT_VERSIONS}"
+            )
+        self.prompt_version = prompt_version
+        self._board_card = ""
+        if prompt_version == "prompt_v2":
+            self._board_card = build_board_rules_card(
+                _ruleset, {p.player_id: p.role for p in config.players}
+            )
         # Registry-driven action dispatch (Phase-3 ②a). Each migrated ability id maps to a
         # driver. Night order is explicit DATA (load-bearing: wolf BEFORE seer — both may draw
         # 0/1 from self._rng). The witch is DEFERRED (inline, ②b) so it is NOT in this map/order.
@@ -497,6 +512,12 @@ class EmergentGameEngine:
     def _events_by_id(self) -> dict[str, dict[str, Any]]:
         return {e["event_id"]: e for e in self._events}
 
+    def _render_obs(self, obs: AgentObservation) -> RenderedObservation:
+        if self.prompt_version == "prompt_v2":
+            text, ids = render_observation_text_v2(obs, self._events_by_id())
+            return RenderedObservation(text=text, source_event_ids=ids)
+        return render_observation_text(obs, self._events_by_id())
+
     def _b1_seat_index(self):
         cached = getattr(self, "_b1_seat_index_cache", None)
         if cached is None:
@@ -539,7 +560,7 @@ class EmergentGameEngine:
         action on an engine-level game rule (so live_success_rate stays honest)."""
         self._budget.charge()  # may raise BudgetExhausted -> propagates to run()
         obs = self._build_obs(player_id, phase, rnd)
-        rendered = render_observation_text(obs, self._events_by_id())
+        rendered = self._render_obs(obs)
         agent = self._agents[player_id]
         turn: dict[str, Any] = {
             "request_id": f"{self._game_id}_r{rnd:02d}_{player_id}",
@@ -563,6 +584,8 @@ class EmergentGameEngine:
                 observation_text=rendered.text,
                 response_kind="action",
                 max_output_tokens=ACTION_MAX_OUTPUT_TOKENS,
+                prompt_version=self.prompt_version,
+                board_card=self._board_card,
             )
         except ProviderActionError as exc:
             turn["kind"] = _fallback_kind_for(exc.failure.kind)
@@ -766,7 +789,7 @@ class EmergentGameEngine:
         self._budget.charge()  # may raise BudgetExhausted -> propagates to run()
         provider = self._agents[witch].provider
         obs = self._build_obs(witch, "night", rnd)
-        rendered = render_observation_text(obs, self._events_by_id())
+        rendered = self._render_obs(obs)
         witch_obs_text = augment_witch_observation(rendered.text, victim)
         request = ProviderRequest(
             request_id=f"{self._game_id}_r{rnd:02d}_{witch}_witch",
@@ -780,6 +803,8 @@ class EmergentGameEngine:
             observation_text=witch_obs_text,
             response_kind="action",
             max_output_tokens=ACTION_MAX_OUTPUT_TOKENS,
+            prompt_version=self.prompt_version,
+            board_card=self._board_card,
         )
         turn: dict[str, Any] = {
             "request_id": request.request_id, "round": rnd, "phase": "night", "actor": witch,
@@ -846,7 +871,7 @@ class EmergentGameEngine:
         self._budget.charge()  # may raise BudgetExhausted -> propagates to run()
         provider = self._agents[player_id].provider
         obs = self._build_obs(player_id, SPEECH_REQUEST_PHASE, rnd)
-        rendered = render_observation_text(obs, self._events_by_id())
+        rendered = self._render_obs(obs)
         request = ProviderRequest(
             request_id=f"{self._game_id}_r{rnd:02d}_{player_id}_speech",
             game_id=self._game_id,
@@ -859,6 +884,8 @@ class EmergentGameEngine:
             observation_text=rendered.text,
             response_kind="speech",
             max_output_tokens=SPEECH_MAX_OUTPUT_TOKENS,
+            prompt_version=self.prompt_version,
+            board_card=self._board_card,
         )
         turn: dict[str, Any] = {
             "request_id": request.request_id, "round": rnd, "phase": "day", "actor": player_id,
@@ -918,7 +945,7 @@ class EmergentGameEngine:
         perturbs the seeded RNG order of a 4-role game."""
         self._budget.charge()
         obs = self._build_obs(hunter, phase, rnd)
-        rendered = render_observation_text(obs, self._events_by_id())
+        rendered = self._render_obs(obs)
         request = ProviderRequest(
             request_id=f"{self._game_id}_r{rnd:02d}_{hunter}_shot",
             game_id=self._game_id, actor=hunter, phase=HUNTER_SHOT_REQUEST_PHASE, round=rnd,
@@ -927,6 +954,8 @@ class EmergentGameEngine:
             allowed_targets=sorted(self._alive),
             observation_text=rendered.text + HUNTER_SHOT_OBSERVATION_SUFFIX,
             response_kind="action", max_output_tokens=ACTION_MAX_OUTPUT_TOKENS,
+            prompt_version=self.prompt_version,
+            board_card=self._board_card,
         )
         turn: dict[str, Any] = {
             "request_id": request.request_id, "round": rnd, "phase": phase, "actor": hunter,

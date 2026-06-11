@@ -34,8 +34,53 @@
   {
     "schema_addition": "score_log.evaluation_bucket + settlement_bundle.evaluation_bucket (BUNDLE_VERSION p2d.settlement.v2)",
     "reason": "additive tuple stamp per spec §4.5; s2/s5 gold score-log expectation dicts regenerated (whole-dict assertEqual targets)",
-    "regenerated_fixtures": ["docs/gold-game/s2-score-log.json", "docs/gold-game/s5-score-log.json"],
+    "regenerated_fixtures": [
+      "docs/gold-game/s2-score-log.json",
+      "docs/gold-game/s5-score-log.json"
+    ],
     "blessed_by": "subagent-driven execution of plan 2026-06-10-prompt-versioning (Task 9)",
     "blessed_at": "2026-06-10"
+  },
+  {
+    "prompt_version": "prompt_v2",
+    "base_version": "prompt_v1",
+    "reason": "SYS-B1 Layer-1 context repair: data-driven board rules card + structured observation (private/facts/labeled-speeches/vote-matrix) + stance-taking speech contract",
+    "expected_change": "v2 coexists with v1 at runtime (arm-selected); v1 goldens untouched; targets P3/P4 hallucinations + P5 role-ability confusion + P6 stance",
+    "touched_chain": [
+      "prompt_v2.render_observation_text_v2",
+      "prompt_v2.build_board_rules_card",
+      "llm_providers.build_speech_system_prompt_v2",
+      "llm_providers._system_for(board_card prepend)"
+    ],
+    "golden_prompt_hashes": {
+      "before": null,
+      "after": {
+        "board_card_standard_6p": "460f71adee6ec9f6febaee16e29a65d49c67127e4908b2d5651116f63db3d06f",
+        "speech_villager_v2": "aac8bfe20533757bc5d153dbdcc579514368ff99f0220ce525e59ce9ace3e0b7",
+        "speech_werewolf_v2": "38b79a9d5ebc5d0cf6c69092ac2639a3c659333a5fee1a3c39afa558135dfefd",
+        "obs_v2_seer_day": "d51275804bceb468762b06f7d3806c0e88d7f05e46c6bc47892861f409426b89",
+        "obs_v2_werewolf_night": "4787c6a00555a018dd17276b4fd433e3e7e215692e0dcf5ca803d46c1e814cf3",
+        "obs_v2_villager_day": "4540e3d3f10d348bb60159b5432e300318021f26088f94ff00f40db951541e94",
+        "obs_v2_witch_victim": "2ca651cb2cdbbc975f57f228aadd9df529e64edfc3af10ad313677cf690e09b2",
+        "obs_v2_witch_no_victim": "ffbc86e320d634e84ce3ae1ce83e47947f7dd49ff6e5efc6efde4623133f3d21",
+        "obs_v2_hunter_shot": "a3e196d1166bc5a2fca3477d613f765dd46a4338e57f9584cfb806ce5ca9be1c",
+        "compose_full_v2_speech": "c7d4895cfb7e17142202aa285a7ac83a5ddf0a0c4ccec592ca4846da07147315"
+      }
+    },
+    "behavior_evidence": {
+      "status": "attached",
+      "evidence": "45-game live ablation b1 vs baseline (paired seeds 1000-1044, n_valid 45/45 both arms; snapshots docs/harness/reviews/2026-06-11-baseline-prompt-v1-metrics.json + docs/harness/reviews/2026-06-11-b1-prompt-v2-metrics.json). Hallucination repair PASS: visual-halluc speech rate 12.4%->2.45% (target <5% met), mechanic-halluc game rate 11.1%->2.2% (no parroting inflation), visual game rate 35.6%->11.1%. Gameplay outcome FAIL/REGRESSED: wolf win 77.8%->93.3% (+15.6pp, opposite of target), day1 hit 42.2%->31.1%, day2 50%->28.6%, verify-wolf-followed 50%->30% (n=20), seer-survives-d1 73.3%->57.8%. Root cause (per-game rows): in 14/20 seer-checked-wolf games the day-1 majority voted out the TRUE SEER; the discrimination guidance armed wolf counter-claims while villagers lack a claim ledger to resolve them -> confirms the SYS-B4 gap (village cannot structurally use seer information)."
+    },
+    "blessed_by": "user (spec 2026-06-10 quality §3 review; plan 2026-06-11-sys-b1-context-repair)",
+    "blessed_at": "2026-06-11",
+    "arm_status": "frozen_experimental_arm",
+    "arm_label": "b1_context_repair",
+    "verdict": {
+      "infrastructure": "PASS",
+      "hallucination_repair": "PASS",
+      "gameplay_outcome": "FAIL_REGRESSED",
+      "production_default": "DO_NOT_FLIP (PROMPT_VERSION stays prompt_v1)",
+      "next": "SYS-B4 Claim Ledger + Vote Scaffold (input-side scaffold; action strict-JSON contract unchanged)"
+    }
   }
 ]

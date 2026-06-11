@@ -31,7 +31,6 @@ from werewolf_eval.provider_contract import (
     ProviderTrace,
 )
 from werewolf_eval.evaluation_versions import SCORING_VERSION, evaluation_bucket
-from werewolf_eval.prompt_version import PROMPT_VERSION
 from werewolf_eval.runtime_events import RuntimeEventWriter, build_prompt_manifest, redact_secret_values
 
 ProviderFactory = Callable[[str], ProviderAgent]
@@ -136,6 +135,7 @@ def run_emergent_deepseek_game(
     max_day_rounds: int = 3,
     source_label: str | None = None,
     seat_roles: dict[str, str] | None = None,
+    prompt_version: str = "prompt_v1",
 ) -> int:
     writer = RuntimeEventWriter(run_id=game_id, out_dir=out_dir)
     agents = {pid: provider_factory(pid) for pid in PLAYER_IDS}
@@ -150,6 +150,7 @@ def run_emergent_deepseek_game(
         source_label=effective_label,
         budget=EmergentBudget(max_requests=max_requests_per_game, max_day_rounds=max_day_rounds),
         runtime_events=writer,
+        prompt_version=prompt_version,
     )
     outcome = engine.run()
 
@@ -170,7 +171,7 @@ def run_emergent_deepseek_game(
         agents=_seat_manifest_agents(agents, model),
         evaluation_bucket=evaluation_bucket(
             rules_version=engine.rules_version,
-            prompt_version=PROMPT_VERSION,
+            prompt_version=engine.prompt_version,
             scoring_version=SCORING_VERSION,
         ),
         # getattr default True is the SAFE-for-live direction but LIES for an
