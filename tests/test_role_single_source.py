@@ -133,7 +133,12 @@ class VocabCompletenessSentinelTest(unittest.TestCase):
     """Coverage-only sentinels. The prompt and display vocabularies are
     deliberately different wordings and must never be merged (prompt bytes are
     golden-locked); these tests only guarantee no role/team/ability that a
-    ruleset can put on a board is missing a word in either vocabulary."""
+    ruleset can put on a board is missing a word in either vocabulary.
+
+    Known coupling: the TYPE_LABELS check assumes an ability's emitted event
+    type == its action_id (true for every ability today, e.g. hunter_shoot at
+    emergent_engine.py:1080). A future ability emitting under a different name
+    would force a label entry no renderer looks up — relax this check then."""
 
     def test_prompt_tables_cover_all_rulesets(self) -> None:
         from werewolf_eval import prompt_v2

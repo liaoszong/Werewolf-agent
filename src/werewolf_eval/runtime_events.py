@@ -478,8 +478,9 @@ def _project_known_roles_for_observer(
         return dict(known_roles)
     # Non-wolves: hide werewolf roles.
     projected: dict[str, str] = {}
+    teams = _known_role_teams()
     for pid, role in known_roles.items():
-        team = _known_role_teams().get(role, "villager")
+        team = teams.get(role, "villager")
         if team == "werewolf":
             projected[pid] = "unknown"
         else:
