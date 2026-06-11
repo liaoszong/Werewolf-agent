@@ -95,3 +95,11 @@ def test_compare_emits_deltas():
     d = {r["metric"]: r for r in rows}
     assert abs(d["wolf_win_rate"]["delta"] - (-0.23)) < 1e-9
     assert d["day1_hit"]["a"] == 0.51 and d["day1_hit"]["b"] == 0.66
+
+def test_aggregate_emits_per_game_rows():
+    run_dirs = sorted(p for p in FIX.iterdir() if p.is_dir())
+    agg = aggregate(run_dirs)
+    rows = agg["games"]
+    assert len(rows) == 3
+    assert {r["run_dir"] for r in rows} == {d.name for d in run_dirs}
+    assert all("winner" in r and "herd_share" in r for r in rows)

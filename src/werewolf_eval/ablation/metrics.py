@@ -94,8 +94,11 @@ def aggregate(run_dirs) -> dict:
             invalid += 1; continue
         if not (gl.get("result") or {}).get("winner"):
             invalid += 1; continue
-        valid.append(analyze_game_dict(gl))
+        row = analyze_game_dict(gl)
+        row["run_dir"] = d.name
+        valid.append(row)
     out = aggregate_games(valid)
+    out["games"] = valid
     out["n_total"] = len(run_dirs)
     out["n_invalid_lowlive"] = invalid
     return out
