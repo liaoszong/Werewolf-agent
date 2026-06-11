@@ -77,6 +77,10 @@ def test_rules_card_is_data_driven_from_board():
     assert "所有狼人出局" in card and "达到或超过" in card
     # 反视觉幻觉声明(P3 打击面)
     assert "纯文字" in card and "眼神" in card
+    # P4 打击面:显式否定不存在的机制(对齐 metrics.MECHANIC_WORDS 扫词面),
+    # 并要求不在发言中复述它们(防 halluc_mechanic 扫词被"规则说了没警长"反向污染)
+    assert "警长" in card and "警徽" in card and "守卫" in card and "守夜人" in card
+    assert "不存在" in card and "不要在发言中讨论" in card
 
 
 def test_rules_card_includes_hunter_on_hunter_board():
@@ -150,6 +154,10 @@ def build_board_rules_card(ruleset: BoardRuleset, seat_roles: dict[str, str]) ->
         "胜负规则:所有狼人出局→好人阵营胜;狼人数量达到或超过其余存活玩家数→狼人阵营胜。"
     )
     lines.append(
+        "本局不存在的机制:没有警长竞选、没有警徽流、没有警上警下之分、没有守卫或守夜人。"
+        "上面能力表就是本局的全部机制,不要据不存在的机制推理,也不要在发言中讨论它们。"
+    )
+    lines.append(
         "重要:这是纯文字推理游戏,不存在表情、眼神、语气、肢体动作等任何视觉或听觉信息;"
         "不得以此类\"观察\"作为推理依据。"
     )
@@ -218,8 +226,9 @@ def test_v2_sections_private_facts_speeches_votes():
     i_priv, i_pub = text.index("【你的私有信息】"), text.index("【公开状态】")
     i_sp, i_vote = text.index("【发言记录】"), text.index("【投票记录】")
     assert i_priv < i_pub < i_sp < i_vote
-    # 私有区含验人结果(seer 私有事件),且在私有区内
-    assert "Seer p3 checks p1" in text[i_priv:i_pub]
+    # 私有区含验人结果(seer 私有事件),且在私有区内;事件行保留 phase 标注(夜死/放逐可直读)
+    assert "(r1 night) Seer p3 checks p1" in text[i_priv:i_pub]
+    assert "(r1 day) p5 died during the night" in text[i_pub:i_sp]
     # 发言带说话人标签(修"无主语一坨")
     assert "p3: 我验了p1" in text and "p1: p3在说谎" in text
     # 投票矩阵按轮聚合
@@ -296,16 +305,20 @@ def render_observation_text_v2(obs: Any, events_by_id: dict[str, dict[str, Any]]
         source_event_ids.append(ref)
         etype = ev.get("type", "")
         rnd = ev.get("round")
+        ph = ev.get("phase")
         if ref not in public_set:
-            private_lines.append(f"- (r{rnd}) {summary}")
+            private_lines.append(f"- (r{rnd} {ph}) {summary}")
         elif etype == "player_speech":
+            # speeches are always day-phase; the speaker label is the payload here
             speech_lines.append(f"- (r{rnd}) {ev.get('actor')}: {summary}")
         elif etype == "player_vote":
             votes_by_round.setdefault(rnd, []).append(f"{ev.get('actor')}→{ev.get('target')}")
         elif etype in _PUBLIC_FACT_TYPES:
-            fact_lines.append(f"- (r{rnd}) {summary}")
+            # keep the v1-style phase tag: "died in r1 night" vs "eliminated in r1 day"
+            # must stay directly readable
+            fact_lines.append(f"- (r{rnd} {ph}) {summary}")
         else:
-            other_lines.append(f"- (r{rnd}) {summary}")
+            other_lines.append(f"- (r{rnd} {ph}) {summary}")
 
     lines = ["【你的私有信息】", f"你是 {obs.player_id}(身份:{obs.role},阵营:{obs.team})。"]
     known_others = {pid: role for pid, role in obs.known_roles.items() if pid != obs.player_id}
@@ -412,6 +425,15 @@ def test_action_contract_unchanged_under_v2():
     provider = OpenAICompatibleProvider(ChatProviderConfig(api_key="k", base_url="http://x", model="m"))
     # v2 不改 action 机器契约(JSON 解析链零风险);只有卡会前置
     assert provider._system_for(a2) == build_action_system_prompt(a1)
+
+
+def test_system_for_rejects_unknown_version():
+    # 纵深防御:engine/harness 已有 KNOWN 硬门;provider 层对漏网的未知版本
+    # 同样 fail-loud,绝不静默降级到 v1(无静默兜底原则)
+    import pytest
+    provider = OpenAICompatibleProvider(ChatProviderConfig(api_key="k", base_url="http://x", model="m"))
+    with pytest.raises(ValueError, match="prompt_version"):
+        provider._system_for(_speech_req(prompt_version="prompt_v99"))
 ```
 
 - [ ] **Step 2: 跑测试确认失败**
@@ -461,6 +483,12 @@ def build_speech_system_prompt_v2(request: ProviderRequest) -> str:
 
 ```python
     def _system_for(self, request: ProviderRequest) -> str:
+        if request.prompt_version not in KNOWN_PROMPT_VERSIONS:
+            # defense in depth: engine/harness already gate this; never silently
+            # render an unknown version as v1.
+            raise ValueError(
+                f"unknown prompt_version {request.prompt_version!r}; known: {KNOWN_PROMPT_VERSIONS}"
+            )
         if request.response_kind == "speech":
             if request.prompt_version == "prompt_v2":
                 contract = build_speech_system_prompt_v2(request)
@@ -475,6 +503,8 @@ def build_speech_system_prompt_v2(request: ProviderRequest) -> str:
             return f"{request.board_card}\n\n{composed}"
         return composed
 ```
+
+(`llm_providers.py` imports 区追加 `from werewolf_eval.prompt_version import KNOWN_PROMPT_VERSIONS`。)
 
 - [ ] **Step 4: 跑测试 + v1 字节守卫**
 
@@ -530,14 +560,16 @@ def test_engine_v2_threads_card_and_structured_text():
     _, reqs = _run_engine("prompt_v2")
     assert all(r.prompt_version == "prompt_v2" for r in reqs)
     assert all(r.board_card.startswith("【本局规则卡】") for r in reqs)
-    assert all(r.observation_text.startswith("【你的私有信息】") for r in reqs)
+    # contains 而非 startswith:witch/hunter 路径对渲染文本做"追加"式增补,现状都在
+    # 末尾,但用 contains 防未来前置式增补把断言变脆
+    assert all("【你的私有信息】" in r.observation_text for r in reqs)
 
 
 def test_engine_v1_default_requests_unchanged():
     _, reqs = _run_engine("prompt_v1")
     assert all(r.prompt_version == "prompt_v1" for r in reqs)
     assert all(r.board_card == "" for r in reqs)
-    assert all(r.observation_text.startswith("你是 ") for r in reqs)  # v1 渲染首行
+    assert all("你是 " in r.observation_text for r in reqs)  # v1 渲染首行(contains 同理加固)
 ```
 
 - [ ] **Step 2: 跑测试确认失败**
@@ -604,7 +636,7 @@ from werewolf_eval.prompt_v2 import build_board_rules_card, render_observation_t
 - [ ] **Step 4: 跑测试 + 全量回归**
 
 Run: `NO_PROXY='*' PYTHONPATH=src python -m pytest tests/test_prompt_v2.py -q`
-Expected: PASS (8 passed)
+Expected: PASS (13 passed)(T1 2 + T2 3 + T3 5 + 本任务 3)
 
 Run: `NO_PROXY='*' PYTHONPATH=src python -m pytest tests/ -q`
 Expected: 全绿(≥1034 passed + 新增;golden 守卫绿 = v1 字节没动)
@@ -802,7 +834,7 @@ entries.append({
   "expected_change": "v2 coexists with v1 at runtime (arm-selected); v1 goldens untouched; targets P3/P4 hallucinations + P5 role-ability confusion + P6 stance",
   "touched_chain": ["prompt_v2.render_observation_text_v2", "prompt_v2.build_board_rules_card", "llm_providers.build_speech_system_prompt_v2", "llm_providers._system_for(board_card prepend)"],
   "golden_prompt_hashes": {"before": None, "after": after},
-  "behavior_evidence": {"status": "not_run", "reason_if_not_run": "pending ablation arm b1 vs baseline (plan Task 9)"},
+  "behavior_evidence": {"status": "not_run", "reason_if_not_run": "pending ablation arm b1 vs baseline (plan Task 10)"},
   "blessed_by": "user (spec 2026-06-10 quality §3 review; plan 2026-06-11-sys-b1-context-repair)",
   "blessed_at": "2026-06-11",
 })
@@ -842,12 +874,21 @@ class PromptV2GuardTests(unittest.TestCase):
         for name, text in samples.items():
             self.assertEqual(after[name], hashlib.sha256(text.encode("utf-8")).hexdigest())
 
-    def test_v2_differs_from_v1(self) -> None:
-        v1 = {p.stem: p.read_bytes() for p in (GOLDEN_ROOT / "prompt_v1").glob("*.txt")}
-        v2 = {p.stem: p.read_bytes() for p in (GOLDEN_ROOT / PROMPT_V2).glob("*.txt")}
-        self.assertTrue(v1 and v2)
-        self.assertFalse(v1 == v2, "prompt_v2 byte-identical to prompt_v1 — meaningless version")
+    def test_v2_carries_b1_markers(self) -> None:
+        # NOT a v1!=v2 dict compare (sample names differ -> trivially true, zero
+        # discrimination). Lock the B1 substance instead: the card exists, the
+        # structured sections exist, and the full composition is card-topped.
+        samples = dict(canonical_prompt_samples_v2())
+        self.assertIn("【本局规则卡】", samples["board_card_standard_6p"])
+        self.assertIn("不要在发言中讨论", samples["board_card_standard_6p"])
+        for name in ("obs_v2_seer_day", "obs_v2_werewolf_night", "obs_v2_villager_day"):
+            self.assertIn("【你的私有信息】", samples[name])
+            self.assertIn("【发言记录】", samples[name])
+        self.assertTrue(samples["compose_full_v2_speech"].startswith("【本局规则卡】"))
+        self.assertIn("表态", samples["speech_villager_v2"])
 ```
+
+> caveat(记一笔,与 v1 的 `compose_persona_action` 同先例):`compose_full_v2_speech` 锁的是 `f"{card}\n\n" + compose_system(...)` 这个**手工复刻**,不是 `_system_for` 真实路径——若将来改拼装次序,golden 不会自动抓到,靠 Task 3 的 `test_system_for_selects_by_prompt_version_and_prepends_card` 端到端断言兜底。
 
 - [ ] **Step 5: 跑守卫 + 样本确定性 + 提交**
 
@@ -978,11 +1019,68 @@ git commit -m "feat(ablation): real prompt_version selector replaces the Part-A 
 
 ---
 
-### Task 9: 实验 — b1 臂 45 局 + 与 baseline 配对对比(live,opt-in,用户门)
+### Task 9: `_metrics.json` 落 per-game 明细行(配对统计能力,选项 b)
+
+> **配对语义(评审裁决,写明)**:`_metrics.json` 此前只存聚合,per-game 的 `analyze_game_dict` 结果在 `aggregate` 里算完即丢;baseline 的原始 `.runs` 已随 worktree 删除 → **逐 seed 配对统计(胜负翻转/McNemar)对 baseline 已物理不可能**。本期 b1 vs baseline 的对比 = **聚合 delta,配对 seed 仅用于方差控制**(同 index→同布局)。本任务给 `aggregate` 输出加 per-game 行:**b1 臂起保留明细,为将来 v2 vs v3 的真·逐 seed 配对留能力**;baseline 接受只有聚合。
+
+**Files:**
+- Modify: `src/werewolf_eval/ablation/metrics.py`
+- Test: `tests/test_ablation_metrics.py`
+
+- [ ] **Step 1: 写失败测试**
+
+```python
+# 追加到 tests/test_ablation_metrics.py
+def test_aggregate_emits_per_game_rows():
+    run_dirs = sorted(p for p in FIX.iterdir() if p.is_dir())
+    agg = aggregate(run_dirs)
+    rows = agg["games"]
+    assert len(rows) == 3
+    assert {r["run_dir"] for r in rows} == {d.name for d in run_dirs}
+    assert all("winner" in r and "herd_share" in r for r in rows)
+```
+
+- [ ] **Step 2: 跑测试确认失败**
+
+Run: `NO_PROXY='*' PYTHONPATH=src python -m pytest tests/test_ablation_metrics.py::test_aggregate_emits_per_game_rows -q`
+Expected: FAIL (KeyError: 'games')
+
+- [ ] **Step 3: 改实现**(`metrics.py` 的 `aggregate`,两处小改)
+
+`valid.append(analyze_game_dict(gl))` 改为:
+
+```python
+        row = analyze_game_dict(gl)
+        row["run_dir"] = d.name
+        valid.append(row)
+```
+
+(`aggregate_games` 只按键取值,多出的 `run_dir` 键无害。)`out["n_total"] = ...` 之前追加:
+
+```python
+    out["games"] = valid
+```
+
+- [ ] **Step 4: 跑测试确认通过**
+
+Run: `NO_PROXY='*' PYTHONPATH=src python -m pytest tests/test_ablation_metrics.py tests/test_ablation_harness_fake.py -q`
+Expected: 全绿(8 + 3 passed;harness 的 `_metrics.json` 自动带上明细)
+
+- [ ] **Step 5: 提交**
+
+```bash
+git add src/werewolf_eval/ablation/metrics.py tests/test_ablation_metrics.py
+git commit -m "feat(ablation): per-game rows in _metrics.json (paired-stats capability from b1 onward)"
+```
+
+---
+
+### Task 10: 实验 — b1 臂 45 局 + 与 baseline 配对对比(live,opt-in,用户门)
 
 **Files:** 无代码改动;产物落 `.runs/ablation/`(gitignore)+ docs 快照。
 
 > **用户硬门**:跑前向用户报预算(45 局 × max_requests 80 = 上限 3600 请求,预期 ~900-1050,参照 baseline 实测 1024 次/779k completion tokens/41 分钟);批准后再跑。
+> **对比口径(见 Task 9 裁决)**:聚合 delta + 配对 seed 方差控制;b1 的 `_metrics.json` 含 per-game 明细,baseline 只有聚合。
 
 - [ ] **Step 0: 恢复 baseline 对比目录**(Part A 的原始 `.runs` 已随 worktree 清理;compare 只需 `_metrics.json`)
 
@@ -1017,7 +1115,7 @@ git commit -m "chore(ablation): b1 (prompt_v2) arm metrics snapshot (45 live gam
 - 验狼跟投 50% → 目标 85%
 - day1 命中 42.2% → 目标 65%+
 - 狼胜 77.8% → 按乘法模型预期降至 ~50-60%
-- 机制幻觉局率 11.1% → 应趋零(规则卡直接打击面)
+- 机制幻觉局率 11.1% → 应趋零(规则卡直接打击面)。**解读注意**:该指标是发言扫词;规则卡已要求"不要在发言中讨论不存在的机制",但若模型仍复述("规则说了没警长"),扫词会把复述计为幻觉——该偏置方向对 v2 不利(保守),若该指标不降反升,先抽发言看是真幻觉还是复述,再下结论。
 
 结果连同 compare 表交用户裁决:显著改善 → 后续子消融(单独规则卡/单独结构化/单独发言,follow-up 非本期);不显著 → 回 spec §4.5(强模型天花板标定 3-5 局,判断结构占比)。
 
@@ -1026,12 +1124,13 @@ git commit -m "chore(ablation): b1 (prompt_v2) arm metrics snapshot (45 live gam
 ## Self-Review
 
 **1. Spec 覆盖**(对 spec §3 + §4):
-- §3.1 规则卡数据驱动(BoardRuleset+seat_roles 计数、能力归属、parity、反视觉声明、严禁写死构成)→ Task 1;穿线(engine 算卡 → ProviderRequest.board_card → `_system_for` 拼入)→ Task 3(d/e/f)+ Task 4 ✓。猎人板正确性有专测(Task 1 test 2)✓。
+- §3.1 规则卡数据驱动(BoardRuleset+seat_roles 计数、能力归属、parity、反视觉声明、**显式否定不存在机制(对齐 MECHANIC_WORDS)+ 要求不在发言中复述(防扫词指标被复述污染)**、严禁写死构成)→ Task 1;穿线(engine 算卡 → ProviderRequest.board_card → `_system_for` 拼入)→ Task 3(d/e/f)+ Task 4 ✓。猎人板正确性有专测(Task 1 test 2)✓。
 - §3.2 结构化公共状态(私有单列/公开事实/带标签发言/投票矩阵;砍声称区;只用可见集)→ Task 2;hidden-event 硬不变量测试 = spec §6 风险 1 的 TDD 要求 ✓。声称区明确不做(设计决策 3)✓。
 - §3.3 发言升级(硬信息表态信/不信+理由;判别结构非"相信预言家")→ Task 3,有 `"相信预言家" not in text` 反断言 ✓。
 - §3.4 v1/v2 共存(arm 选择、两套 golden、manifest 戳实际版本、I4b、安全网全绿、v1 golden 不动)→ Task 4(选择器+fail-loud)、Task 5(manifest 实际版本)、Task 6(v2 golden+ledger+守卫+`git diff --exit-code` v1 不动)、Task 7(check_run 全绿)✓。`PROMPT_VERSION` 常量语义冲突已用设计决策 1 化解(不翻默认,新增 KNOWN 集;ledger 仍记 v2 条目满足"ledger 记账")。
-- §4 实验协议(baseline 已打;b1 臂 45 局配对 seed;成功判据方向性)→ Task 9 ✓。强模型标定 = §4.5 建议,列为 Task 9 Step 4 的条件分支(不显著才跑),非独立任务 ✓。
-- **未覆盖(刻意)**:默认 PROMPT_VERSION 翻转(消融后用户决策);子消融臂(spec 列 follow-up);声称区(spec 裁决砍)。
+- §4 实验协议(baseline 已打;b1 臂 45 局配对 seed;成功判据方向性)→ Task 10 ✓。强模型标定 = §4.5 建议,列为 Task 10 Step 4 的条件分支(不显著才跑),非独立任务 ✓。**配对语义已写明(评审裁决选 b)**:本期=聚合 delta + 配对 seed 方差控制;Task 9 给 `_metrics.json` 落 per-game 行,b1 起留逐 seed 配对能力,baseline 接受只有聚合 ✓。
+- **评审加固(2026-06-11 user review)**:provider 层未知版本 fail-loud(Task 3,纵深防御);Task 4 断言 startswith→contains;Task 6 恒真对比测试换 B1 标记断言;v2 事件行带回 phase 标注(Task 2);`compose_full_v2_speech` 复刻拼装的 caveat 已记(靠 Task 3 端到端断言兜底)。
+- **未覆盖(刻意)**:默认 PROMPT_VERSION 翻转(消融后用户决策);子消融臂(spec 列 follow-up);声称区(spec 裁决砍);baseline 逐 seed 明细(原始已删,物理不可能)。
 
 **2. 占位符扫描**:每个代码 step 都有完整代码。两处"先读再改"(Task 5 Step 1 manifest 键路径、Task 6 Step 2 生成器)给了预期形态 + 以实际为准的修正指令,非空占位——manifest 键路径在断言里给了预期 `["evaluation_bucket"]["prompt_version"]`,生成器给了确切循环结构。
 
@@ -1042,4 +1141,4 @@ git commit -m "chore(ablation): b1 (prompt_v2) arm metrics snapshot (45 live gam
 ---
 
 ## Execution Handoff
-见对话:选 subagent-driven(推荐)或 inline。Task 9 是 live 用户门(报预算批准后执行)。
+见对话:选 subagent-driven(推荐)或 inline。Task 10 是 live 用户门(报预算批准后执行)。
