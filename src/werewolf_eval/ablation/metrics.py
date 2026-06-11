@@ -6,6 +6,7 @@ from pathlib import Path
 VISUAL_WORDS = ("眼神", "表情", "紧张", "躲闪", "支支吾吾", "语气", "闪躲")
 MECHANIC_WORDS = ("警徽", "警长", "警上", "警下", "守卫", "守夜人")
 LIVE_RATE_MIN = 0.7
+SCAFFOLD_COVERAGE_MIN = 0.5  # arm purity, spec §5.2b; threshold adjustable, separate reporting NOT removable
 
 
 def classify_event(ev: dict):
@@ -35,14 +36,38 @@ def classify_event(ev: dict):
 
 def live_rate_from_turns(turns_doc) -> float:
     turns = turns_doc.get("turns") if isinstance(turns_doc, dict) else turns_doc
-    if not turns: return 0.0
-    return sum(1 for t in turns if t.get("kind") == "live_success") / len(turns)
+    if turns is None:
+        return 0.0
+    player = [t for t in turns if t.get("response_kind") != "scaffold"]
+    if not player:
+        return 0.0
+    return sum(1 for t in player if t.get("kind") == "live_success") / len(player)
 
 
 def live_rate(run_dir: Path) -> float:
     p = Path(run_dir) / "provider-turns.json"
     if not p.exists(): return 0.0
     return live_rate_from_turns(json.loads(p.read_text(encoding="utf-8")))
+
+
+def scaffold_coverage_from_turns(turns_doc):
+    """scaffold_success / scaffold attempts; None when the game ran no scribe
+    (non-v3 arms) so the validity gate is vacuous for them (spec §5.2b)."""
+    turns = turns_doc.get("turns") if isinstance(turns_doc, dict) else (turns_doc or [])
+    attempts = [t for t in turns if t.get("response_kind") == "scaffold"]
+    if not attempts:
+        return None
+    return sum(1 for t in attempts if t.get("kind") == "scaffold_success") / len(attempts)
+
+
+def scaffold_coverage(run_dir) -> float | None:
+    p = Path(run_dir) / "provider-turns.json"
+    if not p.exists():
+        return None
+    try:
+        return scaffold_coverage_from_turns(json.loads(p.read_text(encoding="utf-8")))
+    except (json.JSONDecodeError, OSError):
+        return None
 
 
 def _mean(xs):
@@ -83,12 +108,15 @@ def aggregate_games(games: list[dict]) -> dict:
 def aggregate(run_dirs) -> dict:
     """Read run dirs, drop low-live (RNG) / incomplete / corrupt games, aggregate the valid ones."""
     run_dirs = [Path(d) for d in run_dirs]
-    valid, invalid = [], 0
+    valid, invalid, invalid_scaffold = [], 0, 0
     for d in run_dirs:
         gl_path = d / "game-log.json"
         try:
             if not gl_path.exists() or live_rate(d) < LIVE_RATE_MIN:
                 invalid += 1; continue
+            cov = scaffold_coverage(d)
+            if cov is not None and cov < SCAFFOLD_COVERAGE_MIN:
+                invalid_scaffold += 1; continue
             gl = json.loads(gl_path.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):
             invalid += 1; continue
@@ -96,11 +124,13 @@ def aggregate(run_dirs) -> dict:
             invalid += 1; continue
         row = analyze_game_dict(gl)
         row["run_dir"] = d.name
+        row["scaffold_coverage"] = cov
         valid.append(row)
     out = aggregate_games(valid)
     out["games"] = valid
     out["n_total"] = len(run_dirs)
     out["n_invalid_lowlive"] = invalid
+    out["n_invalid_scaffold"] = invalid_scaffold
     return out
 
 

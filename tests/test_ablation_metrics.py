@@ -103,3 +103,37 @@ def test_aggregate_emits_per_game_rows():
     assert len(rows) == 3
     assert {r["run_dir"] for r in rows} == {d.name for d in run_dirs}
     assert all("winner" in r and "herd_share" in r for r in rows)
+
+
+from werewolf_eval.ablation.metrics import scaffold_coverage_from_turns
+
+def test_live_rate_excludes_scaffold_turns():
+    # spec §8.1 钉死测试:scribe turns 不得稀释玩家 live 率
+    turns = [{"kind": "live_success"}] * 9 + [{"kind": "timeout_then_fallback"}] \
+          + [{"kind": "scaffold_success", "response_kind": "scaffold"}] * 3 \
+          + [{"kind": "scaffold_fallback", "response_kind": "scaffold"}]
+    assert live_rate_from_turns({"turns": turns}) == 0.9      # 9/10,不是 9/14
+
+def test_scaffold_coverage_from_turns():
+    turns = [{"kind": "scaffold_success", "response_kind": "scaffold"},
+             {"kind": "scaffold_fallback", "response_kind": "scaffold"},
+             {"kind": "live_success"}]
+    assert scaffold_coverage_from_turns({"turns": turns}) == 0.5
+    assert scaffold_coverage_from_turns({"turns": [{"kind": "live_success"}]}) is None  # 非 v3 局
+
+def test_aggregate_gates_low_scaffold_coverage(tmp_path):
+    import json, shutil
+    # 用真 fixture 复制一份,再伪造 scaffold turns:1 成功 3 失败 -> coverage 0.25 < 0.5
+    src = FIX / "diag_A_seer_p2_3"
+    bad = tmp_path / "low_cov"; shutil.copytree(src, bad)
+    doc = json.loads((bad / "provider-turns.json").read_text(encoding="utf-8"))
+    doc["turns"] += [{"kind": "scaffold_success", "response_kind": "scaffold", "live_requested": False}] \
+                  + [{"kind": "scaffold_fallback", "response_kind": "scaffold", "live_requested": False}] * 3
+    (bad / "provider-turns.json").write_text(json.dumps(doc), encoding="utf-8")
+    ok = tmp_path / "good"; shutil.copytree(src, ok)
+    agg = aggregate([bad, ok])
+    assert agg["n_total"] == 2
+    assert agg["n_valid"] == 1                 # low_cov 被臂纯度门剔除
+    assert agg["n_invalid_scaffold"] == 1      # 单列计数(spec §8.9)
+    assert agg["n_invalid_lowlive"] == 0
+    assert agg["games"][0]["scaffold_coverage"] is None   # good 局非 v3 -> None
