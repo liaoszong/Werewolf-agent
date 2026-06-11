@@ -24,6 +24,7 @@ from werewolf_eval.artifacts import collect_provider_trace, write_json
 from werewolf_eval.deepseek_provider import DeepSeekProviderConfig
 from werewolf_eval.provider_registry import build_provider
 from werewolf_eval.emergent_engine import EmergentBudget, EmergentGameEngine, build_emergent_config
+from werewolf_eval.prompt_renderers import get_renderer
 from werewolf_eval.provider_agent import ProviderAgent
 from werewolf_eval.provider_contract import (
     DEEPSEEK_PROVIDER_SOURCE_LABEL,
@@ -130,9 +131,9 @@ def run_emergent_deepseek_game(
 ) -> int:
     # Fail-loud before any side effects (writer/engine construction).
     scaffold_agent = None
-    if prompt_version == "prompt_v3":
+    if get_renderer(prompt_version).requires_scaffold:
         if scaffold_provider_factory is None:
-            raise ValueError("prompt_v3 requires scaffold_provider_factory (scribe provider)")
+            raise ValueError(f"{prompt_version} requires scaffold_provider_factory (scribe provider)")
         scaffold_agent = scaffold_provider_factory()
     writer = RuntimeEventWriter(run_id=game_id, out_dir=out_dir)
     agents = {pid: provider_factory(pid) for pid in PLAYER_IDS}

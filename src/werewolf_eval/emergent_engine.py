@@ -50,14 +50,12 @@ from werewolf_eval.action_runtime import (
 )
 from werewolf_eval.action_runtime.abilities import TARGET_RULES
 from werewolf_eval.invariants.guards import assert_prompt_entitled, assert_death_commit_once
-from werewolf_eval.prompt_version import KNOWN_PROMPT_VERSIONS
-from werewolf_eval.prompt_v2 import build_board_rules_card, render_observation_text_v2
+from werewolf_eval.prompt_renderers import get_renderer
+from werewolf_eval.prompt_v1 import RenderedObservation, render_observation_text
 from werewolf_eval.prompt_v3 import (
     SCRIBE_MAX_OUTPUT_TOKENS,
     parse_scribe_claims,
-    render_claim_digest,
     render_scribe_input,
-    render_vote_scaffold,
 )
 from werewolf_eval.role_visibility import private_refs_for_role, public_refs
 
@@ -112,60 +110,6 @@ def _fallback_kind_for(failure_kind: str) -> str:
     if failure_kind in ("invalid_action", "parse_failure"):
         return INVALID_FALLBACK
     return ERROR_FALLBACK
-
-
-@dataclass(frozen=True)
-class RenderedObservation:
-    """Readable, ROLE-SAFE observation text for a live provider prompt, plus the
-    exact event ids it was rendered from (for the visibility-no-feed-leak gate)."""
-
-    text: str
-    source_event_ids: list[str]
-
-
-def render_observation_text(
-    obs: AgentObservation, events_by_id: dict[str, dict[str, Any]]
-) -> RenderedObservation:
-    """Render `obs` into readable prompt text. HARD invariant (P2-A-2 gate ①):
-    rendered ONLY from `obs.public_event_ids ∪ obs.private_event_ids` and
-    `obs.known_roles` — never the global event store or global role map. The
-    caller passes `events_by_id`, but this function touches only the ids that
-    already appear in `obs`'s role-filtered ref lists, so a hidden event whose id
-    is not in those lists can never leak in.
-    """
-    visible_ids: list[str] = []
-    seen: set[str] = set()
-    for ref in list(obs.public_event_ids) + list(obs.private_event_ids):
-        if ref not in seen:
-            seen.add(ref)
-            visible_ids.append(ref)
-
-    lines: list[str] = [
-        f"你是 {obs.player_id}(身份:{obs.role},阵营:{obs.team})。",
-        f"当前:第 {obs.round} 轮 {obs.phase} 阶段。存活玩家:{', '.join(obs.alive_players)}。",
-    ]
-    # known_roles comes ONLY from the role-filtered observation (self + wolf
-    # teammates for a wolf), never a global seat-role index / god snapshot.
-    known_others = {pid: role for pid, role in obs.known_roles.items() if pid != obs.player_id}
-    if known_others:
-        lines.append("你已知的身份:" + ", ".join(f"{pid}={role}" for pid, role in sorted(known_others.items())) + "。")
-
-    source_event_ids: list[str] = []
-    event_lines: list[str] = []
-    for ref in visible_ids:
-        event = events_by_id.get(ref)
-        if event is None:
-            continue
-        summary = event.get("data", {}).get("summary", "")
-        if not summary:
-            continue
-        source_event_ids.append(ref)
-        event_lines.append(f"- (r{event.get('round')} {event.get('phase')}) {summary}")
-    if event_lines:
-        lines.append("你能看到的事件:")
-        lines.extend(event_lines)
-
-    return RenderedObservation(text="\n".join(lines), source_event_ids=source_event_ids)
 
 
 def augment_witch_observation(base_text: str, victim: str | None) -> str:
@@ -316,22 +260,17 @@ class EmergentGameEngine:
         self._settler = JointSettler(_ruleset)
         self._validator = ActionValidator(self._registry)
         # SYS-B1: runtime-selectable prompt rendering chain (v1 default = legacy
-        # bytes). Fail loud on unknown versions — no silent fallback.
-        if prompt_version not in KNOWN_PROMPT_VERSIONS:
-            raise ValueError(
-                f"unknown prompt_version {prompt_version!r}; known: {KNOWN_PROMPT_VERSIONS}"
-            )
+        # bytes). get_renderer fail-louds on unknown versions — no silent fallback.
+        self._renderer = get_renderer(prompt_version)
         self.prompt_version = prompt_version
-        self._board_card = ""
-        if prompt_version in ("prompt_v2", "prompt_v3"):
-            self._board_card = build_board_rules_card(
-                _ruleset, {p.player_id: p.role for p in config.players}
-            )
-        # SYS-B4: the scribe is NOT a player. prompt_v3 REQUIRES it (no silent
-        # scaffold-less v3); other versions ignore it.
+        self._board_card = self._renderer.board_card(
+            _ruleset, {p.player_id: p.role for p in config.players}
+        )
+        # SYS-B4: the scribe is NOT a player. A scaffold-requiring renderer (v3)
+        # REQUIRES it (no silent scaffold-less run); other versions ignore it.
         self._scaffold_agent = scaffold_agent
-        if prompt_version == "prompt_v3" and scaffold_agent is None:
-            raise ValueError("prompt_v3 requires a scaffold_agent (scribe provider)")
+        if self._renderer.requires_scaffold and scaffold_agent is None:
+            raise ValueError(f"{prompt_version} requires a scaffold_agent (scribe provider)")
         # Cross-round claim ledger; scribe failures NEVER clear it (spec §3 ②).
         self._claim_ledger: list[dict[str, Any]] = []
         # Registry-driven action dispatch (Phase-3 ②a). Each migrated ability id maps to a
@@ -537,10 +476,7 @@ class EmergentGameEngine:
         return {e["event_id"]: e for e in self._events}
 
     def _render_obs(self, obs: AgentObservation) -> RenderedObservation:
-        if self.prompt_version in ("prompt_v2", "prompt_v3"):
-            text, ids = render_observation_text_v2(obs, self._events_by_id())
-            return RenderedObservation(text=text, source_event_ids=ids)
-        return render_observation_text(obs, self._events_by_id())
+        return self._renderer.render_observation(obs, self._events_by_id())
 
     def _b1_seat_index(self):
         cached = getattr(self, "_b1_seat_index_cache", None)
@@ -587,12 +523,11 @@ class EmergentGameEngine:
         obs = self._build_obs(player_id, phase, rnd)
         rendered = self._render_obs(obs)
         agent = self._agents[player_id]
-        obs_text = rendered.text
-        if self.prompt_version == "prompt_v3" and phase == "day":
-            # vote request (the only day-phase action path; hunter uses its own
-            # site): inject digest + comparison program. Input-side ONLY — the
-            # action system prompt / strict-JSON contract is untouched (spec §0).
-            obs_text = f"{obs_text}\n{render_vote_scaffold(self._claim_ledger)}"
+        # vote request (the only day-phase action path; hunter uses its own
+        # site): a scaffold renderer (v3) injects digest + comparison program.
+        # Input-side ONLY — the action system prompt / strict-JSON contract is
+        # untouched (spec §0). Empty suffix for v1/v2 keeps bytes identical.
+        obs_text = rendered.text + self._renderer.action_obs_suffix(phase, self._claim_ledger)
         turn: dict[str, Any] = {
             "request_id": f"{self._game_id}_r{rnd:02d}_{player_id}",
             "round": rnd,
@@ -914,11 +849,10 @@ class EmergentGameEngine:
         provider = self._agents[player_id].provider
         obs = self._build_obs(player_id, SPEECH_REQUEST_PHASE, rnd)
         rendered = self._render_obs(obs)
-        obs_text = rendered.text
-        if self.prompt_version == "prompt_v3" and self._claim_ledger:
-            # graded guidance: speeches get the DIGEST only (information symmetry),
-            # never the comparison program (b1 lesson: don't arm wolf fake-claims).
-            obs_text = f"{obs_text}\n{render_claim_digest(self._claim_ledger)}"
+        # graded guidance: speeches get the DIGEST only (information symmetry),
+        # never the comparison program (b1 lesson: don't arm wolf fake-claims).
+        # Non-v3 renderers return "" — bytes identical.
+        obs_text = rendered.text + self._renderer.speech_obs_suffix(self._claim_ledger)
         request = ProviderRequest(
             request_id=f"{self._game_id}_r{rnd:02d}_{player_id}_speech",
             game_id=self._game_id,
@@ -1192,7 +1126,7 @@ class EmergentGameEngine:
             for speaker in self._alive_in_seat_order():
                 self._resolve_speech(speaker, rnd)
 
-            if self.prompt_version == "prompt_v3":
+            if self._renderer.requires_scaffold:
                 self._run_scribe(rnd)
 
             eliminated = self._RESOLVERS["player_vote"](rnd)
