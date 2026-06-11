@@ -104,7 +104,11 @@
         "claim_digest_two_claims": "c4d3fb3afeae089a8fc64b2c7b8954829f0c1a21fdd95d1526ab88bc976a4cf9",
         "vote_scaffold_with_claims": "ee1271bd5253d7af7df5cfc74763918aab5a4388b1c4ae7bef48c33972452d0e",
         "vote_scaffold_empty_ledger": "0b0c849f68cad68f03d4a7577caf4e3aa95de2f04af9ff98333f90b91ff7dd49",
-        "speech_villager_v3": "b4ead2d81af5aca155c9f49bd0f16591c15cae71499c4bf4d15f1150233ce3ba"
+        "speech_villager_v3": "b4ead2d81af5aca155c9f49bd0f16591c15cae71499c4bf4d15f1150233ce3ba",
+        "board_card_guard_6p": "1a69857d15ed0326b4a71b5c6c07d8be3b8f8963c691f1acc856c5bc580853a5",
+        "speech_villager_v3_guard_board": "f9b208838009f08b0a4d77fdf91a54faa12513faaed6cf06506fda028b7ed842",
+        "action_guard_night": "0604bfbe620981450f5f05a974f30302784ae3fe882b4fdd4ea5d5dc7bd36c4a",
+        "obs_v2_guard_night": "785be6cc832036d431bf6195d4effef373606f1d302f8fad1ef4d605ad514bf4"
       }
     },
     "behavior_evidence": {
@@ -121,6 +125,17 @@
       "gameplay_outcome": "PARTIAL_PASS (failure chain halved; win-rate directional gate not met)",
       "production_default": "DO_NOT_FLIP (PROMPT_VERSION stays prompt_v1)",
       "next": "Layer 4 board structure (seer survival / board balance) — adjudicated 2026-06-11; NO further B4 prompt tuning"
+    },
+    "l4_guard_addendum": {
+      "reason": "L4 guard arm (spec 2026-06-11-l4-guard-arm): guard-board samples appended — board-conditional rules card (no-guard denial line replaced by protect rules incl. milk-pierce), board-conditional speech v3 anti-mechanic line, guard action prompt, guard night observation. All pre-existing sample hashes untouched (append-only); non-guard boards byte-identical (pinned by test_prompt_v2/test_prompt_v3_speech_guard + unchanged goldens).",
+      "added_samples": [
+        "action_guard_night",
+        "board_card_guard_6p",
+        "obs_v2_guard_night",
+        "speech_villager_v3_guard_board"
+      ],
+      "blessed_by": "l4-guard-arm plan Task 11 (docs/harness/plans/2026-06-11--l4-guard-arm-plan.md)",
+      "blessed_at": "2026-06-11"
     }
   }
 ]
