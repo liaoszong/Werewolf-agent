@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 522
+- Entries: 527
 
 ```text
 ./
@@ -218,6 +218,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   │   ├── 2026-06-08--full-health-check.md
 │   │   │   ├── 2026-06-08--p2b-byo-key-rework-plan.md
 │   │   │   ├── 2026-06-11--b2-engine-visibility-single-source-plan.md
+│   │   │   ├── 2026-06-11--b3-scoring-split-plan.md
 │   │   │   ├── 2026-06-11--b4-observer-visibility-layering-plan.md
 │   │   │   ├── 2026-06-11--foundation-artifacts-pyproject-plan.md
 │   │   │   ├── 2026-06-11--l4-guard-arm-plan.md
@@ -381,6 +382,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       ├── fake_provider.py
 │       ├── game_engine.py
 │       ├── game_log.py
+│       ├── gold_game_fixtures.py
 │       ├── llm_providers.py
 │       ├── log_bundle.py
 │       ├── observer_enrichment.py
@@ -414,6 +416,9 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       ├── run_scripted_game.py
 │       ├── runtime_events.py
 │       ├── score_game.py
+│       ├── scoring_metrics.py
+│       ├── scoring_records.py
+│       ├── scoring_types.py
 │       ├── scoring.py
 │       ├── scripted_game.py
 │       ├── seat_agents.py
