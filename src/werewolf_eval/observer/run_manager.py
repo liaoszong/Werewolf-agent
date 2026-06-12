@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import shutil
 import time
+from inspect import Parameter, signature
 from pathlib import Path
 
 from werewolf_eval.evaluation_versions import read_manifest_bucket
@@ -31,6 +32,11 @@ from werewolf_eval.provider_registry import PROVIDER_REGISTRY, provider_specs_pa
 from werewolf_eval.runtime_events import RuntimeEventError, read_events_jsonl
 from werewolf_eval.seat_agents import ProviderCredential
 
+_STATUS_FILE = "status.json"
+_PROVIDER_TURNS_FILE = "provider-turns.json"
+_LOW_LIVE_SUCCESS_RATE_THRESHOLD = 0.80
+_LOW_LIVE_SUCCESS_RATE_REASON = "low_live_success_rate"
+
 
 def _resolve_live_launcher_for_launch(
     state: ObserverServerState,
@@ -40,8 +46,7 @@ def _resolve_live_launcher_for_launch(
 
     1. If EVERY provider used by the seats has a client credential → a per-seat
        multi-provider launcher (the general path; handles mixed and single-provider).
-    2. Back-compat deepseek-only: client deepseek key via the single-key factory,
-       else the prebuilt env launcher.
+    2. Back-compat deepseek-only: env key via a per-launch factory.
     3. No silent fallback: a seat whose provider lacks a credential → 403.
 
     Keys flow ONLY into the launcher closures (provider Authorization), never
@@ -60,24 +65,32 @@ def _resolve_live_launcher_for_launch(
 
     if not missing and state.multi_provider_launcher_factory is not None:
         return state.multi_provider_launcher_factory(resolved_seats, creds), None
-    # Back-compat (deepseek-only) paths. The legacy launchers run ONE shared model
-    # for all seats, so they may only serve a UNIFORM profile (single provider +
-    # single model); a mixed-model deepseek profile must go through the multi
-    # launcher above (per-seat) to avoid resolved-profile.json claiming models the
-    # run never used.
+    # Back-compat env-key path. The legacy launcher runs ONE shared model for all
+    # seats, so it may only serve a UNIFORM profile (single provider + single
+    # model); a mixed-model deepseek profile must go through the multi launcher
+    # above (per-seat) to avoid resolved-profile.json claiming models the run
+    # never used.
     uniform = len({(str(s.get("provider")), str(s.get("model"))) for s in resolved_seats}) == 1
-    if used == {"deepseek"} and uniform and "deepseek" in creds and state.live_launcher_factory is not None:
+    if (
+        not missing
+        and state.multi_provider_launcher_factory is None
+        and used == {"deepseek"}
+        and uniform
+        and "deepseek" in creds
+        and state.live_launcher_factory is not None
+    ):
+        # Compatibility-only seam for direct unit states that do not wire the
+        # production multi-provider factory. create_observer_server always wires
+        # that factory when live is enabled, so normal client-key launches use
+        # the per-seat path above.
         cred = creds["deepseek"]
-        # Forward the client's custom base_url when one was supplied; otherwise
-        # call the legacy single-arg factory so its server-default endpoint stands.
-        launcher = (
+        return (
             state.live_launcher_factory(cred.key, cred.base_url)
             if cred.base_url
             else state.live_launcher_factory(cred.key)
-        )
-        return launcher, None
+        ), None
     if used == {"deepseek"} and uniform and state.live_launcher is not None:
-        return state.live_launcher, None
+        return _materialize_env_live_launcher(state), None
     if missing:
         return None, (
             403,
@@ -85,6 +98,31 @@ def _resolve_live_launcher_for_launch(
             f"no credential for provider(s): {', '.join(sorted(set(missing)))}",
         )
     return None, (403, "missing_api_key", "no live credential is available")
+
+
+def _materialize_env_live_launcher(state: ObserverServerState) -> RunLauncher:
+    """Return a concrete launcher from the env-key back-compat hook.
+
+    New servers store a no-arg factory in ``state.live_launcher`` so each launch
+    gets fresh provider state. Legacy tests may still inject a concrete
+    ``RunLauncher``; keep that shape working while production uses the factory.
+    """
+    launcher_or_factory = state.live_launcher
+    if launcher_or_factory is None:
+        raise RuntimeError("env live launcher is not configured")
+    try:
+        params = signature(launcher_or_factory).parameters
+    except (TypeError, ValueError):
+        return launcher_or_factory  # type: ignore[return-value]
+    required = [
+        p
+        for p in params.values()
+        if p.default is Parameter.empty
+        and p.kind in (Parameter.POSITIONAL_ONLY, Parameter.POSITIONAL_OR_KEYWORD, Parameter.KEYWORD_ONLY)
+    ]
+    if required:
+        return launcher_or_factory  # type: ignore[return-value]
+    return launcher_or_factory()  # type: ignore[operator]
 
 
 def _check_live_capability(
@@ -268,6 +306,61 @@ def _read_events_jsonl_safe(path: Path) -> list[dict[str, object]]:
     return []
 
 
+def _read_status_metadata(run_dir: Path) -> dict[str, object]:
+    path = run_dir / _STATUS_FILE
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _write_status_metadata(run_dir: Path, metadata: dict[str, object]) -> None:
+    if not metadata:
+        return
+    try:
+        payload = _read_status_metadata(run_dir)
+        payload.update(metadata)
+        run_dir.mkdir(parents=True, exist_ok=True)
+        tmp = run_dir / (_STATUS_FILE + ".tmp")
+        tmp.write_text(json.dumps(payload), encoding="utf-8")
+        tmp.replace(run_dir / _STATUS_FILE)
+    except OSError:
+        pass
+
+
+def _read_live_success_metadata(run_dir: Path) -> dict[str, object]:
+    path = run_dir / _PROVIDER_TURNS_FILE
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    if not isinstance(data, dict):
+        return {}
+
+    metadata: dict[str, object] = {}
+    rate = data.get("live_success_rate")
+    requested = data.get("live_requested_actions")
+    actions = data.get("live_success_actions")
+    if isinstance(rate, (int, float)) and not isinstance(rate, bool):
+        metadata["live_success_rate"] = float(rate)
+    if isinstance(requested, (int, float)) and not isinstance(requested, bool):
+        metadata["live_requested_actions"] = int(requested)
+    if isinstance(actions, (int, float)) and not isinstance(actions, bool):
+        metadata["live_success_actions"] = int(actions)
+    return metadata
+
+
+def _is_low_live_success_rate(metadata: dict[str, object]) -> bool:
+    rate = metadata.get("live_success_rate")
+    requested = metadata.get("live_requested_actions")
+    if not isinstance(rate, (int, float)) or isinstance(rate, bool):
+        return False
+    if not isinstance(requested, int) or isinstance(requested, bool) or requested <= 0:
+        return False
+    return float(rate) < _LOW_LIVE_SUCCESS_RATE_THRESHOLD
+
+
 class RunManager:
     """Run state machine over an ``ObserverServerState``: in-memory status map
     with durable ``status.json`` dual-write, key-free error reasons, synchronous
@@ -317,20 +410,39 @@ class RunManager:
         """Run *launcher* synchronously and record status + a key-free reason.
 
         Always records a canonical run-status reason on failure
-        (``budget_exhausted``/``provider_failure``) — never raw exception text —
-        because the reason is exposed via run detail/list/SSE (A7)."""
+        (``budget_exhausted``/``provider_failure``/``low_live_success_rate``) —
+        never raw exception text — because the reason is exposed via run
+        detail/list/SSE (A7)."""
         self.set_status(run_id, "running")
         try:
             ret = launcher(run_id, run_dir)
         except Exception as exc:  # noqa: BLE001
-            self.set_error(run_id, _sanitize_launcher_error(exc))
+            reason = _sanitize_launcher_error(exc)
+            self.set_error(run_id, reason)
             self.set_status(run_id, "failed")
+            _write_status_metadata(run_dir, {"reason": reason})
             return
+        live_metadata = _read_live_success_metadata(run_dir)
         if ret == 0:
+            if _is_low_live_success_rate(live_metadata):
+                self.set_error(run_id, _LOW_LIVE_SUCCESS_RATE_REASON)
+                self.set_status(run_id, "failed")
+                _write_status_metadata(
+                    run_dir,
+                    {
+                        **live_metadata,
+                        "live_success_threshold": _LOW_LIVE_SUCCESS_RATE_THRESHOLD,
+                        "reason": _LOW_LIVE_SUCCESS_RATE_REASON,
+                    },
+                )
+                return
             self.set_status(run_id, "completed")
+            _write_status_metadata(run_dir, live_metadata)
         else:
-            self.set_error(run_id, _map_launcher_exit_reason(ret))
+            reason = _map_launcher_exit_reason(ret)
+            self.set_error(run_id, reason)
             self.set_status(run_id, "failed")
+            _write_status_metadata(run_dir, {**live_metadata, "reason": reason})
 
     # -- deletion ------------------------------------------------------------
 
@@ -356,9 +468,22 @@ class RunManager:
         the chip falls back to ``SYS: SIMULATION``."""
         mem_status = self.get_status(run_id, run_dir)
         detail = build_run_detail(run_dir, status=mem_status)
+        status_metadata = _read_status_metadata(run_dir)
         reason = self.get_error(run_id)
+        if reason is None:
+            persisted_reason = status_metadata.get("reason")
+            if isinstance(persisted_reason, str):
+                reason = persisted_reason
         if reason is not None:
             detail["reason"] = reason
+        for key in (
+            "live_success_rate",
+            "live_requested_actions",
+            "live_success_actions",
+            "live_success_threshold",
+        ):
+            if key in status_metadata:
+                detail[key] = status_metadata[key]
         execution_mode = _read_execution_mode(run_dir)
         if execution_mode is not None:
             detail["execution_mode"] = execution_mode
