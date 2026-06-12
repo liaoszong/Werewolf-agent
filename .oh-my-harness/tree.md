@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 528
+- Entries: 534
 
 ```text
 ./
@@ -398,6 +398,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       ├── prompt_v1.py
 │       ├── prompt_v2.py
 │       ├── prompt_v3.py
+│       ├── prompt_v4.py
 │       ├── prompt_version.py
 │       ├── provider_agent.py
 │       ├── provider_contract.py
@@ -472,17 +473,21 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   │   ├── obs_v2_witch_victim.txt
 │   │   │   ├── speech_villager_v2.txt
 │   │   │   └── speech_werewolf_v2.txt
-│   │   └── prompt_v3/
-│   │       ├── action_guard_night.txt
-│   │       ├── board_card_guard_6p.txt
-│   │       ├── claim_digest_two_claims.txt
-│   │       ├── obs_v2_guard_night.txt
-│   │       ├── scribe_input_round1.txt
-│   │       ├── scribe_system_prompt.txt
-│   │       ├── speech_villager_v3_guard_board.txt
-│   │       ├── speech_villager_v3.txt
-│   │       ├── vote_scaffold_empty_ledger.txt
-│   │       └── vote_scaffold_with_claims.txt
+│   │   ├── prompt_v3/
+│   │   │   ├── action_guard_night.txt
+│   │   │   ├── board_card_guard_6p.txt
+│   │   │   ├── claim_digest_two_claims.txt
+│   │   │   ├── obs_v2_guard_night.txt
+│   │   │   ├── scribe_input_round1.txt
+│   │   │   ├── scribe_system_prompt.txt
+│   │   │   ├── speech_villager_v3_guard_board.txt
+│   │   │   ├── speech_villager_v3.txt
+│   │   │   ├── vote_scaffold_empty_ledger.txt
+│   │   │   └── vote_scaffold_with_claims.txt
+│   │   └── prompt_v4/
+│   │       ├── obs_witch_guard_board_no_victim_identity.txt
+│   │       ├── obs_witch_guard_board_victim_coord.txt
+│   │       └── witch_coord_suffix_injected.txt
 │   ├── fake_scribe.py
 │   ├── parity_scripts.py
 │   ├── test_ablation_arms.py
@@ -557,6 +562,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── test_prompt_v3_invariants.py
 │   ├── test_prompt_v3_speech_guard.py
 │   ├── test_prompt_v3.py
+│   ├── test_prompt_v4_engine.py
+│   ├── test_prompt_v4.py
 │   ├── test_prompt_versioning.py
 │   ├── test_provider_contract.py
 │   ├── test_provider_registry.py
