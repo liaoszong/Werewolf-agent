@@ -134,6 +134,121 @@ class GateAndOrderSentinelTest(unittest.TestCase):
         self.assertLessEqual(set(NIGHT_DISPATCH_ORDER), night_ids)
 
 
+class ObserverProjectionCoverageSentinelTest(unittest.TestCase):
+    def test_role_specific_visibility_constant_drives_projection(self) -> None:
+        from werewolf_eval import observer_projection
+
+        original = observer_projection.ROLE_SPECIFIC_EVENT_VISIBILITIES
+        try:
+            observer_projection.ROLE_SPECIFIC_EVENT_VISIBILITIES = frozenset(
+                set(original) | {"sentinel_private_role"}
+            )
+            visible, reason = observer_projection.event_visible_in_projection(
+                {"event_id": "e_sentinel", "visibility": "sentinel_private_role"},
+                "role:p1",
+                {
+                    "p1": {
+                        "role": "sentinel_private_role",
+                        "team": "villager",
+                        "role_source": "role_projection_snapshot",
+                        "team_source": "role_projection_snapshot",
+                    }
+                },
+            )
+        finally:
+            observer_projection.ROLE_SPECIFIC_EVENT_VISIBILITIES = original
+
+        self.assertTrue(visible)
+        self.assertEqual(reason, "sentinel_private_role_event")
+
+    def test_ruleset_role_private_visibilities_are_projection_covered(self) -> None:
+        from werewolf_eval import observer_projection, observer_protocol
+
+        role_specific_visibilities = {
+            ability.visibility
+            for rs in all_rulesets()
+            for ability in rs.abilities
+            if ability.visibility not in observer_protocol.PUBLIC_EVENT_VISIBILITIES
+            and ability.visibility not in observer_protocol.WEREWOLF_TEAM_EVENT_VISIBILITIES
+        }
+        self.assertLessEqual(
+            role_specific_visibilities,
+            set(observer_projection.ROLE_SPECIFIC_EVENT_VISIBILITIES),
+        )
+        for visibility in role_specific_visibilities:
+            visible, reason = observer_projection.event_visible_in_projection(
+                {"event_id": f"e_{visibility}", "visibility": visibility},
+                "role:p1",
+                {
+                    "p1": {
+                        "role": visibility,
+                        "team": known_role_teams()[visibility],
+                        "role_source": "role_projection_snapshot",
+                        "team_source": "role_projection_snapshot",
+                    }
+                },
+            )
+            self.assertTrue(visible, visibility)
+            self.assertEqual(reason, f"{visibility}_event")
+
+
+class ScoringCoverageSentinelTest(unittest.TestCase):
+    def test_key_villager_roles_cover_ruleset_special_villagers(self) -> None:
+        from werewolf_eval.scoring_types import KEY_VILLAGER_ROLES
+
+        special_villagers = {
+            role_def.role
+            for rs in all_rulesets()
+            for role_def in rs.roles
+            if role_def.team == "villager"
+            and role_def.ability_ids != ("player_vote",)
+        }
+        self.assertLessEqual(special_villagers, KEY_VILLAGER_ROLES)
+
+
+class InvariantCoverageSentinelTest(unittest.TestCase):
+    def test_invariant_event_type_tables_cover_ruleset_abilities_by_family(self) -> None:
+        from werewolf_eval.invariants import checker
+
+        ability_ids = {
+            ability.action_id
+            for rs in all_rulesets()
+            for ability in rs.abilities
+        }
+        death_like = {
+            action_id
+            for action_id in ability_ids
+            if action_id.endswith(("_kill", "_poison", "_shoot"))
+        }
+        consume_like = {
+            action_id
+            for action_id in ability_ids
+            if action_id.endswith(("_save", "_poison", "_shoot"))
+        }
+        self.assertLessEqual(set(checker.CONSUME_TYPES), ability_ids)
+        self.assertLessEqual(set(checker.DEATH_CAUSE_TYPES), ability_ids)
+        self.assertLessEqual(death_like, set(checker.DEATH_CAUSE_TYPES))
+        self.assertLessEqual(consume_like, set(checker.CONSUME_TYPES))
+
+
+class AblationCoverageSentinelTest(unittest.TestCase):
+    def test_classify_event_handles_every_ruleset_ability_event_type(self) -> None:
+        from werewolf_eval.ablation.metrics import classify_event
+
+        for rs in all_rulesets():
+            for ability in rs.abilities:
+                kind = classify_event(
+                    {
+                        "type": ability.action_id,
+                        "phase": "night",
+                        "actor": "p1",
+                        "target": "p2",
+                        "data": {"summary": ""},
+                    }
+                )[0]
+                self.assertNotEqual(kind, "other", ability.action_id)
+
+
 class VocabCompletenessSentinelTest(unittest.TestCase):
     """Coverage-only sentinels. The prompt and display vocabularies are
     deliberately different wordings and must never be merged (prompt bytes are

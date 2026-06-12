@@ -6,7 +6,7 @@ Both engines (``GameEngine`` scripted/mock arcs and ``EmergentGameEngine``) deci
 
 * public set:  ``visibility in {"public", "all"}``
 * private set: ``visibility == "all"``, OR ``visibility ==`` the seat's role, OR
-  ``visibility == "werewolf_team"`` for werewolf seats
+  ``visibility == "werewolf_team"`` for werewolf-team seats
 
 This is the invariant the P2-A-2 "no feed leak" hard gate renders prompts from.
 
@@ -29,12 +29,13 @@ def public_refs(events: list[dict[str, Any]]) -> list[str]:
     return [e["event_id"] for e in events if e["visibility"] in PUBLIC_VISIBILITIES]
 
 
-def private_refs_for_role(events: list[dict[str, Any]], role: str) -> list[str]:
+def private_refs_for_role(events: list[dict[str, Any]], role: str, team: str | None = None) -> list[str]:
     """Event ids a seat of ``role`` privately sees, in event order: "all" events,
-    its own role-private events, and the wolf-team channel for werewolves."""
+    its own role-private events, and the wolf-team channel for werewolf-team seats."""
     refs: list[str] = []
+    is_wolf_team = team == "werewolf" if team is not None else role == "werewolf"
     for e in events:
         v = e["visibility"]
-        if v == "all" or v == role or (v == "werewolf_team" and role == "werewolf"):
+        if v == "all" or v == role or (v == "werewolf_team" and is_wolf_team):
             refs.append(e["event_id"])
     return refs

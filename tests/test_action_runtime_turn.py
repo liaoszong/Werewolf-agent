@@ -53,6 +53,35 @@ class SeerResolverTests(unittest.TestCase):
         self.assertEqual(plan.decision.target, "p1")
         self.assertEqual(plan.decision.refs, ())  # seer decision carries no refs
 
+    def test_render_result_uses_team_for_wolf_side_roles(self):
+        roles = dict(ROLES)
+        roles["p1"] = "wolf_variant"
+        teams = {pid: "werewolf" if pid in {"p1", "p2"} else "villager" for pid in roles}
+        w = DecisionWindow(
+            rnd=1,
+            actor="p3",
+            role="seer",
+            emit_phase="night",
+            registry_phase="night",
+            alive_seat_order=ALIVE,
+            roles=roles,
+            public_refs=("r1",),
+            live_action=AgentAction(
+                actor="p3",
+                action="seer_check",
+                target="p1",
+                phase="night",
+                round=1,
+                reason_summary="",
+                decision_type="",
+                confidence=1.0,
+            ),
+            validator=VALIDATOR,
+            runtime_state=RuntimeState(alive=frozenset(ALIVE), roles=roles, teams=teams),
+        )
+        plan = SeerResolver().render(w, "p1", "inference_based")
+        self.assertEqual(plan.event.summary, "Seer p3 checks p1, result: werewolf.")
+
 
 class VoteResolverTests(unittest.TestCase):
     def test_legal_vote_accepted_with_refs(self):

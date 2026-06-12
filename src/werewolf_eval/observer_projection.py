@@ -68,8 +68,8 @@ def perspective_kind(perspective: str) -> str:
 
 
 def is_werewolf_role(role: str) -> bool:
-    """Return ``True`` when *role* is ``"werewolf"``."""
-    return role == "werewolf"
+    """Return ``True`` when *role* belongs to the werewolf team."""
+    return _KNOWN_ROLE_TEAMS.get(role) == "werewolf"
 
 
 def infer_player_ids(seat_index: dict[str, dict[str, object]]) -> list[str]:
@@ -185,8 +185,8 @@ def build_player_projection(
             else:
                 # Other players: only expose if in projected_known_roles and non-wolf
                 known_role = projected_known_roles.get(pid, "unknown")
-                # Never expose wolf roles from projected_known_roles for non-self
-                if known_role == "werewolf" or known_role == "unknown":
+                # Never expose wolf-team roles from projected_known_roles for non-self.
+                if known_role == "unknown" or is_werewolf_role(known_role):
                     display_role = "unknown"
                     display_team = "unknown"
                 else:
@@ -271,21 +271,10 @@ def event_visible_in_projection(
         # Always visible: public/all
         if visibility in PUBLIC_LIKE_EVENT_VISIBILITIES:
             return True, "public_event"
-        # seer/witch visibility only if trusted role matches
-        if visibility == "seer":
+        if visibility in ROLE_SPECIFIC_EVENT_VISIBILITIES:
             trusted_role = _trusted_role_for_player(seat_index, role_player)
-            if trusted_role == "seer":
-                return True, "seer_event"
-            return False, "hidden"
-        if visibility == "witch":
-            trusted_role = _trusted_role_for_player(seat_index, role_player)
-            if trusted_role == "witch":
-                return True, "witch_event"
-            return False, "hidden"
-        if visibility == "guard":
-            trusted_role = _trusted_role_for_player(seat_index, role_player)
-            if trusted_role == "guard":
-                return True, "guard_event"
+            if trusted_role == visibility:
+                return True, f"{visibility}_event"
             return False, "hidden"
         # werewolf_team only if trusted team is werewolf
         if visibility == "werewolf_team":

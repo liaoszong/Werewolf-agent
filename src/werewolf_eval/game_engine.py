@@ -92,6 +92,12 @@ class EngineOutputs:
 _DEFAULT_SEAT_ORDER = ("p1", "p2", "p3", "p4", "p5", "p6")
 
 
+def _team_for_role(role: str) -> str:
+    from werewolf_eval.observer_protocol import KNOWN_ROLE_TEAMS
+
+    return KNOWN_ROLE_TEAMS.get(role, "werewolf" if role == "werewolf" else "villager")
+
+
 def build_default_config(game_id: str = "g1b_mock_001", seat_roles: dict[str, str] | None = None) -> GameConfig:
     if seat_roles is None:
         return GameConfig(
@@ -106,11 +112,11 @@ def build_default_config(game_id: str = "g1b_mock_001", seat_roles: dict[str, st
             ],
         )
     # seat_roles given: per-seat role override (multiset preserved upstream). team derives
-    # from role (werewolf -> werewolf, else villager); seat_roles == default -> identical board.
+    # from the ruleset role table; seat_roles == default -> identical board.
     return GameConfig(
         game_id=game_id,
         players=[
-            EnginePlayer(pid, seat_roles[pid], "werewolf" if seat_roles[pid] == "werewolf" else "villager")
+            EnginePlayer(pid, seat_roles[pid], _team_for_role(seat_roles[pid]))
             for pid in _DEFAULT_SEAT_ORDER
         ],
     )
@@ -271,13 +277,13 @@ class GameEngine:
         player = self._players_by_id[player_id]
         known_roles: dict[str, str] = {player_id: player.role}
 
-        if player.role == "werewolf":
+        if player.team == "werewolf":
             for pid, p in self._players_by_id.items():
-                if p.role == "werewolf":
+                if p.team == "werewolf":
                     known_roles[pid] = p.role
 
         public_event_ids = public_refs(self._events)
-        private_event_ids = private_refs_for_role(self._events, player.role)
+        private_event_ids = private_refs_for_role(self._events, player.role, team=player.team)
 
         return AgentObservation(
             game_id=self._config.game_id,
@@ -307,10 +313,10 @@ class GameEngine:
                 known_roles = {
                     pid: self._players_by_id[pid].role
                     for pid in wolf_players
-                    if pid in alive and self._players_by_id[pid].role == "werewolf"
+                    if pid in alive and self._players_by_id[pid].team == "werewolf"
                 }
                 public_event_ids = public_refs(events)
-                private_event_ids = private_refs_for_role(events, player.role)
+                private_event_ids = private_refs_for_role(events, player.role, team=player.team)
 
                 obs = AgentObservation(
                     game_id=game_id,
@@ -531,11 +537,12 @@ class GameEngine:
         def _public_refs() -> list[str]:
             return public_refs(events)
 
-        def _private_refs_for_role(role: str) -> list[str]:
-            return private_refs_for_role(events, role)
+        def _private_refs_for_role(role: str, team: str | None = None) -> list[str]:
+            return private_refs_for_role(events, role, team=team)
 
         def _private_refs(player_id: str) -> list[str]:
-            return _private_refs_for_role(self._players_by_id[player_id].role)
+            p = self._players_by_id[player_id]
+            return _private_refs_for_role(p.role, p.team)
 
         def _wolf_obs(phase: str, rnd: int, wolf_players: list[str]) -> AgentObservation:
             obs = AgentObservation(
@@ -545,8 +552,8 @@ class GameEngine:
                 # R-18: filter to the werewolf role's visible set (all + werewolf_team) —
                 # NOT every event id. Copying all ids leaked seer/witch event ids/counts
                 # (metadata) into the wolf role-projection snapshot in g1b/mock mode.
-                private_event_ids=_private_refs_for_role("werewolf"),
-                known_roles={pid: "werewolf" for pid in wolf_players},
+                private_event_ids=_private_refs_for_role("werewolf", "werewolf"),
+                known_roles={pid: self._players_by_id[pid].role for pid in wolf_players},
             )
             if self._runtime_events is not None:
                 self._runtime_events.emit(

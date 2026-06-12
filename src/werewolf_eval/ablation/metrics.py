@@ -15,11 +15,34 @@ SCAFFOLD_COVERAGE_MIN = 0.5  # arm purity, spec §5.2b; threshold adjustable, se
 
 def classify_event(ev: dict):
     """-> (kind, actor, target, extra). kind in {kill,check,witch_save,witch_pass,
-    witch_poison,guard,peaceful,vote,elim,reveal,night_death,speech,other}.
+    witch_poison,guard,hunter_shoot,hunter_pass,peaceful,vote,elim,reveal,night_death,speech,other}.
     NOTE: the p\\d patterns match single-digit seats only (p1-p9) — fine for 6p
     boards; a >9-seat board would silently drop events here."""
     s = (ev.get("data") or {}).get("summary", "") or ""
-    actor, tgt, ph = ev.get("actor"), ev.get("target"), ev.get("phase")
+    actor, tgt, ph, etype = ev.get("actor"), ev.get("target"), ev.get("phase"), ev.get("type")
+    if etype in {
+        "werewolf_kill",
+        "seer_check",
+        "witch_save",
+        "witch_pass",
+        "witch_poison",
+        "guard_protect",
+        "hunter_shoot",
+        "hunter_pass",
+        "player_vote",
+    }:
+        by_type = {
+            "werewolf_kill": "kill",
+            "seer_check": "check",
+            "witch_save": "witch_save",
+            "witch_pass": "witch_pass",
+            "witch_poison": "witch_poison",
+            "guard_protect": "guard",
+            "hunter_shoot": "hunter_shoot",
+            "hunter_pass": "hunter_pass",
+            "player_vote": "vote",
+        }
+        return (by_type[str(etype)], actor, tgt, None)
     m = re.match(r"Wolf team kills (p\d)", s)
     if m: return ("kill", actor, m.group(1), None)
     m = re.match(r"Seer (p\d) checks (p\d), result: (\w+)", s)
@@ -316,7 +339,11 @@ def seer_claim_to_night_survival(run_dir, row: dict) -> bool | None:
 
 def analyze_game_dict(gl: dict) -> dict:
     roles = {p["player_id"]: p["role"] for p in gl["players"]}
-    wolves = {k for k, v in roles.items() if v == "werewolf"}
+    teams = {
+        p["player_id"]: p.get("team", "werewolf" if p.get("role") == "werewolf" else "villager")
+        for p in gl["players"]
+    }
+    wolves = {pid for pid, team in teams.items() if team == "werewolf"}
     seer = next((k for k, v in roles.items() if v == "seer"), None)
     res = gl.get("result") or {}
     votes = collections.defaultdict(list)   # round -> [(voter,target)]

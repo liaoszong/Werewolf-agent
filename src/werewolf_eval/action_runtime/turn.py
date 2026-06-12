@@ -126,7 +126,7 @@ class SeerResolver:
                             failure=failure, downgrade_reason=downgrade)
 
     def render(self, w: DecisionWindow, target: str, dtype: str) -> EmitPlan:
-        result = "werewolf" if w.roles.get(target) == "werewolf" else "good"
+        result = "werewolf" if w.runtime_state.is_wolf(target) else "good"
         return EmitPlan(
             decision=DecisionRow(w.actor, "single", "night", "seer_check", target, dtype, f"seer checks {target}"),
             event=EventRow("night", "seer_check", w.actor, target, "seer",

@@ -108,11 +108,12 @@ def _event_visible_to_decision_actor(game: GameLog, event: Event, actor: str) ->
         return False
 
     actor_role = _role_of(game, actor)
+    actor_team = _team_of(game, actor)
     if event.visibility == actor_role:
         return True
 
     if event.visibility == "werewolf_team":
-        return actor_role == "werewolf"
+        return actor_team == "werewolf"
 
     if event.visibility == "specific_player_ids":
         return event.target == actor
@@ -385,7 +386,7 @@ def _score_witch_save(game: GameLog, event: Event, assessment: DecisionAssessmen
         outcome = -1
         rule = "rubric:E.3.witch.save_werewolf"
         notes = f"Witch saved {event.target}, who is later revealed as werewolf."
-    elif target_role in {"seer", "hunter"}:
+    elif target_role in KEY_VILLAGER_ROLES:
         outcome = 3
         rule = "rubric:E.3.witch.save_key_villager"
         notes = f"Witch saved {event.target}, who is later revealed as {target_role}."
@@ -407,7 +408,7 @@ def _score_witch_poison(game: GameLog, event: Event, assessment: DecisionAssessm
         outcome = 3
         rule = "rubric:E.3.witch.poison_werewolf"
         notes = f"Witch poisoned {event.target}, who is revealed as werewolf."
-    elif target_role in {"seer", "hunter"}:
+    elif target_role in KEY_VILLAGER_ROLES:
         outcome = -3
         rule = "rubric:E.3.witch.poison_key_villager"
         notes = f"Witch poisoned {event.target}, who is later revealed as {target_role}."
@@ -476,7 +477,8 @@ def _score_player_vote(game: GameLog, event: Event, eliminated_by_round: dict[in
             score_id_prefix=score_id_prefix,
         )
 
-    if actor_role == "werewolf" and eliminated_target != event.target:
+    actor_team = _team_of(game, event.actor)
+    if actor_team == "werewolf" and eliminated_target != event.target:
         return _record(
             event,
             0,
@@ -487,7 +489,7 @@ def _score_player_vote(game: GameLog, event: Event, eliminated_by_round: dict[in
             score_id_prefix=score_id_prefix,
         )
 
-    if actor_role == "werewolf":
+    if actor_team == "werewolf":
         if target_team == "werewolf":
             return _record(event, -2, ["rubric:E.1.werewolf.vote_eliminate_teammate"], evidence, f"Werewolf {event.actor} voted to eliminate teammate {event.target}.", assessment, score_id_prefix=score_id_prefix)
         if target_role in KEY_VILLAGER_ROLES:

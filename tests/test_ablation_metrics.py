@@ -49,6 +49,25 @@ def test_analyze_game_dict_basic():
     assert abs(g["herd_share"] - 4/5) < 1e-9
 
 
+def test_analyze_game_dict_uses_team_for_wolf_membership():
+    gl = {
+        "players": [
+            {"player_id":"p1","role":"seer","team":"villager"},
+            {"player_id":"p2","role":"wolf_variant","team":"werewolf"},
+            {"player_id":"p3","role":"villager","team":"villager"},
+        ],
+        "result": {"winner":"villager","end_round":1},
+        "events": [
+            _ev(1,"day","p1","p2","p1 votes p2."),
+            _ev(1,"day","p3","p2","p3 votes p2."),
+        ],
+    }
+    g = analyze_game_dict(gl)
+    assert g["wolves"] == ["p2"]
+    assert g["d1_majority"] == "p2"
+    assert g["d1_majority_is_wolf"] is True
+
+
 def test_live_rate_from_turns():
     assert live_rate_from_turns({"turns":[{"kind":"live_success"}]*9 + [{"kind":"timeout_then_fallback"}]}) == 0.9
     assert live_rate_from_turns({"turns":[]}) == 0.0

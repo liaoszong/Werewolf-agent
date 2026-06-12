@@ -295,7 +295,7 @@ class EmergentGameEngine:
         return self._config.game_id
 
     def _wolves(self) -> list[str]:
-        return [p.player_id for p in self._config.players if p.role == "werewolf"]
+        return [p.player_id for p in self._config.players if p.team == "werewolf"]
 
     def _alive_in_seat_order(self, exclude: set[str] | None = None) -> list[str]:
         exclude = exclude or set()
@@ -305,7 +305,8 @@ class EmergentGameEngine:
         return public_refs(self._events)
 
     def _private_refs(self, player_id: str) -> list[str]:
-        return private_refs_for_role(self._events, self._players_by_id[player_id].role)
+        p = self._players_by_id[player_id]
+        return private_refs_for_role(self._events, p.role, team=p.team)
 
     def _emit(
         self,
@@ -465,9 +466,9 @@ class EmergentGameEngine:
     def _build_obs(self, player_id: str, phase: str, rnd: int) -> AgentObservation:
         p = self._players_by_id[player_id]
         known_roles = {player_id: p.role}
-        if p.role == "werewolf":
+        if p.team == "werewolf":
             for w in self._wolves():
-                known_roles[w] = "werewolf"
+                known_roles[w] = self._players_by_id[w].role
         return AgentObservation(
             game_id=self._game_id,
             player_id=player_id,
@@ -504,6 +505,7 @@ class EmergentGameEngine:
             roles={pid: p.role for pid, p in self._players_by_id.items()},
             night_victim=night_victim,
             last_guarded_target=self._last_guarded,
+            teams={pid: p.team for pid, p in self._players_by_id.items()},
         )
 
     def _action_legal(self, actor: str, role: str, phase: str, action: AgentAction) -> bool:
@@ -678,8 +680,8 @@ class EmergentGameEngine:
     # ---- win condition -------------------------------------------------
 
     def _win_check(self) -> str | None:
-        alive_wolves = [pid for pid in self._alive if self._players_by_id[pid].role == "werewolf"]
-        alive_non_wolves = [pid for pid in self._alive if self._players_by_id[pid].role != "werewolf"]
+        alive_wolves = [pid for pid in self._alive if self._players_by_id[pid].team == "werewolf"]
+        alive_non_wolves = [pid for pid in self._alive if self._players_by_id[pid].team != "werewolf"]
         if not alive_wolves:
             return "villager"
         if len(alive_wolves) >= len(alive_non_wolves):
@@ -702,13 +704,13 @@ class EmergentGameEngine:
                 else:
                     self._record_failure(rnd, "night", wolf, "agent_error", f"{wolf} raised {type(err).__name__}: {err}")
                 continue
-            if not self._action_legal(wolf, "werewolf", "night", action):
+            if not self._action_legal(wolf, self._players_by_id[wolf].role, "night", action):
                 self._record_failure(rnd, "night", wolf, "invalid_action", f"{wolf} proposed invalid kill {action.target}", action.target)
                 self._downgrade_turn(turn, f"engine rejected kill target {action.target}")
                 continue
             proposals.append((wolf, action.target))
         candidates = tuple(pid for pid in self._seat_order
-                           if pid in self._alive and self._players_by_id[pid].role != "werewolf")
+                           if pid in self._alive and self._players_by_id[pid].team != "werewolf")
         ww = WolfWindow(rnd=rnd, wolves=tuple(wolves), proposals=tuple(proposals),
                         candidates=candidates, consensus_id=consensus_id)
         adj = WolfResolver().adjudicate(ww)

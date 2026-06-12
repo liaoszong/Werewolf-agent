@@ -16,6 +16,7 @@ from werewolf_eval.emergent_fake_script import (
     build_hunter_night_kill_script,
     build_hunter_voteout_script,
 )
+from werewolf_eval.game_engine import EnginePlayer, GameConfig
 
 
 class RulesV11Tests(unittest.TestCase):
@@ -133,6 +134,42 @@ class HunterGameTests(unittest.TestCase):
         outcome = engine.run()
         self.assertEqual(outcome.status, "completed")
         self.assertFalse([e for e in outcome.game_log["events"] if e["type"] in ("hunter_shoot", "hunter_pass")])
+
+
+class WerewolfTeamFoundationTests(unittest.TestCase):
+    def _engine(self) -> EmergentGameEngine:
+        return EmergentGameEngine(
+            config=GameConfig(
+                game_id="wolf_team_foundation",
+                players=[
+                    EnginePlayer("p1", "wolf_variant", "werewolf"),
+                    EnginePlayer("p2", "werewolf", "werewolf"),
+                    EnginePlayer("p3", "seer", "villager"),
+                    EnginePlayer("p4", "villager", "villager"),
+                ],
+            ),
+            agents={},
+            seed=0,
+        )
+
+    def test_wolf_team_members_are_derived_from_team(self) -> None:
+        engine = self._engine()
+        self.assertEqual(engine._wolves(), ["p1", "p2"])
+
+    def test_win_check_counts_werewolf_team_roles(self) -> None:
+        engine = self._engine()
+        engine._alive = {"p1", "p3"}
+        self.assertEqual(engine._win_check(), "werewolf")
+
+    def test_wolf_observation_knows_wolf_team_roles_and_channel(self) -> None:
+        engine = self._engine()
+        engine._emit("night", 1, "werewolf_kill", "p2", "p3", "werewolf_team", "Wolf team kills p3.")
+
+        obs = engine._build_obs("p1", "night", 1)
+
+        self.assertEqual(obs.known_roles["p1"], "wolf_variant")
+        self.assertEqual(obs.known_roles["p2"], "werewolf")
+        self.assertIn(engine._events[0]["event_id"], obs.private_event_ids)
 
 
 if __name__ == "__main__":

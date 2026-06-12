@@ -481,6 +481,55 @@ class MalformedInputRobustnessTests(unittest.TestCase):
         self.assertEqual(p5["total_votes"], 0)
         self.assertEqual(p5["vote_accuracy"], 0.0)
 
+    def test_werewolf_team_variant_vote_scores_as_werewolf(self) -> None:
+        players = [
+            self._player("p1", "wolf_variant", "werewolf"),
+            self._player("p2", "werewolf", "werewolf"),
+            self._player("p3", "seer", "villager"),
+            self._player("p4", "witch", "villager"),
+        ]
+        game = GameLog(
+            game_id="wolf_variant_vote",
+            source_label="emergent_offline",
+            players=players,
+            events=[
+                self._vote("p1", "p3"),
+                Event(
+                    event_id="e_elim_p3",
+                    sequence=2,
+                    round=1,
+                    phase="day",
+                    type="player_eliminated",
+                    actor="system",
+                    target="p3",
+                    visibility="all",
+                    data={},
+                ),
+                Event(
+                    event_id="e_reveal_p3",
+                    sequence=3,
+                    round=1,
+                    phase="day",
+                    type="role_revealed",
+                    actor="system",
+                    target="p3",
+                    visibility="all",
+                    data={},
+                ),
+            ],
+            result=GameResult(
+                winner="werewolf",
+                end_round=1,
+                survivors=["p1", "p2", "p4"],
+                end_condition="werewolves_reach_parity",
+            ),
+        )
+
+        score_log = score_game(game)
+
+        record = next(r for r in score_log.records if r.event_id == "e_p1_p3")
+        self.assertIn("rubric:E.1.werewolf.vote_eliminate_key_villager", record.rules_triggered)
+
 
 class ScoreLogBucketTests(unittest.TestCase):
     def setUp(self) -> None:

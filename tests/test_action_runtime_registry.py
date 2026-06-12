@@ -26,6 +26,15 @@ class RuntimeStateTests(unittest.TestCase):
         self.assertFalse(s.is_wolf("p3"))
         self.assertTrue(s.is_wolf("p1"))
 
+    def test_is_wolf_uses_team_not_role_literal(self) -> None:
+        s = RuntimeState(
+            alive=frozenset({"p1", "p2"}),
+            roles={"p1": "wolf_variant", "p2": "seer"},
+            teams={"p1": "werewolf", "p2": "villager"},
+        )
+        self.assertTrue(s.is_wolf("p1"))
+        self.assertFalse(s.is_wolf("p2"))
+
 
 class TargetRuleTests(unittest.TestCase):
     def _state(self) -> RuntimeState:
@@ -41,6 +50,16 @@ class TargetRuleTests(unittest.TestCase):
         self.assertTrue(rule(s, "p1", "p5"))    # villager alive -> ok
         self.assertFalse(rule(s, "p1", "p2"))   # wolf -> rejected
         self.assertFalse(rule(s, "p1", "p9"))   # dead/unknown -> rejected
+
+    def test_alive_non_wolf_excludes_werewolf_team_roles(self) -> None:
+        s = RuntimeState(
+            alive=frozenset({"p1", "p2", "p3"}),
+            roles={"p1": "werewolf", "p2": "wolf_variant", "p3": "seer"},
+            teams={"p1": "werewolf", "p2": "werewolf", "p3": "villager"},
+        )
+        rule = TARGET_RULES["alive_non_wolf"]
+        self.assertFalse(rule(s, "p1", "p2"))
+        self.assertTrue(rule(s, "p1", "p3"))
 
     def test_exclude_self(self) -> None:
         s = self._state()
@@ -132,6 +151,15 @@ class RegistryParityTests(unittest.TestCase):
         from werewolf_eval.provider_agent import _ALLOWED_ACTIONS_REGISTRY
         self.assertEqual(_ALLOWED_ACTIONS_REGISTRY.allowed_actions("guard", "night"),
                          ["guard_protect"])
+
+    def test_provider_agent_ruleset_pin_fails_loud_on_new_ruleset(self) -> None:
+        # A-5: provider_agent is still intentionally pinned to the latest shipped
+        # ruleset so prompt bytes do not silently change when a future rules_v1_3
+        # lands. This sentinel goes red the day all_rulesets() grows.
+        from werewolf_eval.action_runtime.ruleset import all_rulesets
+        from werewolf_eval.provider_agent import _ALLOWED_ACTIONS_RULESET_VERSION
+
+        self.assertEqual(_ALLOWED_ACTIONS_RULESET_VERSION, all_rulesets()[-1].rules_version)
 
     def test_legal_targets_wolf_kill_excludes_wolves(self) -> None:
         s = RuntimeState(

@@ -134,7 +134,7 @@ SCORE_RELEVANT_EVENT_TYPES = {
     "player_vote",
 }
 
-KEY_VILLAGER_ROLES = {"seer", "witch", "hunter"}
+KEY_VILLAGER_ROLES = {"seer", "witch", "hunter", "guard"}
 
 SCORE_RELEVANT_DECISION_ACTIONS = SCORE_RELEVANT_EVENT_TYPES
 

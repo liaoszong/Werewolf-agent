@@ -23,7 +23,9 @@ class ProviderActionError(ValueError):
 # speeches call provider.respond() directly — and rules_v1_2 is a backward-compatible
 # superset (hunter + guard): boards without them get identical lists (same order), so
 # prompt bytes are unchanged. Built once at import (the ruleset builder is pure/cheap).
-_ALLOWED_ACTIONS_REGISTRY = RoleAbilityRegistry(rules_v1_2())
+_ALLOWED_ACTIONS_RULESET = rules_v1_2()
+_ALLOWED_ACTIONS_RULESET_VERSION = _ALLOWED_ACTIONS_RULESET.rules_version
+_ALLOWED_ACTIONS_REGISTRY = RoleAbilityRegistry(_ALLOWED_ACTIONS_RULESET)
 # External engine phase -> registry phase. The engine emits 'day' for votes; the registry
 # keys day votes under 'day_vote'. MUST map: an unmapped phase degrades to [] (registry
 # hardening), which would silently reject every vote (contract A / audit B4-1).

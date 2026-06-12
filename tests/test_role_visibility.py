@@ -49,6 +49,12 @@ class PrivateRefsForRoleTest(unittest.TestCase):
     def test_werewolf_gets_team_channel(self):
         self.assertEqual(private_refs_for_role(EVENTS, "werewolf"), ["e2", "e5"])
 
+    def test_werewolf_team_role_gets_team_channel(self):
+        self.assertEqual(
+            private_refs_for_role(EVENTS, "wolf_variant", team="werewolf"),
+            ["e2", "e5"],
+        )
+
     def test_guard_role_match_is_generic(self):
         self.assertEqual(private_refs_for_role(EVENTS, "guard"), ["e2", "e7"])
 

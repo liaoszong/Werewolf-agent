@@ -237,8 +237,8 @@ def _known_rubric_gaps(game: GameLog) -> list[dict[str, Any]]:
     for event in game.events:
         if event.actor not in players:
             continue
-        role = _role_of(game, event.actor)
-        if event.type == "player_vote" and role == "werewolf":
+        team = _team_of(game, event.actor)
+        if event.type == "player_vote" and team == "werewolf":
             eliminated_this_round = any(
                 e.type == "player_eliminated"
                 and e.target == event.target
