@@ -161,12 +161,26 @@
       }
     },
     "behavior_evidence": {
-      "status": "not_run",
-      "reason_if_not_run": "live 45-game l4_guard_witch_coord arm is the user-triggered T-live step; metrics snapshot + verdict will attach there"
+      "status": "attached",
+      "evidence": "45-game live ablation l4_guard_witch_coord vs l4_guard (seat-level TRUE pairing, same multiset + seed stream; n_valid=41 -- 1 fail-closed + 1 low-live + 2 scaffold_coverage drops; all 45 artifact sets pass invariants I1-I8c with ZERO violations; snapshot docs/harness/reviews/2026-06-12-l4-guard-witch-coord-prompt-v4-metrics.json). PRIMARY CRITERION FAILED CLEANLY: milk_pierce_death_count 12 -> 12 (target <=5), witch_save_rate 1.0 -> 1.0, witch_save_night1_share 1.0 -> 1.0. Injection chain verified working (45/45 night-1 witch requests carry the suffix, conditional gate correct on later rounds); the witch cites the milk-pierce risk in reason_summary and then saves anyway every game -- guidance read, rationalized away, behavior unchanged. Wolf win 68.2% -> 65.9% (0.85pp above the <=65% gate) NOT attributed to coordination (pierce count unchanged). Conclusion: input-side prompt guidance cannot fix the witch's mechanical night-1 save / milk-pierce leak. Loss taxonomy (offline): 90%+ of village losses end by round 2 in both arms (cap=4 has no constituency -- deferred on evidence)."
     },
     "blessed_by": "user (spec verdict ACCEPTED_WITH_SMALL_EDITS, 2026-06-12; plan 2026-06-12--l4-guard-witch-coord-arm-plan)",
     "blessed_at": "2026-06-12",
-    "arm_status": "pending_live_run",
-    "arm_label": "l4_guard_witch_coord"
+    "arm_status": "archived_failed_experimental_arm",
+    "arm_label": "l4_guard_witch_coord",
+    "verdict": {
+      "verdict": "FAILED_NEGATIVE",
+      "infrastructure_result": "PASS",
+      "injection_result": "PASS",
+      "behavior_change_result": "FAIL",
+      "mechanism_result": "FAIL",
+      "winrate_result": "NEAR_MISS_NO_ATTRIBUTABLE_MECHANISM",
+      "production_default": "DO_NOT_FLIP (PROMPT_VERSION stays prompt_v1)",
+      "canonical_guard_arm": "l4_guard_v3",
+      "prompt_v4_status": "archived_failed_experimental_arm",
+      "next": "do not iterate witch-coordination prompt; cap=4 stays backlog (loss taxonomy shows no round-cap constituency); remaining open lines = P8 witch-poison-zero, L3 night-1 position bias (user adjudicates next)",
+      "verdict_doc": "docs/harness/reviews/2026-06-12-l4-guard-witch-coord-VERDICT.md",
+      "adjudicated_by": "user, 2026-06-12"
+    }
   }
 ]
