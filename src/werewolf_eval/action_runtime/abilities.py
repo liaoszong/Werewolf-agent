@@ -51,6 +51,12 @@ class AbilityDefinition:
     target_rule: str      # key in TARGET_RULES ("" when arity none)
     target_arity: str     # ARITY_NONE | ARITY_ONE | ARITY_MANY
     visibility: str        # one of RUNTIME_EVENT_VISIBILITIES
+    # Death causes that SUPPRESS an event:on_death ability (ruling A-2, audit
+    # 2026-06-12). Empty = the trigger fires for every death cause. For the hunter
+    # this carries {"witch_poison"}: a poisoned hunter does not get to shoot, while
+    # a wolf-killed / voted-out / shot hunter still does. Default empty -> every
+    # pre-existing ability is byte- and behavior-identical.
+    suppressed_by_cause: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True)

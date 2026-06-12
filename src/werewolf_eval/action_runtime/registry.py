@@ -49,6 +49,16 @@ class RoleAbilityRegistry:
             if self._rs.ability(aid).trigger == "event:on_death"
         ]
 
+    def death_trigger_suppressing_causes(self, role: str) -> frozenset[str]:
+        """Death causes under which a role's on_death trigger is SUPPRESSED (ruling
+        A-2). Union of ``suppressed_by_cause`` over the role's on_death abilities.
+        Empty for a role with no death trigger or no suppression -> the engine hook
+        fires normally. For the hunter this is {"witch_poison"}."""
+        causes: set[str] = set()
+        for ability in self.on_death_abilities(role):
+            causes |= ability.suppressed_by_cause
+        return frozenset(causes)
+
     def shown_targets(self, action_id: str, state: RuntimeState) -> list[str]:
         """The BROAD target list the model is SHOWN in the prompt — the full alive
         set, matching the engine's ``observation.alive_players``

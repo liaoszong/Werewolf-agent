@@ -849,9 +849,15 @@ class EmergentGameEngine:
         # validate (a parsed-but-illegal potion use is rejected -> fall back to
         # pass AND downgrade the turn: the live result was not used)
         if action_name == WITCH_SAVE:
-            if save_used or victim is None or target != victim:
-                self._record_failure(rnd, "night", witch, "invalid_action", f"{witch} invalid witch_save target={target}", target)
-                self._downgrade_turn(turn, f"invalid witch_save target={target}")
+            # Ruling A-3 (audit 2026-06-12): the witch may self-save ONLY on the first
+            # night. target==victim is already required (she can only antidote the wolf
+            # victim), so a self-save means she IS the victim — gate that on rnd==1.
+            self_save_late = target == witch and rnd != 1
+            if save_used or victim is None or target != victim or self_save_late:
+                reason = ("witch self-save only allowed on the first night"
+                          if self_save_late else f"invalid witch_save target={target}")
+                self._record_failure(rnd, "night", witch, "invalid_action", f"{witch} {reason}", target)
+                self._downgrade_turn(turn, reason)
                 action_name = WITCH_PASS
         elif action_name == WITCH_POISON:
             if poison_used or target not in self._alive or target == witch:
@@ -983,21 +989,29 @@ class EmergentGameEngine:
 
     # ---- death-triggered abilities (hunter v1.1) -----------------------
 
-    def _trigger_on_death(self, dead: str, rnd: int, phase: str) -> None:
+    def _trigger_on_death(self, dead: str, rnd: int, phase: str, cause: str) -> None:
         """Fire a dead player's on_death ability (data-driven via the ruleset). For the
         hunter that is a model-driven shot; the shot victim may itself trigger (cascade —
         terminates because each pid is removed from _alive before recursing). No-op for any
-        role with no on_death ability, so 4-role games are byte-unchanged."""
+        role with no on_death ability, so 4-role games are byte-unchanged.
+
+        ``cause`` is the death cause (``werewolf_kill`` / ``witch_poison`` / ``vote`` /
+        ``hunter_shoot``). Ruling A-2 (audit 2026-06-12): a cause listed in the role's
+        ``death_trigger_suppressing_causes`` suppresses the trigger — a POISONED hunter
+        does NOT shoot, while a wolf-killed / voted-out / shot hunter still does. A cascade
+        shot carries cause ``hunter_shoot`` (not suppressed)."""
         role = self._players_by_id[dead].role
         if not self._registry.on_death_abilities(role):
             return
+        if cause in self._registry.death_trigger_suppressing_causes(role):
+            return                          # A-2: e.g. a poisoned hunter gets no shot
         target = self._resolve_hunter_shot(dead, rnd, phase)
         if target is not None and target in self._alive:
             self._alive.discard(target)
             assert_death_commit_once(target, self._death_committed)
             self._emit(phase, rnd, "player_died", "system", target, "all",
                        f"{target} was shot by {dead}.")
-            self._trigger_on_death(target, rnd, phase)
+            self._trigger_on_death(target, rnd, phase, "hunter_shoot")
 
     def _resolve_hunter_shot(self, hunter: str, rnd: int, phase: str) -> str | None:
         """Ask the hunter's provider for a shot (hunter_shoot) or a pass. Validate via the
@@ -1158,7 +1172,10 @@ class EmergentGameEngine:
                 self._alive.discard(pid)
                 assert_death_commit_once(pid, self._death_committed)
                 self._emit("night", rnd, "player_died", "system", pid, "all", f"{pid} died during the night.")
-                self._trigger_on_death(pid, rnd, "night")
+                # deaths ⊆ {wolf victim, poison target} (settler order); the wolf victim is
+                # added first, so a pid that is NOT the victim is the poison death (A-2 cause).
+                cause = "werewolf_kill" if pid == victim else "witch_poison"
+                self._trigger_on_death(pid, rnd, "night", cause)
 
             self._write_god_snapshot(f"god_view_r{rnd}_night", rnd, "night")
 
@@ -1186,7 +1203,7 @@ class EmergentGameEngine:
                 role = self._players_by_id[eliminated].role
                 self._emit("day", rnd, "player_eliminated", "system", eliminated, "all", f"{eliminated} eliminated by vote.")
                 self._emit("day", rnd, "role_revealed", "system", eliminated, "all", f"{eliminated} revealed as {role}.")
-                self._trigger_on_death(eliminated, rnd, "day")
+                self._trigger_on_death(eliminated, rnd, "day", "vote")
 
             self._write_god_snapshot(f"god_view_r{rnd}_day", rnd, "day")
 

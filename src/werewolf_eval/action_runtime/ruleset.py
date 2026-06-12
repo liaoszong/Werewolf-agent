@@ -72,7 +72,10 @@ def rules_v1_1() -> BoardRuleset:
     base = rules_v1()
     hunter_abilities = (
         # on_death shot: a model decision fired when the hunter dies (night kill or vote-out).
-        AbilityDefinition("hunter_shoot", "event:on_death", "exclude_self", ARITY_ONE, "public"),
+        # Ruling A-2 (audit 2026-06-12): a POISON death suppresses the shot; wolf-kill,
+        # vote-out and being-shot all still trigger it.
+        AbilityDefinition("hunter_shoot", "event:on_death", "exclude_self", ARITY_ONE, "public",
+                          suppressed_by_cause=frozenset({"witch_poison"})),
         AbilityDefinition("hunter_pass", "event:on_death", "", ARITY_NONE, "public"),
     )
     hunter = RoleDefinition("hunter", "villager", ("player_vote", "hunter_shoot", "hunter_pass"))
