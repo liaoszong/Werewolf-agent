@@ -37,17 +37,19 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
 def resolve_live_launcher(
     args: argparse.Namespace, environ: Mapping[str, str]
-) -> tuple[bool, RunLauncher | None, bool, Callable[[str], RunLauncher] | None]:
+) -> tuple[bool, Callable[[], RunLauncher] | None, bool, Callable[..., RunLauncher] | None]:
     """Pure resolver: map parsed args + an env mapping to
-    ``(live_enabled, env_launcher_or_None, env_key_available, factory_or_None)``
+    ``(live_enabled, env_launcher_factory_or_None, env_key_available, factory_or_None)``
     for ``create_observer_server``.
 
-    The API key is read **once** from ``environ`` and flows only into the
-    launcher closure (provider config + Authorization header) — never logged,
-    echoed, or stored elsewhere.
+    The API key is read **once** from ``environ`` and flows only into launcher
+    factories (provider config + Authorization header) — never logged, echoed,
+    or stored elsewhere.
 
-    - ``env_launcher_or_None``: prebuilt launcher from the env key (back-compat
-      fallback); ``None`` when the flag is off or no env key is present.
+    - ``env_launcher_factory_or_None``: no-arg factory from the env key
+      (back-compat fallback); ``None`` when the flag is off or no env key is
+      present. It builds a fresh concrete launcher per run so provider budget
+      and trace state cannot bleed across launches.
     - ``env_key_available``: True iff an env key was present at startup.
     - ``factory_or_None``: per-launch builder used with a client-supplied key;
       ``None`` only when the flag is off (factory is always present when live is
@@ -56,19 +58,8 @@ def resolve_live_launcher(
         return (False, None, False, None)
     api_key = environ.get(args.api_key_env, "")
     env_key_available = bool(api_key)
-    env_launcher = (
-        build_emergent_deepseek_launcher(
-            api_key=api_key,
-            base_url=args.deepseek_base_url,
-            model=args.deepseek_model,
-            max_tokens=_LIVE_MAX_TOKENS,
-            max_requests=args.max_live_requests,
-        )
-        if api_key
-        else None
-    )
 
-    def factory(key: str, base_url: str | None = None) -> RunLauncher:
+    def _build_launcher(key: str, base_url: str | None = None) -> RunLauncher:
         return build_emergent_deepseek_launcher(
             api_key=key,
             base_url=base_url or args.deepseek_base_url,
@@ -77,7 +68,16 @@ def resolve_live_launcher(
             max_requests=args.max_live_requests,
         )
 
-    return (True, env_launcher, env_key_available, factory)
+    env_launcher_factory = (
+        (lambda: _build_launcher(api_key, args.deepseek_base_url))
+        if api_key
+        else None
+    )
+
+    def factory(key: str, base_url: str | None = None) -> RunLauncher:
+        return _build_launcher(key, base_url)
+
+    return (True, env_launcher_factory, env_key_available, factory)
 
 
 def main() -> int:

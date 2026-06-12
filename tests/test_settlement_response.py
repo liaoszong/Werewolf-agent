@@ -156,8 +156,9 @@ class TestBuildSettlementResponse(unittest.TestCase):
             self.assertEqual(r["reason"], "invalid_game_log")
 
     def test_per_seat_model_and_token_from_artifacts(self):
-        # R-09: prompt-manifest.json gives per-seat model/provider; provider-trace.json
-        # responses give a per-seat token rollup. Both reach players[] additively.
+        # R-09: prompt-manifest.json gives per-seat model/provider; provider-turns.json
+        # turns (C12-02: real artifact shape, not provider-trace.json) give a per-seat
+        # token rollup. Both reach players[] additively.
         with tempfile.TemporaryDirectory() as td:
             d = self._run_dir(td)
             (d / "prompt-manifest.json").write_text(
@@ -173,10 +174,10 @@ class TestBuildSettlementResponse(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            (d / "provider-trace.json").write_text(
+            (d / "provider-turns.json").write_text(
                 json.dumps(
                     {
-                        "responses": [
+                        "turns": [
                             {"actor": "p1", "token_usage": {"total_tokens": 100}},
                             {"actor": "p1", "token_usage": {"total_tokens": 50}},
                         ]

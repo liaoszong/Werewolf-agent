@@ -15,6 +15,7 @@ VALID_VISIBILITIES = {
     "seer",
     "witch",
     "hunter",
+    "guard",
     "specific_player_ids",
 }
 

@@ -511,5 +511,81 @@ class ScoreLogBucketTests(unittest.TestCase):
         self.assertEqual(d["evaluation_bucket"], bucket)
 
 
+class ScoreIdPrefixRaceTests(unittest.TestCase):
+    """C12-05: Module-level _current_score_id_prefix is a threading race.
+    score_game() must be re-entrant — two concurrent calls with different
+    game_ids must NOT cross-contaminate each other's score_id prefixes."""
+
+    @staticmethod
+    def _make_game(game_id: str, role: str = "villager") -> GameLog:
+        return GameLog(
+            game_id=game_id,
+            source_label="emergent_offline",
+            players=[
+                Player(player_id="p1", role="werewolf", team="werewolf"),
+                Player(player_id="p2", role="werewolf", team="werewolf"),
+                Player(player_id="p3", role="seer", team="villager"),
+                Player(player_id="p4", role="witch", team="villager"),
+                Player(player_id="p5", role=role, team="villager"),
+                Player(player_id="p6", role="villager", team="villager"),
+            ],
+            events=[
+                Event(
+                    event_id="e001",
+                    sequence=1,
+                    round=1,
+                    phase="night",
+                    type="werewolf_kill",
+                    actor="wolf_team",
+                    target="p5",
+                    visibility="werewolf_team",
+                    data={},
+                ),
+            ],
+            result=GameResult(
+                winner="werewolf",
+                end_round=1,
+                survivors=["p1", "p2", "p3", "p4", "p6"],
+                end_condition="all_villagers_eliminated",
+            ),
+        )
+
+    def test_concurrent_score_game_prefixes_do_not_leak(self) -> None:
+        import threading
+
+        game_a = self._make_game("race_test_a")
+        game_b = self._make_game("race_test_b")
+        results: dict[str, object] = {}
+        errors: list[Exception] = []
+
+        def score_and_capture(game: GameLog) -> None:
+            try:
+                log = score_game(game)
+                results[game.game_id] = log
+            except Exception as exc:
+                errors.append(exc)
+
+        # Fire many concurrent pairs to stress the race window.
+        for _ in range(30):
+            results.clear()
+            errors.clear()
+            t1 = threading.Thread(target=score_and_capture, args=(game_a,))
+            t2 = threading.Thread(target=score_and_capture, args=(game_b,))
+            t1.start()
+            t2.start()
+            t1.join()
+            t2.join()
+
+            self.assertEqual(errors, [])
+            for game_id, log in results.items():
+                expected_prefix = f"score_{game_id}_"
+                for record in log.records:
+                    self.assertTrue(
+                        record.score_id.startswith(expected_prefix),
+                        f"score_id={record.score_id!r} does not start with "
+                        f"expected prefix {expected_prefix!r} (game_id={game_id})",
+                    )
+
+
 if __name__ == "__main__":
     unittest.main()

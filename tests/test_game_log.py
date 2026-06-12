@@ -75,6 +75,13 @@ class GameLogParserTests(unittest.TestCase):
         with self.assertRaisesRegex(GameLogValidationError, "invalid visibility"):
             parse_game_log(raw)
 
+    def test_accepts_guard_visibility(self) -> None:
+        raw = load_raw_gold_game()
+        raw["events"][0] = copy.deepcopy(raw["events"][0])
+        raw["events"][0]["visibility"] = "guard"
+        game = parse_game_log(raw)
+        self.assertEqual(game.events[0].visibility, "guard")
+
     def test_rejects_unknown_visible_info_ref(self) -> None:
         raw = load_raw_gold_game()
         raw["events"][24] = copy.deepcopy(raw["events"][24])

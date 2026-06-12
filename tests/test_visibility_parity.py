@@ -41,6 +41,7 @@ _VISIBILITIES = [
     "all",
     "seer",
     "witch",
+    "guard",
     "werewolf_team",
     "internal",
     "some_future_role",  # an unknown visibility must stay hidden on both paths

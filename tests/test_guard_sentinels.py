@@ -15,6 +15,7 @@ from werewolf_eval.emergent_engine import EmergentGameEngine, build_emergent_con
 from werewolf_eval.emergent_fake_script import (
     _act, build_emergent_fake_agents, SPEECH_REQUEST_PHASE,
 )
+from werewolf_eval.invariants import check_run
 
 # 无女巫板:2狼 + 预言家 + 守卫 + 2民(脚本免去女巫每夜回合)
 SEATS_NO_WITCH = {"p1": "werewolf", "p2": "werewolf", "p3": "seer",
@@ -117,6 +118,9 @@ class GuardBlocksKillSentinel(unittest.TestCase):
     def test_guard_block_yields_peaceful_night(self):
         outcome = _run("guard_block", SEATS_NO_WITCH, build_guard_blocks_script())
         self.assertEqual(outcome.status, "completed")
+        violations = check_run(outcome)
+        self.assertEqual([v for v in violations if v.severity == "error"], [],
+                         f"C3-12: guard_block tripped error invariants: {violations}")
         events = outcome.game_log["events"]
         r1_deaths = [e for e in events if e["type"] == "player_died" and e["round"] == 1]
         self.assertEqual(r1_deaths, [])
@@ -134,6 +138,9 @@ class MilkPierceSentinel(unittest.TestCase):
     def test_guard_plus_save_same_target_dies(self):
         outcome = _run("guard_milk_pierce", SEATS_WITH_WITCH, build_milk_pierce_script())
         self.assertEqual(outcome.status, "completed")
+        violations = check_run(outcome)
+        self.assertEqual([v for v in violations if v.severity == "error"], [],
+                         f"C3-12: milk_pierce tripped error invariants: {violations}")
         events = outcome.game_log["events"]
         self.assertTrue(any(e["type"] == "player_died" and e["target"] == "p6" and e["round"] == 1
                             for e in events))  # I8b:同守同救 -> 死
@@ -147,6 +154,9 @@ class ConsecutiveRepeatSentinel(unittest.TestCase):
     def test_repeat_protect_rejected_and_falls_back(self):
         outcome = _run("guard_consecutive", SEATS_NO_WITCH, build_consecutive_repeat_script())
         self.assertEqual(outcome.status, "completed")
+        violations = check_run(outcome)
+        self.assertEqual([v for v in violations if v.severity == "error"], [],
+                         f"C3-12: consecutive_repeat tripped error invariants: {violations}")
         self.assertIn("invalid_action", [f["kind"] for f in outcome.failure_audit["failures"]])
         protects = [e for e in outcome.game_log["events"] if e["type"] == "guard_protect"]
         self.assertEqual(len(protects), 2)
@@ -176,6 +186,9 @@ class SelfProtectSentinel(unittest.TestCase):
     def test_self_protect_blocks_own_kill(self):
         outcome = _run("guard_self", SEATS_NO_WITCH, build_self_protect_script())
         self.assertEqual(outcome.status, "completed")
+        violations = check_run(outcome)
+        self.assertEqual([v for v in violations if v.severity == "error"], [],
+                         f"C3-12: self_protect tripped error invariants: {violations}")
         events = outcome.game_log["events"]
         r1_deaths = [e for e in events if e["type"] == "player_died" and e["round"] == 1]
         self.assertEqual(r1_deaths, [])
@@ -214,6 +227,9 @@ class GuardBoardV3SmokeSentinel(unittest.TestCase):
         )
         outcome = engine.run()
         self.assertEqual(outcome.status, "completed")
+        violations = check_run(outcome)
+        self.assertEqual([v for v in violations if v.severity == "error"], [],
+                         f"C3-12: v3_guard_board tripped error invariants: {violations}")
         self.assertEqual(engine.rules_version, "rules_v1_2")
         self.assertIn("守卫×1", engine._board_card)
         self.assertIn("同守同救", engine._board_card)

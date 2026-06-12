@@ -321,7 +321,7 @@ def _scoring_boundary(has_decision_log: bool = False, has_s5: bool = False) -> S
     )
 
 
-def _score_werewolf_kill(game: GameLog, event: Event, assessment: DecisionAssessment | None = None) -> ScoreRecord:
+def _score_werewolf_kill(game: GameLog, event: Event, assessment: DecisionAssessment | None = None, score_id_prefix: str = "") -> ScoreRecord:
     target_role = _role_of(game, event.target)
     if target_role in KEY_VILLAGER_ROLES:
         outcome = 3
@@ -358,10 +358,10 @@ def _score_werewolf_kill(game: GameLog, event: Event, assessment: DecisionAssess
     if event.event_id == GOLD_E007_EVENT_ID:
         notes = GOLD_E007_NOTE
 
-    return _record(event, outcome, [rule], evidence, notes, assessment)
+    return _record(event, outcome, [rule], evidence, notes, assessment, score_id_prefix=score_id_prefix)
 
 
-def _score_seer_check(game: GameLog, event: Event, assessment: DecisionAssessment | None = None) -> ScoreRecord:
+def _score_seer_check(game: GameLog, event: Event, assessment: DecisionAssessment | None = None, score_id_prefix: str = "") -> ScoreRecord:
     target_team = _team_of(game, event.target)
     if target_team == "werewolf":
         outcome = 2
@@ -375,10 +375,10 @@ def _score_seer_check(game: GameLog, event: Event, assessment: DecisionAssessmen
     reveal_event = _reveal_event_for_target(game, event.target)
     if reveal_event:
         evidence.append(reveal_event)
-    return _record(event, outcome, [rule], evidence, notes, assessment)
+    return _record(event, outcome, [rule], evidence, notes, assessment, score_id_prefix=score_id_prefix)
 
 
-def _score_witch_save(game: GameLog, event: Event, assessment: DecisionAssessment | None = None) -> ScoreRecord:
+def _score_witch_save(game: GameLog, event: Event, assessment: DecisionAssessment | None = None, score_id_prefix: str = "") -> ScoreRecord:
     target_role = _role_of(game, event.target)
     target_team = _team_of(game, event.target)
     if target_team == "werewolf":
@@ -397,10 +397,10 @@ def _score_witch_save(game: GameLog, event: Event, assessment: DecisionAssessmen
     reveal_event = _reveal_event_for_target(game, event.target)
     if reveal_event:
         evidence.append(reveal_event)
-    return _record(event, outcome, [rule], evidence, notes, assessment)
+    return _record(event, outcome, [rule], evidence, notes, assessment, score_id_prefix=score_id_prefix)
 
 
-def _score_witch_poison(game: GameLog, event: Event, assessment: DecisionAssessment | None = None) -> ScoreRecord:
+def _score_witch_poison(game: GameLog, event: Event, assessment: DecisionAssessment | None = None, score_id_prefix: str = "") -> ScoreRecord:
     target_role = _role_of(game, event.target)
     target_team = _team_of(game, event.target)
     if target_team == "werewolf":
@@ -419,7 +419,7 @@ def _score_witch_poison(game: GameLog, event: Event, assessment: DecisionAssessm
     reveal_event = _reveal_event_for_target(game, event.target)
     if reveal_event:
         evidence.append(reveal_event)
-    return _record(event, outcome, [rule], evidence, notes, assessment)
+    return _record(event, outcome, [rule], evidence, notes, assessment, score_id_prefix=score_id_prefix)
 
 
 def _round_elimination_event(game: GameLog, round_number: int) -> str | None:
@@ -429,7 +429,7 @@ def _round_elimination_event(game: GameLog, round_number: int) -> str | None:
     return None
 
 
-def _score_player_vote(game: GameLog, event: Event, eliminated_by_round: dict[int, str], assessment: DecisionAssessment | None = None) -> ScoreRecord:
+def _score_player_vote(game: GameLog, event: Event, eliminated_by_round: dict[int, str], assessment: DecisionAssessment | None = None, score_id_prefix: str = "") -> ScoreRecord:
     players = _player_by_id(game)
     if event.actor not in players or event.target not in players:
         # game_log validation accepts non-player actors ("system"/"wolf_team") and
@@ -444,6 +444,7 @@ def _score_player_vote(game: GameLog, event: Event, eliminated_by_round: dict[in
             [event.event_id],
             f"Vote references a non-player id (actor={event.actor!r}, target={event.target!r}); no deterministic vote scoring row applies.",
             assessment,
+            score_id_prefix=score_id_prefix,
         )
     actor_role = _role_of(game, event.actor)
     target_role = _role_of(game, event.target)
@@ -472,6 +473,7 @@ def _score_player_vote(game: GameLog, event: Event, eliminated_by_round: dict[in
             evidence,
             "Witch daytime vote is counted in vote_accuracy metrics, but E.3 has no explicit vote outcome row. S2 assigns score 0 and records the rubric gap.",
             assessment,
+            score_id_prefix=score_id_prefix,
         )
 
     if actor_role == "werewolf" and eliminated_target != event.target:
@@ -482,30 +484,31 @@ def _score_player_vote(game: GameLog, event: Event, eliminated_by_round: dict[in
             evidence,
             f"{event.actor} voted for {event.target}, but {event.target} was not eliminated. E.1 has no explicit row for a werewolf vote that does not cause elimination, so S2 assigns 0 and records the rubric gap.",
             assessment,
+            score_id_prefix=score_id_prefix,
         )
 
     if actor_role == "werewolf":
         if target_team == "werewolf":
-            return _record(event, -2, ["rubric:E.1.werewolf.vote_eliminate_teammate"], evidence, f"Werewolf {event.actor} voted to eliminate teammate {event.target}.", assessment)
+            return _record(event, -2, ["rubric:E.1.werewolf.vote_eliminate_teammate"], evidence, f"Werewolf {event.actor} voted to eliminate teammate {event.target}.", assessment, score_id_prefix=score_id_prefix)
         if target_role in KEY_VILLAGER_ROLES:
-            return _record(event, 2, ["rubric:E.1.werewolf.vote_eliminate_key_villager"], evidence, f"Werewolf {event.actor} voted to eliminate {event.target}, who is revealed as {target_role}.", assessment)
-        return _record(event, 1, ["rubric:E.1.werewolf.vote_eliminate_villager"], evidence, f"Werewolf {event.actor} voted to eliminate villager {event.target}.", assessment)
+            return _record(event, 2, ["rubric:E.1.werewolf.vote_eliminate_key_villager"], evidence, f"Werewolf {event.actor} voted to eliminate {event.target}, who is revealed as {target_role}.", assessment, score_id_prefix=score_id_prefix)
+        return _record(event, 1, ["rubric:E.1.werewolf.vote_eliminate_villager"], evidence, f"Werewolf {event.actor} voted to eliminate villager {event.target}.", assessment, score_id_prefix=score_id_prefix)
 
     if actor_role == "seer":
         if target_team == "werewolf":
-            return _record(event, 2, ["rubric:E.2.seer.vote_eliminate_werewolf"], evidence, f"Seer {event.actor} voted for {event.target}, who is later revealed as werewolf.", assessment)
+            return _record(event, 2, ["rubric:E.2.seer.vote_eliminate_werewolf"], evidence, f"Seer {event.actor} voted for {event.target}, who is later revealed as werewolf.", assessment, score_id_prefix=score_id_prefix)
         if target_role in KEY_VILLAGER_ROLES:
-            return _record(event, -1, ["rubric:E.2.seer.vote_eliminate_key_villager"], evidence, f"Seer {event.actor} voted for key villager {event.target}.", assessment)
-        return _record(event, -1, ["rubric:E.2.seer.vote_eliminate_villager"], evidence, f"Seer {event.actor} voted for villager {event.target}.", assessment)
+            return _record(event, -1, ["rubric:E.2.seer.vote_eliminate_key_villager"], evidence, f"Seer {event.actor} voted for key villager {event.target}.", assessment, score_id_prefix=score_id_prefix)
+        return _record(event, -1, ["rubric:E.2.seer.vote_eliminate_villager"], evidence, f"Seer {event.actor} voted for villager {event.target}.", assessment, score_id_prefix=score_id_prefix)
 
     if actor_role == "villager":
         if target_team == "werewolf":
-            return _record(event, 2, ["rubric:E.4.villager.vote_eliminate_werewolf"], evidence, f"Villager {event.actor} voted to eliminate {event.target}, who is revealed as werewolf.", assessment)
+            return _record(event, 2, ["rubric:E.4.villager.vote_eliminate_werewolf"], evidence, f"Villager {event.actor} voted to eliminate {event.target}, who is revealed as werewolf.", assessment, score_id_prefix=score_id_prefix)
         if target_role in KEY_VILLAGER_ROLES:
-            return _record(event, -2, ["rubric:E.4.villager.vote_eliminate_key_villager"], evidence, f"Villager {event.actor} voted to eliminate {event.target}, who is revealed as {target_role}.", assessment)
-        return _record(event, -1, ["rubric:E.4.villager.vote_eliminate_villager"], evidence, f"Villager {event.actor} voted to eliminate villager {event.target}.", assessment)
+            return _record(event, -2, ["rubric:E.4.villager.vote_eliminate_key_villager"], evidence, f"Villager {event.actor} voted to eliminate {event.target}, who is revealed as {target_role}.", assessment, score_id_prefix=score_id_prefix)
+        return _record(event, -1, ["rubric:E.4.villager.vote_eliminate_villager"], evidence, f"Villager {event.actor} voted to eliminate villager {event.target}.", assessment, score_id_prefix=score_id_prefix)
 
-    return _record(event, 0, ["rubric-gap:unscored_vote_role"], evidence, f"No explicit deterministic vote scoring row for role {actor_role}.", assessment)
+    return _record(event, 0, ["rubric-gap:unscored_vote_role"], evidence, f"No explicit deterministic vote scoring row for role {actor_role}.", assessment, score_id_prefix=score_id_prefix)
 
 
 def _score_id_prefix(game: GameLog) -> str:
@@ -530,9 +533,6 @@ def _score_source_label(game: GameLog, decision_log: DecisionLog | None, semanti
     return "[deterministic]"
 
 
-_current_score_id_prefix: str = GOLD_SCORE_ID_PREFIX
-
-
 def _record(
     event: Event,
     outcome_score: int,
@@ -540,12 +540,13 @@ def _record(
     evidence_event_ids: list[str],
     notes: str,
     assessment: DecisionAssessment | None = None,
+    score_id_prefix: str = "",
 ) -> ScoreRecord:
     decision_rules = assessment.rules_triggered if assessment else []
     decision_evidence = assessment.evidence_event_ids if assessment else []
     decision_notes = assessment.notes if assessment else []
     return ScoreRecord(
-        score_id=f"{_current_score_id_prefix}_{event.event_id.split('_')[-1]}",
+        score_id=f"{score_id_prefix}_{event.event_id.split('_')[-1]}",
         event_id=event.event_id,
         decision_id=assessment.decision_id if assessment else None,
         actor=event.actor,
@@ -564,14 +565,13 @@ def _record(
 
 
 def score_game(game: GameLog, decision_log: DecisionLog | None = None, semantic_label_log: SemanticLabelLog | None = None) -> ScoreLog:
-    global _current_score_id_prefix
     if semantic_label_log is not None and decision_log is None:
         raise ValueError("semantic_label_log requires decision_log")
     eliminated_by_round = _eliminated_target_by_round(game)
     decisions_by_event = _decision_by_event_id(game, decision_log)
     labels_by_decision = semantic_label_log.label_by_decision_id if semantic_label_log else {}
     semantic_labels_enabled = semantic_label_log is not None
-    _current_score_id_prefix = _score_id_prefix(game)
+    score_id_prefix = _score_id_prefix(game)
     records: list[ScoreRecord] = []
 
     for event in game.events:
@@ -581,15 +581,15 @@ def score_game(game: GameLog, decision_log: DecisionLog | None = None, semantic_
         semantic_label = labels_by_decision.get(decision.decision_id) if decision else None
         assessment = _assess_decision(game, decision, semantic_label, semantic_labels_enabled)
         if event.type == "werewolf_kill":
-            records.append(_score_werewolf_kill(game, event, assessment))
+            records.append(_score_werewolf_kill(game, event, assessment, score_id_prefix=score_id_prefix))
         elif event.type == "seer_check":
-            records.append(_score_seer_check(game, event, assessment))
+            records.append(_score_seer_check(game, event, assessment, score_id_prefix=score_id_prefix))
         elif event.type == "witch_save":
-            records.append(_score_witch_save(game, event, assessment))
+            records.append(_score_witch_save(game, event, assessment, score_id_prefix=score_id_prefix))
         elif event.type == "witch_poison":
-            records.append(_score_witch_poison(game, event, assessment))
+            records.append(_score_witch_poison(game, event, assessment, score_id_prefix=score_id_prefix))
         elif event.type == "player_vote":
-            records.append(_score_player_vote(game, event, eliminated_by_round, assessment))
+            records.append(_score_player_vote(game, event, eliminated_by_round, assessment, score_id_prefix=score_id_prefix))
 
     score_log_id = _score_log_id(game, semantic_labels_enabled)
     source_label = _score_source_label(game, decision_log, semantic_labels_enabled)
