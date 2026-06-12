@@ -36,5 +36,27 @@ class TestEndToEndOffline(unittest.TestCase):
         self._run_and_check("werewolf_win")
 
 
+class TestZeroArtifactGap(unittest.TestCase):
+    """C3-7: e2e 对 artifact_gap 零容忍 — 任何严重级别(含 artifact_gap)的违例都不得出现。"""
+
+    _scripts = ("villager_win", "werewolf_win")
+
+    def _run_and_check_all(self, script: str) -> None:
+        with tempfile.TemporaryDirectory() as d:
+            out_dir = Path(d) / "run"
+            run_emergent_fake_runtime(game_id=f"c3_7_{script}", out_dir=out_dir, script=script)
+            violations = check_run(out_dir)
+            self.assertEqual(
+                violations, [],
+                f"[C3-7][{script}] zero-tolerance violated: {violations}",
+            )
+
+    def test_villager_win_zero_gap(self) -> None:
+        self._run_and_check_all("villager_win")
+
+    def test_werewolf_win_zero_gap(self) -> None:
+        self._run_and_check_all("werewolf_win")
+
+
 if __name__ == "__main__":
     unittest.main()
