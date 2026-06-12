@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 516
+- Entries: 527
 
 ```text
 ./
@@ -119,7 +119,10 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   ├── 0001-client-agnostic-live-observer-protocol.md
 │   │   ├── 0002-src-layout-installable-package.md
 │   │   ├── 2026-06-09-action-runtime-orchestrator.md
+│   │   ├── 2026-06-11-byo-key-security-invariants.md
 │   │   ├── 2026-06-11-engine-visibility-single-source.md
+│   │   ├── 2026-06-11-fake-default-live-gate-testing-strategy.md
+│   │   ├── 2026-06-11-observer-visibility-layering.md
 │   │   └── 2026-06-11-role-facts-single-source.md
 │   ├── demo/
 │   │   ├── phase1-gold-demo.html
@@ -216,6 +219,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   │   ├── 2026-06-08--p2b-byo-key-rework-plan.md
 │   │   │   ├── 2026-06-11--b2-engine-visibility-single-source-plan.md
 │   │   │   ├── 2026-06-11--b3-scoring-split-plan.md
+│   │   │   ├── 2026-06-11--b4-observer-visibility-layering-plan.md
 │   │   │   ├── 2026-06-11--foundation-artifacts-pyproject-plan.md
 │   │   │   ├── 2026-06-11--l4-guard-arm-plan.md
 │   │   │   ├── 2026-06-11--observer-server-split-plan.md
@@ -236,7 +240,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │       ├── 2026-06-11-b4-scaffold-VERDICT.md
 │   │       ├── 2026-06-11-baseline-prompt-v1-metrics.json
 │   │       ├── 2026-06-11-l4-baseline-backfill.json
-│   │       └── 2026-06-11-l4-guard-prompt-v3-metrics.json
+│   │       ├── 2026-06-11-l4-guard-prompt-v3-metrics.json
+│   │       └── 2026-06-11-l4-guard-VERDICT.md
 │   ├── health-check/
 │   │   ├── _baseline/
 │   │   │   ├── baseline.py
@@ -299,7 +304,9 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │       ├── 2026-06-10-prompt-versioning-design.md
 │   │       ├── 2026-06-10-quality-ablation-harness-and-b1-context-design.md
 │   │       ├── 2026-06-11-l4-guard-arm-design.md
-│   │       └── 2026-06-11-sys-b4-claim-ledger-vote-scaffold-design.md
+│   │       ├── 2026-06-11-sys-b3-b5-closeout-design.md
+│   │       ├── 2026-06-11-sys-b4-claim-ledger-vote-scaffold-design.md
+│   │       └── 2026-06-12-l4-guard-witch-coord-arm-design.md
 │   ├── CHECKPOINT_TEMPLATE.md
 │   ├── EVALUATION_RUBRIC.md
 │   ├── GOLD_DEMO.md
@@ -378,8 +385,11 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       ├── gold_game_fixtures.py
 │       ├── llm_providers.py
 │       ├── log_bundle.py
+│       ├── observer_enrichment.py
+│       ├── observer_projection.py
 │       ├── observer_protocol.py
 │       ├── observer_server.py
+│       ├── observer_trust_index.py
 │       ├── observer_visibility.py
 │       ├── profile_config.py
 │       ├── prompt_goldens.py
@@ -586,5 +596,6 @@ Use this file for navigation only. Verify implementation details by reading sour
 ├── live-check.bat
 ├── pyproject.toml
 ├── README.md
-└── README.zh-CN.md
+├── README.zh-CN.md
+└── requirements-dev.txt
 ```

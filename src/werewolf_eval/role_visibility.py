@@ -10,9 +10,11 @@ Both engines (``GameEngine`` scripted/mock arcs and ``EmergentGameEngine``) deci
 
 This is the invariant the P2-A-2 "no feed leak" hard gate renders prompts from.
 
-WITNESS BOUNDARY (do not widen): ``observer_visibility.py`` / ``observer_protocol.py``
-and ``invariants/`` are deliberate INDEPENDENT implementations (SYS-A4 dual witness /
-safety-net I4b anti-circularity). They must never import this module —
+WITNESS BOUNDARY (do not widen): ``observer_visibility.py`` (facade) +
+``observer_trust_index.py`` / ``observer_projection.py`` / ``observer_enrichment.py``
+(B-4 layering) / ``observer_protocol.py`` and ``invariants/`` are deliberate
+INDEPENDENT implementations (SYS-A4 dual witness / safety-net I4b
+anti-circularity). They must never import this module —
 ``tests/test_role_visibility.py`` enforces that with a sentinel."""
 
 from __future__ import annotations
