@@ -16,4 +16,6 @@ PROMPT_VERSION = "prompt_v1"
 # stays the default; prompt_v2 (SYS-B1 context repair) coexists and is selected
 # per-arm/per-game. Each version has its own golden dir under tests/golden_prompts/.
 # prompt_v3 = SYS-B4 claim-ledger/vote-scaffold chain (scribe + restrained speech).
-KNOWN_PROMPT_VERSIONS = ("prompt_v1", "prompt_v2", "prompt_v3")
+# prompt_v4 = v3 + witch antidote-coordination guidance on guard boards
+# (l4_guard_witch_coord arm, spec 2026-06-12).
+KNOWN_PROMPT_VERSIONS = ("prompt_v1", "prompt_v2", "prompt_v3", "prompt_v4")

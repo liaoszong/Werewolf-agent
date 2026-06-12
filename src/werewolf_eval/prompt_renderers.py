@@ -28,6 +28,7 @@ from werewolf_eval.prompt_v3 import (
     render_claim_digest,
     render_vote_scaffold,
 )
+from werewolf_eval.prompt_v4 import render_witch_coord_suffix
 from werewolf_eval.prompt_version import KNOWN_PROMPT_VERSIONS
 
 
@@ -51,6 +52,9 @@ class PromptRendererV1:
         return ""
 
     def speech_obs_suffix(self, claim_ledger: list[dict[str, Any]]) -> str:
+        return ""
+
+    def witch_obs_suffix(self, board_card: str | None, victim: str | None, save_used: bool) -> str:
         return ""
 
 
@@ -93,8 +97,19 @@ class PromptRendererV3(PromptRendererV2):
         return ""
 
 
+class PromptRendererV4(PromptRendererV3):
+    """l4_guard_witch_coord arm: the full v3 chain + witch antidote-coordination
+    guidance injected ONLY into the witch's night action observation
+    (3-condition gate in prompt_v4.render_witch_coord_suffix; spec 2026-06-12 §3)."""
+
+    version = "prompt_v4"
+
+    def witch_obs_suffix(self, board_card: str | None, victim: str | None, save_used: bool) -> str:
+        return render_witch_coord_suffix(board_card, victim, save_used)
+
+
 REGISTRY: dict[str, PromptRendererV1] = {
-    r.version: r for r in (PromptRendererV1(), PromptRendererV2(), PromptRendererV3())
+    r.version: r for r in (PromptRendererV1(), PromptRendererV2(), PromptRendererV3(), PromptRendererV4())
 }
 
 

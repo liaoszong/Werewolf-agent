@@ -18,12 +18,15 @@ from werewolf_eval.prompt_v3 import (
     render_claim_digest,
     render_vote_scaffold,
 )
-from werewolf_eval.action_runtime.ruleset import rules_v1_1
+from werewolf_eval.prompt_v4 import WITCH_COORD_GUIDANCE
+from werewolf_eval.action_runtime.ruleset import rules_v1_1, rules_v1_2
 from werewolf_eval.game_engine import AgentObservation
 from werewolf_eval.provider_contract import ProviderRequest
 
 _SEATS = {"p1": "werewolf", "p2": "werewolf", "p3": "seer",
           "p4": "witch", "p5": "villager", "p6": "villager"}
+_GUARD_SEATS = {"p1": "werewolf", "p2": "werewolf", "p3": "seer",
+                "p4": "witch", "p5": "guard", "p6": "villager"}
 _EVENTS = {
     "e1": {"event_id": "e1", "sequence": 1, "round": 1, "phase": "night",
            "type": "werewolf_kill", "actor": "p1", "target": "p5",
@@ -70,6 +73,7 @@ class RegistrySentinelTest(unittest.TestCase):
         self.assertFalse(REGISTRY["prompt_v1"].requires_scaffold)
         self.assertFalse(REGISTRY["prompt_v2"].requires_scaffold)
         self.assertTrue(REGISTRY["prompt_v3"].requires_scaffold)
+        self.assertTrue(REGISTRY["prompt_v4"].requires_scaffold)
 
 
 class AdapterByteEquivalenceTest(unittest.TestCase):
@@ -103,6 +107,37 @@ class AdapterByteEquivalenceTest(unittest.TestCase):
                          build_speech_system_prompt_v2(req))
         self.assertEqual(get_renderer("prompt_v3").speech_contract(req),
                          build_speech_system_prompt_v3(req))
+
+    def test_v4_inherits_v3_surfaces(self):
+        req = _req()
+        r4 = get_renderer("prompt_v4")
+        self.assertEqual(r4.speech_contract(req), build_speech_system_prompt_v3(req))
+        self.assertEqual(r4.action_obs_suffix("day", _CLAIMS), "\n" + render_vote_scaffold(_CLAIMS))
+        self.assertEqual(r4.speech_obs_suffix(_CLAIMS), "\n" + render_claim_digest(_CLAIMS))
+        rs = rules_v1_1()
+        self.assertEqual(r4.board_card(rs, _SEATS),
+                         get_renderer("prompt_v3").board_card(rs, _SEATS))
+
+
+class WitchObsSuffixDispatchTest(unittest.TestCase):
+    """v4 注入 hook:v1/v2/v3 恒返 ""(既有版本字节零影响);v4 走 3 条件门。"""
+
+    def setUp(self):
+        # build_board_rules_card is already module-level imported in this file
+        self.guard_card = build_board_rules_card(rules_v1_2(), _GUARD_SEATS)
+
+    def test_v1_v2_v3_always_empty(self):
+        for v in ("prompt_v1", "prompt_v2", "prompt_v3"):
+            self.assertEqual(get_renderer(v).witch_obs_suffix(self.guard_card, "p5", False), "")
+
+    def test_v4_injects_only_on_full_conjunction(self):
+        r4 = get_renderer("prompt_v4")
+        self.assertEqual(r4.witch_obs_suffix(self.guard_card, "p5", False),
+                         "\n" + WITCH_COORD_GUIDANCE)
+        self.assertEqual(r4.witch_obs_suffix(self.guard_card, None, False), "")
+        self.assertEqual(r4.witch_obs_suffix(self.guard_card, "p5", True), "")
+        std_card = get_renderer("prompt_v2").board_card(rules_v1_1(), _SEATS)
+        self.assertEqual(r4.witch_obs_suffix(std_card, "p5", False), "")
 
 
 class InjectionSuffixTest(unittest.TestCase):
