@@ -114,7 +114,11 @@ class ProviderAgent:
         )
         allowed_targets = list(observation.alive_players)
 
-        request_id = f"{game_id}_r{round_num:02d}_{actor}"
+        # C12-01: day-phase action = vote; append _vote so the ProviderRequest
+        # request_id matches the engine's turn request_id and never collides with
+        # the same actor's night action (same bare stem).
+        _req_suffix = "_vote" if phase == "day" else ""
+        request_id = f"{game_id}_r{round_num:02d}_{actor}{_req_suffix}"
 
         if self._failure_mode == "timeout":
             failure = ProviderFailure(
