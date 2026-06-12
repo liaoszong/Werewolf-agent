@@ -13,7 +13,7 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from werewolf_eval.observer.run_manager import RunManager
+from werewolf_eval.observer.run_manager import RunManager, _materialize_env_live_launcher
 from werewolf_eval.observer.state import ObserverServerState
 from werewolf_eval.observer_protocol import read_run_status
 
@@ -106,6 +106,23 @@ class ExecuteRunTests(_Fixture):
         rm = self._execute("a", _denied)
         self.assertEqual(rm.get_error("a"), "provider_auth_failed")
 
+    def test_exit_zero_records_low_live_success_rate(self) -> None:
+        def _simulate_run(rid: str, rd: Path) -> int:
+            (rd / "provider-turns.json").write_text(json.dumps({
+                "live_success_rate": 0.79,
+                "live_requested_actions": 100,
+                "live_success_actions": 79,
+            }), encoding="utf-8")
+            return 0
+        rm = self._execute("low", _simulate_run)
+        run_dir = self.runs / "low"
+        self.assertEqual(rm.get_status("low", run_dir), "failed")
+        self.assertEqual(rm.get_error("low"), "low_live_success_rate")
+        
+        status_data = json.loads((run_dir / "status.json").read_text(encoding="utf-8"))
+        self.assertEqual(status_data["reason"], "low_live_success_rate")
+        self.assertEqual(status_data["live_success_rate"], 0.79)
+
 
 class DeleteRunTests(_Fixture):
     def test_active_run_is_never_deleted(self) -> None:
@@ -162,6 +179,25 @@ class RunDetailTests(_Fixture):
         detail = rm.run_detail_with_reason("d2", run_dir)
         self.assertNotIn("reason", detail)
         self.assertNotIn("execution_mode", detail)
+
+
+class MaterializeEnvLiveLauncherTests(_Fixture):
+    def test_materialize_parameterless_factory(self) -> None:
+        def my_launcher(run_id: str, run_dir: Path) -> int:
+            return 0
+        def factory():
+            return my_launcher
+            
+        state = self._state()
+        state.live_launcher = factory
+        result = _materialize_env_live_launcher(state)
+        self.assertIs(result, my_launcher)
+        
+    def test_materialize_concrete_launcher(self) -> None:
+        state = self._state()
+        state.live_launcher = _noop_launcher
+        result = _materialize_env_live_launcher(state)
+        self.assertIs(result, _noop_launcher)
 
 
 if __name__ == "__main__":
