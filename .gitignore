@@ -45,3 +45,5 @@ clients/qt_observer/build/
 
 # Claude Code agent worktree scratch (embedded git repos)
 .claude/worktrees/
+
+.worktrees/
