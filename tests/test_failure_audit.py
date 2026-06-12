@@ -48,6 +48,28 @@ class FailureAuditTests(unittest.TestCase):
         with self.assertRaisesRegex(FailureAuditValidationError, "failure missing fields"):
             parse_failure_audit(raw, _game())
 
+    def test_accepts_structured_provider_failure_kinds(self):
+        # B34-10 / B12-02/03: provider transport/respond exceptions are now
+        # classified into structured kinds that flow into the failure audit via
+        # ProviderFailure.kind. The whitelist must accept them.
+        for kind in ("budget_exhausted", "transport_error", "auth_failed", "provider_error"):
+            with self.subTest(kind=kind):
+                raw = _valid_raw()
+                raw["failures"] = [
+                    {
+                        "game_id": "g1c_wolf_consensus",
+                        "round": 1,
+                        "phase": "night",
+                        "actor": "p1",
+                        "kind": kind,
+                        "target": None,
+                        "reason": f"provider error classified as {kind}",
+                        "repaired_to_valid_action": False,
+                    }
+                ]
+                audit = parse_failure_audit(raw, _game())
+                self.assertEqual(audit.failures[0].kind, kind)
+
     def test_rejects_repaired_to_valid_action_true(self):
         raw = _valid_raw()
         raw["failures"] = [

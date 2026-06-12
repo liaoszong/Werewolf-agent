@@ -14,6 +14,13 @@ VALID_FAILURE_KINDS = {
     "parse_failure",
     "invalid_action",
     "wolf_consensus_failure",
+    # B34-10 / B12-02/03: structured provider transport/respond failure kinds
+    # (classify_provider_failure_kind). These flow into the audit via
+    # ProviderFailure.kind on the wolf/seer/vote and inline witch/hunter paths.
+    "budget_exhausted",
+    "transport_error",
+    "auth_failed",
+    "provider_error",
 }
 VALID_FAILURE_PHASES = {"night", "day"}
 

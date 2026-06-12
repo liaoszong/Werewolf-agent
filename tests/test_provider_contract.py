@@ -9,6 +9,7 @@ from werewolf_eval.provider_contract import (
     ProviderRequest,
     ProviderResponse,
     ProviderTrace,
+    classify_provider_failure_kind,
     provider_failure_to_dict,
     provider_request_to_dict,
     provider_response_to_dict,
@@ -69,6 +70,45 @@ class ProviderContractTests(unittest.TestCase):
         self.assertFalse(provider_failure_to_dict(failure)["repaired_to_valid_action"])
         self.assertEqual(provider_request_to_dict(request)["response_format_version"], "g1d-action-v1")
         self.assertEqual(provider_response_to_dict(response)["source_label"], FAKE_PROVIDER_SOURCE_LABEL)
+
+
+class ClassifyProviderFailureKindTests(unittest.TestCase):
+    """B34-10: single source of truth mapping a provider transport/respond
+    exception to a structured failure kind. Matches llm_providers wording."""
+
+    def test_budget_exhausted_from_either_wording(self) -> None:
+        # llm_providers raises "request budget exceeded: N"; emergent reason reads
+        # "budget exhausted"; both must classify structurally.
+        self.assertEqual(
+            classify_provider_failure_kind(RuntimeError("request budget exceeded: 32")),
+            "budget_exhausted",
+        )
+        self.assertEqual(
+            classify_provider_failure_kind(RuntimeError("budget exhausted: 30/30 requests")),
+            "budget_exhausted",
+        )
+
+    def test_transport_error(self) -> None:
+        self.assertEqual(
+            classify_provider_failure_kind(RuntimeError("[DeepSeek API output] transport error: ConnectionError")),
+            "transport_error",
+        )
+
+    def test_auth_failed(self) -> None:
+        self.assertEqual(
+            classify_provider_failure_kind(RuntimeError("DeepSeek API key is not configured")),
+            "auth_failed",
+        )
+
+    def test_unknown_defaults_to_provider_error(self) -> None:
+        self.assertEqual(
+            classify_provider_failure_kind(RuntimeError("DeepSeek returned empty content")),
+            "provider_error",
+        )
+        self.assertEqual(
+            classify_provider_failure_kind(ValueError("something weird")),
+            "provider_error",
+        )
 
 
 if __name__ == "__main__":

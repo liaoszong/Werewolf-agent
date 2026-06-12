@@ -30,7 +30,7 @@ from werewolf_eval.game_engine import (
 )
 from werewolf_eval.runtime_events import build_god_snapshot, build_role_projection_snapshot
 from werewolf_eval.provider_agent import ProviderActionError
-from werewolf_eval.provider_contract import ProviderRequest
+from werewolf_eval.provider_contract import ProviderRequest, classify_provider_failure_kind
 from werewolf_eval.action_runtime import (
     ActionEnvelope,
     ActionValidator,
@@ -105,7 +105,12 @@ SCAFFOLD_FALLBACK = "scaffold_fallback"
 
 
 def _fallback_kind_for(failure_kind: str) -> str:
-    if failure_kind == "timeout":
+    # Transport-class failures (timeout / transport_error / budget_exhausted) keep
+    # the existing timeout_then_fallback turn-kind (budget used to arrive as
+    # "timeout" pre-B34-10, so this preserves continuity). parse/invalid live
+    # results map to invalid_then_fallback; everything else (auth_failed /
+    # provider_error / unknown) is an error_then_fallback.
+    if failure_kind in ("timeout", "transport_error", "budget_exhausted"):
         return TIMEOUT_FALLBACK
     if failure_kind in ("invalid_action", "parse_failure"):
         return INVALID_FALLBACK
@@ -803,21 +808,36 @@ class EmergentGameEngine:
         target: str | None = None
         try:
             response = provider.respond(request)
-            turn["source_label"] = response.source_label
-            turn["token_usage"] = dict(response.token_usage)
-            parsed = json.loads(response.raw_content)
-            if not isinstance(parsed, dict):
-                raise ValueError("witch response not a JSON object")
-            action_name = parsed.get("action", WITCH_PASS)
-            target = parsed.get("target")
-            turn["kind"] = LIVE_SUCCESS
-        except Exception as exc:  # noqa: BLE001
-            self._record_failure(rnd, "night", witch, "parse_failure", f"{witch} witch parse failed: {exc}")
-            turn["kind"] = INVALID_FALLBACK
-            turn["fallback_reason"] = f"witch parse failed: {exc}"
+        except Exception as exc:  # noqa: BLE001 — transport/respond failure, NOT a parse failure
+            # B12-02/03: classify the network/respond exception (transport / budget /
+            # auth / provider) instead of lumping it with JSON parse errors. The
+            # turn-kind follows _fallback_kind_for so transport != invalid_then_fallback.
+            kind = classify_provider_failure_kind(exc)
+            self._record_failure(rnd, "night", witch, kind, f"{witch} witch provider error: {exc}")
+            turn["kind"] = _fallback_kind_for(kind)
+            turn["fallback_reason"] = f"witch provider error: {exc}"
             turn["source_label"] = None
             turn["token_usage"] = None
-            action_name = WITCH_PASS
+        else:
+            turn["source_label"] = response.source_label
+            turn["token_usage"] = dict(response.token_usage)
+            try:
+                parsed = json.loads(response.raw_content)
+                if not isinstance(parsed, dict):
+                    raise ValueError("witch response not a JSON object")
+            except Exception as exc:  # noqa: BLE001 — JSON parse failure
+                self._record_failure(rnd, "night", witch, "parse_failure", f"{witch} witch parse failed: {exc}")
+                self._downgrade_turn(turn, f"witch parse failed: {exc}")
+            else:
+                if "action" not in parsed:
+                    # B12-01: a JSON-valid response missing the mandatory action key is a
+                    # parse failure (matching ProviderAgent), NOT a silent live pass.
+                    self._record_failure(rnd, "night", witch, "parse_failure", f"{witch} witch missing action key")
+                    self._downgrade_turn(turn, f"{witch} witch missing action key")
+                else:
+                    action_name = parsed["action"]
+                    target = parsed.get("target")
+                    turn["kind"] = LIVE_SUCCESS
 
         # validate (a parsed-but-illegal potion use is rejected -> fall back to
         # pass AND downgrade the turn: the live result was not used)
@@ -1006,17 +1026,33 @@ class EmergentGameEngine:
         action_name, target = "hunter_pass", None
         try:
             response = self._agents[hunter].provider.respond(request)
+        except Exception as exc:  # noqa: BLE001 — transport/respond failure, NOT a parse failure
+            # B12-02/03 parity with the witch resolver.
+            kind = classify_provider_failure_kind(exc)
+            self._record_failure(rnd, phase, hunter, kind, f"{hunter} hunter provider error: {exc}")
+            turn["kind"] = _fallback_kind_for(kind)
+            turn["fallback_reason"] = f"hunter provider error: {exc}"
+            turn["source_label"] = None
+            turn["token_usage"] = None
+        else:
             turn["source_label"] = response.source_label
             turn["token_usage"] = dict(response.token_usage)
-            parsed = json.loads(response.raw_content)
-            action_name = parsed.get("action", "hunter_pass")
-            target = parsed.get("target")
-            turn["kind"] = LIVE_SUCCESS
-        except Exception as exc:  # noqa: BLE001
-            self._record_failure(rnd, phase, hunter, "parse_failure", f"{hunter} hunter parse failed: {exc}")
-            turn["kind"] = INVALID_FALLBACK
-            turn["fallback_reason"] = f"hunter parse failed: {exc}"
-            action_name, target = "hunter_pass", None
+            try:
+                parsed = json.loads(response.raw_content)
+                if not isinstance(parsed, dict):
+                    raise ValueError("hunter response not a JSON object")
+            except Exception as exc:  # noqa: BLE001 — JSON parse failure
+                self._record_failure(rnd, phase, hunter, "parse_failure", f"{hunter} hunter parse failed: {exc}")
+                self._downgrade_turn(turn, f"hunter parse failed: {exc}")
+            else:
+                if "action" not in parsed:
+                    # B12-01: missing mandatory action key is a parse failure, not a silent pass.
+                    self._record_failure(rnd, phase, hunter, "parse_failure", f"{hunter} hunter missing action key")
+                    self._downgrade_turn(turn, f"{hunter} hunter missing action key")
+                else:
+                    action_name = parsed["action"]
+                    target = parsed.get("target")
+                    turn["kind"] = LIVE_SUCCESS
 
         if action_name == "hunter_shoot":
             ab = next((a for a in self._registry.on_death_abilities("hunter")

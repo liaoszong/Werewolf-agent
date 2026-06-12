@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 534
+- Entries: 541
 
 ```text
 ./
@@ -226,6 +226,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   │   ├── 2026-06-11--provider-launcher-mechanical-refactor-plan.md
 │   │   │   ├── 2026-06-11--sys-a2-role-single-source-plan.md
 │   │   │   ├── 2026-06-11--sys-b1-prompt-renderer-registry-plan.md
+│   │   │   ├── 2026-06-12--b2-engine-failure-classification-plan.md
+│   │   │   ├── 2026-06-12--c12-score-id-race-plan.md
 │   │   │   └── 2026-06-12--l4-guard-witch-coord-arm-plan.md
 │   │   └── reviews/
 │   │       ├── 2026-06-01--g1c-project-healthcheck-final.md
@@ -242,7 +244,9 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │       ├── 2026-06-11-baseline-prompt-v1-metrics.json
 │   │       ├── 2026-06-11-l4-baseline-backfill.json
 │   │       ├── 2026-06-11-l4-guard-prompt-v3-metrics.json
-│   │       └── 2026-06-11-l4-guard-VERDICT.md
+│   │       ├── 2026-06-11-l4-guard-VERDICT.md
+│   │       ├── 2026-06-12-l4-guard-witch-coord-prompt-v4-metrics.json
+│   │       └── 2026-06-12-l4-guard-witch-coord-VERDICT.md
 │   ├── health-check/
 │   │   ├── _baseline/
 │   │   │   ├── baseline.py
@@ -504,6 +508,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── test_artifacts.py
 │   ├── test_attribution.py
 │   ├── test_build_review_packet.py
+│   ├── test_c3_negative_scan.py
 │   ├── test_consensus_log.py
 │   ├── test_context_budget.py
 │   ├── test_credential_store.py
@@ -529,6 +534,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── test_guard_resolver.py
 │   ├── test_guard_sentinels.py
 │   ├── test_guard_visibility.py
+│   ├── test_inline_witch_hunter_failure.py
 │   ├── test_invariants_artifacts.py
 │   ├── test_invariants_bad_examples.py
 │   ├── test_invariants_checker.py
@@ -565,6 +571,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── test_prompt_v4_engine.py
 │   ├── test_prompt_v4.py
 │   ├── test_prompt_versioning.py
+│   ├── test_provider_agent_failure_classification.py
 │   ├── test_provider_contract.py
 │   ├── test_provider_registry.py
 │   ├── test_qt_observer_static_contract.py

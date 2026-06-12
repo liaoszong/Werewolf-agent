@@ -8,6 +8,7 @@ from werewolf_eval.game_engine import AgentAction, AgentObservation
 from werewolf_eval.provider_contract import (
     ProviderFailure,
     ProviderRequest,
+    classify_provider_failure_kind,
 )
 
 
@@ -172,13 +173,20 @@ class ProviderAgent:
             response = self._provider.respond(request)
             self._last_response = response
         except Exception as exc:
+            # B34-10: classify the transport/respond exception into a structured
+            # kind (budget_exhausted / transport_error / auth_failed /
+            # provider_error) instead of flattening everything to "timeout". The
+            # original message stays in `reason`, so substring detectors that
+            # predate this (deepseek_launcher._failure_is_budget_exhausted) and
+            # diagnostics keep working.
+            kind = classify_provider_failure_kind(exc)
             failure = ProviderFailure(
                 request_id=request_id,
                 game_id=game_id,
                 round=round_num,
                 phase=phase,
                 actor=actor,
-                kind="timeout",
+                kind=kind,
                 reason=f"provider error: {exc}",
             )
             self._emit_provider_event(
@@ -186,7 +194,7 @@ class ProviderAgent:
                 round=round_num,
                 phase=phase,
                 actor=actor,
-                payload={"request_id": request_id, "kind": "timeout", "reason": str(exc)},
+                payload={"request_id": request_id, "kind": kind, "reason": str(exc)},
             )
             raise ProviderActionError(failure) from exc
 

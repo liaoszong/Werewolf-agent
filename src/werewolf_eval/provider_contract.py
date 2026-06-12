@@ -66,6 +66,26 @@ class ProviderFailure:
     repaired_to_valid_action: bool = False
 
 
+def classify_provider_failure_kind(exc: Exception) -> str:
+    """Map a provider transport/respond exception to a structured failure kind.
+
+    Single source of truth so the ``ProviderAgent`` path and the inline
+    witch/hunter paths classify identically (B34-10 / B12-02/03). Keyed on the
+    wording ``llm_providers`` raises (transport error / api key not configured /
+    request budget exceeded). The caller keeps the original message in the
+    failure ``reason``, so the substring detectors that predate this (e.g.
+    ``deepseek_launcher._failure_is_budget_exhausted``) keep working unchanged.
+    """
+    msg = str(exc).lower()
+    if "budget exceeded" in msg or "budget exhausted" in msg:
+        return "budget_exhausted"
+    if "transport error" in msg:
+        return "transport_error"
+    if "api key is not configured" in msg:
+        return "auth_failed"
+    return "provider_error"
+
+
 @dataclass(frozen=True)
 class ProviderTrace:
     game_id: str
