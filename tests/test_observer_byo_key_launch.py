@@ -89,7 +89,6 @@ class NoOrphanRunDirOnLiveRejectTests(unittest.TestCase):
             launcher=lambda r, d: 0,
             live_enabled=True,
             credential_store=cs,
-            live_launcher_factory=None,  # no factory
             multi_provider_launcher_factory=lambda seats, creds: (lambda r, d: 0),
         )
 

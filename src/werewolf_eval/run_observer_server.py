@@ -6,13 +6,9 @@ import argparse
 import os
 import sys
 from pathlib import Path
-from typing import Callable, Mapping
+from typing import Mapping
 
-from werewolf_eval.deepseek_launcher import (
-    DEFAULT_MAX_LIVE_REQUESTS,
-    RunLauncher,
-    build_emergent_deepseek_launcher,
-)
+from werewolf_eval.deepseek_launcher import DEFAULT_MAX_LIVE_REQUESTS
 from werewolf_eval.observer_server import create_observer_server
 from werewolf_eval.run_emergent_fake_runtime import default_emergent_fake_launcher
 
@@ -45,20 +41,18 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
 def resolve_live_launcher(
     args: argparse.Namespace, environ: Mapping[str, str]
-) -> tuple[bool, Callable[..., RunLauncher] | None]:
-    """Pure resolver: map parsed args to ``(live_enabled, factory_or_None)``
-    for ``create_observer_server``.
+) -> bool:
+    """Pure resolver: map parsed args to ``live_enabled`` for
+    ``create_observer_server``.
 
     B5 closeout: the deepseek-only env-key fallback has been retired. The
     ``--api-key-env`` flag is retained for CLI back-compat but ignored (with a
     deprecation warning if the env var it names is actually set). Live launches
     now require a client-supplied credential for every provider via
-    POST /api/credentials.
-
-    The factory builds a fresh launcher per launch from a client-supplied key;
-    it is ``None`` only when live is disabled."""
+    POST /api/credentials; the old single-provider ``live_launcher_factory`` was
+    write-only (never read by the launch path) and has been removed."""
     if not args.allow_live_api:
-        return (False, None)
+        return False
     # Deprecation warning: if the named env var is set, warn that it's ignored.
     api_key_env_name = getattr(args, "api_key_env", "DEEPSEEK_API_KEY")
     if environ.get(api_key_env_name):
@@ -67,23 +61,13 @@ def resolve_live_launcher(
             f"and ignored (B5 closeout: use POST /api/credentials instead)",
             file=sys.stderr,
         )
-
-    def factory(key: str, base_url: str | None = None) -> RunLauncher:
-        return build_emergent_deepseek_launcher(
-            api_key=key,
-            base_url=base_url or args.deepseek_base_url,
-            model=args.deepseek_model,
-            max_tokens=_LIVE_MAX_TOKENS,
-            max_requests=args.max_live_requests,
-        )
-
-    return (True, factory)
+    return True
 
 
 def main() -> int:
     args = build_arg_parser().parse_args()
 
-    live_enabled, factory = resolve_live_launcher(args, os.environ)
+    live_enabled = resolve_live_launcher(args, os.environ)
 
     server = create_observer_server(
         args.host,
@@ -91,7 +75,6 @@ def main() -> int:
         Path(args.runs_dir),
         launcher=default_emergent_fake_launcher,
         live_enabled=live_enabled,
-        live_launcher_factory=factory,
         live_max_requests=args.max_live_requests,
         live_max_tokens=_LIVE_MAX_TOKENS,
         # A fresh server seeds a baseline default profile so the setup page is

@@ -25,11 +25,10 @@ class ObserverServerState:
     # Live launches now require a client-supplied credential for every provider
     # (including deepseek) via POST /api/credentials → CredentialStore.
     live_enabled: bool = False
-    # P2-B-1 BYO-key: in-memory client credentials + a per-launch live launcher
-    # factory (built from a key at launch). env_key_available and live_launcher
-    # (the old env-key back-compat hooks) were removed in B5 closeout.
+    # P2-B-1 BYO-key: in-memory client credentials. env_key_available,
+    # live_launcher, and the vestigial single-provider live_launcher_factory
+    # (write-only — never read by the launch path) were all removed in B5 closeout.
     credential_store: CredentialStore = field(default_factory=CredentialStore)
-    live_launcher_factory: Callable[..., RunLauncher] | None = None
     # P2-B-3/B-4: per-seat multi-provider launcher builder. Given the resolved
     # seats + a {provider: ProviderCredential} map, returns a RunLauncher that runs
     # the game with each seat on its own provider/model/persona. Injectable so

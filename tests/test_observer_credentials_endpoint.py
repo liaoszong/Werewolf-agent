@@ -19,7 +19,6 @@ def _state(tmp, *, live_enabled, has_client_key):
         runs_dir=Path(tmp), launcher=lambda r, d: 0,
         live_enabled=live_enabled,
         credential_store=cs,
-        live_launcher_factory=(lambda api_key: (lambda r, d: 0)),
     )
 
 

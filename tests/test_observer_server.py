@@ -1620,38 +1620,40 @@ class ObserverServerLiveOptInTests(TestCase):
             )
 
     def test_no_flag_yields_disabled(self) -> None:
-        # B5 closeout: resolve_live_launcher returns (live_enabled, factory) 2-tuple.
-        # --api-key-env is deprecated and ignored.
-        live_enabled, factory = self._resolve(
+        # B5 closeout: resolve_live_launcher returns live_enabled (bool); the
+        # vestigial single-provider factory was removed. --api-key-env is ignored.
+        live_enabled = self._resolve(
             ["--runs-dir", "x"], {"DEEPSEEK_API_KEY": "sk-test-fake-unused"}
         )
         self.assertFalse(live_enabled)
-        self.assertIsNone(factory)
         # request-time effect: live → live_api_disabled
         st = self._state(live_enabled)
         self.assertEqual(_check_live_capability(st, "live")[1], "live_api_disabled")  # type: ignore[index]
 
-    def test_flag_on_yields_enabled_with_factory(self) -> None:
-        # B5 closeout: --allow-live-api enables live and returns a factory.
-        # --api-key-env is deprecated and ignored (env var set or not).
-        live_enabled, factory = self._resolve(
+    def test_flag_on_yields_enabled(self) -> None:
+        # B5 closeout: --allow-live-api enables live. Live launches require a
+        # client-supplied credential (no env-key factory). --api-key-env ignored.
+        live_enabled = self._resolve(
             ["--allow-live-api", "--api-key-env", "DOES_NOT_EXIST_XXXX"], {}
         )
         self.assertTrue(live_enabled)
-        # factory is present because a client can supply a key
-        self.assertTrue(callable(factory))
         # with empty credential store, capability returns missing_api_key
         st = self._state(live_enabled)
         self.assertEqual(_check_live_capability(st, "live")[1], "missing_api_key")  # type: ignore[index]
 
-    def test_env_var_set_triggers_deprecation_but_factory_still_built(self) -> None:
-        # B5 closeout: if the named env var is set, a deprecation warning is printed
-        # but the factory is still built (for client-supplied keys).
-        live_enabled, factory = self._resolve(
-            ["--allow-live-api"], {"DEEPSEEK_API_KEY": "sk-test-fake-key"}
-        )
+    def test_env_var_set_triggers_deprecation_warning(self) -> None:
+        # B5 closeout: if the named env var is set, a deprecation warning is
+        # printed to stderr; the env key is otherwise ignored.
+        import contextlib
+        import io
+
+        buf = io.StringIO()
+        with contextlib.redirect_stderr(buf):
+            live_enabled = self._resolve(
+                ["--allow-live-api"], {"DEEPSEEK_API_KEY": "sk-test-fake-key"}
+            )
         self.assertTrue(live_enabled)
-        self.assertTrue(callable(factory))
+        self.assertIn("deprecated", buf.getvalue())
 
     def test_help_lists_live_flags(self) -> None:
         import subprocess

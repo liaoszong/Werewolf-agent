@@ -44,7 +44,6 @@ def create_observer_server(
     launcher: RunLauncher | None = None,
     profiles_dir: Path | None = None,
     live_enabled: bool = False,
-    live_launcher_factory: Callable[..., RunLauncher] | None = None,
     live_max_requests: int = 32,
     live_max_tokens: int = 256,
     seed_default_profile: bool = False,
@@ -54,9 +53,6 @@ def create_observer_server(
     ``live_enabled`` wires the G3-1 opt-in live path: live is the only mode that
     consults it, and only a profile launch (not a template launch) may select it.
     Defaults off so the server stays fake-only.
-
-    ``live_launcher_factory`` is the per-launch builder used with a client-supplied
-    key (P2-B-1 BYO-key path).
 
     P2-B-4: when live is enabled, a ``multi_provider_launcher_factory`` is built
     with the server live limits — the per-seat multi-provider launch path.
@@ -90,7 +86,6 @@ def create_observer_server(
         launcher=launcher,
         profiles_dir=profiles_dir,
         live_enabled=live_enabled,
-        live_launcher_factory=live_launcher_factory,
         multi_provider_launcher_factory=multi_provider_launcher_factory,
     )
 
