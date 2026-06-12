@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 516
+- Entries: 517
 
 ```text
 ./
@@ -302,7 +302,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │       ├── 2026-06-10-quality-ablation-harness-and-b1-context-design.md
 │   │       ├── 2026-06-11-l4-guard-arm-design.md
 │   │       ├── 2026-06-11-sys-b3-b5-closeout-design.md
-│   │       └── 2026-06-11-sys-b4-claim-ledger-vote-scaffold-design.md
+│   │       ├── 2026-06-11-sys-b4-claim-ledger-vote-scaffold-design.md
+│   │       └── 2026-06-12-l4-guard-witch-coord-arm-design.md
 │   ├── CHECKPOINT_TEMPLATE.md
 │   ├── EVALUATION_RUBRIC.md
 │   ├── GOLD_DEMO.md
