@@ -68,6 +68,28 @@ class CrossRoundEnrichmentTests(unittest.TestCase):
         self.assertEqual(result["e_g2"]["decision_id"], "d2")
         self.assertEqual(result["e_g2"]["request_id"], "r02_p3")
 
+    def test_round_bearing_event_without_same_round_decision_not_mislabeled(self):
+        """A45-7 regression: a round-2 event whose round-2 decision is MISSING must
+        NOT inherit a different round's reason. The pre-fix greedy last-resort
+        fallback grabbed the round-1 decision and stamped it on the round-2 event
+        (reproduced). Correct behavior: leave the event unmatched rather than
+        attach the wrong round's reasoning."""
+        run_dir = _write_run_dir(
+            self._base_game_log([
+                {"event_id": "e_g2", "round": 2, "phase": "night", "actor": "p3", "type": "guard_protect", "target": "p3", "data": {"summary": "Guard protects p3 r2"}},
+            ]),
+            self._base_decision_log([
+                {"decision_id": "d1", "actor": "p3", "decision_scope": "single", "phase": "night", "round": 1, "action": "guard_protect", "target": "p3", "reason_summary": "r1 reason", "decision_type": "inference_based", "visible_info_refs": [], "request_id": "r01_p3"},
+            ]),
+        )
+        result = _load_decision_reasons(run_dir)
+        # The round-2 event must NOT be labeled with the round-1 decision at all.
+        self.assertNotIn(
+            "e_g2", result,
+            "round-bearing event with no same-round decision must stay unmatched, "
+            "not inherit another round's reason",
+        )
+
     def test_ambiguous_duplicate_key_marked_not_silently_resolved(self):
         """When two decisions share the same (round, phase, actor, action, target),
         enrichment marks ambiguity instead of silently picking one."""

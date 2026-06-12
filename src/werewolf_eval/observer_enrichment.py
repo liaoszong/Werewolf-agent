@@ -134,9 +134,16 @@ def _load_decision_reasons(run_dir: Path) -> dict[str, dict[str, str]]:
         action = str(event.get("type", ""))
         target = "" if event.get("target") is None else str(event.get("target", ""))
         round_val = event.get("round")
+        # Mirror the decision-side round check (incl. the bool exclusion): a JSON
+        # ``true`` is an int subclass but never a valid round.
+        event_has_round = (
+            isinstance(round_val, int)
+            and not isinstance(round_val, bool)
+            and round_val >= 0
+        )
 
         # Try composite key match first (when both decision and event have round).
-        if has_round and round_val is not None and isinstance(round_val, int):
+        if has_round and event_has_round:
             key = (round_val, phase, actor, action, target)
             entries = pending.get(key)
             if entries is not None:
@@ -181,9 +188,13 @@ def _load_decision_reasons(run_dir: Path) -> dict[str, dict[str, str]]:
             }
             continue
 
-        # Also check composite-key pending for events without round in the event,
-        # but decisions that have round — try greedy match on action/actor/target
-        # as a last resort (same as legacy behavior but with a different annotation).
+        # Last-resort greedy match against round-bearing decisions — ONLY for an
+        # event that itself lacks a usable round. A round-bearing event that missed
+        # its same-round decision in step 1 must stay UNMATCHED: grabbing a
+        # different round's decision here would re-open the A45-7 cross-round
+        # mislabel (round-2 event stamped with the round-1 reason).
+        if event_has_round:
+            continue
         for rk, entries in list(pending.items()):
             if entries and rk[2] == actor and rk[3] == action and rk[4] == target:
                 entry = entries.pop(0)
