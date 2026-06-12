@@ -17,6 +17,11 @@ from pathlib import Path
 _SNAPSHOTS_DIR = "snapshots"
 
 
+# ---------------------------------------------------------------------------
+# Seat / role index builder (Step 2)
+# ---------------------------------------------------------------------------
+
+
 # Phase ordering within a round, so "latest snapshot" means newest *game time*
 # (not alphabetical filename). game_end/result come last; setup first.
 _PHASE_RANK: dict[str, int] = {
