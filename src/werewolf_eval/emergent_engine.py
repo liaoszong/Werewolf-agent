@@ -528,8 +528,14 @@ class EmergentGameEngine:
         # Input-side ONLY — the action system prompt / strict-JSON contract is
         # untouched (spec §0). Empty suffix for v1/v2 keeps bytes identical.
         obs_text = rendered.text + self._renderer.action_obs_suffix(phase, self._claim_ledger)
+        # C12-01: day-phase action = vote; append _vote so the request_id never
+        # collides with the same actor's night action (which shares the bare
+        # f"{game_id}_r{rnd:02d}_{actor}" stem). Witch/speech/hunter/scribe already
+        # carry their own suffixes; without this, artifacts.collect_provider_trace
+        # dedup-by-request_id silently swallowed vote traces for night-acting seats.
+        _req_suffix = "_vote" if phase == "day" else ""
         turn: dict[str, Any] = {
-            "request_id": f"{self._game_id}_r{rnd:02d}_{player_id}",
+            "request_id": f"{self._game_id}_r{rnd:02d}_{player_id}{_req_suffix}",
             "round": rnd,
             "phase": phase,
             "actor": player_id,

@@ -282,8 +282,8 @@ def build_settlement_bundle(
 
 
 def _load_seat_meta(run_dir: Path) -> dict[str, dict]:
-    """Per-seat model/provider (prompt-manifest.json) + token rollup (provider-trace.json
-    responses, summed by actor). Both runners write these; absent/garbage -> empty.
+    """Per-seat model/provider (prompt-manifest.json) + token rollup (provider-turns.json
+    turns, summed by actor, excluding scribe). Both runners write these; absent/garbage -> empty.
     Pure filesystem read, never raises (best-effort enrichment, R-09)."""
     meta: dict[str, dict] = {}
     mpath = run_dir / "prompt-manifest.json"
@@ -301,15 +301,22 @@ def _load_seat_meta(run_dir: Path) -> dict[str, dict]:
                     entry["provider"] = agent["provider"]
         except (ValueError, OSError, AttributeError):
             pass
-    tpath = run_dir / "provider-trace.json"
+    # C12-02: token rollup reads provider-turns.json (each turn carries actor +
+    # token_usage), NOT provider-trace.json whose ProviderResponse schema has no
+    # actor field (the old code silently produced empty per-seat token_usage for
+    # every live run). Scribe turns are excluded — they are scaffold, not player.
+    tpath = run_dir / "provider-turns.json"
     if tpath.exists():
         try:
-            trace = json.loads(tpath.read_text(encoding="utf-8"))
+            pt = json.loads(tpath.read_text(encoding="utf-8"))
+            turns = pt.get("turns", []) if isinstance(pt, dict) else []
             rollup: dict[str, dict] = {}
-            for resp in trace.get("responses", []):
-                actor = resp.get("actor")
-                usage = resp.get("token_usage")
-                if not actor or not isinstance(usage, dict):
+            for turn in turns:
+                actor = turn.get("actor")
+                if not actor or actor == "scribe":
+                    continue
+                usage = turn.get("token_usage")
+                if not isinstance(usage, dict):
                     continue
                 acc = rollup.setdefault(actor, {})
                 for key, val in usage.items():
