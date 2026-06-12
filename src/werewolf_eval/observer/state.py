@@ -10,6 +10,7 @@ from typing import Callable
 from werewolf_eval.credential_store import CredentialStore
 
 RunLauncher = Callable[[str, Path], int]
+EnvLiveLauncherFactory = Callable[[], RunLauncher]
 
 
 @dataclass
@@ -20,13 +21,15 @@ class ObserverServerState:
     run_status: dict[str, str] = field(default_factory=dict)
     run_errors: dict[str, str] = field(default_factory=dict)
     lock: Lock = field(default_factory=Lock)
-    # G3-1 live opt-in: ``live_enabled`` reflects ``--allow-live-api``;
-    # ``live_launcher`` is wired only when an env API key was present at start.
+    # G3-1 live opt-in: ``live_enabled`` reflects ``--allow-live-api``.
+    # ``live_launcher`` is the env-key back-compat hook. New servers store a
+    # no-arg factory here so each env-backed launch gets fresh provider/budget
+    # state; old tests may still inject a concrete RunLauncher.
     live_enabled: bool = False
-    live_launcher: RunLauncher | None = None
+    live_launcher: EnvLiveLauncherFactory | RunLauncher | None = None
     # P2-B-1 BYO-key: in-memory client credentials + a per-launch live launcher
     # factory (built from a key at launch). live_launcher above stays as the
-    # prebuilt ENV launcher (back-compat / fallback); env_key_available records
+    # env-key launcher hook (back-compat / fallback); env_key_available records
     # whether the server started with an env key.
     credential_store: CredentialStore = field(default_factory=CredentialStore)
     live_launcher_factory: Callable[..., RunLauncher] | None = None
