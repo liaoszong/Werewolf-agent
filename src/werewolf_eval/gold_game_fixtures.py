@@ -1,7 +1,8 @@
 """docs/gold-game ``g001`` fixture constants — the one place the scorer knows the
 gold game by name (health-check B-3: lifted from ~10 scattered literals in
 ``scoring.py``). Everything here is byte-load-bearing for the s2/s5 expected
-fixtures; change only together with regenerated fixtures."""
+fixtures; change only together with regenerated fixtures. List/dict constants are
+returned by reference (e.g. ``_known_rubric_gaps``) — treat them as immutable."""
 
 from __future__ import annotations
 
