@@ -133,5 +133,103 @@ class SeerClaimSurvivalTests(unittest.TestCase):
                 d2, {"seer": "p3", "end_round": 1, "seer_death": None}))
 
 
+def _witch_coord_game(events, end_round=2):
+    players = [
+        {"player_id": "p1", "role": "werewolf"}, {"player_id": "p2", "role": "werewolf"},
+        {"player_id": "p3", "role": "seer"}, {"player_id": "p4", "role": "witch"},
+        {"player_id": "p5", "role": "guard"}, {"player_id": "p6", "role": "villager"},
+    ]
+    return {"players": players, "events": events,
+            "result": {"winner": "werewolf", "end_round": end_round}}
+
+
+_PIERCE_R1 = [
+    _ev(1, "night", "guard_protect", "p5", "p3", "Guard p5 protects p3."),
+    _ev(1, "night", "werewolf_kill", "p1", "p3", "Wolf team kills p3."),
+    _ev(1, "night", "witch_action", "p4", "p3", "Witch saves p3."),
+    _ev(1, "night", "player_died", "system", "p3", "p3 died during the night."),
+]
+
+
+class MilkPierceMetricsTests(unittest.TestCase):
+    """spec 2026-06-12 §6: overlap/death two-layer split; denominator = n_valid set."""
+
+    def test_pierce_counts_overlap_and_death(self):
+        row = analyze_game_dict(_witch_coord_game(list(_PIERCE_R1)))
+        self.assertEqual(row["milk_pierce_overlap"], 1)
+        self.assertEqual(row["milk_pierce_death"], 1)
+        self.assertEqual(row["witch_save_round"], 1)
+
+    def test_overlap_without_night_death_is_not_a_pierce_death(self):
+        # 规则不可知层:重叠但目标活到天亮 → overlap=1, death=0(标准规则下
+        # 两键应恒等;不等=结算异常,verdict 须解释 — spec §6)
+        row = analyze_game_dict(_witch_coord_game([
+            _ev(1, "night", "guard_protect", "p5", "p3", "Guard p5 protects p3."),
+            _ev(1, "night", "werewolf_kill", "p1", "p3", "Wolf team kills p3."),
+            _ev(1, "night", "witch_action", "p4", "p3", "Witch saves p3."),
+            _ev(1, "day", "day_announcement", "system", "none", "A peaceful night: nobody died."),
+        ]))
+        self.assertEqual(row["milk_pierce_overlap"], 1)
+        self.assertEqual(row["milk_pierce_death"], 0)
+
+    def test_disjoint_guard_and_save_targets_no_overlap(self):
+        row = analyze_game_dict(_witch_coord_game([
+            _ev(1, "night", "guard_protect", "p5", "p6", "Guard p5 protects p6."),
+            _ev(1, "night", "werewolf_kill", "p1", "p3", "Wolf team kills p3."),
+            _ev(1, "night", "witch_action", "p4", "p3", "Witch saves p3."),
+            _ev(1, "day", "day_announcement", "system", "none", "A peaceful night: nobody died."),
+        ]))
+        self.assertEqual(row["milk_pierce_overlap"], 0)
+        self.assertEqual(row["milk_pierce_death"], 0)
+
+    def test_vote_death_same_round_is_not_a_pierce_death(self):
+        # 死亡链边界:重叠 + 当轮被票出(白天死,cause=vote)→ death 不计
+        row = analyze_game_dict(_witch_coord_game([
+            _ev(1, "night", "guard_protect", "p5", "p3", "Guard p5 protects p3."),
+            _ev(1, "night", "witch_action", "p4", "p3", "Witch saves p3."),
+            _ev(1, "day", "vote_result", "system", "p3", "p3 eliminated by vote."),
+        ]))
+        self.assertEqual(row["milk_pierce_overlap"], 1)
+        self.assertEqual(row["milk_pierce_death"], 0)
+
+    def test_poison_death_of_other_player_is_not_a_pierce_death(self):
+        # spec §9 边界:重叠在 p3 上、同夜 p6 死于其他死亡链(如毒)——pid 不匹配,不计
+        row = analyze_game_dict(_witch_coord_game([
+            _ev(1, "night", "guard_protect", "p5", "p3", "Guard p5 protects p3."),
+            _ev(1, "night", "witch_action", "p4", "p3", "Witch saves p3."),
+            _ev(1, "night", "player_died", "system", "p6", "p6 died during the night."),
+        ]))
+        self.assertEqual(row["milk_pierce_overlap"], 1)
+        self.assertEqual(row["milk_pierce_death"], 0)
+
+    def test_aggregate_counts_and_night1_share(self):
+        g_pierce = analyze_game_dict(_witch_coord_game(list(_PIERCE_R1)))
+        g_late_save = analyze_game_dict(_witch_coord_game([
+            _ev(2, "night", "witch_action", "p4", "p6", "Witch saves p6."),
+        ], end_round=3))
+        g_no_save = analyze_game_dict(_witch_coord_game([
+            _ev(1, "night", "witch_action", "p4", "none", "Witch uses no potion."),
+        ]))
+        agg = aggregate_games([g_pierce, g_late_save, g_no_save])
+        self.assertEqual(agg["milk_pierce_overlap_count"], 1)
+        self.assertEqual(agg["milk_pierce_death_count"], 1)
+        # 用药局 2(夜1 + 夜2),其中夜1 用药 1 → share 0.5;不用药局不进分母
+        self.assertEqual(agg["witch_save_night1_share"], 0.5)
+
+    def test_no_save_games_yield_none_share(self):
+        g = analyze_game_dict(_witch_coord_game([
+            _ev(1, "night", "witch_action", "p4", "none", "Witch uses no potion."),
+        ]))
+        agg = aggregate_games([g])
+        self.assertEqual(agg["milk_pierce_overlap_count"], 0)
+        self.assertEqual(agg["milk_pierce_death_count"], 0)
+        self.assertIsNone(agg["witch_save_night1_share"])
+
+    def test_compare_keys_include_milk_pierce_family(self):
+        from werewolf_eval.ablation.metrics import DEFAULT_COMPARE_KEYS
+        for k in ("milk_pierce_overlap_count", "milk_pierce_death_count", "witch_save_night1_share"):
+            self.assertIn(k, DEFAULT_COMPARE_KEYS)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -93,6 +93,7 @@ def aggregate_games(games: list[dict]) -> dict:
     svo = [g.get("verify_seer_voted_out") for g in games if g.get("verify_seer_voted_out") is not None]
     tot_sp = sum(g["n_speeches"] for g in games) or 1
     kill_dist = collections.Counter(g["night1_kill"] for g in games if g["night1_kill"])
+    saved_games = [g for g in games if g.get("witch_save_round") is not None]
     return {
         "n_valid": n,
         "wolf_win_rate": rate(lambda g: g["winner"] == "werewolf"),
@@ -121,6 +122,12 @@ def aggregate_games(games: list[dict]) -> dict:
             [g.get("seer_claimed_then_survived_night") for g in games]),
         "seer_claim_to_night_survival_n": sum(
             1 for g in games if g.get("seer_claimed_then_survived_night") is not None),
+        # ---- v4 witch-coordination arm (spec 2026-06-12 §6); totals over the n_valid set ----
+        "milk_pierce_overlap_count": sum(g.get("milk_pierce_overlap") or 0 for g in games),
+        "milk_pierce_death_count": sum(g.get("milk_pierce_death") or 0 for g in games),
+        "witch_save_night1_share": (
+            sum(1 for g in saved_games if g["witch_save_round"] == 1) / len(saved_games)
+        ) if saved_games else None,
     }
 
 
@@ -161,6 +168,7 @@ DEFAULT_COMPARE_KEYS = (
     "seer_survives_d1_rate","avg_rounds",
     "seer_death_rate","seer_night_death_rate","seer_claim_to_night_survival_rate",
     "guard_target_seer_rate","guard_success_rate","avg_peaceful_nights",
+    "milk_pierce_overlap_count","milk_pierce_death_count","witch_save_night1_share",
 )
 
 
@@ -232,6 +240,7 @@ def analyze_game_dict(gl: dict) -> dict:
     speeches = []                            # (round, actor, text)
     kills, checks = {}, {}
     guards_by_round = {}                     # round -> guard target (L4)
+    saves_by_round = {}                      # round -> saved target (v4 milk-pierce, spec 2026-06-12 §6)
     peaceful = 0
     save = poison = False
     deaths = []                              # (round, pid, cause)
@@ -240,7 +249,10 @@ def analyze_game_dict(gl: dict) -> dict:
         r = ev.get("round")
         if kind == "kill": kills[r] = t
         elif kind == "check": checks[r] = (t, extra)
-        elif kind == "witch_save": save = True
+        elif kind == "witch_save":
+            save = True
+            if t is not None and re.match(r"p\d$", str(t)):
+                saves_by_round[r] = t
         elif kind == "witch_poison": poison = True
         elif kind == "guard": guards_by_round[r] = t
         elif kind == "peaceful": peaceful += 1
@@ -274,6 +286,11 @@ def analyze_game_dict(gl: dict) -> dict:
     has_guard = "guard" in roles.values()
     mech_words = GUARD_BOARD_MECHANIC_WORDS if has_guard else MECHANIC_WORDS
     gn = len(guards_by_round)
+    overlap_rounds = [r for r, t in saves_by_round.items() if guards_by_round.get(r) == t]
+    milk_death = sum(
+        1 for r in overlap_rounds
+        if any(dr == r and pid == saves_by_round[r] and cause == "night"
+               for (dr, pid, cause) in deaths))
     return {
         "roles": roles, "seer": seer, "wolves": sorted(wolves),
         "winner": res.get("winner"), "end_round": res.get("end_round"),
@@ -295,6 +312,9 @@ def analyze_game_dict(gl: dict) -> dict:
         # this measures aiming, NOT survival; read verdict tables accordingly.
         "guard_block_share": (sum(1 for r2, t in guards_by_round.items() if kills.get(r2) == t) / gn) if gn else None,
         "n_peaceful_nights": peaceful,
+        "witch_save_round": (min(saves_by_round) if saves_by_round else None),
+        "milk_pierce_overlap": len(overlap_rounds),
+        "milk_pierce_death": milk_death,
         "herd_share": sum(shares) / len(shares) if shares else None,
         "has_visual_halluc": any(w in text_all for w in VISUAL_WORDS),
         "has_mechanic_halluc": any(w in text_all for w in mech_words),
