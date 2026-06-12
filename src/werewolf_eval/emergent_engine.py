@@ -1159,23 +1159,22 @@ class EmergentGameEngine:
             # Night settlement delegates to the Agent Action Runtime's JointSettler
             # (Phase-3 swap). Byte-identical to the prior inline logic for rules_v1 —
             # proven by tests/test_action_runtime_parity.py and the full suite below.
-            deaths: list[str] = list(
-                self._settler.resolve_night(
-                    NightIntents(wolf_victim=victim, saved=saved,
-                                 poison_target=poison_target, guard_target=guard_target),
-                    self._runtime_state(),
-                ).deaths
+            night_result = self._settler.resolve_night(
+                NightIntents(wolf_victim=victim, saved=saved,
+                             poison_target=poison_target, guard_target=guard_target),
+                self._runtime_state(),
             )
+            deaths: list[str] = list(night_result.deaths)
             for pid in deaths:
                 if pid not in self._alive:   # a hunter shot may have already killed a co-victim
                     continue
                 self._alive.discard(pid)
                 assert_death_commit_once(pid, self._death_committed)
                 self._emit("night", rnd, "player_died", "system", pid, "all", f"{pid} died during the night.")
-                # deaths ⊆ {wolf victim, poison target} (settler order); the wolf victim is
-                # added first, so a pid that is NOT the victim is the poison death (A-2 cause).
-                cause = "werewolf_kill" if pid == victim else "witch_poison"
-                self._trigger_on_death(pid, rnd, "night", cause)
+                # A-2 cause comes from the settler (the actual lethal source), NOT from
+                # pid==victim: a guard-canceled wolf kill on a poisoned target dies by
+                # poison, so a poisoned hunter must not shoot even when pid==wolf_victim.
+                self._trigger_on_death(pid, rnd, "night", night_result.death_causes[pid])
 
             self._write_god_snapshot(f"god_view_r{rnd}_night", rnd, "night")
 

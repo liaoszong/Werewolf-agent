@@ -91,7 +91,7 @@ def _manifest_model_honest(
     if not manifest or not isinstance(manifest.get("agents"), list) or not manifest["agents"]:
         return False
     agents = manifest["agents"]
-    if expected_by_seat is not None:
+    if expected_by_seat:                      # non-empty per-seat plan; {} -> fail closed below
         by_id = {a.get("player_id"): a for a in agents}
         if not set(expected_by_seat) <= set(by_id):
             return False                       # a configured seat is missing

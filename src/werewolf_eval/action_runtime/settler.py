@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from werewolf_eval.action_runtime.ruleset import BoardRuleset
 from werewolf_eval.action_runtime.state import RuntimeState
@@ -19,6 +19,12 @@ class NightIntents:
 @dataclass(frozen=True)
 class NightResult:
     deaths: list[str]
+    # The LETHAL cause per dead player ("werewolf_kill" | "witch_poison"). Drives
+    # ruling A-2 (poison suppresses the hunter's shot). Crucially this is the
+    # *actual* source: a wolf victim whose kill was guard-canceled but who then dies
+    # to poison is "witch_poison", NOT "werewolf_kill" — the engine must NOT infer
+    # the cause from pid==wolf_victim (audit 2026-06-12 review fix).
+    death_causes: dict[str, str] = field(default_factory=dict)
 
 
 class JointSettler:
@@ -41,6 +47,7 @@ class JointSettler:
 
     def resolve_night(self, intents: NightIntents, state: RuntimeState) -> NightResult:
         deaths: list[str] = []
+        causes: dict[str, str] = {}
 
         protected = intents.saved
         # v1.5 (guard present): guard cancels the kill UNLESS the witch also saved
@@ -55,9 +62,11 @@ class JointSettler:
         v = intents.wolf_victim
         if v is not None and not protected and v in state.alive:
             deaths.append(v)
+            causes[v] = "werewolf_kill"   # the wolf kill actually landed (incl. 奶穿)
 
         p = intents.poison_target
         if p is not None and p in state.alive and p not in deaths:
             deaths.append(p)
+            causes[p] = "witch_poison"    # poison is the sole lethal source for this pid
 
-        return NightResult(deaths=deaths)
+        return NightResult(deaths=deaths, death_causes=causes)

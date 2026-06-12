@@ -29,6 +29,7 @@ from werewolf_eval.emergent_fake_script import (
     build_hunter_night_kill_script,
     build_hunter_voteout_script,
 )
+from werewolf_eval.game_engine import EnginePlayer, GameConfig
 
 
 def _shot(target: str) -> str:
@@ -106,6 +107,57 @@ class PoisonedHunterRulingTests(unittest.TestCase):
         self.assertEqual(outcome.status, "completed")
         shots = [e for e in _events(outcome) if e["type"] == "hunter_shoot"]
         self.assertEqual(len(shots), 1)
+        self.assertEqual((shots[0]["actor"], shots[0]["target"]), ("p6", "p1"))
+
+
+class GuardBoardPoisonedHunterRulingTests(unittest.TestCase):
+    """A-2 on a guard+hunter board (rules_v1_2): the death CAUSE must come from the
+    settler's actual lethal source, not from pid==wolf_victim. Regression for the
+    review finding where a guard-blocked-then-poisoned hunter wrongly shot."""
+
+    def _guard_hunter_engine(self, script):
+        # p1/p2 wolves, p3 seer, p4 witch, p5 guard, p6 hunter -> rules_v1_2
+        cfg = GameConfig(game_id="gh", players=[
+            EnginePlayer("p1", "werewolf", "werewolf"), EnginePlayer("p2", "werewolf", "werewolf"),
+            EnginePlayer("p3", "seer", "villager"), EnginePlayer("p4", "witch", "villager"),
+            EnginePlayer("p5", "guard", "villager"), EnginePlayer("p6", "hunter", "villager")])
+        return EmergentGameEngine(config=cfg, agents=build_emergent_fake_agents(script), seed=0)
+
+    def test_guard_blocks_wolf_then_poison_kills_hunter_no_shoot(self) -> None:
+        """Wolves target the hunter, the GUARD cancels that kill, but the witch
+        POISONS the hunter. The hunter dies by poison (pid still == wolf_victim) and
+        must NOT shoot."""
+        s: dict[tuple, str] = {}
+        s[("p1", "night", 1)] = _act("werewolf_kill", "p6", "team_coordinated", "kill hunter")
+        s[("p2", "night", 1)] = _act("werewolf_kill", "p6", "team_coordinated", "kill hunter")
+        s[("p3", "night", 1)] = _act("seer_check", "p1", "inference_based", "check p1")
+        s[("p4", "night", 1)] = _witch("witch_poison", "p6")            # poison the hunter
+        s[("p5", "night", 1)] = _act("guard_protect", "p6", "inference_based", "guard hunter")
+        s[("p6", "hunter_shot", 1)] = _shot("p1")                       # offered, must be suppressed
+        engine = self._guard_hunter_engine(s)
+        outcome = engine.run()
+        self.assertEqual(outcome.status, "completed")
+        self.assertEqual(engine.rules_version, "rules_v1_2")
+        shots = [e for e in _events(outcome) if e["type"] == "hunter_shoot"]
+        self.assertEqual(shots, [], "guard-blocked + poisoned hunter must not shoot")
+        self.assertTrue([e for e in _events(outcome)
+                         if e["type"] == "player_died" and e.get("target") == "p6"])
+
+    def test_milk_pierce_hunter_still_shoots(self) -> None:
+        """奶穿: guard AND witch-save the SAME target (the hunter), wolves target it ->
+        the hunter dies by the (un-canceled) WOLF kill, so it STILL shoots."""
+        s: dict[tuple, str] = {}
+        s[("p1", "night", 1)] = _act("werewolf_kill", "p6", "team_coordinated", "kill hunter")
+        s[("p2", "night", 1)] = _act("werewolf_kill", "p6", "team_coordinated", "kill hunter")
+        s[("p3", "night", 1)] = _act("seer_check", "p1", "inference_based", "check p1")
+        s[("p4", "night", 1)] = _witch("witch_save", "p6")             # save same target as guard -> 奶穿
+        s[("p5", "night", 1)] = _act("guard_protect", "p6", "inference_based", "guard hunter")
+        s[("p6", "hunter_shot", 1)] = _shot("p1")
+        engine = self._guard_hunter_engine(s)
+        outcome = engine.run()
+        self.assertEqual(outcome.status, "completed")
+        shots = [e for e in _events(outcome) if e["type"] == "hunter_shoot"]
+        self.assertEqual(len(shots), 1, "奶穿 death is a wolf kill -> hunter shoots")
         self.assertEqual((shots[0]["actor"], shots[0]["target"]), ("p6", "p1"))
 
 

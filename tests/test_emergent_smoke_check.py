@@ -215,6 +215,16 @@ class ProviderAgnosticHonestyTests(unittest.TestCase):
             v = evaluate_emergent_smoke(tmp, expected_models_by_seat=expected)
             self.assertTrue(v["passed"], v["checks"])
 
+    def test_empty_per_seat_plan_fails_closed(self) -> None:
+        # An empty per-seat plan must NOT vacuously pass the manifest gate.
+        with tempfile.TemporaryDirectory() as t:
+            tmp = Path(t)
+            turns = [_live_turn_labeled(f"p{i}", OPENAI_LABEL, model="gpt-x") for i in (1, 2, 3)] * 5
+            agents = [{"player_id": f"p{i}", "model": "gpt-x"} for i in (1, 2, 3)]
+            _write_mixed_run(tmp, turns=turns, agents=agents)
+            v = evaluate_emergent_smoke(tmp, expected_models_by_seat={})
+            self.assertFalse(v["checks"]["manifest_model_honest"])
+
     def test_per_seat_wrong_model_fails(self) -> None:
         with tempfile.TemporaryDirectory() as t:
             tmp = Path(t)

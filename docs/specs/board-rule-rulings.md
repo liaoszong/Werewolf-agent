@@ -33,10 +33,14 @@ an engine special-case:
   `suppressed_by_cause = frozenset({"witch_poison"})`.
 - `action_runtime/registry.py` — `death_trigger_suppressing_causes(role)` unions the
   causes over a role's on-death abilities.
+- `action_runtime/settler.py` — `NightResult.death_causes` maps each dead player to its
+  ACTUAL lethal source (`werewolf_kill` / `witch_poison`). This is authoritative: a wolf
+  victim whose kill is guard-canceled but who then dies to poison is `witch_poison`, NOT
+  `werewolf_kill`. The engine must not infer the cause from `pid == wolf_victim`.
 - `emergent_engine.py` — `_trigger_on_death(dead, rnd, phase, cause)` carries the death
   cause and returns early when `cause ∈ registry.death_trigger_suppressing_causes(role)`.
-  Causes wired at the call sites: night deaths → `werewolf_kill` (wolf victim) or
-  `witch_poison` (the other death); day vote-out → `vote`; cascade shot → `hunter_shoot`.
+  Causes wired at the call sites: night deaths → `night_result.death_causes[pid]` (from the
+  settler); day vote-out → `vote`; cascade shot → `hunter_shoot`.
 
 **Honesty.** Suppression produces no `hunter_shoot`/`hunter_pass` event and no
 provider call (the hunter is never asked). The poison death event itself is recorded

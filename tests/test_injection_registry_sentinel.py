@@ -18,7 +18,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from werewolf_eval.prompt_renderers import PromptRendererV1
+from werewolf_eval.prompt_renderers import REGISTRY as _RENDERER_REGISTRY
 
 # The frozen registry of injection channels (see spec §2). A new channel MUST be
 # added here AND to docs/specs/text-injection-channels.md in the same change.
@@ -37,9 +37,15 @@ ENGINE_SRC = (ROOT / "src" / "werewolf_eval" / "emergent_engine.py").read_text(e
 
 class InjectionRegistrySentinel(unittest.TestCase):
     def test_renderer_obs_suffix_methods_all_registered(self) -> None:
-        """Every `*_obs_suffix` hook on the renderer base is a registered channel.
-        Adding a new renderer suffix method without registering it fails here."""
-        suffix_methods = {n for n in dir(PromptRendererV1) if n.endswith("_obs_suffix")}
+        """Every `*_obs_suffix` hook on ANY registered renderer (base + subclasses)
+        is a registered channel. Adding a new suffix method — even one defined only
+        on a subclass like V4 — without registering it fails here."""
+        suffix_methods = {
+            n
+            for renderer in _RENDERER_REGISTRY.values()
+            for n in dir(renderer)
+            if n.endswith("_obs_suffix")
+        }
         self.assertTrue(suffix_methods, "expected at least the known *_obs_suffix hooks")
         unregistered = suffix_methods - REGISTERED_CHANNELS
         self.assertEqual(unregistered, set(),
