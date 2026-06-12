@@ -23,6 +23,7 @@
 ## Process requirements (repo discipline)
 
 - Execute in an **isolated worktree** (`superpowers:using-git-worktrees`); never run subagents in the shared main checkout. Before every commit: `git branch --show-current` + `git status --short` (stray-staged check) — see `.agents/skills/committing-in-shared-worktrees/SKILL.md`.
+- **Read `.agents/skills/guarding-prompt-bytes/SKILL.md` before Tasks 1-4** (spec §5: the whole prompt surface goes through that runbook — coexisting-version path: KNOWN extension + own golden dir + ledger entry, NO `PROMPT_VERSION` bump; Tasks 4/7 implement its mechanical steps).
 - **Chinese text must be written with the Edit/Write tools, NEVER via bash heredoc** (Windows bash heredoc corrupts Chinese to mojibake — verified gotcha).
 - Test runs need `NO_PROXY='*'` (localhost server tests false-fail behind proxy).
 - Baseline test count: measure `python -m unittest discover` on the branch base commit FIRST and pin that number; cross-session counts are not comparable.
@@ -94,6 +95,10 @@ class GuidanceContentTest(unittest.TestCase):
         self.assertIn("不要机械地夜1必救", WITCH_COORD_GUIDANCE)
         self.assertIn("死亡风险高", WITCH_COORD_GUIDANCE)
         self.assertNotIn("高价值", WITCH_COORD_GUIDANCE)
+        # 引号字节钉死(独立审 B-1):spec §4 用 ASCII 直引号,不许被"美化"成 CJK 弯引号
+        self.assertIn('你认为"死亡风险高、且不太可能同时被守卫守护"的目标', WITCH_COORD_GUIDANCE)
+        self.assertNotIn("“", WITCH_COORD_GUIDANCE)
+        self.assertNotIn("”", WITCH_COORD_GUIDANCE)
 
     def test_guidance_has_no_newlines(self):
         # Single paragraph; the injected suffix's ONLY newline is the leading join.
@@ -111,7 +116,7 @@ Expected: ERROR — `ModuleNotFoundError: No module named 'werewolf_eval.prompt_
 
 - [ ] **Step 1.3: Implement `prompt_v4.py`**
 
-Create `src/werewolf_eval/prompt_v4.py` with the Write tool. The guidance string is the spec §4 text **verbatim, byte-for-byte** (copy from the spec file, including the CJK quotes `“”` around 死亡风险高...守护 — do not retype):
+Create `src/werewolf_eval/prompt_v4.py` with the Write tool. The guidance string is the spec §4 text **verbatim, byte-for-byte** — copy from the spec file. NOTE: the quotes around 死亡风险高...守护 are **ASCII straight quotes `"` (U+0022)**, matching the user's original ruling text. Do NOT "beautify" them into CJK quotes `“”` — that is a byte drift the content tests below pin against:
 
 ```python
 """prompt_v4 (l4_guard_witch_coord): witch antidote-coordination guidance.
@@ -130,7 +135,7 @@ WITCH_COORD_GUIDANCE = (
     "【解药协调提示】本局存在守卫。守卫每晚守护一名玩家;若你解药救下的人当晚同时被守卫守护,"
     "该玩家会因「同守同救」规则死亡。你无法知道守卫今晚守了谁。用药前请权衡:该目标是否很可能"
     "正被守卫保护,例如已公开跳出且被全场关注的预言家。信息不足时不要机械地夜1必救;解药整局"
-    "仅一瓶,应优先用于你认为“死亡风险高、且不太可能同时被守卫守护”的目标。"
+    "仅一瓶,应优先用于你认为\"死亡风险高、且不太可能同时被守卫守护\"的目标。"
 )
 
 
@@ -213,7 +218,7 @@ class WitchObsSuffixDispatchTest(unittest.TestCase):
     """v4 注入 hook:v1/v2/v3 恒返 ""(既有版本字节零影响);v4 走 3 条件门。"""
 
     def setUp(self):
-        from werewolf_eval.prompt_v2 import build_board_rules_card
+        # build_board_rules_card is already module-level imported in this file
         self.guard_card = build_board_rules_card(rules_v1_2(), _GUARD_SEATS)
 
     def test_v1_v2_v3_always_empty(self):
@@ -233,7 +238,7 @@ class WitchObsSuffixDispatchTest(unittest.TestCase):
 - [ ] **Step 2.2: Run, verify failures**
 
 Run: `NO_PROXY='*' PYTHONPATH=src python -m unittest tests.test_prompt_renderers -v`
-Expected: FAIL/ERROR — `KeyError: 'prompt_v4'` and `AttributeError: ... no attribute 'witch_obs_suffix'`.
+Expected: FAIL/ERROR — a mix of `KeyError: 'prompt_v4'` (direct `REGISTRY[...]` access), `ValueError: unknown prompt_version` (`get_renderer` wraps the KeyError, prompt_renderers.py:104-107), and `AttributeError: ... no attribute 'witch_obs_suffix'`.
 
 - [ ] **Step 2.3: Implement**
 
@@ -554,6 +559,8 @@ git commit -m "feat(goldens): prompt_v4 byte lock (injected suffix + composed wi
 **Files:**
 - Modify: `src/werewolf_eval/ablation/metrics.py` (analyze_game_dict, aggregate_games, DEFAULT_COMPARE_KEYS)
 - Modify: `tests/test_l4_metrics.py`
+
+Data-source note (documented deviation from spec §6's "decision-log + game-log" wording): the implementation reads game-log events only. This is equivalent for the spec's purpose — the `guard_protect` event is rendered from the ADJUDICATED target (action_runtime/turn.py:164), i.e. it already carries the fallback-resolved actual effective target the spec requires. Independently verified during plan review; the Task 6 backfill gate (12/12 reproduction) re-proves it on real artifacts.
 
 - [ ] **Step 5.1: Write the failing tests**
 
