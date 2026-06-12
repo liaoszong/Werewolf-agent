@@ -768,6 +768,7 @@ class EmergentGameEngine:
         obs = self._build_obs(witch, "night", rnd)
         rendered = self._render_obs(obs)
         witch_obs_text = augment_witch_observation(rendered.text, victim)
+        witch_obs_text += self._renderer.witch_obs_suffix(self._board_card, victim, save_used)
         request = ProviderRequest(
             request_id=f"{self._game_id}_r{rnd:02d}_{witch}_witch",
             game_id=self._game_id,
