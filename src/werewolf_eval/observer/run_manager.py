@@ -16,7 +16,6 @@ from __future__ import annotations
 import json
 import shutil
 import time
-from inspect import Parameter, signature
 from pathlib import Path
 
 from werewolf_eval.evaluation_versions import read_manifest_bucket
@@ -46,8 +45,10 @@ def _resolve_live_launcher_for_launch(
 
     1. If EVERY provider used by the seats has a client credential → a per-seat
        multi-provider launcher (the general path; handles mixed and single-provider).
-    2. Back-compat deepseek-only: env key via a per-launch factory.
-    3. No silent fallback: a seat whose provider lacks a credential → 403.
+    2. No silent fallback: a seat whose provider lacks a credential → 403.
+
+    B5 closeout: the deepseek-only env-key fallback has been retired. All live
+    launches require client-supplied credentials via POST /api/credentials.
 
     Keys flow ONLY into the launcher closures (provider Authorization), never
     returned."""
@@ -65,32 +66,6 @@ def _resolve_live_launcher_for_launch(
 
     if not missing and state.multi_provider_launcher_factory is not None:
         return state.multi_provider_launcher_factory(resolved_seats, creds), None
-    # Back-compat env-key path. The legacy launcher runs ONE shared model for all
-    # seats, so it may only serve a UNIFORM profile (single provider + single
-    # model); a mixed-model deepseek profile must go through the multi launcher
-    # above (per-seat) to avoid resolved-profile.json claiming models the run
-    # never used.
-    uniform = len({(str(s.get("provider")), str(s.get("model"))) for s in resolved_seats}) == 1
-    if (
-        not missing
-        and state.multi_provider_launcher_factory is None
-        and used == {"deepseek"}
-        and uniform
-        and "deepseek" in creds
-        and state.live_launcher_factory is not None
-    ):
-        # Compatibility-only seam for direct unit states that do not wire the
-        # production multi-provider factory. create_observer_server always wires
-        # that factory when live is enabled, so normal client-key launches use
-        # the per-seat path above.
-        cred = creds["deepseek"]
-        return (
-            state.live_launcher_factory(cred.key, cred.base_url)
-            if cred.base_url
-            else state.live_launcher_factory(cred.key)
-        ), None
-    if used == {"deepseek"} and uniform and state.live_launcher is not None:
-        return _materialize_env_live_launcher(state), None
     if missing:
         return None, (
             403,
@@ -100,31 +75,6 @@ def _resolve_live_launcher_for_launch(
     return None, (403, "missing_api_key", "no live credential is available")
 
 
-def _materialize_env_live_launcher(state: ObserverServerState) -> RunLauncher:
-    """Return a concrete launcher from the env-key back-compat hook.
-
-    New servers store a no-arg factory in ``state.live_launcher`` so each launch
-    gets fresh provider state. Legacy tests may still inject a concrete
-    ``RunLauncher``; keep that shape working while production uses the factory.
-    """
-    launcher_or_factory = state.live_launcher
-    if launcher_or_factory is None:
-        raise RuntimeError("env live launcher is not configured")
-    try:
-        params = signature(launcher_or_factory).parameters
-    except (TypeError, ValueError):
-        return launcher_or_factory  # type: ignore[return-value]
-    required = [
-        p
-        for p in params.values()
-        if p.default is Parameter.empty
-        and p.kind in (Parameter.POSITIONAL_ONLY, Parameter.POSITIONAL_OR_KEYWORD, Parameter.KEYWORD_ONLY)
-    ]
-    if required:
-        return launcher_or_factory  # type: ignore[return-value]
-    return launcher_or_factory()  # type: ignore[operator]
-
-
 def _check_live_capability(
     state: ObserverServerState, mode: str
 ) -> tuple[int, str, str] | None:
@@ -132,19 +82,19 @@ def _check_live_capability(
     loaded/validated, so an un-provisioned server rejects even a malformed or
     non-deepseek profile with a capability code (never ``invalid_profile`` or a
     shape error).  Returns ``(status, code, message)`` to reject, or ``None`` to
-    proceed.  Non-live modes always proceed."""
+    proceed.  Non-live modes always proceed.
+
+    B5 closeout: the deepseek-only env-key fallback has been retired. A credential
+    is available only if the client has synced at least one provider key via
+    POST /api/credentials."""
     if mode != "live":
         return None
     if not state.live_enabled:
         return (403, "live_api_disabled", "live API is not enabled on this server")
-    # BYO-key: a credential is available if the client synced ANY supported
-    # provider key OR the server started with an env key (back-compat). This is a
-    # COARSE gate; the per-seat credential check happens at launcher resolution.
-    has_credential = (
-        any(state.credential_store.has(p) for p in PROVIDER_REGISTRY)
-        or state.env_key_available
-        or state.live_launcher is not None
-    )
+    # BYO-key: a credential is available if the client has synced ANY supported
+    # provider key. This is a COARSE gate; the per-seat credential check happens
+    # at launcher resolution.
+    has_credential = any(state.credential_store.has(p) for p in PROVIDER_REGISTRY)
     if not has_credential:
         return (403, "missing_api_key", "no live credential is available (set one in the client)")
     return None
@@ -182,17 +132,14 @@ def _provider_live_posture(
 
     * live disabled (global) → ``live_api_disabled`` for every provider.
     * live enabled but this provider has no credential → ``missing_api_key``.
-      ``deepseek`` additionally counts the legacy env key / prebuilt env launcher
-      (back-compat); other providers are credential-only.
+
+    B5 closeout: the deepseek-only env-key fallback has been retired. A provider
+    is available only if the client has synced a credential for it.
 
     Never reads or returns a secret."""
     if not state.live_enabled:
         return (False, "live_api_disabled", "live API is not enabled on this server")
     has_credential = state.credential_store.has(provider)
-    if provider == "deepseek":
-        has_credential = (
-            has_credential or state.env_key_available or state.live_launcher is not None
-        )
     if has_credential:
         return (True, None, None)
     return (

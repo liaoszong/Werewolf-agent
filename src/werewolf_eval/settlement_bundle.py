@@ -30,9 +30,39 @@ from werewolf_eval.evaluation_versions import (
     read_manifest_bucket,
 )
 from werewolf_eval.game_log import GameLog, load_game_log
+from werewolf_eval.provider_registry import PROVIDER_REGISTRY
 from werewolf_eval.scoring import score_game, summarize_metrics
 
 BUNDLE_VERSION = "p2d.settlement.v2"
+
+
+def _compute_cost_estimate(
+    token_usage: dict, provider: str | None
+) -> dict | None:
+    """B5 closeout: compute a cost estimate from token_usage and provider pricing.
+
+    Returns {"amount": float, "currency": str} if pricing is available for the
+    provider, else None (token totals only, no cost row). Cost is always labeled
+    an estimate (prices drift; we do not promise billing accuracy).
+
+    Pricing schema: {"input_per_mtok": float, "output_per_mtok": float, "currency": str}
+    Token usage keys: prompt_tokens, completion_tokens, total_tokens."""
+    if not provider or provider not in PROVIDER_REGISTRY:
+        return None
+    pricing = PROVIDER_REGISTRY[provider].pricing
+    if not pricing:
+        return None
+    try:
+        input_per_mtok = float(pricing.get("input_per_mtok", 0))
+        output_per_mtok = float(pricing.get("output_per_mtok", 0))
+        currency = str(pricing.get("currency", "USD"))
+        prompt_tokens = int(token_usage.get("prompt_tokens", 0))
+        completion_tokens = int(token_usage.get("completion_tokens", 0))
+        # Cost = (input tokens * input price + output tokens * output price) / 1M
+        amount = (prompt_tokens * input_per_mtok + completion_tokens * output_per_mtok) / 1_000_000
+        return {"amount": round(amount, 6), "currency": currency}
+    except (TypeError, ValueError):
+        return None
 
 
 def _unknown_bucket() -> dict[str, str]:
@@ -97,6 +127,31 @@ def _curtain(
 ) -> dict:
     survivors = set(game.result.survivors)
     seat_meta = seat_meta or {}
+    players = []
+    for p in game.players:
+        meta = seat_meta.get(p.player_id, {})
+        token_usage = meta.get("token_usage", {})
+        provider = meta.get("provider")
+        cost_estimate = _compute_cost_estimate(token_usage, provider)
+        players.append({
+            "player_id": p.player_id,
+            "role": p.role,
+            "team": p.team,
+            "alive": p.player_id in survivors,
+            "outcome_score": 0,
+            "rule_integrity_score": 0,
+            "decision_quality_score": 0,
+            # R-09: per-seat model/provider/token for heterogeneous-AI fairness +
+            # cost (additive, eval-v1). Resolved by the route from prompt-manifest +
+            # provider-turns; None / {} when unavailable (fake runs report "none").
+            "model": meta.get("model"),
+            "provider": provider,
+            "token_usage": token_usage,
+            # B5 closeout: per-seat cost estimate (None if no pricing available).
+            "cost_estimate": cost_estimate,
+        })
+    # B5 closeout: usage_summary aggregates seat + scaffold tokens for honest totals.
+    usage_summary = _build_usage_summary(seat_meta)
     return {
         "bundle_version": BUNDLE_VERSION,
         "run_id": run_id,
@@ -115,24 +170,7 @@ def _curtain(
             "margin": None,
             "source_label": game.source_label,
         },
-        "players": [
-            {
-                "player_id": p.player_id,
-                "role": p.role,
-                "team": p.team,
-                "alive": p.player_id in survivors,
-                "outcome_score": 0,
-                "rule_integrity_score": 0,
-                "decision_quality_score": 0,
-                # R-09: per-seat model/provider/token for heterogeneous-AI fairness +
-                # cost (additive, eval-v1). Resolved by the route from prompt-manifest +
-                # provider-trace; None / {} when unavailable (fake runs report "none").
-                "model": seat_meta.get(p.player_id, {}).get("model"),
-                "provider": seat_meta.get(p.player_id, {}).get("provider"),
-                "token_usage": seat_meta.get(p.player_id, {}).get("token_usage", {}),
-            }
-            for p in game.players
-        ],
+        "players": players,
         "core_metrics": {},
         "top_attribution": None,
         "turning_points": [],
@@ -141,6 +179,54 @@ def _curtain(
         "score_records": [],
         "board_timeline": board,
         "evaluation_bucket": _unknown_bucket(),
+        # B5 closeout: usage_summary with seats/scaffold/total token breakdown.
+        "usage_summary": usage_summary,
+    }
+
+
+def _build_usage_summary(seat_meta: dict[str, dict]) -> dict:
+    """B5 closeout: aggregate token usage across seats and scaffold.
+
+    Returns {"seats": {...sums...}, "scaffold": {...sums...}, "total": {...sums...}}.
+    Scaffold carries non-seat actors (e.g. scribe) so the total is honest.
+    Each sum has prompt_tokens, completion_tokens, total_tokens."""
+    seats_prompt = 0
+    seats_completion = 0
+    seats_total = 0
+    scaffold_prompt = 0
+    scaffold_completion = 0
+    scaffold_total = 0
+    # seat_meta keys are player_ids (p1..p6) plus optional __scaffold__ key.
+    for pid, meta in seat_meta.items():
+        if pid == "__scaffold__":
+            # Scaffold (scribe) tokens — tracked separately by _load_seat_meta.
+            usage = meta.get("token_usage", {})
+            if isinstance(usage, dict):
+                scaffold_prompt += int(usage.get("prompt_tokens", 0))
+                scaffold_completion += int(usage.get("completion_tokens", 0))
+                scaffold_total += int(usage.get("total_tokens", 0))
+            continue
+        usage = meta.get("token_usage", {})
+        if isinstance(usage, dict):
+            seats_prompt += int(usage.get("prompt_tokens", 0))
+            seats_completion += int(usage.get("completion_tokens", 0))
+            seats_total += int(usage.get("total_tokens", 0))
+    return {
+        "seats": {
+            "prompt_tokens": seats_prompt,
+            "completion_tokens": seats_completion,
+            "total_tokens": seats_total,
+        },
+        "scaffold": {
+            "prompt_tokens": scaffold_prompt,
+            "completion_tokens": scaffold_completion,
+            "total_tokens": scaffold_total,
+        },
+        "total": {
+            "prompt_tokens": seats_prompt + scaffold_prompt,
+            "completion_tokens": seats_completion + scaffold_completion,
+            "total_tokens": seats_total + scaffold_total,
+        },
     }
 
 
@@ -284,7 +370,10 @@ def build_settlement_bundle(
 def _load_seat_meta(run_dir: Path) -> dict[str, dict]:
     """Per-seat model/provider (prompt-manifest.json) + token rollup (provider-turns.json
     turns, summed by actor, excluding scribe). Both runners write these; absent/garbage -> empty.
-    Pure filesystem read, never raises (best-effort enrichment, R-09)."""
+    Pure filesystem read, never raises (best-effort enrichment, R-09).
+
+    B5 closeout: scaffold (scribe) tokens are tracked under the special key
+    ``__scaffold__`` so ``_build_usage_summary`` can report honest totals."""
     meta: dict[str, dict] = {}
     mpath = run_dir / "prompt-manifest.json"
     if mpath.exists():
@@ -304,19 +393,27 @@ def _load_seat_meta(run_dir: Path) -> dict[str, dict]:
     # C12-02: token rollup reads provider-turns.json (each turn carries actor +
     # token_usage), NOT provider-trace.json whose ProviderResponse schema has no
     # actor field (the old code silently produced empty per-seat token_usage for
-    # every live run). Scribe turns are excluded — they are scaffold, not player.
+    # every live run). Scribe turns are excluded from per-seat sums — they are
+    # scaffold, not player. B5 closeout: scaffold tokens tracked under __scaffold__.
     tpath = run_dir / "provider-turns.json"
     if tpath.exists():
         try:
             pt = json.loads(tpath.read_text(encoding="utf-8"))
             turns = pt.get("turns", []) if isinstance(pt, dict) else []
             rollup: dict[str, dict] = {}
+            scaffold_rollup: dict[str, int] = {}
             for turn in turns:
                 actor = turn.get("actor")
-                if not actor or actor == "scribe":
+                if not actor:
                     continue
                 usage = turn.get("token_usage")
                 if not isinstance(usage, dict):
+                    continue
+                if actor == "scribe":
+                    # Scaffold (scribe) tokens — separate from per-seat sums.
+                    for key, val in usage.items():
+                        if isinstance(val, (int, float)) and not isinstance(val, bool):
+                            scaffold_rollup[key] = scaffold_rollup.get(key, 0) + val
                     continue
                 acc = rollup.setdefault(actor, {})
                 for key, val in usage.items():
@@ -324,6 +421,8 @@ def _load_seat_meta(run_dir: Path) -> dict[str, dict]:
                         acc[key] = acc.get(key, 0) + val
             for pid, usage in rollup.items():
                 meta.setdefault(pid, {})["token_usage"] = usage
+            if scaffold_rollup:
+                meta["__scaffold__"] = {"token_usage": scaffold_rollup}
         except (ValueError, OSError, AttributeError):
             pass
     return meta

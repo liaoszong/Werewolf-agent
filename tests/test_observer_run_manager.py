@@ -13,7 +13,7 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from werewolf_eval.observer.run_manager import RunManager, _materialize_env_live_launcher
+from werewolf_eval.observer.run_manager import RunManager
 from werewolf_eval.observer.state import ObserverServerState
 from werewolf_eval.observer_protocol import read_run_status
 
@@ -179,25 +179,6 @@ class RunDetailTests(_Fixture):
         detail = rm.run_detail_with_reason("d2", run_dir)
         self.assertNotIn("reason", detail)
         self.assertNotIn("execution_mode", detail)
-
-
-class MaterializeEnvLiveLauncherTests(_Fixture):
-    def test_materialize_parameterless_factory(self) -> None:
-        def my_launcher(run_id: str, run_dir: Path) -> int:
-            return 0
-        def factory():
-            return my_launcher
-            
-        state = self._state()
-        state.live_launcher = factory
-        result = _materialize_env_live_launcher(state)
-        self.assertIs(result, my_launcher)
-        
-    def test_materialize_concrete_launcher(self) -> None:
-        state = self._state()
-        state.live_launcher = _noop_launcher
-        result = _materialize_env_live_launcher(state)
-        self.assertIs(result, _noop_launcher)
 
 
 if __name__ == "__main__":

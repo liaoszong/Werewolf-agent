@@ -48,6 +48,13 @@ class ProviderSpec:
     # Offline UI fallback model ids (live fetch overrides). NOT a validation
     # allowlist — live providers trust the fetched/typed model id.
     default_models: tuple[str, ...] = ()
+    # B5 closeout: optional pricing metadata for cost estimation.
+    # Schema: {"input_per_mtok": float, "output_per_mtok": float, "currency": str}
+    # No hardcoded prices here — pricing is provider-specific and drifts over time.
+    # Consumers (settlement_bundle) use this to compute cost estimates; None means
+    # "no pricing available, show token totals only". Prices can be populated by
+    # external configuration or a future pricing registry.
+    pricing: dict[str, object] | None = None
 
 
 PROVIDER_REGISTRY: dict[str, ProviderSpec] = {

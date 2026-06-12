@@ -1137,38 +1137,48 @@ def _resolved_seats(provider: str, model: str) -> list[dict]:
 
 
 class LiveGateHelperTests(TestCase):
-    """Pure-helper unit tests for the live-mode gate matrix (no socket)."""
+    """Pure-helper unit tests for the live-mode gate matrix (no socket).
 
-    def _state(self, *, live_enabled: bool, live_launcher: object) -> ObserverServerState:
+    B5 closeout: the env-key fallback (live_launcher, env_key_available) has been
+    retired. Live capability now depends on credential_store having at least one
+    provider key."""
+
+    def _state(self, *, live_enabled: bool, has_credential: bool = False) -> ObserverServerState:
+        from werewolf_eval.credential_store import CredentialStore
         with TemporaryDirectory() as tmp:
             runs = Path(tmp) / "runs"
             runs.mkdir()
+            cs = CredentialStore()
+            if has_credential:
+                cs.set("deepseek", "sk-test-fake-key")
             return ObserverServerState(
                 runs_dir=runs,
                 launcher=default_fake_launcher,
                 live_enabled=live_enabled,
-                live_launcher=live_launcher,  # type: ignore[arg-type]
+                credential_store=cs,
             )
 
     # -- capability (BEFORE load/validate) --------------------------------
 
     def test_capability_fake_mode_always_proceeds(self) -> None:
-        st = self._state(live_enabled=False, live_launcher=None)
+        st = self._state(live_enabled=False)
         self.assertIsNone(_check_live_capability(st, "fake"))
 
     def test_capability_live_not_enabled_is_403_disabled(self) -> None:
-        st = self._state(live_enabled=False, live_launcher=None)
+        st = self._state(live_enabled=False)
         result = _check_live_capability(st, "live")
         self.assertEqual(result, (403, "live_api_disabled", result[2]))  # type: ignore[index]
 
-    def test_capability_live_enabled_no_launcher_is_403_missing_key(self) -> None:
-        st = self._state(live_enabled=True, live_launcher=None)
+    def test_capability_live_enabled_no_credential_is_403_missing_key(self) -> None:
+        # B5 closeout: without a client credential, capability returns missing_api_key.
+        st = self._state(live_enabled=True, has_credential=False)
         result = _check_live_capability(st, "live")
         self.assertEqual(result[0], 403)  # type: ignore[index]
         self.assertEqual(result[1], "missing_api_key")  # type: ignore[index]
 
-    def test_capability_live_enabled_with_launcher_proceeds(self) -> None:
-        st = self._state(live_enabled=True, live_launcher=lambda r, d: 0)
+    def test_capability_live_enabled_with_credential_proceeds(self) -> None:
+        # B5 closeout: with a client credential, capability proceeds.
+        st = self._state(live_enabled=True, has_credential=True)
         self.assertIsNone(_check_live_capability(st, "live"))
 
     # -- shape (AFTER validate) -------------------------------------------
@@ -1222,21 +1232,30 @@ class RuntimeCapabilitiesEndpointTests(TestCase):
     (``_build_capabilities_payload``) — exactly as the G3-1 gate matrix is proven
     via ``_check_live_capability``.  The live-socket variant (a real GET
     round-trip) is env-blocked (RemoteDisconnected) and intentionally not
-    exercised here; document, don't 'fix'."""
+    exercised here; document, don't 'fix'.
 
-    def _state(self, *, live_enabled: bool, live_launcher: object) -> ObserverServerState:
+    B5 closeout: the env-key fallback (live_launcher, env_key_available) has been
+    retired. Live capability now depends on credential_store having at least one
+    provider key."""
+
+    def _state(self, *, live_enabled: bool, has_credential: bool = False) -> ObserverServerState:
+        from werewolf_eval.credential_store import CredentialStore
         with TemporaryDirectory() as tmp:
             runs = Path(tmp) / "runs"
             runs.mkdir()
+            cs = CredentialStore()
+            if has_credential:
+                cs.set("deepseek", "sk-test-fake-key")
             return ObserverServerState(
                 runs_dir=runs,
                 launcher=default_fake_launcher,
                 live_enabled=live_enabled,
-                live_launcher=live_launcher,  # type: ignore[arg-type]
+                credential_store=cs,
             )
 
     def test_available_posture_proceeds_with_no_reason(self) -> None:
-        st = self._state(live_enabled=True, live_launcher=lambda r, d: 0)
+        # B5 closeout: with a client credential, deepseek is available.
+        st = self._state(live_enabled=True, has_credential=True)
         payload = _build_capabilities_payload(st)
         self.assertEqual(payload["schema_version"], RUNTIME_CAPABILITIES_SCHEMA_VERSION)
         self.assertEqual(payload["default_mode"], "fake")
@@ -1250,7 +1269,7 @@ class RuntimeCapabilitiesEndpointTests(TestCase):
         self.assertIsNone(_check_live_capability(st, "live"))
 
     def test_disabled_posture_reason_matches_launch_403(self) -> None:
-        st = self._state(live_enabled=False, live_launcher=None)
+        st = self._state(live_enabled=False)
         payload = _build_capabilities_payload(st)
         live = payload["live_api"]
         self.assertFalse(live["enabled"])
@@ -1262,7 +1281,8 @@ class RuntimeCapabilitiesEndpointTests(TestCase):
         self.assertEqual(ds["reason_code"], _check_live_capability(st, "live")[1])  # type: ignore[index]
 
     def test_flag_on_no_key_posture_reason_matches_launch_403(self) -> None:
-        st = self._state(live_enabled=True, live_launcher=None)
+        # B5 closeout: without a client credential, deepseek is unavailable.
+        st = self._state(live_enabled=True, has_credential=False)
         payload = _build_capabilities_payload(st)
         live = payload["live_api"]
         self.assertTrue(live["enabled"])
@@ -1277,9 +1297,9 @@ class RuntimeCapabilitiesEndpointTests(TestCase):
         # secret scan (which also excludes the ``api_key`` substring).
         markers = ("Authorization", "Bearer ", "DEEPSEEK_API_KEY", "sk-")
         for st in (
-            self._state(live_enabled=False, live_launcher=None),
-            self._state(live_enabled=True, live_launcher=None),
-            self._state(live_enabled=True, live_launcher=lambda r, d: 0),
+            self._state(live_enabled=False),
+            self._state(live_enabled=True, has_credential=False),
+            self._state(live_enabled=True, has_credential=True),
         ):
             text = json.dumps(_build_capabilities_payload(st), ensure_ascii=False, sort_keys=True)
             for marker in markers:
@@ -1311,7 +1331,11 @@ class _InProcessHandler(ObserverRequestHandler):
 
 
 class LiveDispatchTests(TestCase):
-    """In-process dispatch tests for the live gate matrix (no socket)."""
+    """In-process dispatch tests for the live gate matrix (no socket).
+
+    B5 closeout: the env-key fallback (live_launcher, env_key_available) has been
+    retired. Live launches now require client-supplied credentials via
+    credential_store + multi_provider_launcher_factory."""
 
     def _live_launcher(self, run_id: str, run_dir: Path) -> int:
         (run_dir / "live.sentinel").write_text("live", encoding="utf-8")
@@ -1326,7 +1350,6 @@ class LiveDispatchTests(TestCase):
         body: dict,
         *,
         live_enabled: bool = False,
-        live_launcher_set: bool = False,
         credential_store: object | None = None,
         multi_factory: object | None = None,
         tmp: Path | None = None,
@@ -1345,7 +1368,6 @@ class LiveDispatchTests(TestCase):
             launcher=self._fake_launcher,
             profiles_dir=profiles,
             live_enabled=live_enabled,
-            live_launcher=self._live_launcher if live_launcher_set else None,
             **kwargs,
         )
         handler = _InProcessHandler(state)
@@ -1359,10 +1381,23 @@ class LiveDispatchTests(TestCase):
     def _run_dir(self, runs: Path, run_id: str) -> Path:
         return runs / run_id
 
+    def _make_cs_and_factory(self):
+        """Helper: create a credential_store with deepseek key and a multi_factory
+        that returns the live launcher."""
+        from werewolf_eval.credential_store import CredentialStore
+        cs = CredentialStore()
+        cs.set("deepseek", "sk-test-fake-key")
+
+        def multi_factory(resolved_seats, credentials):
+            return self._live_launcher
+
+        return cs, multi_factory
+
     # 1. mode omitted + deepseek profile → fake launcher ran (no live sentinel)
     def test_mode_omitted_runs_fake_launcher(self) -> None:
         body = {"profile": _deepseek_profile(), "run_id": "r_omit"}
-        h, runs = self._dispatch(body, live_enabled=True, live_launcher_set=True)
+        cs, multi_factory = self._make_cs_and_factory()
+        h, runs = self._dispatch(body, live_enabled=True, credential_store=cs, multi_factory=multi_factory)
         self.assertEqual(h.responses[-1][0], 202)
         self.assertEqual(h.responses[-1][1]["mode"], "fake")
         rd = self._run_dir(runs, "r_omit")
@@ -1372,7 +1407,8 @@ class LiveDispatchTests(TestCase):
     # 2. mode=fake → fake launcher ran
     def test_mode_fake_runs_fake_launcher(self) -> None:
         body = {"profile": _deepseek_profile(), "run_id": "r_fake", "mode": "fake"}
-        h, runs = self._dispatch(body, live_enabled=True, live_launcher_set=True)
+        cs, multi_factory = self._make_cs_and_factory()
+        h, runs = self._dispatch(body, live_enabled=True, credential_store=cs, multi_factory=multi_factory)
         rd = self._run_dir(runs, "r_fake")
         self.assertTrue((rd / "fake.sentinel").exists())
         self.assertFalse((rd / "live.sentinel").exists())
@@ -1382,7 +1418,8 @@ class LiveDispatchTests(TestCase):
         prof = _deepseek_profile()
         prof["role_shuffle"] = {"enabled": True}
         body = {"profile": prof, "run_id": "r_fs", "mode": "fake"}
-        h, runs = self._dispatch(body, live_enabled=True, live_launcher_set=True)
+        cs, multi_factory = self._make_cs_and_factory()
+        h, runs = self._dispatch(body, live_enabled=True, credential_store=cs, multi_factory=multi_factory)
         self.assertEqual(h.responses[-1][0], 400)
         self.assertEqual(h.responses[-1][1].get("code"), "shuffle_requires_live")
         self.assertFalse((self._run_dir(runs, "r_fs") / "fake.sentinel").exists())
@@ -1390,22 +1427,23 @@ class LiveDispatchTests(TestCase):
     def test_mode_omitted_with_role_shuffle_is_400(self) -> None:
         prof = _deepseek_profile()
         prof["role_shuffle"] = {"enabled": True}
-        h, runs = self._dispatch({"profile": prof, "run_id": "r_om"}, live_enabled=True, live_launcher_set=True)
+        cs, multi_factory = self._make_cs_and_factory()
+        h, runs = self._dispatch({"profile": prof, "run_id": "r_om"}, live_enabled=True, credential_store=cs, multi_factory=multi_factory)
         self.assertEqual(h.responses[-1][0], 400)
         self.assertEqual(h.responses[-1][1].get("code"), "shuffle_requires_live")
 
     # 3. mode=live, server NOT live-enabled → 403 live_api_disabled, no run_dir
     def test_live_not_enabled_403_disabled_no_run_dir(self) -> None:
         body = {"profile": _deepseek_profile(), "run_id": "r_dis", "mode": "live"}
-        h, runs = self._dispatch(body, live_enabled=False, live_launcher_set=False)
+        h, runs = self._dispatch(body, live_enabled=False)
         self.assertEqual(h.responses[-1][0], 403)
         self.assertEqual(h.responses[-1][1]["code"], "live_api_disabled")
         self.assertFalse(self._run_dir(runs, "r_dis").exists())
 
-    # 4. mode=live, enabled but launcher=None (key missing) → 403 missing_api_key
+    # 4. mode=live, enabled but no credential → 403 missing_api_key
     def test_live_enabled_no_key_403_missing_no_run_dir(self) -> None:
         body = {"profile": _deepseek_profile(), "run_id": "r_key", "mode": "live"}
-        h, runs = self._dispatch(body, live_enabled=True, live_launcher_set=False)
+        h, runs = self._dispatch(body, live_enabled=True)
         self.assertEqual(h.responses[-1][0], 403)
         self.assertEqual(h.responses[-1][1]["code"], "missing_api_key")
         self.assertFalse(self._run_dir(runs, "r_key").exists())
@@ -1413,14 +1451,14 @@ class LiveDispatchTests(TestCase):
     # 5. mode=live + non-deepseek provider → 400 unsupported_live_provider
     def test_live_non_deepseek_400_unsupported_no_run_dir(self) -> None:
         body = {"profile": _valid_profile_payload("fakeonly"), "run_id": "r_unsup", "mode": "live"}
-        h, runs = self._dispatch(body, live_enabled=True, live_launcher_set=True)
+        cs, multi_factory = self._make_cs_and_factory()
+        h, runs = self._dispatch(body, live_enabled=True, credential_store=cs, multi_factory=multi_factory)
         self.assertEqual(h.responses[-1][0], 400)
         self.assertEqual(h.responses[-1][1]["code"], "unsupported_live_provider")
         self.assertFalse(self._run_dir(runs, "r_unsup").exists())
 
-    # 6. mode=live + >1 distinct deepseek model → ALLOWED (P2-B-3) but must run via
-    #    the per-seat MULTI launcher (the env single-model path can't honor mixed
-    #    models, so it is gated to uniform profiles).
+    # 6. mode=live + >1 distinct deepseek model → ALLOWED (P2-B-3) and runs via
+    #    the per-seat MULTI launcher.
     def test_live_mixed_models_runs_via_multi(self) -> None:
         from werewolf_eval.credential_store import CredentialStore
         cs = CredentialStore()
@@ -1441,19 +1479,19 @@ class LiveDispatchTests(TestCase):
         self.assertTrue((self._run_dir(runs, "r_mix") / "multi.sentinel").exists())
         self.assertEqual(captured["models"], {"deepseek-chat", "deepseek-reasoner"})
 
-    def test_live_mixed_models_env_only_requires_client_key(self) -> None:
-        # Env-only deployment can't honor per-seat models → 403 (no silent
-        # single-model fallback that would misrepresent the run).
+    def test_live_mixed_models_without_credential_403(self) -> None:
+        # B5 closeout: without a client credential, mixed-model profile → 403.
         body = {"profile": _mixed_model_deepseek_profile(), "run_id": "r_mix2", "mode": "live"}
-        h, runs = self._dispatch(body, live_enabled=True, live_launcher_set=True)
+        h, runs = self._dispatch(body, live_enabled=True)
         self.assertEqual(h.responses[-1][0], 403)
-        self.assertEqual(h.responses[-1][1]["code"], "missing_provider_credential")
+        self.assertEqual(h.responses[-1][1]["code"], "missing_api_key")
         self.assertFalse(self._run_dir(runs, "r_mix2").exists())
 
-    # 7. mode=live + single-model deepseek + live_launcher → live launcher ran
+    # 7. mode=live + single-model deepseek + credential → live launcher ran
     def test_live_valid_runs_live_launcher(self) -> None:
         body = {"profile": _deepseek_profile(), "run_id": "r_live", "mode": "live"}
-        h, runs = self._dispatch(body, live_enabled=True, live_launcher_set=True)
+        cs, multi_factory = self._make_cs_and_factory()
+        h, runs = self._dispatch(body, live_enabled=True, credential_store=cs, multi_factory=multi_factory)
         self.assertEqual(h.responses[-1][0], 202)
         self.assertEqual(h.responses[-1][1]["mode"], "live")
         rd = self._run_dir(runs, "r_live")
@@ -1508,21 +1546,21 @@ class LiveDispatchTests(TestCase):
     # 8. capability precedes validity/shape: not-enabled + malformed profile
     def test_capability_precedes_validity_disabled_with_malformed(self) -> None:
         body = {"profile": {"name": "x"}, "run_id": "r_cap1", "mode": "live"}
-        h, runs = self._dispatch(body, live_enabled=False, live_launcher_set=False)
+        h, runs = self._dispatch(body, live_enabled=False)
         self.assertEqual(h.responses[-1][1]["code"], "live_api_disabled")
         self.assertFalse(self._run_dir(runs, "r_cap1").exists())
 
     # 8b. capability precedes validity/shape: not-enabled + non-deepseek profile
     def test_capability_precedes_shape_disabled_with_non_deepseek(self) -> None:
         body = {"profile": _valid_profile_payload("fakeonly"), "run_id": "r_cap2", "mode": "live"}
-        h, runs = self._dispatch(body, live_enabled=False, live_launcher_set=False)
+        h, runs = self._dispatch(body, live_enabled=False)
         self.assertEqual(h.responses[-1][1]["code"], "live_api_disabled")
         self.assertFalse(self._run_dir(runs, "r_cap2").exists())
 
     # 8c. flag-on + key-missing + malformed → missing_api_key (capability wins)
     def test_capability_missing_key_precedes_validity(self) -> None:
         body = {"profile": {"name": "x"}, "run_id": "r_cap3", "mode": "live"}
-        h, runs = self._dispatch(body, live_enabled=True, live_launcher_set=False)
+        h, runs = self._dispatch(body, live_enabled=True)
         self.assertEqual(h.responses[-1][1]["code"], "missing_api_key")
         self.assertFalse(self._run_dir(runs, "r_cap3").exists())
 
@@ -1535,7 +1573,8 @@ class LiveDispatchTests(TestCase):
 
     def test_live_dispatch_stamps_live_markers(self) -> None:
         body = {"profile": _deepseek_profile(), "run_id": "r_live_mark", "mode": "live"}
-        h, runs = self._dispatch(body, live_enabled=True, live_launcher_set=True)
+        cs, multi_factory = self._make_cs_and_factory()
+        h, runs = self._dispatch(body, live_enabled=True, credential_store=cs, multi_factory=multi_factory)
         art = self._resolved_artifact(runs, "r_live_mark")
         self.assertEqual(art["execution_mode"], "live")
         self.assertEqual(art["live_api"], "used")
@@ -1545,7 +1584,8 @@ class LiveDispatchTests(TestCase):
 
     def test_fake_dispatch_stamps_fake_markers(self) -> None:
         body = {"profile": _deepseek_profile(), "run_id": "r_fake_mark", "mode": "fake"}
-        h, runs = self._dispatch(body, live_enabled=True, live_launcher_set=True)
+        cs, multi_factory = self._make_cs_and_factory()
+        h, runs = self._dispatch(body, live_enabled=True, credential_store=cs, multi_factory=multi_factory)
         art = self._resolved_artifact(runs, "r_fake_mark")
         self.assertEqual(art["execution_mode"], "fake")
         self.assertEqual(art["live_api"], "not_used")
@@ -1570,58 +1610,47 @@ class ObserverServerLiveOptInTests(TestCase):
 
         return resolve_live_launcher(self._args(argv), environ)
 
-    def _state(self, live_enabled: bool, live_launcher: object) -> ObserverServerState:
+    def _state(self, live_enabled: bool) -> ObserverServerState:
         with TemporaryDirectory() as tmp:
             runs = Path(tmp) / "runs"
             runs.mkdir()
             return ObserverServerState(
                 runs_dir=runs, launcher=default_fake_launcher,
-                live_enabled=live_enabled, live_launcher=live_launcher,  # type: ignore[arg-type]
+                live_enabled=live_enabled,
             )
 
     def test_no_flag_yields_disabled(self) -> None:
-        live_enabled, env_launcher, env_key_available, factory = self._resolve(
+        # B5 closeout: resolve_live_launcher returns (live_enabled, factory) 2-tuple.
+        # --api-key-env is deprecated and ignored.
+        live_enabled, factory = self._resolve(
             ["--runs-dir", "x"], {"DEEPSEEK_API_KEY": "sk-test-fake-unused"}
         )
         self.assertFalse(live_enabled)
-        self.assertIsNone(env_launcher)
-        self.assertFalse(env_key_available)
         self.assertIsNone(factory)
         # request-time effect: live → live_api_disabled
-        st = self._state(live_enabled, env_launcher)
+        st = self._state(live_enabled)
         self.assertEqual(_check_live_capability(st, "live")[1], "live_api_disabled")  # type: ignore[index]
 
-    def test_flag_on_missing_key_yields_enabled_no_env_launcher_but_factory(self) -> None:
-        live_enabled, env_launcher, env_key_available, factory = self._resolve(
+    def test_flag_on_yields_enabled_with_factory(self) -> None:
+        # B5 closeout: --allow-live-api enables live and returns a factory.
+        # --api-key-env is deprecated and ignored (env var set or not).
+        live_enabled, factory = self._resolve(
             ["--allow-live-api", "--api-key-env", "DOES_NOT_EXIST_XXXX"], {}
         )
         self.assertTrue(live_enabled)
-        self.assertIsNone(env_launcher)
-        self.assertFalse(env_key_available)
         # factory is present because a client can supply a key
         self.assertTrue(callable(factory))
-        # with no env key and empty credential store, capability still returns missing_api_key
-        st = self._state(live_enabled, env_launcher)
+        # with empty credential store, capability returns missing_api_key
+        st = self._state(live_enabled)
         self.assertEqual(_check_live_capability(st, "live")[1], "missing_api_key")  # type: ignore[index]
 
-    def test_flag_on_with_key_builds_env_launcher_and_factory(self) -> None:
-        live_enabled, env_launcher, env_key_available, factory = self._resolve(
+    def test_env_var_set_triggers_deprecation_but_factory_still_built(self) -> None:
+        # B5 closeout: if the named env var is set, a deprecation warning is printed
+        # but the factory is still built (for client-supplied keys).
+        live_enabled, factory = self._resolve(
             ["--allow-live-api"], {"DEEPSEEK_API_KEY": "sk-test-fake-key"}
         )
         self.assertTrue(live_enabled)
-        self.assertTrue(callable(env_launcher))
-        self.assertTrue(env_key_available)
-        self.assertTrue(callable(factory))
-        st = self._state(live_enabled, env_launcher)
-        self.assertIsNone(_check_live_capability(st, "live"))  # proceeds
-
-    def test_custom_api_key_env_is_honored(self) -> None:
-        live_enabled, env_launcher, env_key_available, factory = self._resolve(
-            ["--allow-live-api", "--api-key-env", "MY_KEY"], {"MY_KEY": "sk-test-fake-key"}
-        )
-        self.assertTrue(live_enabled)
-        self.assertTrue(callable(env_launcher))
-        self.assertTrue(env_key_available)
         self.assertTrue(callable(factory))
 
     def test_help_lists_live_flags(self) -> None:
@@ -1708,6 +1737,7 @@ class LiveArtifactContractTests(TestCase):
 
     def _dispatch_real(self, run_id: str, mode: str) -> Path:
         from werewolf_eval.deepseek_launcher import build_deepseek_launcher
+        from werewolf_eval.credential_store import CredentialStore
 
         runs = self._root / mode / "runs"
         runs.mkdir(parents=True, exist_ok=True)
@@ -1716,10 +1746,20 @@ class LiveArtifactContractTests(TestCase):
             model="deepseek-chat", max_tokens=64, max_requests=32,
             provider_factory=_consensus_ok_factory,
         )
+        # B5 closeout: live_launcher field removed from state. Use
+        # multi_provider_launcher_factory to inject the fake launcher for testing.
+        cs = CredentialStore()
+        cs.set("deepseek", "sk-test-fake-key")
+
+        def multi_factory(resolved_seats, credentials):
+            return live_launcher
+
         state = ObserverServerState(
             runs_dir=runs, launcher=default_fake_launcher,
             profiles_dir=self._root / "profiles",
-            live_enabled=True, live_launcher=live_launcher,
+            live_enabled=True,
+            credential_store=cs,
+            multi_provider_launcher_factory=multi_factory,
         )
         handler = _InProcessHandler(state)
         handler._handle_profile_launch(

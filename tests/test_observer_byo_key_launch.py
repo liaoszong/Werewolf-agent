@@ -11,7 +11,6 @@ from werewolf_eval.credential_store import CredentialStore
 from werewolf_eval.observer_server import _resolve_live_launcher_for_launch
 
 _CLIENT = "sk-test-fake-client-AAAA"
-_ENV = "sk-test-fake-env-BBBB"
 
 
 def _deepseek_seats():
@@ -19,58 +18,32 @@ def _deepseek_seats():
 
 
 class ResolveLiveLauncherTests(unittest.TestCase):
-    def _state(self, *, client, env, client_base_url=""):
+    def _state(self, *, client, client_base_url=""):
         cs = CredentialStore()
         if client:
             cs.set("deepseek", _CLIENT, base_url=client_base_url)
-        captured = {}
-
-        def factory(api_key, base_url=None):
-            captured["key"] = api_key
-            captured["base_url"] = base_url
-            return lambda r, d: 0
 
         from werewolf_eval.observer_server import ObserverServerState
         st = ObserverServerState(
             runs_dir=Path("."), launcher=lambda r, d: 0,
             live_enabled=True, credential_store=cs,
-            live_launcher_factory=factory,
-            env_key_available=bool(env),
-            live_launcher=(lambda r, d: 0) if env else None,
+            # B5 closeout: multi_provider_launcher_factory is always wired by
+            # create_observer_server when live is enabled. For unit tests that
+            # don't go through the factory, we simulate it with a simple builder.
+            multi_provider_launcher_factory=lambda seats, creds: (lambda r, d: 0),
         )
-        return st, captured
+        return st
 
-    def test_client_key_preferred_over_env(self):
-        # No multi factory wired → the back-compat single-key factory handles the
-        # deepseek-only client-key case (client beats env).
-        st, captured = self._state(client=True, env=True)
+    def test_client_key_resolves_launcher(self):
+        # B5 closeout: with a client credential, the multi-provider launcher resolves.
+        st = self._state(client=True)
         launcher, err = _resolve_live_launcher_for_launch(st, _deepseek_seats())
         self.assertIsNone(err)
         self.assertIsNotNone(launcher)
-        self.assertEqual(captured["key"], _CLIENT)   # client beats env
 
-    def test_client_base_url_forwarded_to_factory(self):
-        # provider-02: a client-supplied custom base_url must reach the launcher
-        # factory, not be silently dropped (leaving the server's hard-coded
-        # default endpoint) on the uniform-deepseek back-compat path.
-        url = "https://deepseek.example-proxy.internal/v1"
-        st, captured = self._state(client=True, env=False, client_base_url=url)
-        launcher, err = _resolve_live_launcher_for_launch(st, _deepseek_seats())
-        self.assertIsNone(err)
-        self.assertIsNotNone(launcher)
-        self.assertEqual(captured["key"], _CLIENT)
-        self.assertEqual(captured["base_url"], url)
-
-    def test_env_fallback_when_no_client_key(self):
-        st, captured = self._state(client=False, env=True)
-        launcher, err = _resolve_live_launcher_for_launch(st, _deepseek_seats())
-        self.assertIsNone(err)
-        self.assertIs(launcher, st.live_launcher)    # uses the prebuilt env launcher
-
-    def test_error_when_neither(self):
-        st, _ = self._state(client=False, env=False)
-        st.live_launcher = None
-        st.env_key_available = False
+    def test_error_when_no_credential(self):
+        # B5 closeout: without any client credential, the resolver returns 403.
+        st = self._state(client=False)
         launcher, err = _resolve_live_launcher_for_launch(st, _deepseek_seats())
         self.assertIsNone(launcher)
         # P2-B-4: the per-seat resolver reports which provider lacks a credential.
@@ -117,8 +90,7 @@ class NoOrphanRunDirOnLiveRejectTests(unittest.TestCase):
             live_enabled=True,
             credential_store=cs,
             live_launcher_factory=None,  # no factory
-            env_key_available=False,     # no env key
-            live_launcher=None,          # no prebuilt launcher
+            multi_provider_launcher_factory=lambda seats, creds: (lambda r, d: 0),
         )
 
     def test_no_run_dir_created_on_missing_api_key_reject(self):

@@ -10,7 +10,8 @@ from werewolf_eval.credential_store import CredentialStore
 from werewolf_eval.observer_server import ObserverServerState, _build_capabilities_payload
 
 
-def _state(tmp, *, live_enabled, env_key_available, has_client_key):
+def _state(tmp, *, live_enabled, has_client_key):
+    """B5 closeout: env_key_available removed. Only client credentials matter."""
     cs = CredentialStore()
     if has_client_key:
         cs.set("deepseek", "sk-test-fake-client-key")
@@ -19,31 +20,27 @@ def _state(tmp, *, live_enabled, env_key_available, has_client_key):
         live_enabled=live_enabled,
         credential_store=cs,
         live_launcher_factory=(lambda api_key: (lambda r, d: 0)),
-        env_key_available=env_key_available,
     )
 
 
 class CapabilityCredentialTests(unittest.TestCase):
-    def test_available_with_client_key_no_env(self) -> None:
+    def test_available_with_client_key(self) -> None:
         with TemporaryDirectory() as t:
-            cap = _build_capabilities_payload(_state(t, live_enabled=True, env_key_available=False, has_client_key=True))
+            cap = _build_capabilities_payload(_state(t, live_enabled=True, has_client_key=True))
             self.assertTrue(cap["live_api"]["providers"]["deepseek"]["available"])
 
-    def test_available_with_env_no_client_key(self) -> None:
+    def test_unavailable_with_no_key(self) -> None:
+        # B5 closeout: without a client credential, deepseek is unavailable.
+        # The env-key fallback has been retired.
         with TemporaryDirectory() as t:
-            cap = _build_capabilities_payload(_state(t, live_enabled=True, env_key_available=True, has_client_key=False))
-            self.assertTrue(cap["live_api"]["providers"]["deepseek"]["available"])
-
-    def test_unavailable_with_neither(self) -> None:
-        with TemporaryDirectory() as t:
-            cap = _build_capabilities_payload(_state(t, live_enabled=True, env_key_available=False, has_client_key=False))
+            cap = _build_capabilities_payload(_state(t, live_enabled=True, has_client_key=False))
             dp = cap["live_api"]["providers"]["deepseek"]
             self.assertFalse(dp["available"])
             self.assertEqual(dp["reason_code"], "missing_api_key")
 
     def test_unavailable_when_live_disabled(self) -> None:
         with TemporaryDirectory() as t:
-            cap = _build_capabilities_payload(_state(t, live_enabled=False, env_key_available=True, has_client_key=True))
+            cap = _build_capabilities_payload(_state(t, live_enabled=False, has_client_key=True))
             self.assertFalse(cap["live_api"]["enabled"])
 
     def test_per_provider_availability_is_independent(self) -> None:
@@ -56,7 +53,6 @@ class CapabilityCredentialTests(unittest.TestCase):
             st = ObserverServerState(
                 runs_dir=Path(t), launcher=lambda r, d: 0,
                 live_enabled=True, credential_store=cs,
-                env_key_available=False,
             )
             providers = _build_capabilities_payload(st)["live_api"]["providers"]
             self.assertTrue(providers["openai"]["available"])
@@ -66,15 +62,17 @@ class CapabilityCredentialTests(unittest.TestCase):
             # every registry provider is reported (not just deepseek)
             self.assertIn("openai_compatible", providers)
 
-    def test_deepseek_env_backcompat_does_not_leak_to_other_providers(self) -> None:
-        # The legacy env key counts ONLY for deepseek; openai/anthropic must still
-        # report unavailable when no client credential exists for them.
+    def test_deepseek_without_client_cred_is_unavailable(self) -> None:
+        # B5 closeout: the env-key fallback has been retired. Without a client
+        # credential for deepseek, it reports unavailable — same as any other
+        # provider without a credential.
         with TemporaryDirectory() as t:
             cap = _build_capabilities_payload(
-                _state(t, live_enabled=True, env_key_available=True, has_client_key=False)
+                _state(t, live_enabled=True, has_client_key=False)
             )
             providers = cap["live_api"]["providers"]
-            self.assertTrue(providers["deepseek"]["available"])
+            self.assertFalse(providers["deepseek"]["available"])
+            self.assertEqual(providers["deepseek"]["reason_code"], "missing_api_key")
             self.assertFalse(providers["openai"]["available"])
             self.assertFalse(providers["anthropic"]["available"])
 

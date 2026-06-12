@@ -95,20 +95,50 @@ def _collect_trace(
 
 def _provider_turns_summary(turns: list[dict]) -> dict:
     by_kind: dict[str, int] = {}
-    total_tokens = 0
+    # B5 closeout (B34-03): honest token naming. Each turn's token_usage carries
+    # prompt_tokens, completion_tokens, total_tokens. We sum them separately so
+    # cost calculations use the correct口径 (completion_tokens for output pricing,
+    # prompt_tokens for input pricing). Scribe turns (scaffold, not a seat) are
+    # tracked separately so per-seat cost is not inflated by scaffold spend.
+    player_prompt_tokens = 0
+    player_completion_tokens = 0
+    player_total_tokens = 0
+    scaffold_prompt_tokens = 0
+    scaffold_completion_tokens = 0
+    scaffold_total_tokens = 0
     for t in turns:
         by_kind[t["kind"]] = by_kind.get(t["kind"], 0) + 1
-        if t.get("token_usage"):
-            total_tokens += int(t["token_usage"].get("total_tokens", 0))
+        usage = t.get("token_usage")
+        if not isinstance(usage, dict):
+            continue
+        prompt = int(usage.get("prompt_tokens", 0))
+        completion = int(usage.get("completion_tokens", 0))
+        total = int(usage.get("total_tokens", 0))
+        if t.get("actor") == "scribe":
+            scaffold_prompt_tokens += prompt
+            scaffold_completion_tokens += completion
+            scaffold_total_tokens += total
+        else:
+            player_prompt_tokens += prompt
+            player_completion_tokens += completion
+            player_total_tokens += total
     live_requested = sum(1 for t in turns if t.get("live_requested"))
     live_success = by_kind.get("live_success", 0)
-    # NOTE for B5 per-seat cost accounting: skip actor=="scribe" turns (scaffold, not a seat).
     return {
         "live_requested_actions": live_requested,
         "live_success_actions": live_success,
         "live_success_rate": (live_success / live_requested) if live_requested else 1.0,
         "by_provider_result_kind": by_kind,
-        "total_completion_tokens": total_tokens,
+        # Player (seat) token sums — exclude scribe (scaffold).
+        "player_prompt_tokens": player_prompt_tokens,
+        "player_completion_tokens": player_completion_tokens,
+        "player_total_tokens": player_total_tokens,
+        # Scaffold (scribe) token sums — separate so per-seat cost is honest.
+        "scaffold_prompt_tokens": scaffold_prompt_tokens,
+        "scaffold_completion_tokens": scaffold_completion_tokens,
+        "scaffold_total_tokens": scaffold_total_tokens,
+        # Legacy alias for backward compat (sum of player + scaffold total).
+        "total_tokens": player_total_tokens + scaffold_total_tokens,
         "player_requests": live_requested,
         "scaffold_requests": sum(1 for t in turns if t.get("response_kind") == "scaffold"),
         "turns": turns,

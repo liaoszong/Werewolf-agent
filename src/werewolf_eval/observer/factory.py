@@ -44,25 +44,26 @@ def create_observer_server(
     launcher: RunLauncher | None = None,
     profiles_dir: Path | None = None,
     live_enabled: bool = False,
-    live_launcher: RunLauncher | None = None,
     live_launcher_factory: Callable[..., RunLauncher] | None = None,
-    env_key_available: bool = False,
     live_max_requests: int = 32,
     live_max_tokens: int = 256,
     seed_default_profile: bool = False,
 ) -> ThreadingHTTPServer:
     """Create and configure a threaded observer HTTP server.
 
-    ``live_enabled``/``live_launcher`` wire the G3-1 opt-in live path: live is
-    the only mode that consults them, and only a profile launch (not a template
-    launch) may select it.  Both default off so the server stays fake-only.
+    ``live_enabled`` wires the G3-1 opt-in live path: live is the only mode that
+    consults it, and only a profile launch (not a template launch) may select it.
+    Defaults off so the server stays fake-only.
 
     ``live_launcher_factory`` is the per-launch builder used with a client-supplied
-    key (P2-B-1 BYO-key path); ``env_key_available`` records whether the server
-    started with an env key (back-compat signal for capability gate).
+    key (P2-B-1 BYO-key path).
 
     P2-B-4: when live is enabled, a ``multi_provider_launcher_factory`` is built
-    with the server live limits — the per-seat multi-provider launch path."""
+    with the server live limits — the per-seat multi-provider launch path.
+
+    B5 closeout: the deepseek-only env-key fallback (``live_launcher``,
+    ``env_key_available``) has been retired. Live launches now require a
+    client-supplied credential for every provider via POST /api/credentials."""
     if launcher is None:
         launcher = default_fake_launcher
     runs_dir.mkdir(parents=True, exist_ok=True)
@@ -89,9 +90,7 @@ def create_observer_server(
         launcher=launcher,
         profiles_dir=profiles_dir,
         live_enabled=live_enabled,
-        live_launcher=live_launcher,
         live_launcher_factory=live_launcher_factory,
-        env_key_available=env_key_available,
         multi_provider_launcher_factory=multi_provider_launcher_factory,
     )
 

@@ -10,7 +10,6 @@ from typing import Callable
 from werewolf_eval.credential_store import CredentialStore
 
 RunLauncher = Callable[[str, Path], int]
-EnvLiveLauncherFactory = Callable[[], RunLauncher]
 
 
 @dataclass
@@ -22,18 +21,15 @@ class ObserverServerState:
     run_errors: dict[str, str] = field(default_factory=dict)
     lock: Lock = field(default_factory=Lock)
     # G3-1 live opt-in: ``live_enabled`` reflects ``--allow-live-api``.
-    # ``live_launcher`` is the env-key back-compat hook. New servers store a
-    # no-arg factory here so each env-backed launch gets fresh provider/budget
-    # state; old tests may still inject a concrete RunLauncher.
+    # B5 closeout: the deepseek-only env-key fallback has been retired.
+    # Live launches now require a client-supplied credential for every provider
+    # (including deepseek) via POST /api/credentials → CredentialStore.
     live_enabled: bool = False
-    live_launcher: EnvLiveLauncherFactory | RunLauncher | None = None
     # P2-B-1 BYO-key: in-memory client credentials + a per-launch live launcher
-    # factory (built from a key at launch). live_launcher above stays as the
-    # env-key launcher hook (back-compat / fallback); env_key_available records
-    # whether the server started with an env key.
+    # factory (built from a key at launch). env_key_available and live_launcher
+    # (the old env-key back-compat hooks) were removed in B5 closeout.
     credential_store: CredentialStore = field(default_factory=CredentialStore)
     live_launcher_factory: Callable[..., RunLauncher] | None = None
-    env_key_available: bool = False
     # P2-B-3/B-4: per-seat multi-provider launcher builder. Given the resolved
     # seats + a {provider: ProviderCredential} map, returns a RunLauncher that runs
     # the game with each seat on its own provider/model/persona. Injectable so
