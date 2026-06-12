@@ -230,6 +230,41 @@ class MilkPierceMetricsTests(unittest.TestCase):
         for k in ("milk_pierce_overlap_count", "milk_pierce_death_count", "witch_save_night1_share"):
             self.assertIn(k, DEFAULT_COMPARE_KEYS)
 
+    def test_aggregate_milk_pierce_rate_guard_board(self):
+        """P3-1: milk_pierce_{overlap,death}_rate on guard boards = _mean over games."""
+        g_pierce = analyze_game_dict(_witch_coord_game(list(_PIERCE_R1)))
+        g_no_pierce = analyze_game_dict(_witch_coord_game([
+            _ev(1, "night", "guard_protect", "p5", "p6", "Guard p5 protects p6."),
+            _ev(1, "night", "werewolf_kill", "p1", "p3", "Wolf team kills p3."),
+        ]))
+        agg = aggregate_games([g_pierce, g_no_pierce])
+        # overlap: 1, 0 -> mean 0.5; death: 1, 0 -> mean 0.5
+        self.assertAlmostEqual(agg["milk_pierce_overlap_rate"], 0.5)
+        self.assertAlmostEqual(agg["milk_pierce_death_rate"], 0.5)
+
+    def test_aggregate_milk_pierce_rate_non_guard_board_is_none(self):
+        """P3-1: milk_pierce_{overlap,death}_rate on non-guard boards = None."""
+        # Non-guard board: no guard role
+        non_guard_game = {
+            "players": [
+                {"player_id": "p1", "role": "werewolf"}, {"player_id": "p2", "role": "werewolf"},
+                {"player_id": "p3", "role": "seer"}, {"player_id": "p4", "role": "witch"},
+                {"player_id": "p5", "role": "villager"}, {"player_id": "p6", "role": "villager"},
+            ],
+            "events": [
+                _ev(1, "night", "werewolf_kill", "p1", "p3", "Wolf team kills p3."),
+                _ev(1, "night", "witch_action", "p4", "p3", "Witch saves p3."),
+            ],
+            "result": {"winner": "villager", "end_round": 2},
+        }
+        row = analyze_game_dict(non_guard_game)
+        agg = aggregate_games([row])
+        self.assertIsNone(agg["milk_pierce_overlap_rate"])
+        self.assertIsNone(agg["milk_pierce_death_rate"])
+        # Counts should still be 0 (not None) for backward compatibility
+        self.assertEqual(agg["milk_pierce_overlap_count"], 0)
+        self.assertEqual(agg["milk_pierce_death_count"], 0)
+
 
 if __name__ == "__main__":
     unittest.main()

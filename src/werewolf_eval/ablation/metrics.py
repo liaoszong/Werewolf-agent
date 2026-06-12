@@ -3,6 +3,8 @@ from __future__ import annotations
 import json, re, collections
 from pathlib import Path
 
+from werewolf_eval.evaluation_versions import read_manifest_bucket
+
 VISUAL_WORDS = ("眼神", "表情", "紧张", "躲闪", "支支吾吾", "语气", "闪躲")
 MECHANIC_WORDS = ("警徽", "警长", "警上", "警下", "守卫", "守夜人")
 # 守卫板上「守卫/守夜人」是真实机制,不是幻觉词(L4);非守卫板维持原词表
@@ -22,10 +24,13 @@ def classify_event(ev: dict):
     if m: return ("kill", actor, m.group(1), None)
     m = re.match(r"Seer (p\d) checks (p\d), result: (\w+)", s)
     if m: return ("check", m.group(1), m.group(2), m.group(3))
-    if "saves" in s:
+    # C12-11 phase guard: day-phase speeches that happen to mention night-action
+    # keywords ("saves" / "no potion" / "poison") must NOT classify as witch
+    # actions. `ph != "day"` preserves legacy phase-less events (None != "day").
+    if "saves" in s and ph != "day":
         m = re.search(r"saves (p\d)", s); return ("witch_save", actor, m.group(1) if m else tgt, None)
-    if "no potion" in s: return ("witch_pass", actor, None, None)
-    if "poison" in s.lower():
+    if "no potion" in s and ph != "day": return ("witch_pass", actor, None, None)
+    if "poison" in s.lower() and ph != "day":
         m = re.search(r"poisons? (p\d)", s); return ("witch_poison", actor, m.group(1) if m else tgt, None)
     m = re.match(r"(p\d) votes (p\d)", s)
     if m: return ("vote", m.group(1), m.group(2), None)
@@ -83,9 +88,35 @@ def _mean(xs):
 
 
 def aggregate_games(games: list[dict]) -> dict:
-    """games = analyze_game_dict outputs of VALID (live) games only."""
+    """games = analyze_game_dict outputs of VALID (live) games only.
+
+    P2-2: returns the full schema (all DEFAULT_COMPARE_KEYS present) even when
+    `games` is empty, so downstream consumers can iterate keys without
+    KeyError. Empty-set values are `None` for rates/means, `0` for counts,
+    `{}` for distributions."""
     n = len(games)
-    if n == 0: return {"n_valid": 0}
+    if n == 0:
+        return {
+            "n_valid": 0,
+            "wolf_win_rate": None, "villager_win_rate": None,
+            "day1_hit": None, "day2_hit": None,
+            "verify_wolf_followed": None, "verify_wolf_followed_n": 0,
+            "seer_voted_out_in_verify_cases": None,
+            "witch_save_rate": None, "witch_poison_rate": None,
+            "herding": None,
+            "halluc_visual_speech_rate": None, "halluc_visual_game_rate": None,
+            "halluc_mechanic_game_rate": None,
+            "seer_survives_d1_rate": None, "avg_rounds": None,
+            "night1_kill_dist": {},
+            "guard_target_seer_rate": None, "guard_success_rate": None,
+            "avg_peaceful_nights": None,
+            "seer_death_rate": None, "seer_night_death_rate": None,
+            "seer_claim_to_night_survival_rate": None,
+            "seer_claim_to_night_survival_n": 0,
+            "milk_pierce_overlap_count": 0, "milk_pierce_death_count": 0,
+            "milk_pierce_overlap_rate": None, "milk_pierce_death_rate": None,
+            "witch_save_night1_share": None,
+        }
     def rate(pred): return sum(1 for g in games if pred(g)) / n
     d1 = [g["d1_majority_is_wolf"] for g in games if g["d1_majority_is_wolf"] is not None]
     d2 = [g.get("d2_majority_is_wolf") for g in games if g.get("d2_majority_is_wolf") is not None]
@@ -123,8 +154,14 @@ def aggregate_games(games: list[dict]) -> dict:
         "seer_claim_to_night_survival_n": sum(
             1 for g in games if g.get("seer_claimed_then_survived_night") is not None),
         # ---- v4 witch-coordination arm (spec 2026-06-12 §6); totals over the n_valid set ----
+        # C12-03 alignment: per-game milk_pierce_{overlap,death} is None on
+        # non-guard boards. `sum(... or 0)` preserves the historical total
+        # (treating None as 0); the new _rate fields are the _mean-family
+        # counterparts (None on non-guard arms, float on guard arms).
         "milk_pierce_overlap_count": sum(g.get("milk_pierce_overlap") or 0 for g in games),
         "milk_pierce_death_count": sum(g.get("milk_pierce_death") or 0 for g in games),
+        "milk_pierce_overlap_rate": _mean([g.get("milk_pierce_overlap") for g in games]),
+        "milk_pierce_death_rate": _mean([g.get("milk_pierce_death") for g in games]),
         "witch_save_night1_share": (
             sum(1 for g in saved_games if g["witch_save_round"] == 1) / len(saved_games)
         ) if saved_games else None,
@@ -132,9 +169,17 @@ def aggregate_games(games: list[dict]) -> dict:
 
 
 def aggregate(run_dirs) -> dict:
-    """Read run dirs, drop low-live (RNG) / incomplete / corrupt games, aggregate the valid ones."""
+    """Read run dirs, drop low-live (RNG) / incomplete / corrupt games, aggregate the valid ones.
+
+    C12-04: asserts all valid games share the same `evaluation_bucket` (read
+    from each run's prompt-manifest.json). Mixed buckets within one arm raise
+    `ValueError` — cross-bucket aggregation is silently meaningless. Legacy
+    runs (no manifest → bucket=None) are tolerated only when ALL valid games
+    are legacy; a mix of legacy and modern buckets is also an error.
+    """
     run_dirs = [Path(d) for d in run_dirs]
     valid, invalid, invalid_scaffold = [], 0, 0
+    valid_buckets: list[tuple[str, dict | None]] = []   # (run_dir_name, bucket)
     for d in run_dirs:
         gl_path = d / "game-log.json"
         try:
@@ -153,11 +198,47 @@ def aggregate(run_dirs) -> dict:
         row["scaffold_coverage"] = cov
         row["seer_claimed_then_survived_night"] = seer_claim_to_night_survival(d, row)
         valid.append(row)
+        valid_buckets.append((d.name, read_manifest_bucket(d)))
+    # C12-04 bucket assertion: all valid games must share one bucket.
+    # P1-1: distinguish "no manifest" (legacy, tolerated) from "manifest exists
+    # but bucket is None/missing" (corrupt, fail-loud). read_manifest_bucket
+    # returns None for both cases, so we re-check file existence here.
+    _LEGACY = "__LEGACY__"
+    bucket_set: set[str] = set()
+    bucket_by_run: dict[str, str] = {}   # run_dir_name -> canonical bucket key
+    for run_name, b in valid_buckets:
+        if b is not None:
+            key = json.dumps(b, sort_keys=True)
+        elif (Path(run_dirs[0].parent) / run_name / "prompt-manifest.json").exists():
+            # Manifest exists but bucket is None → corrupt or missing bucket key.
+            raise ValueError(
+                f"evaluation_bucket invalid in {run_name}: prompt-manifest.json "
+                f"exists but has no usable evaluation_bucket field"
+            )
+        else:
+            key = _LEGACY
+        bucket_set.add(key)
+        bucket_by_run[run_name] = key
+    if len(bucket_set) > 1:
+        # P3-2: include run_dir→bucket mapping for easier live-batch diagnosis.
+        seen = sorted(bucket_set)
+        offenders = {rn: k for rn, k in bucket_by_run.items() if k != next(iter(bucket_set))}
+        raise ValueError(
+            f"evaluation_bucket mismatch within arm: {len(seen)} distinct buckets "
+            f"across {len(valid_buckets)} valid games — buckets={seen}, "
+            f"offending_runs={offenders}"
+        )
+    if bucket_set:
+        only = next(iter(bucket_set))
+        arm_bucket = None if only == _LEGACY else json.loads(only)
+    else:
+        arm_bucket = None
     out = aggregate_games(valid)
     out["games"] = valid
     out["n_total"] = len(run_dirs)
     out["n_invalid_lowlive"] = invalid
     out["n_invalid_scaffold"] = invalid_scaffold
+    out["evaluation_bucket"] = arm_bucket
     return out
 
 
@@ -168,7 +249,9 @@ DEFAULT_COMPARE_KEYS = (
     "seer_survives_d1_rate","avg_rounds",
     "seer_death_rate","seer_night_death_rate","seer_claim_to_night_survival_rate",
     "guard_target_seer_rate","guard_success_rate","avg_peaceful_nights",
-    "milk_pierce_overlap_count","milk_pierce_death_count","witch_save_night1_share",
+    "milk_pierce_overlap_count","milk_pierce_death_count",
+    "milk_pierce_overlap_rate","milk_pierce_death_rate",
+    "witch_save_night1_share",
 )
 
 
@@ -291,6 +374,12 @@ def analyze_game_dict(gl: dict) -> dict:
         1 for r in overlap_rounds
         if any(dr == r and pid == saves_by_round[r] and cause == "night"
                for (dr, pid, cause) in deaths))
+    # C12-03: non-guard boards have no milk-pierce mechanism — report None
+    # (aligns with the guard_target_seer_rate/_mean family convention; compare
+    # reads `None vs 0.28` as "no mechanism" instead of `0 vs 12` as "zero is
+    # better"). Guard boards keep integer counts for backward compatibility.
+    milk_overlap_val: int | None = len(overlap_rounds) if has_guard else None
+    milk_death_val: int | None = milk_death if has_guard else None
     return {
         "roles": roles, "seer": seer, "wolves": sorted(wolves),
         "winner": res.get("winner"), "end_round": res.get("end_round"),
@@ -313,8 +402,8 @@ def analyze_game_dict(gl: dict) -> dict:
         "guard_block_share": (sum(1 for r2, t in guards_by_round.items() if kills.get(r2) == t) / gn) if gn else None,
         "n_peaceful_nights": peaceful,
         "witch_save_round": (min(saves_by_round) if saves_by_round else None),
-        "milk_pierce_overlap": len(overlap_rounds),
-        "milk_pierce_death": milk_death,
+        "milk_pierce_overlap": milk_overlap_val,
+        "milk_pierce_death": milk_death_val,
         "herd_share": sum(shares) / len(shares) if shares else None,
         "has_visual_halluc": any(w in text_all for w in VISUAL_WORDS),
         "has_mechanic_halluc": any(w in text_all for w in mech_words),
