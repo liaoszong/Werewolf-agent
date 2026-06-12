@@ -36,6 +36,7 @@ EVENT_TYPE_REQUIRED_VISIBILITY = {
     "witch_save": "witch",
     "witch_poison": "witch",
     "witch_pass": "witch",
+    "guard_protect": "guard",
     "werewolf_kill": "werewolf_team",
 }
 
