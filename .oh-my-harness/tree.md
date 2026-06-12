@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 517
+- Entries: 522
 
 ```text
 ./
@@ -122,6 +122,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   ├── 2026-06-11-byo-key-security-invariants.md
 │   │   ├── 2026-06-11-engine-visibility-single-source.md
 │   │   ├── 2026-06-11-fake-default-live-gate-testing-strategy.md
+│   │   ├── 2026-06-11-observer-visibility-layering.md
 │   │   └── 2026-06-11-role-facts-single-source.md
 │   ├── demo/
 │   │   ├── phase1-gold-demo.html
@@ -217,6 +218,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   │   ├── 2026-06-08--full-health-check.md
 │   │   │   ├── 2026-06-08--p2b-byo-key-rework-plan.md
 │   │   │   ├── 2026-06-11--b2-engine-visibility-single-source-plan.md
+│   │   │   ├── 2026-06-11--b4-observer-visibility-layering-plan.md
 │   │   │   ├── 2026-06-11--foundation-artifacts-pyproject-plan.md
 │   │   │   ├── 2026-06-11--l4-guard-arm-plan.md
 │   │   │   ├── 2026-06-11--observer-server-split-plan.md
@@ -381,8 +383,11 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       ├── game_log.py
 │       ├── llm_providers.py
 │       ├── log_bundle.py
+│       ├── observer_enrichment.py
+│       ├── observer_projection.py
 │       ├── observer_protocol.py
 │       ├── observer_server.py
+│       ├── observer_trust_index.py
 │       ├── observer_visibility.py
 │       ├── profile_config.py
 │       ├── prompt_goldens.py
