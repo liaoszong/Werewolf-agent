@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 527
+- Entries: 528
 
 ```text
 ./
@@ -225,7 +225,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   │   ├── 2026-06-11--observer-server-split-plan.md
 │   │   │   ├── 2026-06-11--provider-launcher-mechanical-refactor-plan.md
 │   │   │   ├── 2026-06-11--sys-a2-role-single-source-plan.md
-│   │   │   └── 2026-06-11--sys-b1-prompt-renderer-registry-plan.md
+│   │   │   ├── 2026-06-11--sys-b1-prompt-renderer-registry-plan.md
+│   │   │   └── 2026-06-12--l4-guard-witch-coord-arm-plan.md
 │   │   └── reviews/
 │   │       ├── 2026-06-01--g1c-project-healthcheck-final.md
 │   │       ├── 2026-06-01--g1c-project-healthcheck.md
