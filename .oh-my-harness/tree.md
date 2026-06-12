@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 513
+- Entries: 515
 
 ```text
 ./
@@ -375,6 +375,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       ├── fake_provider.py
 │       ├── game_engine.py
 │       ├── game_log.py
+│       ├── gold_game_fixtures.py
 │       ├── llm_providers.py
 │       ├── log_bundle.py
 │       ├── observer_protocol.py
@@ -405,6 +406,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       ├── run_scripted_game.py
 │       ├── runtime_events.py
 │       ├── score_game.py
+│       ├── scoring_records.py
 │       ├── scoring_types.py
 │       ├── scoring.py
 │       ├── scripted_game.py
