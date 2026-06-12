@@ -104,11 +104,14 @@ def _clone(arts: RunArtifacts, **over: Any) -> RunArtifacts:
 # checker validates against what the engine ACTUALLY produced - not hand-crafted
 # synthetic events.
 #
-# Coverage target (audit C3-3): milk-pierce (I8b), guard block (I8a),
-# guard-does-not-block-poison, hunter death cascade, consecutive guard (I8c).
+# Coverage target (audit C3-3): each seed deterministically lands in one of six
+# scenarios so the sweep always exercises milk-pierce (I8b), guard block (I8a),
+# guard-does-not-block-poison, plain kill, and the hunter death cascade on real
+# engine output. Consecutive guard (I8c) needs two rounds and is covered only by
+# guard_board_known_bad (this single-round generator never emits a round-2
+# guard_protect).
 #
-# TODO: expand the seed space for more random shape coverage (currently covers
-#  key combinatorial branches, not random Monte-Carlo).
+# TODO: layer Monte-Carlo shape variety on top of the deterministic scenario floor.
 
 _GUARD_ROLES = [
     ("p1", "seer", "villager"), ("p2", "witch", "villager"),
@@ -156,10 +159,27 @@ def guard_board_game(seed: int) -> RunArtifacts:
         events.append(e)
         return e["event_id"]
 
-    victim = rng.choice(non_wolves)
-    guard_tgt = rng.choice(all_ids)
-    saved = rng.choice([True, False])
-    poison_tgt: str | None = rng.choice([None] + [p for p in non_wolves if p != "p2"])
+    # Deterministic scenario assignment so the seed sweep GUARANTEES coverage of
+    # every key settlement branch on real engine output, instead of leaving the
+    # milk-pierce / guard-block overlap to RNG luck (audit C3-3 HIGH: the old
+    # independent draws hit milk-pierce on only ~2/20 seeds). Free dimensions
+    # (which victim, seer target, poison identity) stay seed-random.
+    poison_pool = [p for p in non_wolves if p != "p2"]
+    scenario = seed % 6
+    victim = "p3" if scenario == 5 else rng.choice(non_wolves)  # 5 -> force hunter cascade
+    others = [p for p in all_ids if p != victim]
+    poison_tgt: str | None
+    if scenario == 0:        # milk-pierce: guard + save on the kill target -> pierced -> dies
+        guard_tgt, saved, poison_tgt = victim, True, None
+    elif scenario == 1:      # guard blocks the kill (no save) -> victim survives
+        guard_tgt, saved, poison_tgt = victim, False, None
+    elif scenario == 2:      # witch saves the victim, guard elsewhere -> victim survives
+        guard_tgt, saved, poison_tgt = rng.choice(others), True, None
+    elif scenario == 3:      # plain kill + a separate poison death
+        choices = [p for p in poison_pool if p != victim] or poison_pool
+        guard_tgt, saved, poison_tgt = rng.choice(others), False, rng.choice(choices)
+    else:                    # 4: plain kill; 5: hunter cascade (victim == hunter)
+        guard_tgt, saved, poison_tgt = rng.choice(others), False, None
 
     wk = add("werewolf_kill", "p4", victim, "werewolf_team")
     turns.append({"request_id": "g_r01_p4", "phase": "night", "actor": "p4",

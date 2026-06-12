@@ -63,6 +63,39 @@ class TestGuardFuzzEngine(unittest.TestCase):
         self.assertTrue(any_kill_with_guard,
                         "guard+kill same-target scenarios must appear (I8 path not vacuum)")
 
+    def test_sweep_covers_milk_pierce_and_guard_block_on_engine_output(self):
+        """C3-3 HIGH: the sweep must DETERMINISTICALLY include both a milk-pierce
+        shape (guard+save+kill same target -> pierced -> dies) and a guard-block
+        shape (guard+kill same target, no save/poison -> survives), each validated
+        against the engine-computed deaths. The old generator left this to RNG and
+        hit milk-pierce on only ~2/20 seeds, so a regression could silently vanish."""
+        milk_pierce_seeds: list[int] = []
+        guard_block_seeds: list[int] = []
+        for seed in GUARD_FUZZ_SEEDS:
+            arts = guard_board_game(seed)
+            kills = {e["target"] for e in arts.events if e.get("type") == "werewolf_kill"}
+            guards = {e["target"] for e in arts.events if e.get("type") == "guard_protect"}
+            saves = {e["target"] for e in arts.events if e.get("type") == "witch_save"}
+            poisons = {e["target"] for e in arts.events if e.get("type") == "witch_poison"}
+            deaths = {e["target"] for e in arts.events if e.get("type") == "player_died"}
+            for t in kills & guards:
+                if t in saves:
+                    milk_pierce_seeds.append(seed)
+                    self.assertIn(
+                        t, deaths,
+                        f"seed {seed}: milk-pierce target {t} must die (guard+save pierced)",
+                    )
+                elif t not in poisons:
+                    guard_block_seeds.append(seed)
+                    self.assertNotIn(
+                        t, deaths,
+                        f"seed {seed}: guard-blocked target {t} (no save/poison) must survive",
+                    )
+        self.assertTrue(milk_pierce_seeds,
+                        "sweep must include a milk-pierce shape (I8b non-vacuous)")
+        self.assertTrue(guard_block_seeds,
+                        "sweep must include a guard-block shape (I8a non-vacuous)")
+
 
 if __name__ == "__main__":
     unittest.main()
