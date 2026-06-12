@@ -250,5 +250,17 @@ class ProviderConstructionSingleSourceTest(unittest.TestCase):
         self.assertEqual(provider.SOURCE_LABEL, DEEPSEEK_PROVIDER_SOURCE_LABEL)
 
 
+class ProviderConfigTests(unittest.TestCase):
+    def test_config_repr_hides_api_key(self) -> None:
+        from werewolf_eval.deepseek_provider import DeepSeekProviderConfig
+        chat_cfg = ChatProviderConfig(api_key="secret_chat_key", base_url="foo")
+        ds_cfg = DeepSeekProviderConfig(api_key="secret_ds_key")
+
+        self.assertNotIn("secret_chat_key", repr(chat_cfg))
+        self.assertNotIn("secret_ds_key", repr(ds_cfg))
+        self.assertIn("base_url='foo'", repr(chat_cfg))
+        self.assertIn("DeepSeekProviderConfig", repr(ds_cfg))
+
+
 if __name__ == "__main__":
     unittest.main()

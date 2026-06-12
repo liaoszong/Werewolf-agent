@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import json
 import urllib.request
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Callable
 
 from werewolf_eval.prompt_renderers import get_renderer
@@ -49,7 +49,7 @@ class ChatProviderConfig:
     ``persona_prompt`` / ``temperature`` are the per-seat knobs; both default to a
     no-op so a provider built without them behaves exactly as before."""
 
-    api_key: str
+    api_key: str = field(repr=False)
     base_url: str = ""
     model: str = ""
     timeout_seconds: int = 30
