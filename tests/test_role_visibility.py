@@ -74,6 +74,9 @@ class WitnessBoundarySentinelTest(unittest.TestCase):
         src = ROOT / "src" / "werewolf_eval"
         witnesses = [
             src / "observer_visibility.py",
+            src / "observer_trust_index.py",
+            src / "observer_projection.py",
+            src / "observer_enrichment.py",
             src / "observer_protocol.py",
             *sorted((src / "invariants").glob("*.py")),
         ]
