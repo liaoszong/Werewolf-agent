@@ -245,5 +245,45 @@ class PromptV3GuardTests(unittest.TestCase):
         self.assertNotIn("表态", samples["speech_villager_v3"])
 
 
+from werewolf_eval.prompt_goldens import canonical_prompt_samples_v4
+
+PROMPT_V4 = "prompt_v4"
+
+
+class PromptV4GuardTests(unittest.TestCase):
+    """prompt_v4 coexists with v1/v2/v3; lock its bytes + ledger the same way."""
+
+    def test_v4_rendered_bytes_match_golden(self) -> None:
+        golden_dir = GOLDEN_ROOT / PROMPT_V4
+        self.assertTrue(golden_dir.is_dir(), "missing tests/golden_prompts/prompt_v4")
+        samples = dict(canonical_prompt_samples_v4())
+        files = {p.stem: p for p in golden_dir.glob("*.txt")}
+        self.assertEqual(sorted(samples), sorted(files))
+        for name, text in samples.items():
+            self.assertEqual(files[name].read_bytes(), text.encode("utf-8"),
+                             f"prompt_v4 bytes changed for '{name}' without regen+ledger")
+
+    def test_v4_ledger_entry_hashes(self) -> None:
+        import hashlib
+        matches = [e for e in _ledger() if e.get("prompt_version") == PROMPT_V4]
+        self.assertEqual(len(matches), 1)
+        after = matches[0]["golden_prompt_hashes"]["after"]
+        samples = dict(canonical_prompt_samples_v4())
+        self.assertEqual(sorted(after), sorted(samples))
+        for name, text in samples.items():
+            self.assertEqual(after[name], hashlib.sha256(text.encode("utf-8")).hexdigest())
+
+    def test_v4_carries_coordination_markers(self) -> None:
+        # 实质标记断言(同 v2/v3 先例,不做恒真比较):注入态含协调提示与文案纪律;
+        # 恒等态样本不含提示(它就是 v3 字节,锁的是「v4 在该态没加任何字节」)。
+        samples = dict(canonical_prompt_samples_v4())
+        self.assertIn("【解药协调提示】", samples["witch_coord_suffix_injected"])
+        self.assertIn("同守同救", samples["witch_coord_suffix_injected"])
+        self.assertNotIn("高价值", samples["witch_coord_suffix_injected"])
+        self.assertIn("【解药协调提示】", samples["obs_witch_guard_board_victim_coord"])
+        self.assertNotIn("【解药协调提示】",
+                         samples["obs_witch_guard_board_no_victim_identity"])
+
+
 if __name__ == "__main__":
     unittest.main()

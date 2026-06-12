@@ -34,6 +34,7 @@ from werewolf_eval.prompt_v3 import (
     render_scribe_input,
     render_vote_scaffold,
 )
+from werewolf_eval.prompt_v4 import render_witch_coord_suffix
 from werewolf_eval.provider_contract import ProviderRequest
 
 _ALIVE = ["p1", "p2", "p3", "p4", "p5", "p6"]
@@ -193,6 +194,26 @@ def canonical_prompt_samples_v3() -> list[tuple[str, str]]:
          build_action_system_prompt(_req("p5", "night", ["guard_protect"], _ALIVE))),
         ("obs_v2_guard_night",
          _v2_text("p5", "guard", "villager", "night", {"p5": "guard"}, [])),
+    ]
+
+
+def canonical_prompt_samples_v4() -> list[tuple[str, str]]:
+    """prompt_v4 golden set — only the NEW surface (spec §5/§9): the injected
+    suffix, the fully composed injected witch observation, and the no-victim
+    identity state (whose bytes ARE prompt_v3's — locking that v4 adds nothing
+    there). The "" states can't be golden files; they are pinned by the canary
+    unit tests (tests/test_prompt_v4*.py)."""
+    guard_card = build_board_rules_card(rules_v1_2(), _GUARD_SEATS)
+    witch_text = _v2_text("p4", "witch", "villager", "night", {"p4": "witch"}, [])
+    return [
+        ("witch_coord_suffix_injected",
+         render_witch_coord_suffix(guard_card, "p5", False)),
+        ("obs_witch_guard_board_victim_coord",
+         augment_witch_observation(witch_text, "p5")
+         + render_witch_coord_suffix(guard_card, "p5", False)),
+        ("obs_witch_guard_board_no_victim_identity",
+         augment_witch_observation(witch_text, None)
+         + render_witch_coord_suffix(guard_card, None, False)),
     ]
 
 

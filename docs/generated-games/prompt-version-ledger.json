@@ -141,5 +141,32 @@
         "evidence": "45-game live ablation l4_guard (prompt_v3 + rules_v1_2 + guard board, paired seeds 1000-1044; n_valid=44 — 0 low-live, 1 dropped by scaffold_coverage gate; all 45 artifact sets pass invariants I1-I7+I4b+I8a/I8b/I8c with ZERO violations; snapshot docs/harness/reviews/2026-06-11-l4-guard-prompt-v3-metrics.json). Wolf win 87.5% (b4) -> 68.2% (-19.3pp, first arm below the 77.8% baseline); all 5 primary criteria met: seer death 82.5% -> 56.8%, claim-to-night-survival 72.2% -> 77.8%, verify-wolf-followed 52.9% -> 64.7% (first past the 60% target), seer-voted-out-in-verify 35.3% -> 23.5%; hallucination gates held (speech 2.96%, mechanic-game 4.55%, board-aware word list). Strong-pass gate (<=65%) missed by 3.2pp. Bottleneck moved to milk-pierce: 12 nights lost to uncoordinated guard+witch double-protection (witch_save_rate 1.0, guard blocked 14 kills, guard-targets-seer only 17%). Verdict: ACCEPTABLE PROGRESS (2026-06-11-l4-guard-VERDICT.md); next arm = witch coordination guidance (prompt_v4 candidate), standard rules unchanged."
       }
     }
+  },
+  {
+    "prompt_version": "prompt_v4",
+    "base_version": "prompt_v3",
+    "reason": "l4_guard_witch_coord arm: witch antidote-coordination guidance injected into the witch's own night action observation on guard boards (spec 2026-06-12-l4-guard-witch-coord-arm-design; targets the L4 bottleneck of 12 milk-pierced nights from uncoordinated guard+witch double-protection)",
+    "expected_change": "witch night observation gains the coordination suffix ONLY when board-has-guard AND victim present AND antidote unused; all other surfaces and states byte-identical to prompt_v3 (canary-pinned: standard board / no victim / spent antidote)",
+    "touched_chain": [
+      "prompt_v4.render_witch_coord_suffix",
+      "prompt_renderers.PromptRendererV4.witch_obs_suffix",
+      "emergent_engine._resolve_witch"
+    ],
+    "golden_prompt_hashes": {
+      "before": null,
+      "after": {
+        "witch_coord_suffix_injected": "e4d71dbb9061e9d52478efdfa3fb0b9ff48be77cee4a416d645ed892ae68d4c7",
+        "obs_witch_guard_board_victim_coord": "a53bd8b07758bed50034a2083818f57a90ff95900fe659b1035094e7db02fbb7",
+        "obs_witch_guard_board_no_victim_identity": "ffbc86e320d634e84ce3ae1ce83e47947f7dd49ff6e5efc6efde4623133f3d21"
+      }
+    },
+    "behavior_evidence": {
+      "status": "not_run",
+      "reason_if_not_run": "live 45-game l4_guard_witch_coord arm is the user-triggered T-live step; metrics snapshot + verdict will attach there"
+    },
+    "blessed_by": "user (spec verdict ACCEPTED_WITH_SMALL_EDITS, 2026-06-12; plan 2026-06-12--l4-guard-witch-coord-arm-plan)",
+    "blessed_at": "2026-06-12",
+    "arm_status": "pending_live_run",
+    "arm_label": "l4_guard_witch_coord"
   }
 ]

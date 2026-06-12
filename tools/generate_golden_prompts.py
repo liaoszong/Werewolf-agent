@@ -17,7 +17,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from werewolf_eval.prompt_goldens import canonical_prompt_samples, canonical_prompt_samples_v2, canonical_prompt_samples_v3
+from werewolf_eval.prompt_goldens import (
+    canonical_prompt_samples,
+    canonical_prompt_samples_v2,
+    canonical_prompt_samples_v3,
+    canonical_prompt_samples_v4,
+)
 from werewolf_eval.prompt_version import PROMPT_VERSION
 
 
@@ -37,6 +42,7 @@ def main() -> None:
     all_hashes[PROMPT_VERSION] = _write_dir(PROMPT_VERSION, canonical_prompt_samples())
     all_hashes["prompt_v2"] = _write_dir("prompt_v2", canonical_prompt_samples_v2())
     all_hashes["prompt_v3"] = _write_dir("prompt_v3", canonical_prompt_samples_v3())
+    all_hashes["prompt_v4"] = _write_dir("prompt_v4", canonical_prompt_samples_v4())
     print(json.dumps(all_hashes, indent=2, ensure_ascii=False))
 
 
