@@ -133,6 +133,13 @@ def check_i4b(arts: RunArtifacts) -> list[InvariantViolation]:
         for eid in turn.get("observation_source_event_ids", []):
             ev = by_id.get(str(eid))
             if ev is None:
+                # C3-1: a dangling source id (event never in the log) is an
+                # integrity failure, NOT a silent skip — the runtime guard
+                # (assert_prompt_entitled) fails loud on the same condition.
+                out.append(InvariantViolation(
+                    "I4b", "error", arts.game_id, (str(eid),),
+                    f"seat {seat} prompt sourced event {eid} absent from the "
+                    "event log (dangling reference)"))
                 continue
             if not entitled(seat, ev, seat_index):
                 out.append(InvariantViolation(

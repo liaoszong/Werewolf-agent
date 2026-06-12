@@ -1,5 +1,9 @@
 import unittest
-from werewolf_eval.invariants.guards import assert_prompt_entitled, PromptLeakError
+from werewolf_eval.invariants.guards import (
+    assert_prompt_entitled,
+    PromptLeakError,
+    DanglingSourceEventError,
+)
 from werewolf_eval.invariants.visibility_oracle import seat_index_from_players
 
 _PLAYERS = [{"player_id": "p1", "role": "seer", "team": "villager"},
@@ -20,8 +24,11 @@ class TestB1(unittest.TestCase):
         with self.assertRaises(PromptLeakError):
             assert_prompt_entitled("p2", ["e1"], self.by_id, self.idx)  # villager must not
 
-    def test_unknown_event_id_is_skipped(self):
-        assert_prompt_entitled("p2", ["missing"], self.by_id, self.idx)  # no raise
+    def test_unknown_event_id_fails_loud(self):
+        # C3-1: a source id absent from the event log is a dangling reference and
+        # must fail loud, not be silently skipped (the old behavior).
+        with self.assertRaises(DanglingSourceEventError):
+            assert_prompt_entitled("p2", ["missing"], self.by_id, self.idx)
 
 
 from werewolf_eval.invariants.guards import assert_death_commit_once, DoubleDeathCommitError
