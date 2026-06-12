@@ -88,7 +88,8 @@ witch_save_night1_share     解药在夜1使用的占比(观察项,不设门;验
 拆 overlap/death 两层的理由(用户裁决 §4):若后续 settler/规则变体或事件链有差异,
 能分清是「重叠少了」还是「死亡结算变了」。本轮不改规则,两值应恒等——不等即结算异常,verdict 须解释。
 数据源:decision-log + game-log(同 I8b 不变量的判定输入);guard 目标取**实际生效目标**
-(含兜底,沿 l4_guard spec §2 口径)。
+(含兜底,沿 l4_guard spec §2 口径)。**分母口径:同其余 metrics 键 = n_valid 过滤后集合**
+(l4_guard 为 44 局;回算门 §11 的「复现 12」按此口径核对)。
 
 保留既有全键:`witch_save_rate` / `witch_poison_rate` / guard 族 / seer 生存族 / 幻觉 / coverage。
 
@@ -111,9 +112,11 @@ PYTHONPATH=src python -m werewolf_eval.ablation run l4_guard_witch_coord --promp
 主判据:
 - milk_pierce_death_count:12 → ≤5(45 局总次数口径)
 - 狼胜:68.2% → ≤65%
-- l4_guard 已过的 5 个主判据不回退:
-  预言家总死亡率 56.8% / 报验后夜间生存率 77.8% / 验狼跟投 64.7% /
-  验狼局投死真预言家 23.5% / (方向门)狼胜不高于 l4_guard 的 68.2%
+- l4_guard 已过的 5 个主判据不回退,**「不回退」= 仍过原 L4 spec §8 门限**
+  (45 局噪声下「不得劣于实测值」过严,单局波动即可翻条;实测值仅作参照列入 verdict 对照表):
+  预言家总死亡率下降(L4 实测 56.8%)/ 报验后夜间生存率上升(77.8%)/ 验狼跟投 ≥b4 52.9%
+  (实测 64.7%)/ 验狼局投死真预言家不回退 b4 35.3%(实测 23.5%)/
+  (方向门)狼胜——本臂已收紧为上行的 ≤65% 主判据与「不高于 l4_guard 实测 68.2%」双显式值,不悬空
 
 塌陷门(用户裁决,量化):
 - witch_save_rate ≥ 0.3(45 局中至少 ~14 局用解药;低于此线视为
@@ -166,7 +169,8 @@ PYTHONPATH=src python -m werewolf_eval.ablation run l4_guard_witch_coord --promp
 | guidance 把女巫吓成不用药 → 保护总量下降、狼胜反升 | 塌陷门 witch_save_rate ≥0.3 硬线 + 狼胜方向门兜底 |
 | v4 注入误碰 v3 既有字节 | 两类 canary + golden 锁 + ledger 哈希;hook 基类返回 "" 钉单测 |
 | 奶穿降了但守卫/女巫保护同目标的「协调」只是双双弃守预言家 | l4_guard 5 主判据不回退门(预言家生存族全在内) |
-| milk_pierce 机算与 verdict 手算口径不一致 | 回算 l4_guard 原始 45 局(.runs/ablation/l4_guard/)须复现 overlap=death=12,作为度量正确性门 |
+| milk_pierce 机算与 verdict 手算口径不一致 | 回算 l4_guard 原始局(.runs/ablation/l4_guard/,n_valid=44 口径,§6)须复现 overlap=death=12,作为度量正确性门 |
+| **已知接受项**:守卫死后协调提示仍注入(「守卫每晚守护一名玩家」隐含守卫存活),可能压制本来安全的用药 | visibility 硬门(§3)禁止 hook 以 guard_alive 为条件——那正是 guard 私有状态喂漏;此为约束下的必然取舍,塌陷门 witch_save_rate≥0.3 部分兜底;verdict 阶段按已知项解读,不作意外发现 |
 | guard 私有状态喂漏进 guidance | §3 visibility 硬门:静态文本 + 仅公开派生输入,审计用例,喂漏=阻断 |
 
 ## 12. 流程
