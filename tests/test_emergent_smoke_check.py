@@ -14,6 +14,9 @@ sys.path.insert(0, str(ROOT / "src"))
 from werewolf_eval.emergent_smoke_check import DEEPSEEK_SOURCE_LABEL, evaluate_emergent_smoke
 
 MODEL = "deepseek-v4-flash"
+OPENAI_LABEL = "[OpenAI API output]"
+ANTHROPIC_LABEL = "[Anthropic API output]"
+FAKE_LABEL = "[deterministic fake provider output]"
 
 
 def _live_turn(actor="p1", kind="live_success", label=DEEPSEEK_SOURCE_LABEL, tokens=19):
@@ -132,6 +135,95 @@ class EmergentSmokeJudgeTests(unittest.TestCase):
             v = evaluate_emergent_smoke(tmp, expected_model=MODEL)
             self.assertTrue(v["checks"]["live_success_floor_ok"])
             self.assertTrue(v["passed"], v["checks"])
+
+
+def _live_turn_labeled(actor, label, tokens=19, model=MODEL):
+    t = _live_turn(actor=actor, label=label, tokens=tokens)
+    t["model"] = model
+    return t
+
+
+def _write_mixed_run(tmp: Path, *, turns, agents):
+    """Mixed-provider run: per-seat agents carry their own model/provider."""
+    live_req = sum(1 for t in turns if t.get("live_requested"))
+    live_succ = sum(1 for t in turns if t.get("kind") == "live_success")
+    (tmp / "provider-turns.json").write_text(json.dumps({
+        "live_requested_actions": live_req,
+        "live_success_actions": live_succ,
+        "live_success_rate": (live_succ / live_req) if live_req else 1.0,
+        "by_provider_result_kind": {},
+        "turns": turns,
+    }), encoding="utf-8")
+    (tmp / "provider-trace.json").write_text(json.dumps({
+        "requests": [{"request_id": "r", "observation_text": "可读文本"}], "responses": [],
+    }), encoding="utf-8")
+    (tmp / "prompt-manifest.json").write_text(json.dumps({"agents": agents}), encoding="utf-8")
+    (tmp / "game-log.json").write_text(json.dumps({"result": {"winner": "villager"}}), encoding="utf-8")
+
+
+class ProviderAgnosticHonestyTests(unittest.TestCase):
+    """B34-07: the honesty gate accepts any real live-provider label and supports a
+    per-seat expected provider/model plan, without any live API call."""
+
+    def test_non_deepseek_single_provider_passes(self) -> None:
+        # A single non-DeepSeek live provider (OpenAI) is honest -> passes.
+        with tempfile.TemporaryDirectory() as t:
+            tmp = Path(t)
+            turns = [_live_turn(actor=f"p{i}", label=OPENAI_LABEL) for i in range(13)]
+            _write_run(tmp, turns=turns, model="gpt-x")
+            v = evaluate_emergent_smoke(tmp, expected_model="gpt-x")
+            self.assertTrue(v["passed"], v["checks"])
+            self.assertTrue(v["checks"]["per_turn_honesty_ok"])
+
+    def test_fake_label_on_live_turn_fails_honesty(self) -> None:
+        # A live_success turn carrying a FAKE label is not a real live turn.
+        with tempfile.TemporaryDirectory() as t:
+            tmp = Path(t)
+            turns = [_live_turn(actor=f"p{i}", label=OPENAI_LABEL) for i in range(13)]
+            turns.append(_live_turn(actor="fake", label=FAKE_LABEL))  # fake masquerading as live_success
+            _write_run(tmp, turns=turns, model="gpt-x")
+            v = evaluate_emergent_smoke(tmp, expected_model="gpt-x")
+            self.assertFalse(v["checks"]["per_turn_honesty_ok"])
+
+    def test_expected_source_label_pin_rejects_other_live_label(self) -> None:
+        # Pinning DeepSeek but receiving OpenAI live output -> honesty fails.
+        with tempfile.TemporaryDirectory() as t:
+            tmp = Path(t)
+            turns = [_live_turn(actor=f"p{i}", label=OPENAI_LABEL) for i in range(13)]
+            _write_run(tmp, turns=turns, model="gpt-x")
+            v = evaluate_emergent_smoke(tmp, expected_model="gpt-x",
+                                        expected_source_label=DEEPSEEK_SOURCE_LABEL)
+            self.assertFalse(v["checks"]["per_turn_honesty_ok"])
+
+    def test_mixed_provider_per_seat_passes(self) -> None:
+        # p1-p3 on OpenAI, p4-p6 on Anthropic; per-seat manifest plan matches.
+        with tempfile.TemporaryDirectory() as t:
+            tmp = Path(t)
+            turns = (
+                [_live_turn_labeled(f"p{i}", OPENAI_LABEL, model="gpt-x") for i in (1, 2, 3)] * 3
+                + [_live_turn_labeled(f"p{i}", ANTHROPIC_LABEL, model="claude-y") for i in (4, 5, 6)] * 2
+            )
+            agents = (
+                [{"player_id": f"p{i}", "model": "gpt-x", "provider": "openai"} for i in (1, 2, 3)]
+                + [{"player_id": f"p{i}", "model": "claude-y", "provider": "anthropic"} for i in (4, 5, 6)]
+            )
+            expected = {
+                **{f"p{i}": {"model": "gpt-x", "provider": "openai"} for i in (1, 2, 3)},
+                **{f"p{i}": {"model": "claude-y", "provider": "anthropic"} for i in (4, 5, 6)},
+            }
+            _write_mixed_run(tmp, turns=turns, agents=agents)
+            v = evaluate_emergent_smoke(tmp, expected_models_by_seat=expected)
+            self.assertTrue(v["passed"], v["checks"])
+
+    def test_per_seat_wrong_model_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as t:
+            tmp = Path(t)
+            turns = [_live_turn_labeled(f"p{i}", OPENAI_LABEL, model="gpt-x") for i in (1, 2, 3)] * 5
+            agents = [{"player_id": f"p{i}", "model": "gpt-x", "provider": "openai"} for i in (1, 2, 3)]
+            expected = {f"p{i}": {"model": "WRONG"} for i in (1, 2, 3)}
+            _write_mixed_run(tmp, turns=turns, agents=agents)
+            v = evaluate_emergent_smoke(tmp, expected_models_by_seat=expected)
+            self.assertFalse(v["checks"]["manifest_model_honest"])
 
 
 if __name__ == "__main__":
