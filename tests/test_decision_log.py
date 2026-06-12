@@ -139,6 +139,51 @@ class DecisionLogTests(unittest.TestCase):
         with self.assertRaisesRegex(DecisionLogValidationError, "invalid source_label"):
             parse_decision_log(raw, self.game)
 
+    # --- C12-06/A45-7: additive round + request_id fields ---
+
+    def test_accepts_decision_without_round_and_request_id(self) -> None:
+        """Legacy fixture without round/request_id must still validate."""
+        raw = self._minimal_raw()
+        # round and request_id are absent by default in _minimal_raw
+        decision_log = parse_decision_log(raw, self.game)
+        self.assertIsNone(decision_log.decisions[0].round)
+        self.assertIsNone(decision_log.decisions[0].request_id)
+
+    def test_accepts_decision_with_round(self) -> None:
+        """round field is accepted when present and valid."""
+        raw = self._minimal_raw()
+        raw["decisions"][0]["round"] = 1
+        decision_log = parse_decision_log(raw, self.game)
+        self.assertEqual(decision_log.decisions[0].round, 1)
+
+    def test_accepts_decision_with_request_id(self) -> None:
+        """request_id field is accepted when present and valid."""
+        raw = self._minimal_raw()
+        raw["decisions"][0]["request_id"] = "test_r01_p4"
+        decision_log = parse_decision_log(raw, self.game)
+        self.assertEqual(decision_log.decisions[0].request_id, "test_r01_p4")
+
+    def test_accepts_decision_with_null_request_id(self) -> None:
+        """request_id=None is valid (wolf consensus decisions have no request_id)."""
+        raw = self._minimal_raw()
+        raw["decisions"][0]["request_id"] = None
+        decision_log = parse_decision_log(raw, self.game)
+        self.assertIsNone(decision_log.decisions[0].request_id)
+
+    def test_rejects_negative_round(self) -> None:
+        """round must be non-negative integer when present."""
+        raw = self._minimal_raw()
+        raw["decisions"][0]["round"] = -1
+        with self.assertRaisesRegex(DecisionLogValidationError, "round must be a non-negative integer"):
+            parse_decision_log(raw, self.game)
+
+    def test_rejects_non_integer_round(self) -> None:
+        """round must be an integer when present."""
+        raw = self._minimal_raw()
+        raw["decisions"][0]["round"] = 1.5
+        with self.assertRaisesRegex(DecisionLogValidationError, "round must be an integer"):
+            parse_decision_log(raw, self.game)
+
 
 if __name__ == "__main__":
     unittest.main()

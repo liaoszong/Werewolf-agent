@@ -63,17 +63,20 @@ def _load_game_log_summaries(run_dir: Path) -> dict[str, dict[str, str]]:
 
 
 def _load_decision_reasons(run_dir: Path) -> dict[str, dict[str, str]]:
-    """Return ``{game_log_event_id: {"reason_summary", "actor"}}`` by joining
-    ``decision-log.json`` reasons onto ``game-log.json`` events, or ``{}`` when
-    absent/malformed.  Never raises.
+    """Return ``{game_log_event_id: {...}}`` by joining ``decision-log.json`` reasons
+    onto ``game-log.json`` events, or ``{}`` when absent/malformed.  Never raises.
 
     UNLIKE summaries, a ``reason_summary`` is PRIVATE strategy: even when the
     underlying event is public (e.g. a vote), the reasoning behind it must only
     reach god or the deciding player.  This loader only builds the join and
     records the deciding ``actor``; :func:`build_projection_envelope` enforces the
-    per-actor gate.  Decisions carry no round, so events and decisions are matched
-    in chronological order by ``(actor, action==type, target)`` — a greedy
-    first-unconsumed pass, so repeated (actor, target) pairs map by sequence.
+    per-actor gate.  Decisions are matched by ``(round, phase, actor, action,
+    target)`` — a composite key that disambiguates repeated same-actor/action/target
+    decisions across rounds (C12-06/A45-7 fix).  When duplicate composite keys
+    exist in the decision log, the enrichment marks them as ambiguous rather than
+    silently resolving to one entry.  For legacy decision logs that lack ``round``,
+    a greedy ``(actor, action, target)`` fallback is used and annotated as
+    ``legacy_no_round``.
     """
     try:
         gl = json.loads((run_dir / "game-log.json").read_text(encoding="utf-8"))
@@ -86,17 +89,38 @@ def _load_decision_reasons(run_dir: Path) -> dict[str, dict[str, str]]:
     decisions = dl.get("decisions", [])
     if not isinstance(decisions, list):
         return {}
-    # Pending decisions keyed by (actor, action, target) -> ordered queue of reasons.
-    pending: dict[tuple[str, str, str], list[str]] = {}
+
+    # Build pending decisions keyed by composite (round, phase, actor, action, target).
+    # Track ambiguity: if >1 decisions share the same key, mark as ambiguous.
+    pending: dict[tuple[int, str, str, str, str], list[dict[str, str]]] = {}
+    legacy_pending: dict[tuple[str, str, str], list[dict[str, str]]] = {}
+    has_round = False
+
     for d in decisions:
         if not isinstance(d, dict):
             continue
         reason = d.get("reason_summary")
         if not reason:
             continue
-        key = (str(d.get("actor", "")), str(d.get("action", "")),
-               "" if d.get("target") is None else str(d.get("target")))
-        pending.setdefault(key, []).append(str(reason))
+        entry = {
+            "reason_summary": str(reason),
+            "decision_id": str(d.get("decision_id", "")),
+            "request_id": d.get("request_id"),  # may be None/missing
+        }
+        round_val = d.get("round")
+        phase = str(d.get("phase", ""))
+        actor = str(d.get("actor", ""))
+        action = str(d.get("action", ""))
+        target = "" if d.get("target") is None else str(d.get("target"))
+
+        if round_val is not None and isinstance(round_val, int) and round_val >= 0:
+            has_round = True
+            key = (round_val, phase, actor, action, target)
+            pending.setdefault(key, []).append(entry)
+        else:
+            # Legacy decision without round: fall back to greedy (actor, action, target)
+            legacy_key = (actor, action, target)
+            legacy_pending.setdefault(legacy_key, []).append(entry)
 
     out: dict[str, dict[str, str]] = {}
     for event in gl.get("events", []):
@@ -106,11 +130,73 @@ def _load_decision_reasons(run_dir: Path) -> dict[str, dict[str, str]]:
         actor = str(event.get("actor", ""))
         if not eid or not actor or actor == "system":
             continue
-        key = (actor, str(event.get("type", "")),
-               "" if event.get("target") is None else str(event.get("target")))
-        queue = pending.get(key)
-        if queue:
-            out[eid] = {"reason_summary": queue.pop(0), "actor": actor}
+        phase = str(event.get("phase", ""))
+        action = str(event.get("type", ""))
+        target = "" if event.get("target") is None else str(event.get("target", ""))
+        round_val = event.get("round")
+
+        # Try composite key match first (when both decision and event have round).
+        if has_round and round_val is not None and isinstance(round_val, int):
+            key = (round_val, phase, actor, action, target)
+            entries = pending.get(key)
+            if entries is not None:
+                if len(entries) == 1:
+                    # Unique match: consume and attach.
+                    entry = entries.pop(0)
+                    if not entries:
+                        del pending[key]
+                    out[eid] = {
+                        "reason_summary": entry["reason_summary"],
+                        "actor": actor,
+                        "decision_id": entry.get("decision_id", ""),
+                        "request_id": entry.get("request_id") or "",
+                        "reason_source": "matched",
+                    }
+                else:
+                    # Ambiguous: multiple decisions share this composite key. Mark.
+                    # Do NOT consume — all matching events get the ambiguity annotation.
+                    out[eid] = {
+                        "reason_summary": entries[0]["reason_summary"],
+                        "actor": actor,
+                        "decision_id": "",
+                        "request_id": "",
+                        "reason_source": "ambiguous",
+                        "reason_detail": f"{len(entries)} decisions match key (round={round_val}, phase={phase}, actor={actor}, action={action}, target={target})",
+                    }
+                continue
+
+        # Fallback: greedy match by (actor, action, target) without round.
+        legacy_key = (actor, action, target)
+        legacy_entries = legacy_pending.get(legacy_key)
+        if legacy_entries:
+            entry = legacy_entries.pop(0)
+            if not legacy_entries:
+                del legacy_pending[legacy_key]
+            out[eid] = {
+                "reason_summary": entry["reason_summary"],
+                "actor": actor,
+                "decision_id": entry.get("decision_id", ""),
+                "request_id": entry.get("request_id") or "",
+                "reason_source": "legacy_no_round",
+            }
+            continue
+
+        # Also check composite-key pending for events without round in the event,
+        # but decisions that have round — try greedy match on action/actor/target
+        # as a last resort (same as legacy behavior but with a different annotation).
+        for rk, entries in list(pending.items()):
+            if entries and rk[2] == actor and rk[3] == action and rk[4] == target:
+                entry = entries.pop(0)
+                if not entries:
+                    del pending[rk]
+                out[eid] = {
+                    "reason_summary": entry["reason_summary"],
+                    "actor": actor,
+                    "decision_id": entry.get("decision_id", ""),
+                    "request_id": entry.get("request_id") or "",
+                    "reason_source": "legacy_no_round",
+                }
+                break
     return out
 
 
@@ -157,6 +243,15 @@ def build_projection_envelope(
                     ev["target"] = match["target"]
             if reason is not None and (kind == "god" or reason_self == reason["actor"]):
                 data["reason_summary"] = reason["reason_summary"]
+                # Attach enrichment metadata for P3-A replay traceability (C12-06/A45-7).
+                src = reason.get("reason_source", "matched")
+                data["reason_source"] = src
+                if src == "ambiguous":
+                    data["reason_detail"] = reason.get("reason_detail", "")
+                if reason.get("decision_id"):
+                    data["decision_id"] = reason["decision_id"]
+                if reason.get("request_id"):
+                    data["request_id"] = reason["request_id"]
             ev["data"] = data
         enriched_events.append(ev)
 

@@ -352,6 +352,8 @@ class EmergentGameEngine:
         target: str | None,
         dtype: str,
         reason: str,
+        rnd: int,
+        request_id: str | None = None,
         refs: list[str] | None = None,
         consensus_id: str | None = None,
         confidence: float = 1.0,
@@ -364,6 +366,7 @@ class EmergentGameEngine:
                 "decision_scope": scope,
                 "consensus_id": consensus_id,
                 "phase": phase,
+                "round": rnd,
                 "action": action,
                 "target": target,
                 "visible_info_refs": refs or [],
@@ -371,6 +374,7 @@ class EmergentGameEngine:
                 "decision_type": dtype,
                 "confidence": confidence,
                 "strategy_tag": None,
+                "request_id": request_id,
             }
         )
         self._flush_partial_logs()
@@ -632,6 +636,7 @@ class EmergentGameEngine:
         plan = resolver.render(window, target, adj.decision_type)
         d = plan.decision
         self._decision(d.actor, d.scope, d.phase, d.action, d.target, d.dtype, d.reason,
+                       rnd=rnd, request_id=turn.get("request_id"),
                        refs=list(d.refs) or None, consensus_id=d.consensus_id)
         e = plan.event
         self._emit(e.phase, rnd, e.etype, e.actor, e.target, e.visibility, e.summary)
@@ -713,7 +718,7 @@ class EmergentGameEngine:
         r = WolfResolver().render(ww, target, adj.is_fallback)
         self._consensus_entries.append(
             self._build_consensus_entry(consensus_id, rnd, wolves, target, r.primary, list(r.supporters), status=adj.status))
-        self._decision(r.primary, "team", "night", "werewolf_kill", target, adj.decision_type, r.reason, consensus_id=consensus_id)
+        self._decision(r.primary, "team", "night", "werewolf_kill", target, adj.decision_type, r.reason, rnd=rnd, request_id=None, consensus_id=consensus_id)
         self._emit("night", rnd, "werewolf_kill", r.primary, target, "werewolf_team", f"Wolf team kills {target}.")
         return target
 
@@ -857,15 +862,15 @@ class EmergentGameEngine:
             action_name = WITCH_PASS
 
         if action_name == WITCH_SAVE:
-            self._decision(witch, "single", "night", WITCH_SAVE, victim, "inference_based", f"witch saves {victim}")
+            self._decision(witch, "single", "night", WITCH_SAVE, victim, "inference_based", f"witch saves {victim}", rnd=rnd, request_id=request.request_id)
             self._emit("night", rnd, WITCH_SAVE, witch, victim, "witch", f"Witch {witch} saves {victim}.")
             return True, None, True, poison_used
         if action_name == WITCH_POISON:
-            self._decision(witch, "single", "night", WITCH_POISON, target, "retaliatory", f"witch poisons {target}")
+            self._decision(witch, "single", "night", WITCH_POISON, target, "retaliatory", f"witch poisons {target}", rnd=rnd, request_id=request.request_id)
             self._emit("night", rnd, WITCH_POISON, witch, target, "witch", f"Witch {witch} poisons {target}.")
             return False, target, save_used, True
         # pass
-        self._decision(witch, "single", "night", WITCH_PASS, "none", FALLBACK_DECISION_TYPE, f"{witch} uses no potion")
+        self._decision(witch, "single", "night", WITCH_PASS, "none", FALLBACK_DECISION_TYPE, f"{witch} uses no potion", rnd=rnd, request_id=request.request_id)
         self._emit("night", rnd, WITCH_PASS, witch, "none", "witch", f"Witch {witch} uses no potion.")
         return False, None, save_used, poison_used
 
@@ -1071,10 +1076,10 @@ class EmergentGameEngine:
             action_name, target = "hunter_pass", None
 
         if action_name == "hunter_shoot" and target is not None:
-            self._decision(hunter, "single", phase, "hunter_shoot", target, "retaliatory", f"hunter {hunter} shoots {target}")
+            self._decision(hunter, "single", phase, "hunter_shoot", target, "retaliatory", f"hunter {hunter} shoots {target}", rnd=rnd, request_id=turn.get("request_id"))
             self._emit(phase, rnd, "hunter_shoot", hunter, target, "public", f"Hunter {hunter} shoots {target}.")
             return target
-        self._decision(hunter, "single", phase, "hunter_pass", "none", FALLBACK_DECISION_TYPE, f"{hunter} does not shoot")
+        self._decision(hunter, "single", phase, "hunter_pass", "none", FALLBACK_DECISION_TYPE, f"{hunter} does not shoot", rnd=rnd, request_id=turn.get("request_id"))
         self._emit(phase, rnd, "hunter_pass", hunter, "none", "public", f"Hunter {hunter} does not shoot.")
         return None
 

@@ -36,6 +36,8 @@ class Decision:
     decision_type: str
     confidence: float | None
     strategy_tag: str | None
+    round: int | None = None        # additive: engine always provides, Phase 1 fixtures may omit
+    request_id: str | None = None   # additive: engine provides (None for wolf consensus)
 
 
 @dataclass(frozen=True)
@@ -141,6 +143,19 @@ def _parse_decision(raw: Any) -> Decision:
     if target is not None:
         target = str(target)
 
+    round_val = raw.get("round")
+    if round_val is not None:
+        if not isinstance(round_val, int) or isinstance(round_val, bool):
+            raise DecisionLogValidationError(
+                f"{raw.get('decision_id', '?')}: round must be an integer"
+            )
+        if round_val < 0:
+            raise DecisionLogValidationError(
+                f"{raw.get('decision_id', '?')}: round must be a non-negative integer"
+            )
+    request_id = raw.get("request_id")
+    # request_id may be None (wolf consensus) or a non-empty string
+
     return Decision(
         decision_id=str(raw["decision_id"]),
         actor=str(raw["actor"]),
@@ -154,6 +169,8 @@ def _parse_decision(raw: Any) -> Decision:
         decision_type=str(raw["decision_type"]),
         confidence=confidence,
         strategy_tag=strategy_tag,
+        round=round_val,
+        request_id=str(request_id) if request_id is not None else None,
     )
 
 
@@ -201,4 +218,14 @@ def _validate_decision(decision: Decision, game: GameLog) -> None:
     if decision.confidence is not None and not 0.0 <= decision.confidence <= 1.0:
         raise DecisionLogValidationError(
             f"{decision.decision_id}: confidence must be between 0 and 1"
+        )
+
+    # Additive fields (C12-06/A45-7): validated when present, accepted when absent.
+    if decision.round is not None and (not isinstance(decision.round, int) or decision.round < 0):
+        raise DecisionLogValidationError(
+            f"{decision.decision_id}: round must be a non-negative integer"
+        )
+    if decision.request_id is not None and not isinstance(decision.request_id, str):
+        raise DecisionLogValidationError(
+            f"{decision.decision_id}: request_id must be a string when present"
         )
