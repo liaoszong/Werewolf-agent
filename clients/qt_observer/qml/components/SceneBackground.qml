@@ -30,16 +30,16 @@ Item {
         visible: status === Image.Ready
     }
 
-    // (3) Readability scrims — lift the left rail/hero and the right cards off the
-    // busy illustration so overlaid text stays legible (spec §4.3).
+    // (3) Light readability scrim — the new backgrounds already bake in calm cream
+    // margins, so this is gentle insurance (crop-tolerance + a touch of text
+    // contrast on the left), not a heavy wash.
     Rectangle {
         anchors.fill: parent
         gradient: Gradient {
             orientation: Gradient.Horizontal
-            GradientStop { position: 0.00; color: Theme.withAlpha(root._night ? Theme.phase.night.bg : Theme.warm.canvas, root._night ? 0.72 : 0.62) }
-            GradientStop { position: 0.40; color: "transparent" }
-            GradientStop { position: 0.70; color: "transparent" }
-            GradientStop { position: 1.00; color: Theme.withAlpha(root._night ? Theme.phase.night.bg : Theme.warm.canvas, root._night ? 0.66 : 0.52) }
+            GradientStop { position: 0.00; color: Theme.withAlpha(root._night ? Theme.phase.night.bg : Theme.phase.day.bg, root._night ? 0.55 : 0.32) }
+            GradientStop { position: 0.34; color: "transparent" }
+            GradientStop { position: 1.00; color: "transparent" }
         }
     }
 }
