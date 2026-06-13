@@ -1024,6 +1024,18 @@ class QtObserverGameRedesignPhase2Tests(unittest.TestCase):
             self.assertIn(prop, c)
         self.assertIn("CharacterAvatar.qml", (QT / "CMakeLists.txt").read_text(encoding="utf-8"))
 
+    def test_phase_components_contract(self) -> None:
+        bg = (QT / "qml/components/PhaseBackground.qml").read_text(encoding="utf-8")
+        self.assertIn('objectName: "phaseBackground"', bg)
+        self.assertIn("Illustrations.tableDay", bg)
+        self.assertIn("Illustrations.tableNight", bg)
+        self.assertIn("Gradient", bg)
+        ind = (QT / "qml/components/PhaseIndicator.qml").read_text(encoding="utf-8")
+        self.assertIn('objectName: "phaseIndicator"', ind)
+        cmake = (QT / "CMakeLists.txt").read_text(encoding="utf-8")
+        self.assertIn("PhaseBackground.qml", cmake)
+        self.assertIn("PhaseIndicator.qml", cmake)
+
 
 if __name__ == "__main__":
     unittest.main()
