@@ -45,7 +45,10 @@ Item {
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.right: parent.right
-        height: 52
+        // Home is a full-bleed warm hub with its own NavRail/chrome; hide the slim
+        // top bar there (and collapse its height) so HomeView reaches parent.top.
+        visible: root.currentView !== "home"
+        height: root.currentView !== "home" ? 52 : 0
 
         Row {
             anchors.left: parent.left
@@ -202,7 +205,7 @@ Item {
     StackView {
         id: stackView
         objectName: "appShellStack"
-        anchors.top: topBar.bottom
+        anchors.top: topBar.visible ? topBar.bottom : parent.top
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
