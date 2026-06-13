@@ -65,6 +65,7 @@ qt_add_qml_module(appqt_observer
         qml/components/ViewBoundaryBadge.qml
         qml/components/ProjectionProofPanel.qml
         qml/components/AppBackground.qml
+        qml/components/SceneBackground.qml
         qml/components/GlowDot.qml
         qml/components/AppCard.qml
         qml/components/AppButton.qml
