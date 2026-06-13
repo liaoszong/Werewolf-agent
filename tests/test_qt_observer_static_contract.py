@@ -894,5 +894,91 @@ class QtObserverVocabContractTests(unittest.TestCase):
         self.assertNotRegex(content, r"text:\s*root\.displayTeam\b")
 
 
+class QtObserverGameRedesignPhase1Tests(unittest.TestCase):
+    """游戏客户端重做 Phase 1：暖色地基 + 插画管线 + HomeView 样板页。"""
+
+    ILLUSTRATIONS = [
+        "assets/illustrations/scene/home-day.png",
+        "assets/illustrations/scene/home-night.png",
+        "assets/illustrations/tarot/werewolf.png",
+        "assets/illustrations/tarot/seer.png",
+        "assets/illustrations/tarot/witch.png",
+        "assets/illustrations/tarot/villager.png",
+        "assets/illustrations/tarot/guard.png",
+        "assets/illustrations/tarot/hunter.png",
+    ]
+
+    def test_illustration_assets_exist(self) -> None:
+        for rel in self.ILLUSTRATIONS:
+            self.assertTrue((QT / rel).exists(), f"missing illustration asset: {rel}")
+
+    def test_cmake_registers_new_qml_and_singleton_and_resources(self) -> None:
+        cmake = (QT / "CMakeLists.txt").read_text(encoding="utf-8")
+        for qml in ["qml/Illustrations.qml",
+                    "qml/components/SceneBackground.qml",
+                    "qml/components/NavRail.qml"]:
+            self.assertIn(qml, cmake, f"CMakeLists must register {qml}")
+        self.assertRegex(cmake, r"qml/Illustrations\.qml\s+PROPERTIES\s+QT_QML_SINGLETON_TYPE\s+TRUE")
+        for rel in self.ILLUSTRATIONS:
+            self.assertIn(rel, cmake, f"CMakeLists must bundle resource {rel}")
+        self.assertIn("RESOURCES", cmake)
+
+    def test_theme_has_warm_phase_font_tokens(self) -> None:
+        theme = (QT / "qml/Theme.qml").read_text(encoding="utf-8")
+        for token in ["property QtObject warm", "canvas", "surfaceCard", "surfaceRaised",
+                      "property QtObject phase", "property QtObject fontFamilies",
+                      "property QtObject warmSize", "property QtObject elevation",
+                      "property QtObject anim",
+                      '"#cc785c"', '"#faf9f5"']:
+            self.assertIn(token, theme, f"Theme.qml missing warm token: {token}")
+        # fontFamilies must be single strings, not arrays (no font.families usage).
+        self.assertRegex(theme, r'property string serif:\s*"Source Han Serif SC"')
+        self.assertNotIn("font.families", theme)
+
+    def test_scene_background_has_no_asset_fallback(self) -> None:
+        c = (QT / "qml/components/SceneBackground.qml").read_text(encoding="utf-8")
+        self.assertIn("Image.Ready", c)          # only show art when loaded
+        self.assertIn("Gradient", c)              # phase-gradient fallback underneath
+        self.assertIn("Illustrations", c)         # sourced via the registry
+
+    def test_navrail_contract(self) -> None:
+        c = (QT / "qml/components/NavRail.qml").read_text(encoding="utf-8")
+        self.assertIn('objectName: "navRail"', c)
+        self.assertIn("currentKey", c)            # selected state
+        self.assertIn("collapsed", c)             # narrow collapse state
+        self.assertIn("signal activated", c)      # emits navigation intent
+
+    def test_home_uses_new_design_system(self) -> None:
+        c = (QT / "qml/HomeView.qml").read_text(encoding="utf-8")
+        self.assertIn("SceneBackground", c)
+        self.assertIn("NavRail", c)
+        self.assertIn("onLight", c)               # warm component path is used
+        # navigation + required objectNames preserved (also covered by REQUIRED_OBJECT_NAMES)
+        self.assertIn("navigateSetup()", c)
+        self.assertIn("navigateHistory()", c)
+        # typography contract: explicit proportional line height; no font.families
+        self.assertIn("lineHeightMode", c)
+        self.assertIn("contextFontMerging", c)
+        self.assertNotIn("font.families", c)
+        # tarot strip falls back on Image.status (not only on empty url)
+        self.assertIn("tarotArt.status !== Image.Ready", c)
+
+    def test_no_phase1_glass_or_grain(self) -> None:
+        # Phase 1 forbids frosted glass and paper-grain overlays.
+        for rel in ["qml/components/SceneBackground.qml", "qml/HomeView.qml",
+                    "qml/components/AppCard.qml"]:
+            c = (QT / rel).read_text(encoding="utf-8")
+            for forbidden in ["FastBlur", "GaussianBlur", "blurEnabled",
+                              "PaperGrainOverlay", "noise.png", "grain.png"]:
+                self.assertNotIn(forbidden, c, f"{forbidden} forbidden in {rel} (Phase 1)")
+
+    def test_appshell_hides_topbar_only_on_home(self) -> None:
+        c = (QT / "qml/AppShell.qml").read_text(encoding="utf-8")
+        # topBar visibility gated on home; chip/objectNames preserved
+        self.assertRegex(c, r'currentView\s*!==\s*"home"')
+        self.assertIn('objectName: "dataSourceChip"', c)
+        self.assertIn('objectName: "appShellStack"', c)
+
+
 if __name__ == "__main__":
     unittest.main()
