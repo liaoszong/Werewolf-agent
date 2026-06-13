@@ -152,8 +152,8 @@ Item {
         id: rightPanels
         anchors.right: parent.right
         anchors.top: parent.top
-        anchors.rightMargin: Theme.space.xl
-        anchors.topMargin: Theme.space.xl
+        anchors.rightMargin: Theme.space.xxl
+        anchors.topMargin: Theme.space.xxl
         width: 264
         spacing: Theme.space.lg
 
@@ -253,7 +253,7 @@ Item {
         anchors.left: rail.right
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: Theme.space.xl
+        anchors.bottomMargin: Theme.space.xxl
         height: 236
         orientation: ListView.Horizontal
         spacing: -34                       // negative -> fish-scale overlap
@@ -276,11 +276,13 @@ Item {
             Component.onCompleted: _ready = true
 
             z: cardHover.hovered ? 100 : index
-            y: cardHover.hovered ? -18 : (index % 2 === 0 ? 0 : 5)
+            y: cardHover.hovered ? -20 : (index % 2 === 0 ? 0 : 6)
             rotation: cardHover.hovered ? 0 : (index % 2 === 0 ? -1.5 : 1.5)
-            Behavior on y { enabled: cardWrapper._ready; NumberAnimation { duration: 200; easing.type: Easing.OutBack } }
-            Behavior on rotation { enabled: cardWrapper._ready; NumberAnimation { duration: 200; easing.type: Easing.OutExpo } }
+            Behavior on y { enabled: cardWrapper._ready; NumberAnimation { duration: 250; easing.type: Easing.OutBack; easing.overshoot: 1.2 } }
+            Behavior on rotation { enabled: cardWrapper._ready; NumberAnimation { duration: 200; easing.type: Easing.OutQuart } }
 
+            // Source art (hidden — composited through MultiEffect for rounded
+            // corners + a height-reactive soft shadow, so no 90° sharp edge).
             Image {
                 id: tarotArt
                 anchors.fill: parent
@@ -288,20 +290,35 @@ Item {
                 fillMode: Image.PreserveAspectFit
                 asynchronous: false      // bundled + cached -> show instantly on re-entry (no pop)
                 cache: true
+                visible: false
+            }
+            Rectangle {
+                id: cardMaskShape
+                anchors.fill: parent
+                radius: 12
+                visible: false
                 layer.enabled: true
-                layer.effect: MultiEffect {
-                    shadowEnabled: true
-                    shadowColor: Qt.rgba(0, 0, 0, 0.32)
-                    shadowBlur: 0.5
-                    shadowVerticalOffset: 6
-                }
+            }
+            MultiEffect {
+                anchors.fill: parent
+                visible: tarotArt.status === Image.Ready
+                source: tarotArt
+                maskEnabled: true
+                maskSource: cardMaskShape
+                shadowEnabled: true
+                shadowColor: Qt.rgba(0, 0, 0, 0.35)
+                // Lifts higher on hover -> larger, softer, more-offset shadow.
+                shadowBlur: cardHover.hovered ? 1.0 : 0.55
+                shadowVerticalOffset: cardHover.hovered ? 13 : 6
+                Behavior on shadowBlur { NumberAnimation { duration: 200 } }
+                Behavior on shadowVerticalOffset { NumberAnimation { duration: 200 } }
             }
 
             // Fallback when the art is missing or fails to load (never blank).
             Rectangle {
                 anchors.fill: parent
                 visible: tarotArt.status !== Image.Ready
-                radius: Theme.radius.md
+                radius: 12
                 color: Theme.warm.surfaceCreamStrong
                 border.width: 1
                 border.color: Theme.withAlpha(Theme.warm.ink, 0.12)

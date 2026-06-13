@@ -128,7 +128,11 @@ Item {
 
                     Row {
                         anchors.left: parent.left
+                        // Restrained hover: a small rightward nudge (no colour jump
+                        // on non-selected items) with a damped OutExpo ease.
                         anchors.leftMargin: Theme.space.md
+                            + ((hov.hovered && rowItem.enabled && !rowItem._selected) ? 4 : 0)
+                        Behavior on anchors.leftMargin { NumberAnimation { duration: 180; easing.type: Easing.OutExpo } }
                         anchors.verticalCenter: parent.verticalCenter
                         spacing: Theme.space.md
 
