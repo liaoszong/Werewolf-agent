@@ -82,6 +82,87 @@ QtObject {
         readonly property color winWerewolf: "#DC2626"
     }
 
+    // ---------------------------------------------- Warm "Claude" palette (game client)
+    // ADDITIVE — the dark tokens above keep their values so un-migrated pages do
+    // not regress. Warm-surfaced pages (Home first) read from `warm` / `phase`.
+    readonly property QtObject warm: QtObject {
+        readonly property color canvas: "#faf9f5"
+        readonly property color surfaceSoft: "#f5f0e8"
+        readonly property color surfaceCard: "#efe9de"
+        readonly property color surfaceCreamStrong: "#e8e0d2"
+        readonly property color surfaceRaised: "#fffefb"
+        readonly property color surfaceDark: "#181715"
+        readonly property color surfaceDarkElevated: "#252320"
+        readonly property color hairline: "#e6dfd8"
+        readonly property color hairlineSoft: "#ebe6df"
+        readonly property color ink: "#141413"
+        readonly property color body: "#3d3d3a"
+        readonly property color bodyStrong: "#252523"
+        readonly property color muted: "#6c6a64"
+        readonly property color mutedSoft: "#8e8b82"
+        readonly property color primary: "#cc785c"
+        readonly property color primaryActive: "#a9583e"
+        readonly property color primaryDisabled: "#e6dfd8"
+        readonly property color onPrimary: "#ffffff"
+        readonly property color onDark: "#faf9f5"
+        readonly property color onDarkSoft: "#a09d96"
+        readonly property color accentAmber: "#e8a55a"
+        readonly property color accentTeal: "#5db8a6"
+        readonly property color success: "#5db872"
+        readonly property color warning: "#d4a017"
+        readonly property color error: "#c64545"
+    }
+
+    // Day / night phase surfaces (extracted from the home-scene illustrations).
+    readonly property QtObject phase: QtObject {
+        readonly property QtObject day: QtObject {
+            readonly property color bg: "#f3e8d2"
+            readonly property color ambient: "#e8c078"
+            readonly property color sky: "#afc9e0"
+        }
+        readonly property QtObject night: QtObject {
+            readonly property color bg: "#2a3a55"
+            readonly property color sky: "#20304f"
+            readonly property color glow: "#e8a85a"
+        }
+    }
+
+    // System-stack-first font families (NO bundled fonts in Phase 1; see spec §3.4).
+    // Single string per role; warm Text uses font.family + font.contextFontMerging
+    // = true so a missing CJK glyph in (e.g.) "Inter" is merged from the system CJK
+    // font at render time. No multi-family arrays, no unverified font features, no subsetting.
+    readonly property QtObject fontFamilies: QtObject {
+        readonly property string serif: "Source Han Serif SC"
+        readonly property string sans:  "Inter"
+        readonly property string mono:  "JetBrains Mono"
+    }
+
+    // Larger warm type scale (additive; existing `size` untouched).
+    readonly property QtObject warmSize: QtObject {
+        readonly property int displayXl: 48
+        readonly property int displayLg: 36
+        readonly property int displayMd: 28
+        readonly property int titleLg: 22
+        readonly property int titleMd: 18
+        readonly property int bodyLg: 16
+    }
+
+    // Restrained damped motion for warm UI (Phase 1). Components reference these
+    // instead of literal durations/easing so the feel stays consistent.
+    //   color/hover -> Easing.OutCubic ; press/scale -> Easing.OutQuad
+    readonly property QtObject anim: QtObject {
+        readonly property int color: 140        // hover / colour cross-fade (120–160)
+        readonly property int press: 100        // press / scale (80–120)
+        readonly property real pressScale: 0.98
+    }
+
+    // Soft warm elevation (consumed by AppCard onLight via QtQuick.Effects MultiEffect).
+    readonly property QtObject elevation: QtObject {
+        readonly property color shadowColor: Qt.rgba(50 / 255, 38 / 255, 24 / 255, 0.18)
+        readonly property real blur: 0.9
+        readonly property real verticalOffset: 10
+    }
+
     // -------------------------------------------------------------- Spacing
     // 8px rhythm (4px for fine adjustments)
     readonly property QtObject space: QtObject {
