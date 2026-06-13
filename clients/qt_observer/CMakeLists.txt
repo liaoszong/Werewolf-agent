@@ -44,12 +44,16 @@ qt_add_qml_module(appqt_observer
         qml/MatchSetupView.qml
         qml/ProviderSettingsView.qml
         qml/PreflightView.qml
-        qml/LiveCockpitView.qml
         qml/TheaterView.qml
+        qml/DesignPreviewView.qml
         qml/SettlementView.qml
         qml/HistoryView.qml
         qml/EventPresentationQueue.qml
         qml/components/RoleCard.qml
+        qml/components/CharacterAvatar.qml
+        qml/components/PhaseBackground.qml
+        qml/components/PhaseIndicator.qml
+        qml/components/CockpitSurface.qml
         qml/components/SeatRing.qml
         qml/components/SettlementSpine.qml
         qml/components/SettlementReport.qml
@@ -86,6 +90,14 @@ qt_add_qml_module(appqt_observer
         assets/illustrations/tarot/villager.png
         assets/illustrations/tarot/guard.png
         assets/illustrations/tarot/hunter.png
+        assets/illustrations/scene/table-day.png
+        assets/illustrations/scene/table-night.png
+        assets/illustrations/avatars/werewolf.png
+        assets/illustrations/avatars/seer.png
+        assets/illustrations/avatars/witch.png
+        assets/illustrations/avatars/villager.png
+        assets/illustrations/avatars/guard.png
+        assets/illustrations/avatars/hunter.png
 )
 
 set_target_properties(appqt_observer PROPERTIES

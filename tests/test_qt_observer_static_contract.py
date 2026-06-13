@@ -33,8 +33,8 @@ REQUIRED_QML_VIEWS = [
     "qml/MatchSetupView.qml",
     "qml/ProviderSettingsView.qml",
     "qml/PreflightView.qml",
-    "qml/LiveCockpitView.qml",
     "qml/TheaterView.qml",
+    "qml/DesignPreviewView.qml",
     "qml/HistoryView.qml",
     "qml/EventPresentationQueue.qml",
     "qml/components/RoleCard.qml",
@@ -61,7 +61,7 @@ REQUIRED_OBJECT_NAMES = {
     # Game-client redesign: recent-runs moved off the home (edge-floating HUD over
     # the illustration); recent runs now live on the History page. The two hero
     # action buttons keep their objectNames (text changed to 进入今夜对局 / 查看昨夜复盘).
-    "qml/HomeView.qml": ["homeView", "startNewMatchButton", "historyButton", "serverStatusBadge"],
+    "qml/HomeView.qml": ["homeView", "startNewMatchButton", "historyButton", "serverStatusBadge", "designPreviewButton"],
     # P2-B Q2: credentials moved OUT of the setup view to the dedicated provider
     # settings page (below); the setup view is now a pure scheduling sandbox.
     "qml/MatchSetupView.qml": ["matchSetupView", "setupRoleCards", "setupContinueButton",
@@ -73,8 +73,8 @@ REQUIRED_OBJECT_NAMES = {
                                      "providerFetchModelsButton", "providerClearButton",
                                      "providerSettingsBackButton"],
     "qml/PreflightView.qml": ["preflightView", "preflightServerStatus", "preflightTemplateSummary", "preflightVisibilitySummary", "startMatchButton"],
-    "qml/LiveCockpitView.qml": ["liveCockpitView", "runStatusBadge", "playerPanelGrid", "eventTimeline", "perspectiveSwitcher", "auditLinksPanel", "providerFailureSummary"],
     "qml/TheaterView.qml": ["theaterView"],
+    "qml/DesignPreviewView.qml": ["designPreviewView"],
     "qml/SettlementView.qml": ["settlementView"],
     "qml/HistoryView.qml": ["historyView", "historyRunsList", "historyRefreshButton",
                             "deleteRunButton", "historyConfirmDialog", "historyNoticeBar",
@@ -193,12 +193,11 @@ class QtObserverSetupContractTests(unittest.TestCase):
 
 
 class QtObserverCockpitContractTests(unittest.TestCase):
-    def test_cockpit_contains_required_object_names(self) -> None:
-        content = (QT / "qml/LiveCockpitView.qml").read_text(encoding="utf-8")
-        for name in ["runStatusBadge", "playerPanelGrid", "eventTimeline",
-                      "perspectiveSwitcher", "auditLinksPanel", "providerFailureSummary"]:
-            self.assertRegex(content, rf'objectName:\s*"{name}"',
-                             f"Missing objectName '{name}' in LiveCockpitView.qml")
+    # LiveCockpitView.qml deleted (Phase 2 redesign): its honesty-chain objectNames
+    # (runStatusBadge/playerPanelGrid/eventTimeline/perspectiveSwitcher/auditLinksPanel/
+    # providerFailureSummary) are re-homed onto EvidenceConsole — see
+    # REQUIRED_OBJECT_NAMES["qml/components/EvidenceConsole.qml"] and
+    # QtObserverTheaterViewTests.test_evidence_console_rehomes_honesty_chain.
 
     def test_perspective_switcher_contains_required_values(self) -> None:
         content = (QT / "qml/components/PerspectiveSwitcher.qml").read_text(encoding="utf-8")
@@ -573,21 +572,17 @@ class QtObserverModeControlComponentTests(unittest.TestCase):
 
 class QtObserverHiddenInfoBoundaryTests(unittest.TestCase):
     def test_live_cockpit_does_not_embed_static_role_assignments(self) -> None:
-        content = (QT / "qml/LiveCockpitView.qml").read_text(encoding="utf-8")
-        # Must not use hardcoded role arrays like `role: "Werewolf"` as the live player model
-        self.assertNotRegex(content, r'role:\s*"(?:Werewolf|Seer|Witch|Villager)"',
-                            "LiveCockpitView.qml contains hardcoded role assignments in static model")
+        # Re-homed from the deleted LiveCockpitView onto the presentational CockpitSurface:
+        # the live ring must not hardcode roles — they arrive via the projected `players`.
+        content = (QT / "qml/components/CockpitSurface.qml").read_text(encoding="utf-8")
+        self.assertNotRegex(content, r'(display_role|role):\s*"(?:Werewolf|Seer|Witch|Villager)"',
+                            "CockpitSurface.qml contains hardcoded role assignments")
+        self.assertIn("players", content)
 
     def test_qml_boundary_copy_mentions_server_projection(self) -> None:
-        content = (QT / "qml/LiveCockpitView.qml").read_text(encoding="utf-8")
-        # Should reference ObserverClient projection properties or projection-related data
-        has_projection = any(tag in content for tag in [
-            "playerItems", "projectionProof", "visibilityContractVersion",
-            "hiddenEventCount", "hiddenSnapshotCount",
-        ])
-        if not has_projection:
-            # qml may use projection via component without explicit property name
-            pass  # Accept if ViewBoundaryBadge is present (checked separately)
+        # The live host (TheaterView) must source seats from the server projection.
+        content = (QT / "qml/TheaterView.qml").read_text(encoding="utf-8")
+        self.assertIn("ObserverClient.playerItems", content)
 
     def test_qt_client_does_not_use_local_snapshot_or_event_paths(self) -> None:
         for src_file in sorted((QT / "src").rglob("*")):
@@ -626,13 +621,13 @@ class QtObserverVisibilityUiTests(unittest.TestCase):
         self.assertIn("ProjectionProofPanel.qml", cmake_text)
 
     def test_live_cockpit_uses_projection_player_items(self) -> None:
-        content = (QT / "qml/LiveCockpitView.qml").read_text(encoding="utf-8")
+        # Re-homed to TheaterView (the live host binds the projected seat list).
+        content = (QT / "qml/TheaterView.qml").read_text(encoding="utf-8")
         self.assertIn("ObserverClient.playerItems", content)
 
-    def test_live_cockpit_contains_boundary_badge_and_proof_panel(self) -> None:
-        content = (QT / "qml/LiveCockpitView.qml").read_text(encoding="utf-8")
-        self.assertIn("ViewBoundaryBadge", content)
-        self.assertIn("ProjectionProofPanel", content)
+    # boundary-badge + projection-proof presence is re-homed to EvidenceConsole and
+    # covered by QtObserverTheaterViewTests.test_evidence_console_rehomes_honesty_chain
+    # (the deleted LiveCockpitView no longer hosts them).
 
     def test_role_card_supports_hidden_role_rendering(self) -> None:
         content = (QT / "qml/components/RoleCard.qml").read_text(encoding="utf-8")
@@ -642,7 +637,8 @@ class QtObserverVisibilityUiTests(unittest.TestCase):
         self.assertIn("Hidden", content)
 
     def test_cockpit_does_not_hardcode_god_roles_as_live_player_source(self) -> None:
-        content = (QT / "qml/LiveCockpitView.qml").read_text(encoding="utf-8")
+        # Re-homed to CockpitSurface (the live ring): roles come from projected players.
+        content = (QT / "qml/components/CockpitSurface.qml").read_text(encoding="utf-8")
         self.assertNotIn('role: "Werewolf"', content)
         self.assertNotIn('role: "Seer"', content)
 
@@ -981,6 +977,110 @@ class QtObserverGameRedesignPhase1Tests(unittest.TestCase):
         self.assertRegex(c, r'currentView\s*!==\s*"home"')
         self.assertIn('objectName: "dataSourceChip"', c)
         self.assertIn('objectName: "appShellStack"', c)
+
+
+class QtObserverGameRedesignPhase2Tests(unittest.TestCase):
+    """游戏客户端重做 Phase 2:上帝视角圆桌 LiveCockpit + 首页静态预览。"""
+
+    PHASE2_ASSETS = [
+        "assets/illustrations/scene/table-day.png",
+        "assets/illustrations/scene/table-night.png",
+        "assets/illustrations/avatars/werewolf.png",
+        "assets/illustrations/avatars/seer.png",
+        "assets/illustrations/avatars/witch.png",
+        "assets/illustrations/avatars/villager.png",
+        "assets/illustrations/avatars/guard.png",
+        "assets/illustrations/avatars/hunter.png",
+    ]
+
+    def test_phase2_assets_exist(self) -> None:
+        for rel in self.PHASE2_ASSETS:
+            self.assertTrue((QT / rel).exists(), f"missing Phase 2 asset: {rel}")
+
+    def test_phase2_assets_registered_in_cmake(self) -> None:
+        cmake = (QT / "CMakeLists.txt").read_text(encoding="utf-8")
+        for rel in self.PHASE2_ASSETS:
+            self.assertIn(rel, cmake, f"CMakeLists must bundle resource {rel}")
+
+    def test_illustrations_registers_table_and_avatar(self) -> None:
+        c = (QT / "qml/Illustrations.qml").read_text(encoding="utf-8")
+        for tok in ["tableDay", "tableNight", "function table(", "function avatar("]:
+            self.assertIn(tok, c, f"Illustrations.qml missing {tok}")
+
+    def test_role_accent_covers_guard_and_hunter(self) -> None:
+        c = (QT / "qml/Theme.qml").read_text(encoding="utf-8")
+        self.assertRegex(c, r'case\s*"guard":')
+        self.assertRegex(c, r'case\s*"hunter":')
+
+    def test_character_avatar_contract(self) -> None:
+        c = (QT / "qml/components/CharacterAvatar.qml").read_text(encoding="utf-8")
+        self.assertIn('objectName: "characterAvatar"', c)
+        self.assertIn("Illustrations.avatar(", c)
+        for prop in ["roleKey", "alive", "speaking", "accent"]:
+            self.assertIn(prop, c)
+        self.assertIn("CharacterAvatar.qml", (QT / "CMakeLists.txt").read_text(encoding="utf-8"))
+
+    def test_phase_components_contract(self) -> None:
+        bg = (QT / "qml/components/PhaseBackground.qml").read_text(encoding="utf-8")
+        self.assertIn('objectName: "phaseBackground"', bg)
+        self.assertIn("Illustrations.tableDay", bg)
+        self.assertIn("Illustrations.tableNight", bg)
+        self.assertIn("Gradient", bg)
+        ind = (QT / "qml/components/PhaseIndicator.qml").read_text(encoding="utf-8")
+        self.assertIn('objectName: "phaseIndicator"', ind)
+        cmake = (QT / "CMakeLists.txt").read_text(encoding="utf-8")
+        self.assertIn("PhaseBackground.qml", cmake)
+        self.assertIn("PhaseIndicator.qml", cmake)
+
+    def test_cockpit_surface_contract(self) -> None:
+        c = (QT / "qml/components/CockpitSurface.qml").read_text(encoding="utf-8")
+        self.assertIn('objectName: "cockpitSurface"', c)
+        for comp in ["PhaseBackground", "CharacterAvatar", "PhaseIndicator"]:
+            self.assertIn(comp, c)
+        self.assertNotIn("ObserverClient", c)        # 表现型:数据经属性
+        for slot in ["perspectiveSlot", "eventLogSlot", "auditSlot", "playbackSlot"]:
+            self.assertIn(slot, c)
+        for prop in ["property var players", "property var votes", "property int majority", "property string phase"]:
+            self.assertIn(prop, c)
+        self.assertIn("CockpitSurface.qml", (QT / "CMakeLists.txt").read_text(encoding="utf-8"))
+
+    def test_home_has_design_preview_entry(self) -> None:
+        c = (QT / "qml/HomeView.qml").read_text(encoding="utf-8")
+        self.assertIn('objectName: "designPreviewButton"', c)
+        self.assertIn("navigateDesignPreview()", c)
+        a = (QT / "qml/AppShell.qml").read_text(encoding="utf-8")
+        self.assertIn("function navigateDesignPreview", a)
+        self.assertIn("DesignPreviewView", a)
+
+    def test_preview_uses_static_sample_not_execution_mode(self) -> None:
+        c = (QT / "qml/DesignPreviewView.qml").read_text(encoding="utf-8")
+        self.assertIn("CockpitSurface", c)
+        self.assertNotIn("currentExecutionMode", c)
+        self.assertNotIn("ObserverClient", c)
+        self.assertIn('objectName: "designPreviewView"', c)
+        for slot in ["perspectiveSlot:", "auditSlot:", "playbackSlot:", "eventLogSlot:"]:
+            self.assertIn(slot, c)
+
+    def test_event_queue_exposes_cursor_truncated_votes(self) -> None:
+        c = (QT / "qml/EventPresentationQueue.qml").read_text(encoding="utf-8")
+        self.assertIn("readonly property var voteTally", c)
+        self.assertIn("readonly property int currentRound", c)
+        # truncated to the playback cursor (same scan bound as deadPlayers), not the full stream
+        self.assertIn("Math.min(_cursor, _ordered.length)", c)
+
+    def test_theater_hosts_cockpit_surface(self) -> None:
+        t = (QT / "qml/TheaterView.qml").read_text(encoding="utf-8")
+        self.assertIn("CockpitSurface", t)
+        self.assertIn("ObserverClient.playerItems", t)
+        self.assertIn("eventQueue.voteTally", t)           # votes from cursor-truncated tally
+        # votes must NOT bind the full projection stream directly (future-vote leak guard)
+        self.assertNotRegex(t, r"votes:\s*ObserverClient\.projectionEvents")
+        self.assertIn("showPerspectiveSwitcher: false", t)  # single-instance: console switcher off
+        self.assertIn("PerspectiveSwitcher", t)             # seat lens lives in the top-left slot
+
+    def test_evidence_console_perspective_toggle(self) -> None:
+        e = (QT / "qml/components/EvidenceConsole.qml").read_text(encoding="utf-8")
+        self.assertIn("showPerspectiveSwitcher", e)
 
 
 if __name__ == "__main__":

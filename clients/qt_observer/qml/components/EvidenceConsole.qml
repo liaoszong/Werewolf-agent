@@ -16,6 +16,10 @@ Item {
 
     property int mode: 0                 // 0 Closed, 1 Peek, 2 Expand, 3 Audit
     property string perspective: "god"
+    // Single-instance guard: when a host already puts a PerspectiveSwitcher elsewhere
+    // (e.g. CockpitSurface's top-left perspectiveSlot), hide the one here so two
+    // controls never both write ObserverClient.currentPerspective.
+    property bool showPerspectiveSwitcher: true
 
     readonly property real fullHeight: parent ? parent.height : 640
     property real _userHeight: 0   // drag-to-resize override (0 = use the mode preset)
@@ -207,6 +211,11 @@ Item {
             anchors.right: parent.right
             anchors.top: parent.top
             spacing: Theme.space.md
+            // Hidden + collapsed when the host owns the perspective control elsewhere
+            // (single-instance guard); logHeader anchors to lensRow.bottom so it must
+            // shrink to 0 to avoid a gap.
+            visible: root.showPerspectiveSwitcher
+            height: visible ? implicitHeight : 0
             PerspectiveSwitcher {
                 id: perspectiveSwitcher
                 objectName: "perspectiveSwitcher"
