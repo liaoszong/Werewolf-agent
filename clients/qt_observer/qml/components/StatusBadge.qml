@@ -8,6 +8,7 @@ Rectangle {
     id: root
 
     property string status: ""
+    property bool onLight: false
 
     readonly property string _label: {
         switch (("" + root.status).toLowerCase()) {
@@ -43,14 +44,14 @@ Rectangle {
         GlowDot {
             anchors.verticalCenter: parent.verticalCenter
             diameter: 7
-            color: Theme.statusColor(root.status)
+            color: root.onLight ? Qt.darker(Theme.statusColor(root.status), 1.15) : Theme.statusColor(root.status)
             pulse: root.status === "running" || root.status === "connected"
         }
 
         Text {
             anchors.verticalCenter: parent.verticalCenter
             text: root._label
-            color: Theme.statusColor(root.status)
+            color: root.onLight ? Qt.darker(Theme.statusColor(root.status), 1.25) : Theme.statusColor(root.status)
             font.family: Theme.font.family
             font.pixelSize: Theme.size.micro
             font.weight: Theme.weight.semibold

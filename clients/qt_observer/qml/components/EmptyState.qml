@@ -9,6 +9,7 @@ Column {
 
     property string title: "Nothing here yet"
     property string subtitle: ""
+    property bool onLight: false
 
     spacing: Theme.space.md
 
@@ -17,6 +18,12 @@ Column {
         anchors.horizontalCenter: parent.horizontalCenter
         width: 64
         height: 64
+
+        // Repaint if the surface tone flips at runtime (rare; usually static).
+        Connections {
+            target: root
+            function onOnLightChanged() { wolfMark.requestPaint() }
+        }
 
         onPaint: {
             var ctx = getContext("2d")
@@ -36,7 +43,7 @@ Column {
             ctx.lineTo(12, 51)   // left cheek
             ctx.lineTo(15, 38)   // left temple
             ctx.closePath()
-            ctx.fillStyle = "rgba(245, 245, 245, 0.12)"
+            ctx.fillStyle = root.onLight ? "rgba(20, 20, 19, 0.10)" : "rgba(245, 245, 245, 0.12)"
             ctx.fill()
         }
     }
@@ -44,7 +51,7 @@ Column {
     Text {
         anchors.horizontalCenter: parent.horizontalCenter
         text: root.title
-        color: Theme.color.textSecondary
+        color: root.onLight ? Theme.warm.body : Theme.color.textSecondary
         font.family: Theme.font.family
         font.pixelSize: Theme.size.body
         font.weight: Theme.weight.medium
@@ -54,7 +61,7 @@ Column {
         visible: root.subtitle !== ""
         anchors.horizontalCenter: parent.horizontalCenter
         text: root.subtitle
-        color: Theme.color.textMuted
+        color: root.onLight ? Theme.warm.muted : Theme.color.textMuted
         font.family: Theme.font.family
         font.pixelSize: Theme.size.caption
         horizontalAlignment: Text.AlignHCenter
