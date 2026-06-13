@@ -60,7 +60,8 @@ Item {
     Rectangle {
         id: bg
         anchors.fill: parent
-        radius: Theme.radius.md
+        // Dark path keeps its original radius (zero-regression); warm uses md.
+        radius: root.onLight ? Theme.radius.md : Theme.radius.sm
         color: hover.hovered ? root._bgHover : root._bg
         border.width: root._outlined ? 1 : 0
         border.color: hover.hovered ? root._borderHover : root._border
