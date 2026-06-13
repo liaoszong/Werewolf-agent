@@ -47,9 +47,9 @@ Item {
         Rectangle {
             width: 34; height: 34; radius: 17
             anchors.verticalCenter: parent.verticalCenter
-            color: Theme.warm.surfaceDark
+            color: Theme.warm.surfaceCreamStrong
             border.width: 1
-            border.color: Theme.withAlpha(Theme.warm.primary, 0.5)
+            border.color: Theme.withAlpha(Theme.warm.accentAmber, 0.6)
             Text {
                 anchors.centerIn: parent
                 text: "🐺"

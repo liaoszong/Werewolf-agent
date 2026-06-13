@@ -17,9 +17,15 @@ Item {
 
     Component.onCompleted: ObserverClient.checkHealth()
 
+    // Backdrop fills ONLY the content region (right of the NavRail) so the
+    // illustration's cream margin lands under the hero text, not behind the rail.
     SceneBackground {
         id: scene
         phase: root.phase
+        anchors.left: rail.right
+        anchors.right: parent.right
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
     }
 
     // ----------------------------------------------------------- Left NavRail
@@ -280,7 +286,7 @@ Item {
                 anchors.fill: parent
                 source: Illustrations.tarot(cardWrapper.modelData)
                 fillMode: Image.PreserveAspectFit
-                asynchronous: true
+                asynchronous: false      // bundled + cached -> show instantly on re-entry (no pop)
                 cache: true
                 layer.enabled: true
                 layer.effect: MultiEffect {
