@@ -160,8 +160,18 @@ def run_emergent_deepseek_game(
     scaffold_provider_factory=None,
 ) -> int:
     # Fail-loud before any side effects (writer/engine construction).
+    renderer = get_renderer(prompt_version)
+    config = build_emergent_config(game_id=game_id, seat_roles=seat_roles)
+    board_roles = {p.role for p in config.players}
+    if "guard" in board_roles and not renderer.requires_scaffold:
+        raise ValueError(
+            f"guard board requires a scaffold-based renderer (prompt_v3+) that carries "
+            f"the guard rules card; prompt_version={prompt_version!r} has none — no rules "
+            f"card / empty guard persona would degrade the live game into invalid-action "
+            f"fallback (B12-04). Set prompt_version to prompt_v3."
+        )
     scaffold_agent = None
-    if get_renderer(prompt_version).requires_scaffold:
+    if renderer.requires_scaffold:
         if scaffold_provider_factory is None:
             raise ValueError(f"{prompt_version} requires scaffold_provider_factory (scribe provider)")
         scaffold_agent = scaffold_provider_factory()
@@ -172,7 +182,7 @@ def run_emergent_deepseek_game(
     provider_name, derived_label = _provider_identity(agents)
     effective_label = source_label or derived_label
     engine = EmergentGameEngine(
-        config=build_emergent_config(game_id=game_id, seat_roles=seat_roles),
+        config=config,
         agents=agents,
         seed=seed,
         source_label=effective_label,
