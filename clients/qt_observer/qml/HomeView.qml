@@ -156,6 +156,14 @@ Item {
                     root.StackView.view.parent.navigateHistory()
                 }
             }
+            AppButton {
+                id: designPreviewButton
+                objectName: "designPreviewButton"
+                onLight: true
+                text: I18n.t("🎴 设计预览", "🎴 Design Preview")
+                variant: "ghost"
+                onClicked: root.StackView.view.parent.navigateDesignPreview()
+            }
         }
     }
 

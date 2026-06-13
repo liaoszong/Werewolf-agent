@@ -22,12 +22,34 @@ Item {
     property Component playbackSlot: null
     signal backRequested()
 
-    // 椭圆落位(右区比例,待真机按 table-day.png 桌沿标定)
+    // 椭圆落位 = 背景图(table-day.png)自身比例,对齐画里的桌沿(待真机微调)。
+    // cx/cy = 桌心在图中的比例;ringRx/ringRy = 头像环半径占图宽/高比例。
     property real cx: 0.40
-    property real cy: 0.54
-    property real ringRx: 0.32
-    property real ringRy: 0.21       // ≈ Rx·cos(俯角)
-    property real depthK: 0.16
+    property real cy: 0.55
+    property real ringRx: 0.30
+    property real ringRy: 0.27
+    property real depthK: 0.18
+
+    // 像素级落位:绑定到 PhaseBackground 实际绘制出的图矩形(paintedX/Y/W/H),
+    // 这样无论窗口/aspect 怎么变,头像永远落在画里的桌沿上。
+    readonly property real _cxPix: bg.paintedX + bg.paintedW * cx
+    readonly property real _cyPix: bg.paintedY + bg.paintedH * cy
+    readonly property real _rxPix: bg.paintedW * ringRx
+    readonly property real _ryPix: bg.paintedH * ringRy
+    readonly property real _avSize: bg.paintedW * 0.10
+
+    // 逐座微调(fraction of paintedW/H):手绘透视桌不是完美椭圆,按座位位置(非角色)
+    // 把个别座位推到画里的实际座位上。仅 6 座(当前唯一真实局型)生效;其它座数走纯椭圆。
+    readonly property var _o6: [
+        { dx: -0.03, dy: -0.045 }, // 顶:狼人位 — 上+左(狼人再上移一点)
+        { dx:  0.00, dy:  0.00 },  // 右上:预言家位
+        { dx:  0.00, dy:  0.00 },  // 右下:女巫位
+        { dx: -0.02, dy:  0.00 },  // 底:村民位 — 左(同守卫幅度)
+        { dx: -0.02, dy:  0.00 },  // 左下:守卫位 — 略左
+        { dx: -0.06, dy:  0.01 }   // 左上:猎人位 — 更左(到守卫左侧)+ 下到桌沿
+    ]
+    function _offX(i) { return (players.length === 6 && _o6[i]) ? _o6[i].dx : 0 }
+    function _offY(i) { return (players.length === 6 && _o6[i]) ? _o6[i].dy : 0 }
 
     function _angle(i, n) { return (-90 + i * 360 / Math.max(1, n)) * Math.PI / 180 }
     function _roleName(role) {
@@ -96,12 +118,12 @@ Item {
         anchors { left: leftCol.right; top: parent.top; right: parent.right; bottom: parent.bottom }
         clip: true
 
-        PhaseBackground { anchors.fill: parent; phase: root.phase }
+        PhaseBackground { id: bg; anchors.fill: parent; phase: root.phase }
 
         PhaseIndicator {
             phase: root.phase; round: root.round
-            x: stage.width * root.cx - width / 2
-            y: stage.height * root.cy - height / 2
+            x: root._cxPix - width / 2
+            y: root._cyPix - height / 2
         }
 
         // 投票/行动箭头(座位间珊瑚虚线;Task 7 细化朝向)
@@ -116,8 +138,8 @@ Item {
                 for (var i = 0; i < root.players.length; i++)
                     if (root.players[i] && root.players[i].player_id === pid) {
                         var th = root._angle(i, root.players.length)
-                        return Qt.point(width * root.cx + width * root.ringRx * Math.cos(th),
-                                        height * root.cy + height * root.ringRy * Math.sin(th))
+                        return Qt.point(root._cxPix + root._rxPix * Math.cos(th) + bg.paintedW * root._offX(i),
+                                        root._cyPix + root._ryPix * Math.sin(th) + bg.paintedH * root._offY(i))
                     }
                 return null
             }
@@ -139,9 +161,9 @@ Item {
             delegate: CharacterAvatar {
                 readonly property real _th: root._angle(index, root.players.length)
                 readonly property real _sin: Math.sin(_th)
-                diameter: Math.min(stage.width, stage.height) * 0.13 * (1 + root.depthK * _sin)
-                x: stage.width * root.cx + stage.width * root.ringRx * Math.cos(_th) - width / 2
-                y: stage.height * root.cy + stage.height * root.ringRy * _sin - diameter / 2
+                diameter: root._avSize * (1 + root.depthK * _sin)
+                x: root._cxPix + root._rxPix * Math.cos(_th) + bg.paintedW * root._offX(index) - width / 2
+                y: root._cyPix + root._ryPix * _sin + bg.paintedH * root._offY(index) - diameter / 2
                 z: 10 + _sin
                 roleKey: (modelData.display_role && modelData.display_role !== "unknown") ? modelData.display_role : ""
                 roleLabel: roleKey ? root._roleName(modelData.display_role) : ""
@@ -214,7 +236,7 @@ Item {
         Rectangle {
             visible: root.majority > 0
             anchors { bottom: parent.bottom; bottomMargin: Theme.space.lg }
-            x: stage.width * root.cx - width / 2
+            x: root._cxPix - width / 2
             implicitWidth: majText.implicitWidth + Theme.space.xxxl
             implicitHeight: majText.implicitHeight + Theme.space.sm
             radius: Theme.radius.pill

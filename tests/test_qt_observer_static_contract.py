@@ -35,6 +35,7 @@ REQUIRED_QML_VIEWS = [
     "qml/PreflightView.qml",
     "qml/LiveCockpitView.qml",
     "qml/TheaterView.qml",
+    "qml/DesignPreviewView.qml",
     "qml/HistoryView.qml",
     "qml/EventPresentationQueue.qml",
     "qml/components/RoleCard.qml",
@@ -61,7 +62,7 @@ REQUIRED_OBJECT_NAMES = {
     # Game-client redesign: recent-runs moved off the home (edge-floating HUD over
     # the illustration); recent runs now live on the History page. The two hero
     # action buttons keep their objectNames (text changed to 进入今夜对局 / 查看昨夜复盘).
-    "qml/HomeView.qml": ["homeView", "startNewMatchButton", "historyButton", "serverStatusBadge"],
+    "qml/HomeView.qml": ["homeView", "startNewMatchButton", "historyButton", "serverStatusBadge", "designPreviewButton"],
     # P2-B Q2: credentials moved OUT of the setup view to the dedicated provider
     # settings page (below); the setup view is now a pure scheduling sandbox.
     "qml/MatchSetupView.qml": ["matchSetupView", "setupRoleCards", "setupContinueButton",
@@ -75,6 +76,7 @@ REQUIRED_OBJECT_NAMES = {
     "qml/PreflightView.qml": ["preflightView", "preflightServerStatus", "preflightTemplateSummary", "preflightVisibilitySummary", "startMatchButton"],
     "qml/LiveCockpitView.qml": ["liveCockpitView", "runStatusBadge", "playerPanelGrid", "eventTimeline", "perspectiveSwitcher", "auditLinksPanel", "providerFailureSummary"],
     "qml/TheaterView.qml": ["theaterView"],
+    "qml/DesignPreviewView.qml": ["designPreviewView"],
     "qml/SettlementView.qml": ["settlementView"],
     "qml/HistoryView.qml": ["historyView", "historyRunsList", "historyRefreshButton",
                             "deleteRunButton", "historyConfirmDialog", "historyNoticeBar",
@@ -1047,6 +1049,23 @@ class QtObserverGameRedesignPhase2Tests(unittest.TestCase):
         for prop in ["property var players", "property var votes", "property int majority", "property string phase"]:
             self.assertIn(prop, c)
         self.assertIn("CockpitSurface.qml", (QT / "CMakeLists.txt").read_text(encoding="utf-8"))
+
+    def test_home_has_design_preview_entry(self) -> None:
+        c = (QT / "qml/HomeView.qml").read_text(encoding="utf-8")
+        self.assertIn('objectName: "designPreviewButton"', c)
+        self.assertIn("navigateDesignPreview()", c)
+        a = (QT / "qml/AppShell.qml").read_text(encoding="utf-8")
+        self.assertIn("function navigateDesignPreview", a)
+        self.assertIn("DesignPreviewView", a)
+
+    def test_preview_uses_static_sample_not_execution_mode(self) -> None:
+        c = (QT / "qml/DesignPreviewView.qml").read_text(encoding="utf-8")
+        self.assertIn("CockpitSurface", c)
+        self.assertNotIn("currentExecutionMode", c)
+        self.assertNotIn("ObserverClient", c)
+        self.assertIn('objectName: "designPreviewView"', c)
+        for slot in ["perspectiveSlot:", "auditSlot:", "playbackSlot:", "eventLogSlot:"]:
+            self.assertIn(slot, c)
 
 
 if __name__ == "__main__":

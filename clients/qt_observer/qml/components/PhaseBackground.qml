@@ -1,12 +1,20 @@
 import QtQuick
 import qt_observer
 
-// 圆桌房间背景:table-day/night 随 phase 交叉淡入。资产缺失 → phase 暖渐变兜底。
+// 圆桌房间背景:table-day/night 随 phase 交叉淡入。PreserveAspectFit 保住原图构图
+// (桌子偏左 + 右留白不被裁掉)。暴露实际绘制矩形 painted*,供上层把头像环精确对到画里的桌沿。
+// 资产缺失 → phase 暖渐变兜底。
 Item {
     id: root
     objectName: "phaseBackground"
     property string phase: "day"
     readonly property bool _night: phase === "night"
+
+    // 当前激活图实际绘制出的矩形(两图同尺寸,取 dayImg 即可),供头像落位对齐。
+    readonly property real paintedW: dayImg.paintedWidth > 0 ? dayImg.paintedWidth : width
+    readonly property real paintedH: dayImg.paintedHeight > 0 ? dayImg.paintedHeight : height
+    readonly property real paintedX: (width - paintedW) / 2
+    readonly property real paintedY: (height - paintedH) / 2
 
     Rectangle {
         anchors.fill: parent
@@ -17,13 +25,13 @@ Item {
     }
     Image {
         id: dayImg; anchors.fill: parent
-        source: Illustrations.tableDay; fillMode: Image.PreserveAspectCrop
+        source: Illustrations.tableDay; fillMode: Image.PreserveAspectFit
         opacity: (!root._night && status === Image.Ready) ? 1 : 0
         Behavior on opacity { NumberAnimation { duration: Theme.motion.base } }
     }
     Image {
         id: nightImg; anchors.fill: parent
-        source: Illustrations.tableNight; fillMode: Image.PreserveAspectCrop
+        source: Illustrations.tableNight; fillMode: Image.PreserveAspectFit
         opacity: (root._night && status === Image.Ready) ? 1 : 0
         Behavior on opacity { NumberAnimation { duration: Theme.motion.base } }
     }

@@ -226,6 +226,7 @@ Item {
     Component { id: cockpitComponent; TheaterView { objectName: "theaterView" } }
     Component { id: historyComponent; HistoryView { objectName: "historyView" } }
     Component { id: providerSettingsComponent; ProviderSettingsView { objectName: "providerSettingsView" } }
+    Component { id: designPreviewComponent; DesignPreviewView { objectName: "designPreviewView" } }
 
     function navigateHome() {
         stackView.replace(homeComponent)
@@ -250,6 +251,11 @@ Item {
     function navigateHistory() {
         stackView.replace(historyComponent)
         currentView = "history"
+    }
+
+    function navigateDesignPreview() {
+        stackView.replace(designPreviewComponent)
+        currentView = "designPreview"
     }
 
     function navigateProviderSettings() {
