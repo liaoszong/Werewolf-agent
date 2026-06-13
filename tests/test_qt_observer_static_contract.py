@@ -1016,6 +1016,14 @@ class QtObserverGameRedesignPhase2Tests(unittest.TestCase):
         self.assertRegex(c, r'case\s*"guard":')
         self.assertRegex(c, r'case\s*"hunter":')
 
+    def test_character_avatar_contract(self) -> None:
+        c = (QT / "qml/components/CharacterAvatar.qml").read_text(encoding="utf-8")
+        self.assertIn('objectName: "characterAvatar"', c)
+        self.assertIn("Illustrations.avatar(", c)
+        for prop in ["roleKey", "alive", "speaking", "accent"]:
+            self.assertIn(prop, c)
+        self.assertIn("CharacterAvatar.qml", (QT / "CMakeLists.txt").read_text(encoding="utf-8"))
+
 
 if __name__ == "__main__":
     unittest.main()

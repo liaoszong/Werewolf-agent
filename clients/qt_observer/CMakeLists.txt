@@ -50,6 +50,7 @@ qt_add_qml_module(appqt_observer
         qml/HistoryView.qml
         qml/EventPresentationQueue.qml
         qml/components/RoleCard.qml
+        qml/components/CharacterAvatar.qml
         qml/components/SeatRing.qml
         qml/components/SettlementSpine.qml
         qml/components/SettlementReport.qml
