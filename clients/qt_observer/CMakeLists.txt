@@ -44,7 +44,6 @@ qt_add_qml_module(appqt_observer
         qml/MatchSetupView.qml
         qml/ProviderSettingsView.qml
         qml/PreflightView.qml
-        qml/LiveCockpitView.qml
         qml/TheaterView.qml
         qml/DesignPreviewView.qml
         qml/SettlementView.qml

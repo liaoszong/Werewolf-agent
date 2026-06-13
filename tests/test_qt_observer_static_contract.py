@@ -33,7 +33,6 @@ REQUIRED_QML_VIEWS = [
     "qml/MatchSetupView.qml",
     "qml/ProviderSettingsView.qml",
     "qml/PreflightView.qml",
-    "qml/LiveCockpitView.qml",
     "qml/TheaterView.qml",
     "qml/DesignPreviewView.qml",
     "qml/HistoryView.qml",
@@ -74,7 +73,6 @@ REQUIRED_OBJECT_NAMES = {
                                      "providerFetchModelsButton", "providerClearButton",
                                      "providerSettingsBackButton"],
     "qml/PreflightView.qml": ["preflightView", "preflightServerStatus", "preflightTemplateSummary", "preflightVisibilitySummary", "startMatchButton"],
-    "qml/LiveCockpitView.qml": ["liveCockpitView", "runStatusBadge", "playerPanelGrid", "eventTimeline", "perspectiveSwitcher", "auditLinksPanel", "providerFailureSummary"],
     "qml/TheaterView.qml": ["theaterView"],
     "qml/DesignPreviewView.qml": ["designPreviewView"],
     "qml/SettlementView.qml": ["settlementView"],
@@ -195,12 +193,11 @@ class QtObserverSetupContractTests(unittest.TestCase):
 
 
 class QtObserverCockpitContractTests(unittest.TestCase):
-    def test_cockpit_contains_required_object_names(self) -> None:
-        content = (QT / "qml/LiveCockpitView.qml").read_text(encoding="utf-8")
-        for name in ["runStatusBadge", "playerPanelGrid", "eventTimeline",
-                      "perspectiveSwitcher", "auditLinksPanel", "providerFailureSummary"]:
-            self.assertRegex(content, rf'objectName:\s*"{name}"',
-                             f"Missing objectName '{name}' in LiveCockpitView.qml")
+    # LiveCockpitView.qml deleted (Phase 2 redesign): its honesty-chain objectNames
+    # (runStatusBadge/playerPanelGrid/eventTimeline/perspectiveSwitcher/auditLinksPanel/
+    # providerFailureSummary) are re-homed onto EvidenceConsole — see
+    # REQUIRED_OBJECT_NAMES["qml/components/EvidenceConsole.qml"] and
+    # QtObserverTheaterViewTests.test_evidence_console_rehomes_honesty_chain.
 
     def test_perspective_switcher_contains_required_values(self) -> None:
         content = (QT / "qml/components/PerspectiveSwitcher.qml").read_text(encoding="utf-8")
@@ -575,21 +572,17 @@ class QtObserverModeControlComponentTests(unittest.TestCase):
 
 class QtObserverHiddenInfoBoundaryTests(unittest.TestCase):
     def test_live_cockpit_does_not_embed_static_role_assignments(self) -> None:
-        content = (QT / "qml/LiveCockpitView.qml").read_text(encoding="utf-8")
-        # Must not use hardcoded role arrays like `role: "Werewolf"` as the live player model
-        self.assertNotRegex(content, r'role:\s*"(?:Werewolf|Seer|Witch|Villager)"',
-                            "LiveCockpitView.qml contains hardcoded role assignments in static model")
+        # Re-homed from the deleted LiveCockpitView onto the presentational CockpitSurface:
+        # the live ring must not hardcode roles — they arrive via the projected `players`.
+        content = (QT / "qml/components/CockpitSurface.qml").read_text(encoding="utf-8")
+        self.assertNotRegex(content, r'(display_role|role):\s*"(?:Werewolf|Seer|Witch|Villager)"',
+                            "CockpitSurface.qml contains hardcoded role assignments")
+        self.assertIn("players", content)
 
     def test_qml_boundary_copy_mentions_server_projection(self) -> None:
-        content = (QT / "qml/LiveCockpitView.qml").read_text(encoding="utf-8")
-        # Should reference ObserverClient projection properties or projection-related data
-        has_projection = any(tag in content for tag in [
-            "playerItems", "projectionProof", "visibilityContractVersion",
-            "hiddenEventCount", "hiddenSnapshotCount",
-        ])
-        if not has_projection:
-            # qml may use projection via component without explicit property name
-            pass  # Accept if ViewBoundaryBadge is present (checked separately)
+        # The live host (TheaterView) must source seats from the server projection.
+        content = (QT / "qml/TheaterView.qml").read_text(encoding="utf-8")
+        self.assertIn("ObserverClient.playerItems", content)
 
     def test_qt_client_does_not_use_local_snapshot_or_event_paths(self) -> None:
         for src_file in sorted((QT / "src").rglob("*")):
@@ -628,13 +621,13 @@ class QtObserverVisibilityUiTests(unittest.TestCase):
         self.assertIn("ProjectionProofPanel.qml", cmake_text)
 
     def test_live_cockpit_uses_projection_player_items(self) -> None:
-        content = (QT / "qml/LiveCockpitView.qml").read_text(encoding="utf-8")
+        # Re-homed to TheaterView (the live host binds the projected seat list).
+        content = (QT / "qml/TheaterView.qml").read_text(encoding="utf-8")
         self.assertIn("ObserverClient.playerItems", content)
 
-    def test_live_cockpit_contains_boundary_badge_and_proof_panel(self) -> None:
-        content = (QT / "qml/LiveCockpitView.qml").read_text(encoding="utf-8")
-        self.assertIn("ViewBoundaryBadge", content)
-        self.assertIn("ProjectionProofPanel", content)
+    # boundary-badge + projection-proof presence is re-homed to EvidenceConsole and
+    # covered by QtObserverTheaterViewTests.test_evidence_console_rehomes_honesty_chain
+    # (the deleted LiveCockpitView no longer hosts them).
 
     def test_role_card_supports_hidden_role_rendering(self) -> None:
         content = (QT / "qml/components/RoleCard.qml").read_text(encoding="utf-8")
@@ -644,7 +637,8 @@ class QtObserverVisibilityUiTests(unittest.TestCase):
         self.assertIn("Hidden", content)
 
     def test_cockpit_does_not_hardcode_god_roles_as_live_player_source(self) -> None:
-        content = (QT / "qml/LiveCockpitView.qml").read_text(encoding="utf-8")
+        # Re-homed to CockpitSurface (the live ring): roles come from projected players.
+        content = (QT / "qml/components/CockpitSurface.qml").read_text(encoding="utf-8")
         self.assertNotIn('role: "Werewolf"', content)
         self.assertNotIn('role: "Seer"', content)
 
