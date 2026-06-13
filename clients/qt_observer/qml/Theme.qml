@@ -103,9 +103,11 @@ QtObject {
         readonly property color primary: "#cc785c"
         readonly property color primaryActive: "#a9583e"
         readonly property color primaryDisabled: "#e6dfd8"
-        readonly property color onPrimary: "#ffffff"
-        readonly property color onDark: "#faf9f5"
-        readonly property color onDarkSoft: "#a09d96"
+        // NOTE: token names must NOT start with "on"+Capital — QML parses those as
+        // signal handlers (onPrimary -> "onPrimary" handler). Use textOn* instead.
+        readonly property color textOnPrimary: "#ffffff"
+        readonly property color textOnDark: "#faf9f5"
+        readonly property color textOnDarkSoft: "#a09d96"
         readonly property color accentAmber: "#e8a55a"
         readonly property color accentTeal: "#5db8a6"
         readonly property color success: "#5db872"

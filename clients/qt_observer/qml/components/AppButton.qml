@@ -44,7 +44,7 @@ Item {
     }
     readonly property color _fg: {
         if (onLight) {
-            if (variant === "primary" || variant === "danger") return Theme.warm.onPrimary;
+            if (variant === "primary" || variant === "danger") return Theme.warm.textOnPrimary;
             if (variant === "secondary") return Theme.warm.ink;
             return Theme.warm.body;  // ghost
         }
