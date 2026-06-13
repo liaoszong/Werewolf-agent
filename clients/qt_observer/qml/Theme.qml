@@ -242,6 +242,10 @@ QtObject {
             return theme.color.witch;
         case "villager":
             return theme.color.villager;
+        case "guard":
+            return "#4a8c6f";
+        case "hunter":
+            return "#b5683a";
         default:
             return theme.color.unknown;
         }

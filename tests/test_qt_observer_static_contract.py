@@ -983,5 +983,39 @@ class QtObserverGameRedesignPhase1Tests(unittest.TestCase):
         self.assertIn('objectName: "appShellStack"', c)
 
 
+class QtObserverGameRedesignPhase2Tests(unittest.TestCase):
+    """游戏客户端重做 Phase 2:上帝视角圆桌 LiveCockpit + 首页静态预览。"""
+
+    PHASE2_ASSETS = [
+        "assets/illustrations/scene/table-day.png",
+        "assets/illustrations/scene/table-night.png",
+        "assets/illustrations/avatars/werewolf.png",
+        "assets/illustrations/avatars/seer.png",
+        "assets/illustrations/avatars/witch.png",
+        "assets/illustrations/avatars/villager.png",
+        "assets/illustrations/avatars/guard.png",
+        "assets/illustrations/avatars/hunter.png",
+    ]
+
+    def test_phase2_assets_exist(self) -> None:
+        for rel in self.PHASE2_ASSETS:
+            self.assertTrue((QT / rel).exists(), f"missing Phase 2 asset: {rel}")
+
+    def test_phase2_assets_registered_in_cmake(self) -> None:
+        cmake = (QT / "CMakeLists.txt").read_text(encoding="utf-8")
+        for rel in self.PHASE2_ASSETS:
+            self.assertIn(rel, cmake, f"CMakeLists must bundle resource {rel}")
+
+    def test_illustrations_registers_table_and_avatar(self) -> None:
+        c = (QT / "qml/Illustrations.qml").read_text(encoding="utf-8")
+        for tok in ["tableDay", "tableNight", "function table(", "function avatar("]:
+            self.assertIn(tok, c, f"Illustrations.qml missing {tok}")
+
+    def test_role_accent_covers_guard_and_hunter(self) -> None:
+        c = (QT / "qml/Theme.qml").read_text(encoding="utf-8")
+        self.assertRegex(c, r'case\s*"guard":')
+        self.assertRegex(c, r'case\s*"hunter":')
+
+
 if __name__ == "__main__":
     unittest.main()

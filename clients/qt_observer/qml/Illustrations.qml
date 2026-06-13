@@ -11,6 +11,18 @@ QtObject {
     readonly property url homeSceneDay: Qt.resolvedUrl("../assets/illustrations/scene/home-day.png")
     readonly property url homeSceneNight: Qt.resolvedUrl("../assets/illustrations/scene/home-night.png")
 
+    readonly property url tableDay: Qt.resolvedUrl("../assets/illustrations/scene/table-day.png")
+    readonly property url tableNight: Qt.resolvedUrl("../assets/illustrations/scene/table-night.png")
+
+    readonly property var _avatar: ({
+        "werewolf": Qt.resolvedUrl("../assets/illustrations/avatars/werewolf.png"),
+        "seer":     Qt.resolvedUrl("../assets/illustrations/avatars/seer.png"),
+        "witch":    Qt.resolvedUrl("../assets/illustrations/avatars/witch.png"),
+        "villager": Qt.resolvedUrl("../assets/illustrations/avatars/villager.png"),
+        "guard":    Qt.resolvedUrl("../assets/illustrations/avatars/guard.png"),
+        "hunter":   Qt.resolvedUrl("../assets/illustrations/avatars/hunter.png")
+    })
+
     readonly property var _tarot: ({
         "werewolf": Qt.resolvedUrl("../assets/illustrations/tarot/werewolf.png"),
         "seer":     Qt.resolvedUrl("../assets/illustrations/tarot/seer.png"),
@@ -28,5 +40,15 @@ QtObject {
 
     function homeScene(phaseName) {
         return ("" + phaseName).toLowerCase() === "night" ? homeSceneNight : homeSceneDay;
+    }
+
+    function table(phaseName) {
+        return ("" + phaseName).toLowerCase() === "night" ? tableNight : tableDay;
+    }
+
+    // Returns "" for an unknown role so the caller renders its fallback.
+    function avatar(roleKey) {
+        var k = ("" + roleKey).toLowerCase();
+        return _avatar[k] !== undefined ? _avatar[k] : "";
     }
 }
