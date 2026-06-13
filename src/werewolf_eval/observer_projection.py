@@ -252,7 +252,7 @@ def event_visible_in_projection(
     """Return ``(visible, reason)`` for *event* under *perspective*.
 
     Reasons: ``god_view``, ``public_event``, ``seer_event``, ``witch_event``,
-    ``werewolf_team_event``, ``hidden``.
+    ``guard_event``, ``werewolf_team_event``, ``hidden``.
     """
     kind = perspective_kind(perspective)
     visibility = event.get("visibility", "internal")
