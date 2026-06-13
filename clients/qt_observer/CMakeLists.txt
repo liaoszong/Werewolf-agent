@@ -29,6 +29,7 @@ target_link_libraries(appqt_observer
 # singletons accessible module-wide as `Theme` and `I18n`.
 set_source_files_properties(qml/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 set_source_files_properties(qml/I18n.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
+set_source_files_properties(qml/Illustrations.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 
 qt_add_qml_module(appqt_observer
     URI qt_observer
@@ -37,6 +38,7 @@ qt_add_qml_module(appqt_observer
         Main.qml
         qml/Theme.qml
         qml/I18n.qml
+        qml/Illustrations.qml
         qml/AppShell.qml
         qml/HomeView.qml
         qml/MatchSetupView.qml
@@ -73,6 +75,15 @@ qt_add_qml_module(appqt_observer
         qml/components/ModeControl.qml
         qml/components/DataSourceChip.qml
         qml/components/ConfirmDialog.qml
+    RESOURCES
+        assets/illustrations/scene/home-day.png
+        assets/illustrations/scene/home-night.png
+        assets/illustrations/tarot/werewolf.png
+        assets/illustrations/tarot/seer.png
+        assets/illustrations/tarot/witch.png
+        assets/illustrations/tarot/villager.png
+        assets/illustrations/tarot/guard.png
+        assets/illustrations/tarot/hunter.png
 )
 
 set_target_properties(appqt_observer PROPERTIES
