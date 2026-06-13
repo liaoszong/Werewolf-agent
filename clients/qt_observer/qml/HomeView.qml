@@ -264,11 +264,16 @@ Item {
             width: 152
             height: 228
 
+            // Snap to the resting fan on creation; only animate on hover (so
+            // returning to Home does NOT replay a right-to-left settle wave).
+            property bool _ready: false
+            Component.onCompleted: _ready = true
+
             z: cardHover.hovered ? 100 : index
             y: cardHover.hovered ? -18 : (index % 2 === 0 ? 0 : 5)
             rotation: cardHover.hovered ? 0 : (index % 2 === 0 ? -1.5 : 1.5)
-            Behavior on y { NumberAnimation { duration: 200; easing.type: Easing.OutBack } }
-            Behavior on rotation { NumberAnimation { duration: 200; easing.type: Easing.OutExpo } }
+            Behavior on y { enabled: cardWrapper._ready; NumberAnimation { duration: 200; easing.type: Easing.OutBack } }
+            Behavior on rotation { enabled: cardWrapper._ready; NumberAnimation { duration: 200; easing.type: Easing.OutExpo } }
 
             Image {
                 id: tarotArt
