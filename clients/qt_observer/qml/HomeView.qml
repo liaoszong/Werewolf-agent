@@ -302,17 +302,37 @@ Item {
                 cache: true
                 visible: status === Image.Ready
 
-                // Height-reactive soft shadow: lifts higher on hover -> larger,
-                // softer, more-offset shadow. (MultiEffect renders on the desktop
+                // Composite shadow: warm-brown (blends into the parchment), and
+                // height-reactive — tight "contact" shadow at rest, wide diffuse
+                // "float" shadow on hover. (MultiEffect renders on the desktop
                 // platform; the offscreen screenshot platform omits it.)
                 layer.enabled: true
                 layer.effect: MultiEffect {
                     shadowEnabled: true
-                    shadowColor: Qt.rgba(0, 0, 0, 0.35)
-                    shadowBlur: cardHover.hovered ? 1.0 : 0.55
-                    shadowVerticalOffset: cardHover.hovered ? 13 : 6
+                    shadowColor: Qt.rgba(40 / 255, 30 / 255, 20 / 255, 0.4)
+                    shadowBlur: cardHover.hovered ? 1.2 : 0.4
+                    shadowVerticalOffset: cardHover.hovered ? 16 : 4
                     Behavior on shadowBlur { NumberAnimation { duration: 200 } }
                     Behavior on shadowVerticalOffset { NumberAnimation { duration: 200 } }
+                }
+
+                // Polished-cardboard edge (no mask needed): a 1px inner vignette
+                // darkens the edge, and a 1px inset highlight fakes a beveled
+                // lit rim — together they "eat" the sharp printed pixels.
+                Rectangle {
+                    anchors.fill: parent
+                    color: "transparent"
+                    radius: 4
+                    border.width: 1
+                    border.color: Qt.rgba(0, 0, 0, 0.22)
+                }
+                Rectangle {
+                    anchors.fill: parent
+                    anchors.margins: 1
+                    color: "transparent"
+                    radius: 3
+                    border.width: 1
+                    border.color: Qt.rgba(1, 1, 1, 0.12)
                 }
             }
 
