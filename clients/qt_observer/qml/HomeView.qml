@@ -270,48 +270,50 @@ Item {
             width: 152
             height: 228
 
-            // Snap to the resting fan on creation; only animate on hover (so
-            // returning to Home does NOT replay a right-to-left settle wave).
+            // Snap to the resting fan on creation; only animate on hover.
             property bool _ready: false
             Component.onCompleted: _ready = true
 
+            // z changes without moving geometry -> hovered card rises to the top.
             z: cardHover.hovered ? 100 : index
-            y: cardHover.hovered ? -20 : (index % 2 === 0 ? 0 : 6)
-            rotation: cardHover.hovered ? 0 : (index % 2 === 0 ? -1.5 : 1.5)
-            Behavior on y { enabled: cardWrapper._ready; NumberAnimation { duration: 250; easing.type: Easing.OutBack; easing.overshoot: 1.2 } }
-            Behavior on rotation { enabled: cardWrapper._ready; NumberAnimation { duration: 200; easing.type: Easing.OutQuart } }
 
-            // Source art (hidden — composited through MultiEffect for rounded
-            // corners + a height-reactive soft shadow, so no 90° sharp edge).
+            // Hover/tap detection lives on this STATIC wrapper (it never moves),
+            // so lifting the art can't pull the card out from under the cursor —
+            // that move-away was the cause of the flicker between two cards.
+            HoverHandler { id: cardHover; cursorShape: Qt.PointingHandCursor }
+            TapHandler { onTapped: { /* role detail page — later phase */ } }
+
+            // The art itself lifts/tilts (y + rotation on the Image, pivoting at
+            // its bottom edge); the wrapper stays put for stable hovering.
             Image {
                 id: tarotArt
-                anchors.fill: parent
+                width: parent.width
+                height: parent.height
+                x: 0
+                y: cardHover.hovered ? -20 : (cardWrapper.index % 2 === 0 ? 0 : 6)
+                transformOrigin: Item.Bottom
+                rotation: cardHover.hovered ? 0 : (cardWrapper.index % 2 === 0 ? -1.5 : 1.5)
+                Behavior on y { enabled: cardWrapper._ready; NumberAnimation { duration: 250; easing.type: Easing.OutBack; easing.overshoot: 1.2 } }
+                Behavior on rotation { enabled: cardWrapper._ready; NumberAnimation { duration: 200; easing.type: Easing.OutQuart } }
+
                 source: Illustrations.tarot(cardWrapper.modelData)
                 fillMode: Image.PreserveAspectFit
-                asynchronous: false      // bundled + cached -> show instantly on re-entry (no pop)
+                asynchronous: false      // bundled + cached -> instant on re-entry (no pop)
                 cache: true
-                visible: false
-            }
-            Rectangle {
-                id: cardMaskShape
-                anchors.fill: parent
-                radius: 12
-                visible: false
+                visible: status === Image.Ready
+
+                // Height-reactive soft shadow: lifts higher on hover -> larger,
+                // softer, more-offset shadow. (MultiEffect renders on the desktop
+                // platform; the offscreen screenshot platform omits it.)
                 layer.enabled: true
-            }
-            MultiEffect {
-                anchors.fill: parent
-                visible: tarotArt.status === Image.Ready
-                source: tarotArt
-                maskEnabled: true
-                maskSource: cardMaskShape
-                shadowEnabled: true
-                shadowColor: Qt.rgba(0, 0, 0, 0.35)
-                // Lifts higher on hover -> larger, softer, more-offset shadow.
-                shadowBlur: cardHover.hovered ? 1.0 : 0.55
-                shadowVerticalOffset: cardHover.hovered ? 13 : 6
-                Behavior on shadowBlur { NumberAnimation { duration: 200 } }
-                Behavior on shadowVerticalOffset { NumberAnimation { duration: 200 } }
+                layer.effect: MultiEffect {
+                    shadowEnabled: true
+                    shadowColor: Qt.rgba(0, 0, 0, 0.35)
+                    shadowBlur: cardHover.hovered ? 1.0 : 0.55
+                    shadowVerticalOffset: cardHover.hovered ? 13 : 6
+                    Behavior on shadowBlur { NumberAnimation { duration: 200 } }
+                    Behavior on shadowVerticalOffset { NumberAnimation { duration: 200 } }
+                }
             }
 
             // Fallback when the art is missing or fails to load (never blank).
@@ -331,9 +333,6 @@ Item {
                     font.pixelSize: Theme.size.caption
                 }
             }
-
-            HoverHandler { id: cardHover; cursorShape: Qt.PointingHandCursor }
-            TapHandler { onTapped: { /* role detail page — later phase */ } }
         }
     }
 }
