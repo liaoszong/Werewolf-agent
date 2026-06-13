@@ -13,6 +13,8 @@ Item {
     property string phase: "day"
     property int round: 1
     property var votes: []
+    // 展示用:按票数降序(队列只给未排序聚合;排序属表现层)
+    readonly property var _votesSorted: (votes || []).slice().sort(function (a, b) { return b.count - a.count })
     property int majority: 0
     property string dataSourceText: ""
     property string perspectiveText: ""
@@ -202,7 +204,7 @@ Item {
             radius: Theme.radius.lg
             color: Theme.withAlpha(Theme.warm.surfaceRaised, 0.9)
             border.width: 1; border.color: Theme.warm.hairline
-            visible: root.votes && root.votes.length > 0
+            visible: root._votesSorted.length > 0
             Column {
                 id: votesCol
                 anchors { left: parent.left; right: parent.right; top: parent.top; margins: Theme.space.md }
@@ -214,7 +216,7 @@ Item {
                     font.pixelSize: Theme.size.micro; font.weight: Theme.weight.bold
                 }
                 Repeater {
-                    model: root.votes
+                    model: root._votesSorted
                     delegate: Text {
                         text: modelData.target + "  ●×" + modelData.count
                         color: Theme.warm.body

@@ -86,6 +86,38 @@ QtObject {
     property real speed: 1.0
     property bool instant: false
 
+    // 当前 round = phaseTimeline 末项(已按游标截断)。
+    readonly property int currentRound: phaseTimeline.length ? phaseTimeline[phaseTimeline.length - 1].round : 0
+
+    // 当前 round 的票数聚合,仅统计「已消费到游标 0.._cursor」的 player_vote(与 deadPlayers 同法
+    // 扫描 _ordered;target 优先取 enrichment,缺则 raw.target)。绝不扫完整 source/enriched —
+    // 否则回放中会提前显示未来票。返回 [{target, count}] 按票数降序。
+    readonly property var voteTally: {
+        var counts = ({})
+        var n = Math.min(_cursor, _ordered.length)
+        var cr = currentRound
+        for (var i = 0; i < n; i++) {
+            var raw = _ordered[i]
+            var t = (raw && raw.payload) ? raw.payload.type : (raw ? raw.type : "")
+            if (t !== "player_vote")
+                continue
+            var rr = (raw && raw.round !== undefined && raw.round !== null) ? raw.round : 0
+            if (rr !== cr)
+                continue
+            var gid = (raw && raw.payload) ? raw.payload.event_id : (raw ? raw.event_id : "")
+            var enr = (gid && _enrichedById[gid]) ? _enrichedById[gid] : null
+            var tgt = (enr && enr.target && enr.target !== "none") ? enr.target
+                    : ((raw && raw.target) ? raw.target : "")
+            if (!tgt)
+                continue
+            counts[tgt] = (counts[tgt] || 0) + 1
+        }
+        var out = []
+        for (var k in counts)
+            out.push({ target: k, count: counts[k] })
+        return out   // 不排序:队列绝不 reorder(presentation-only 不变量);展示层自行排序
+    }
+
     signal phaseBoundary(string phase, int round)   // UI marker ONLY — never a runtime event
 
     // --- enrichment lookup: game-log event_id -> {summary (from data.summary), target} ---

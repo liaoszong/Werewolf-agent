@@ -1067,6 +1067,25 @@ class QtObserverGameRedesignPhase2Tests(unittest.TestCase):
         for slot in ["perspectiveSlot:", "auditSlot:", "playbackSlot:", "eventLogSlot:"]:
             self.assertIn(slot, c)
 
+    def test_event_queue_exposes_cursor_truncated_votes(self) -> None:
+        c = (QT / "qml/EventPresentationQueue.qml").read_text(encoding="utf-8")
+        self.assertIn("readonly property var voteTally", c)
+        self.assertIn("readonly property int currentRound", c)
+        # truncated to the playback cursor (same scan bound as deadPlayers), not the full stream
+        self.assertIn("Math.min(_cursor, _ordered.length)", c)
+
+    def test_theater_hosts_cockpit_surface(self) -> None:
+        t = (QT / "qml/TheaterView.qml").read_text(encoding="utf-8")
+        self.assertIn("CockpitSurface", t)
+        self.assertIn("ObserverClient.playerItems", t)
+        self.assertIn("eventQueue.voteTally", t)           # votes from cursor-truncated tally
+        self.assertIn("showPerspectiveSwitcher: false", t)  # single-instance: console switcher off
+        self.assertIn("PerspectiveSwitcher", t)             # seat lens lives in the top-left slot
+
+    def test_evidence_console_perspective_toggle(self) -> None:
+        e = (QT / "qml/components/EvidenceConsole.qml").read_text(encoding="utf-8")
+        self.assertIn("showPerspectiveSwitcher", e)
+
 
 if __name__ == "__main__":
     unittest.main()
