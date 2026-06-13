@@ -148,11 +148,20 @@ Item {
             onPaint: {
                 var ctx = getContext("2d"); ctx.reset()
                 if (!root.votes) return
-                ctx.strokeStyle = Theme.warm.primary; ctx.lineWidth = 2
-                ctx.setLineDash([6, 5]); ctx.globalAlpha = 0.7
+                // 每个被投目标画一圈珊瑚虚线环,半径随票数增大;领先者填充更实。
+                var lead = 0
+                for (var m = 0; m < root.votes.length; m++)
+                    if (root.votes[m].count > lead) lead = root.votes[m].count
                 for (var k = 0; k < root.votes.length; k++) {
-                    var pt = _seatPt(root.votes[k].target)
-                    if (pt) { ctx.beginPath(); ctx.arc(pt.x, pt.y, 5, 0, 2 * Math.PI); ctx.stroke() }
+                    var v = root.votes[k]
+                    var pt = _seatPt(v.target)
+                    if (!pt) continue
+                    var rad = root._avSize * 0.62 + v.count * (root._avSize * 0.10)
+                    ctx.strokeStyle = Theme.warm.primary
+                    ctx.lineWidth = (v.count === lead && lead > 0) ? 4 : 2
+                    ctx.setLineDash([7, 5])
+                    ctx.globalAlpha = (v.count === lead && lead > 0) ? 0.9 : 0.55
+                    ctx.beginPath(); ctx.arc(pt.x, pt.y, rad, 0, 2 * Math.PI); ctx.stroke()
                 }
             }
         }
