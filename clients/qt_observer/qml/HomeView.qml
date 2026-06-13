@@ -308,6 +308,17 @@ Item {
                 // platform; the offscreen screenshot platform omits it.)
                 layer.enabled: true
                 layer.effect: MultiEffect {
+                    // Micro 4px rounded corners via a proper ShaderEffectSource
+                    // mask (renders the shape to a texture), combined with the
+                    // warm composite shadow in the same effect.
+                    maskEnabled: true
+                    maskSource: ShaderEffectSource {
+                        sourceItem: Rectangle {
+                            width: cardWrapper.width
+                            height: cardWrapper.height
+                            radius: 4
+                        }
+                    }
                     shadowEnabled: true
                     shadowColor: Qt.rgba(40 / 255, 30 / 255, 20 / 255, 0.4)
                     shadowBlur: cardHover.hovered ? 1.2 : 0.4
