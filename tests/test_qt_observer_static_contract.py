@@ -1036,6 +1036,18 @@ class QtObserverGameRedesignPhase2Tests(unittest.TestCase):
         self.assertIn("PhaseBackground.qml", cmake)
         self.assertIn("PhaseIndicator.qml", cmake)
 
+    def test_cockpit_surface_contract(self) -> None:
+        c = (QT / "qml/components/CockpitSurface.qml").read_text(encoding="utf-8")
+        self.assertIn('objectName: "cockpitSurface"', c)
+        for comp in ["PhaseBackground", "CharacterAvatar", "PhaseIndicator"]:
+            self.assertIn(comp, c)
+        self.assertNotIn("ObserverClient", c)        # 表现型:数据经属性
+        for slot in ["perspectiveSlot", "eventLogSlot", "auditSlot", "playbackSlot"]:
+            self.assertIn(slot, c)
+        for prop in ["property var players", "property var votes", "property int majority", "property string phase"]:
+            self.assertIn(prop, c)
+        self.assertIn("CockpitSurface.qml", (QT / "CMakeLists.txt").read_text(encoding="utf-8"))
+
 
 if __name__ == "__main__":
     unittest.main()
