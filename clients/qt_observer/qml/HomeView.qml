@@ -15,6 +15,20 @@ Item {
     // Day/night phase for the backdrop (screenshot matrix toggles this).
     property string phase: "day"
 
+    // Bilingual role name overlaid on each card's blank banner (re-evaluates on
+    // language switch because I18n.t reads I18n.lang).
+    function roleName(k) {
+        switch (("" + k).toLowerCase()) {
+        case "werewolf": return I18n.t("狼人", "Werewolf")
+        case "seer":     return I18n.t("预言家", "Seer")
+        case "witch":    return I18n.t("女巫", "Witch")
+        case "villager": return I18n.t("村民", "Villager")
+        case "guard":    return I18n.t("守卫", "Guard")
+        case "hunter":   return I18n.t("猎人", "Hunter")
+        }
+        return ""
+    }
+
     Component.onCompleted: ObserverClient.checkHealth()
 
     // Backdrop fills ONLY the content region (right of the NavRail) so the
@@ -316,23 +330,21 @@ Item {
                     Behavior on shadowVerticalOffset { NumberAnimation { duration: 200 } }
                 }
 
-                // Polished-cardboard edge (no mask needed): a 1px inner vignette
-                // darkens the edge, and a 1px inset highlight fakes a beveled
-                // lit rim — together they "eat" the sharp printed pixels.
-                Rectangle {
-                    anchors.fill: parent
-                    color: "transparent"
-                    radius: 4
-                    border.width: 1
-                    border.color: Qt.rgba(0, 0, 0, 0.22)
-                }
-                Rectangle {
-                    anchors.fill: parent
-                    anchors.margins: 1
-                    color: "transparent"
-                    radius: 3
-                    border.width: 1
-                    border.color: Qt.rgba(1, 1, 1, 0.12)
+                // Localized role name on the card's EMPTY banner. The art ships
+                // with a blank scroll so zh/en both render here (no baked text).
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    // Centre the name on the banner (banner centre ≈81% down the card).
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.verticalCenterOffset: parent.height * 0.31
+                    text: root.roleName(cardWrapper.modelData)
+                    color: "#3a2a16"
+                    font.family: Theme.fontFamilies.serif
+                    font.contextFontMerging: true
+                    font.pixelSize: Theme.warmSize.titleMd   // bigger
+                    font.weight: Theme.weight.bold           // bolder
+                    font.letterSpacing: 2
+                    horizontalAlignment: Text.AlignHCenter
                 }
             }
 
