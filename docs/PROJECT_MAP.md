@@ -120,7 +120,7 @@
 | **SYS-B1** | 记忆与上下文构建 | **Agent Memory / Context Engineering**;分层:工作记忆 → 情景记忆(episodic)→ 语义记忆(semantic) | `render_observation_text` + `augment_witch_observation`(每轮 prompt 组装) | 🌱 现在 = 工作记忆层的最小实现(每轮由可见事件重建上下文)。情景/语义记忆 ⏳ 属增强层,接缝 AgentContextPacket 已留;**任何记忆注入必须带 source ids 过 I4b 可见性检查**(防隐形喂漏,已写进安全网 spec)。**prompt 版本化机制已落地**(prompt_v1 字节锁 + ledger + 三元组戳,spec 2026-06-10):baseline prompt 修订有合法出口 |
 | **SYS-B2** | 决策协议 | Action Protocol / Structured Output | `action_runtime/envelope.py`(ActionEnvelope)+ strict-JSON;tool-calling 仅作消融轴 | ✅ baseline 统一 strict-JSON 已锁定(评测公平性不变量) |
 | **SYS-B3** | 模型接入网关 | Model Gateway / LLM Provider Abstraction | provider registry + BYO-key + 9 家 OpenAI 兼容预设 | ✅ 主体完成;剩 B5 收尾(per-seat token/成本汇总、退役 deepseek-only env 兜底) |
-| **SYS-B4** | 增强脚手架 | **Agent Scaffolding**(persona / 反思 / 狼频道 / 发言-投票一致性) | manifest 的 `enabled_scaffolds` 字段已留 | ⏳ 仅图纸(另立 spec);边界已锁:脚手架在 ActionEnvelope 上游,baseline 永远裁判 |
+| **SYS-B4** | 增强脚手架 | **Agent Scaffolding**(persona / 反思 / 狼频道 / 发言-投票一致性) | 现有接缝 = 渲染器 `requires_scaffold` 标志 + `scaffold_model`(scribe provider);**注意:并不存在 manifest `enabled_scaffolds` 字段——B4 真正进场时需新增,勿按此名找** | ⏳ 仅图纸(另立 spec);边界已锁:脚手架在 ActionEnvelope 上游,baseline 永远裁判 |
 
 ### C 组 · 平台与质量面(Platform & Quality)
 
