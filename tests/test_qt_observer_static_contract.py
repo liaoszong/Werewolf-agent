@@ -58,7 +58,10 @@ REQUIRED_QML_VIEWS = [
 REQUIRED_OBJECT_NAMES = {
     "Main.qml": ["werewolfObserverMainWindow", "appShellLoader"],
     "qml/AppShell.qml": ["appShell", "appShellStack", "dataSourceChip"],
-    "qml/HomeView.qml": ["homeView", "startNewMatchButton", "historyButton", "serverStatusBadge", "recentRunsList"],
+    # Game-client redesign: recent-runs moved off the home (edge-floating HUD over
+    # the illustration); recent runs now live on the History page. The two hero
+    # action buttons keep their objectNames (text changed to 进入今夜对局 / 查看昨夜复盘).
+    "qml/HomeView.qml": ["homeView", "startNewMatchButton", "historyButton", "serverStatusBadge"],
     # P2-B Q2: credentials moved OUT of the setup view to the dedicated provider
     # settings page (below); the setup view is now a pure scheduling sandbox.
     "qml/MatchSetupView.qml": ["matchSetupView", "setupRoleCards", "setupContinueButton",
