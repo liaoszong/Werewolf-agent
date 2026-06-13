@@ -133,7 +133,14 @@ Item {
             id: arrows
             anchors.fill: parent
             property var v: root.votes
+            // Repaint when votes OR the painted background rect changes — seat coords derive
+            // from bg.paintedW/H, which flip 0→actual on async image load without changing the
+            // (anchors.fill) Canvas size; without these the rings stay at fallback geometry.
+            property real pw: bg.paintedW
+            property real ph: bg.paintedH
             onVChanged: requestPaint()
+            onPwChanged: requestPaint()
+            onPhChanged: requestPaint()
             onWidthChanged: requestPaint()
             onHeightChanged: requestPaint()
             function _seatPt(pid) {

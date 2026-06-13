@@ -1073,6 +1073,8 @@ class QtObserverGameRedesignPhase2Tests(unittest.TestCase):
         self.assertIn("CockpitSurface", t)
         self.assertIn("ObserverClient.playerItems", t)
         self.assertIn("eventQueue.voteTally", t)           # votes from cursor-truncated tally
+        # votes must NOT bind the full projection stream directly (future-vote leak guard)
+        self.assertNotRegex(t, r"votes:\s*ObserverClient\.projectionEvents")
         self.assertIn("showPerspectiveSwitcher: false", t)  # single-instance: console switcher off
         self.assertIn("PerspectiveSwitcher", t)             # seat lens lives in the top-left slot
 

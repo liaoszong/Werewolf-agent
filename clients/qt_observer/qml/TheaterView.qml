@@ -45,7 +45,7 @@ Item {
         enriched: ObserverClient.projectionEvents
     }
 
-    // Majority line = ceil of alive/2 + 1, alive = seats minus those dead up to the cursor.
+    // Majority line = floor(alive/2) + 1, alive = seats minus those dead up to the cursor.
     readonly property int _deadCount: eventQueue.deadPlayers ? eventQueue.deadPlayers.length : 0
     readonly property int _majority: Math.floor((ObserverClient.playerItems.length - theaterRoot._deadCount) / 2) + 1
 
@@ -73,8 +73,10 @@ Item {
         }
     }
 
-    // 视角切换（左上,单实例,P1-C：只写 currentPerspective,绝不写 ring.perspective）
-    Component { id: livePerspective; PerspectiveSwitcher { objectName: "perspectiveSwitcher" } }
+    // 视角切换（左上,单实例,P1-C：只写 currentPerspective,绝不写 ring.perspective）。
+    // 不带 objectName：EvidenceConsole 里那个（隐藏）保留 "perspectiveSwitcher" 契约名,
+    // 此处不复用同名,避免 findChild 歧义。
+    Component { id: livePerspective; PerspectiveSwitcher { } }
     Component { id: liveEventLog;   EventTimeline { } }
     Component { id: livePlayback;   PlaybackControls { queue: eventQueue } }
 

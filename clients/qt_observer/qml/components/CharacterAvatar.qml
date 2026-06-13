@@ -16,7 +16,7 @@ Item {
     property real diameter: 84
 
     readonly property url _art: Illustrations.avatar(roleKey)
-    readonly property bool _hasArt: _art != "" && portrait.status === Image.Ready
+    readonly property bool _hasArt: String(_art) !== "" && portrait.status === Image.Ready
 
     implicitWidth: diameter
     implicitHeight: diameter + 22
