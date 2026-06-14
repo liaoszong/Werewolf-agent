@@ -4,6 +4,11 @@ Status: P2 theater client — live spectating (P2-C theater), match setup / prov
 
 `clients/qt_observer` is the local Qt/QML client that connects to the local observer server (REST/SSE) and provides the spectator surface for Werewolf games: theater view, match setup, settlement report, and history replay/management.
 
+Before creating or redesigning Qt/QML UI, read the root [`DESIGN.md`](../../DESIGN.md).
+It records the current Home + Theater visual language: warm storybook tabletop art,
+parchment HUD cards, dark event rails, antique-gold hairlines, terracotta active states,
+Claude-like cream/coral/ink warmth, and circular role portrait components.
+
 ## Requirements
 
 - Qt 6.8+ (Quick, QuickControls2, Network, Test modules)

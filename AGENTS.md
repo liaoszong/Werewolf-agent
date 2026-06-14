@@ -10,6 +10,7 @@ Telegraph style. Root hard policy only. Read scoped `AGENTS.md` before subtree w
 - **The current module/phase is NOT hardcoded here** — read it from `docs/PROJECT_MAP.md` (phase authority). Do not assume an earlier G-track module is the front. Qt/QML, observer server, emergent engine and settlement are IN scope.
 - Canonical route facts: `docs/PROJECT_MAP.md` (phases) + `docs/ROADMAP.md` / `docs/TASKS.md` (G-track history + task status).
 - Product entry: `README.md`.
+- UI / visual direction: read `DESIGN.md` before creating new UI, redesigning UI, or changing Qt/QML visual style.
 
 ## Skill Routing
 
@@ -27,9 +28,10 @@ Default reads should be small and current:
 
 1. User request and this file.
 2. `README.md`.
-3. Relevant `docs/ROADMAP.md` and `docs/TASKS.md` ranges only.
-4. Active implementation plan, preferably through `docs/generated-context/current-task.ctx.md`.
-5. Exact source/test ranges only when needed.
+3. `DESIGN.md` when the task touches UI, visual design, QML styling, or page redesign.
+4. Relevant `docs/ROADMAP.md` and `docs/TASKS.md` ranges only.
+5. Active implementation plan, preferably through `docs/generated-context/current-task.ctx.md`.
+6. Exact source/test ranges only when needed.
 
 Do not default-read historical material:
 
