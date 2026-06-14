@@ -971,10 +971,15 @@ class QtObserverGameRedesignPhase1Tests(unittest.TestCase):
                               "PaperGrainOverlay", "noise.png", "grain.png"]:
                 self.assertNotIn(forbidden, c, f"{forbidden} forbidden in {rel} (Phase 1)")
 
-    def test_appshell_hides_topbar_only_on_home(self) -> None:
+    def test_appshell_hides_topbar_on_chromeless_views(self) -> None:
         c = (QT / "qml/AppShell.qml").read_text(encoding="utf-8")
-        # topBar visibility gated on home; chip/objectNames preserved
-        self.assertRegex(c, r'currentView\s*!==\s*"home"')
+        # The full-bleed board-game HUDs (home + cockpit + design preview) carry
+        # their own brand chrome; the slim desktop top bar is hidden on them so the
+        # spectator盘面 reaches parent.top (god-view redesign 2026-06-14). The chip
+        # and stack objectNames stay preserved for the (non-chromeless) views.
+        self.assertIn("_chromeless", c)
+        self.assertRegex(c, r'currentView\s*===\s*"cockpit"')
+        self.assertRegex(c, r'currentView\s*===\s*"home"')
         self.assertIn('objectName: "dataSourceChip"', c)
         self.assertIn('objectName: "appShellStack"', c)
 
@@ -1035,7 +1040,9 @@ class QtObserverGameRedesignPhase2Tests(unittest.TestCase):
     def test_cockpit_surface_contract(self) -> None:
         c = (QT / "qml/components/CockpitSurface.qml").read_text(encoding="utf-8")
         self.assertIn('objectName: "cockpitSurface"', c)
-        for comp in ["PhaseBackground", "CharacterAvatar", "PhaseIndicator"]:
+        # god-view HUD redesign 2026-06-14: bare floating CharacterAvatar replaced
+        # by the board-game SeatCard nameplate; right HUD is parchment cards.
+        for comp in ["PhaseBackground", "SeatCard", "PhaseIndicator"]:
             self.assertIn(comp, c)
         self.assertNotIn("ObserverClient", c)        # 表现型:数据经属性
         for slot in ["perspectiveSlot", "eventLogSlot", "auditSlot", "playbackSlot"]:
@@ -1043,6 +1050,45 @@ class QtObserverGameRedesignPhase2Tests(unittest.TestCase):
         for prop in ["property var players", "property var votes", "property int majority", "property string phase"]:
             self.assertIn(prop, c)
         self.assertIn("CockpitSurface.qml", (QT / "CMakeLists.txt").read_text(encoding="utf-8"))
+
+    GODVIEW_HUD_COMPONENTS = [
+        "qml/components/HudCard.qml",
+        "qml/components/PhaseCard.qml",
+        "qml/components/LiveStatusCard.qml",
+        "qml/components/VotesPanel.qml",
+        "qml/components/SeatCard.qml",
+        "qml/components/EventLogPanel.qml",
+        "qml/components/PlaybackBar.qml",
+    ]
+
+    def test_godview_hud_components_registered(self) -> None:
+        # White-screen guard: every new QML in the god-view HUD redesign MUST be
+        # listed in qt_add_qml_module (unregistered QML loads lazily -> blank window).
+        cmake = (QT / "CMakeLists.txt").read_text(encoding="utf-8")
+        for rel in self.GODVIEW_HUD_COMPONENTS:
+            self.assertTrue((QT / rel).exists(), f"missing component: {rel}")
+            name = rel.rsplit("/", 1)[-1]
+            self.assertIn(name, cmake, f"CMakeLists must register {name}")
+
+    def test_seat_card_contract(self) -> None:
+        c = (QT / "qml/components/SeatCard.qml").read_text(encoding="utf-8")
+        self.assertIn('objectName: "seatCard"', c)
+        self.assertIn("Illustrations.avatar(", c)        # role art + fallback
+        for prop in ["roleKey", "seatNumber", "alive", "speaking", "voteCount"]:
+            self.assertIn(prop, c)
+
+    def test_event_log_panel_contract(self) -> None:
+        c = (QT / "qml/components/EventLogPanel.qml").read_text(encoding="utf-8")
+        self.assertIn('objectName: "eventLogPanel"', c)
+        # reads enriched projection for live; previewRows injects static entries
+        self.assertIn("ObserverClient.projectionEvents", c)
+        self.assertIn("previewRows", c)
+
+    def test_parchment_tokens_exist(self) -> None:
+        c = (QT / "qml/Theme.qml").read_text(encoding="utf-8")
+        self.assertIn("property QtObject parchment", c)
+        for tok in ["bgDark", "parchment", "goldLine", "terracotta"]:
+            self.assertRegex(c, r'property color %s' % tok)
 
     def test_home_has_design_preview_entry(self) -> None:
         c = (QT / "qml/HomeView.qml").read_text(encoding="utf-8")

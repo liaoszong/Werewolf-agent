@@ -122,14 +122,16 @@ Item {
 
     // Backdrop + top hairline. Collapsed: transparent (the bar dissolves into the stage);
     // expanded: the raised surface so the log/audit content has a panel to sit on.
+    // Collapsed = a warm parchment strip that blends with the board-game HUD; only
+    // a real expansion drops to the dark technical audit drawer (raw data view).
     Rectangle {
         anchors.fill: parent
-        color: root.mode === 0 ? "transparent" : Theme.color.surface
+        color: root.mode === 0 ? Theme.parchment.parchmentSoft : Theme.color.surface
         Behavior on color { ColorAnimation { duration: Theme.motion.base } }
         Rectangle {
             anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top
             height: 1
-            color: root.mode === 0 ? Theme.withAlpha(Theme.color.border, 0.5) : Theme.color.border
+            color: root.mode === 0 ? Theme.withAlpha(Theme.parchment.goldLine, 0.6) : Theme.color.border
         }
     }
 
@@ -167,16 +169,16 @@ Item {
             spacing: Theme.space.md
             Text {
                 anchors.verticalCenter: parent.verticalCenter
-                text: I18n.t("证据", "Evidence")
-                color: root.mode === 0 ? Theme.color.textMuted : Theme.color.text
+                text: I18n.t("证据 / 审计", "Evidence / Audit")
+                color: root.mode === 0 ? Theme.parchment.ink : Theme.color.text
                 font.family: Theme.font.family
                 font.pixelSize: Theme.size.body
-                font.weight: root.mode === 0 ? Theme.weight.medium : Theme.weight.semibold
+                font.weight: root.mode === 0 ? Theme.weight.semibold : Theme.weight.semibold
             }
             Text {
                 anchors.verticalCenter: parent.verticalCenter
                 text: I18n.t("视角：", "Lens: ") + root.perspective
-                color: Theme.color.textMuted
+                color: root.mode === 0 ? Theme.parchment.mutedInk : Theme.color.textMuted
                 font.family: Theme.font.mono
                 font.pixelSize: Theme.size.micro
             }
@@ -186,10 +188,10 @@ Item {
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
             spacing: Theme.space.xs
-            AppButton { text: I18n.t("收起", "Hide"); variant: root.mode === 0 ? "secondary" : "ghost"; onClicked: root.mode = 0 }
-            AppButton { text: I18n.t("预览", "Peek"); variant: root.mode === 1 ? "secondary" : "ghost"; onClicked: root.mode = 1 }
-            AppButton { text: I18n.t("展开", "Expand"); variant: root.mode === 2 ? "secondary" : "ghost"; onClicked: root.mode = 2 }
-            AppButton { text: I18n.t("审计", "Audit"); variant: root.mode === 3 ? "secondary" : "ghost"; onClicked: root.mode = 3 }
+            AppButton { text: I18n.t("收起", "Hide"); variant: root.mode === 0 ? "secondary" : "ghost"; onLight: root.mode === 0; onClicked: root.mode = 0 }
+            AppButton { text: I18n.t("预览", "Peek"); variant: root.mode === 1 ? "secondary" : "ghost"; onLight: root.mode === 0; onClicked: root.mode = 1 }
+            AppButton { text: I18n.t("展开", "Expand"); variant: root.mode === 2 ? "secondary" : "ghost"; onLight: root.mode === 0; onClicked: root.mode = 2 }
+            AppButton { text: I18n.t("审计", "Audit"); variant: root.mode === 3 ? "secondary" : "ghost"; onLight: root.mode === 0; onClicked: root.mode = 3 }
         }
     }
 

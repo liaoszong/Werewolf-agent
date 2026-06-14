@@ -54,6 +54,13 @@ qt_add_qml_module(appqt_observer
         qml/components/PhaseBackground.qml
         qml/components/PhaseIndicator.qml
         qml/components/CockpitSurface.qml
+        qml/components/HudCard.qml
+        qml/components/PhaseCard.qml
+        qml/components/LiveStatusCard.qml
+        qml/components/VotesPanel.qml
+        qml/components/SeatCard.qml
+        qml/components/EventLogPanel.qml
+        qml/components/PlaybackBar.qml
         qml/components/SeatRing.qml
         qml/components/SettlementSpine.qml
         qml/components/SettlementReport.qml

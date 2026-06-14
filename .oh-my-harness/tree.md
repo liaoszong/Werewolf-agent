@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 541
+- Entries: 594
 
 ```text
 ./
@@ -61,25 +61,58 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   └── writing-plan.md
 ├── clients/
 │   └── qt_observer/
+│       ├── assets/
+│       │   └── illustrations/
+│       │       ├── avatars/
+│       │       │   ├── guard.png
+│       │       │   ├── hunter.png
+│       │       │   ├── seer.png
+│       │       │   ├── villager.png
+│       │       │   ├── werewolf.png
+│       │       │   └── witch.png
+│       │       ├── scene/
+│       │       │   ├── home-day.png
+│       │       │   ├── home-night.png
+│       │       │   ├── table-day.png
+│       │       │   └── table-night.png
+│       │       └── tarot/
+│       │           ├── guard.png
+│       │           ├── hunter.png
+│       │           ├── seer.png
+│       │           ├── villager.png
+│       │           ├── werewolf.png
+│       │           └── witch.png
 │       ├── qml/
 │       │   ├── components/
 │       │   │   ├── AppBackground.qml
 │       │   │   ├── AppButton.qml
 │       │   │   ├── AppCard.qml
 │       │   │   ├── AuditLinksPanel.qml
+│       │   │   ├── CharacterAvatar.qml
+│       │   │   ├── CockpitSurface.qml
 │       │   │   ├── ConfirmDialog.qml
 │       │   │   ├── DataSourceChip.qml
 │       │   │   ├── EmptyState.qml
+│       │   │   ├── EventLogPanel.qml
 │       │   │   ├── EventTimeline.qml
 │       │   │   ├── EvidenceConsole.qml
 │       │   │   ├── GearButton.qml
 │       │   │   ├── GlowDot.qml
+│       │   │   ├── HudCard.qml
+│       │   │   ├── LiveStatusCard.qml
 │       │   │   ├── ModeControl.qml
+│       │   │   ├── NavRail.qml
 │       │   │   ├── PerspectiveSwitcher.qml
+│       │   │   ├── PhaseBackground.qml
+│       │   │   ├── PhaseCard.qml
+│       │   │   ├── PhaseIndicator.qml
 │       │   │   ├── PhaseTimeline.qml
+│       │   │   ├── PlaybackBar.qml
 │       │   │   ├── PlaybackControls.qml
 │       │   │   ├── ProjectionProofPanel.qml
 │       │   │   ├── RoleCard.qml
+│       │   │   ├── SceneBackground.qml
+│       │   │   ├── SeatCard.qml
 │       │   │   ├── SeatEditorPanel.qml
 │       │   │   ├── SeatRing.qml
 │       │   │   ├── SectionHeader.qml
@@ -88,13 +121,15 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       │   │   ├── SpeechTheater.qml
 │       │   │   ├── StatusBadge.qml
 │       │   │   ├── ViewBoundaryBadge.qml
+│       │   │   ├── VotesPanel.qml
 │       │   │   └── WinnerBanner.qml
 │       │   ├── AppShell.qml
+│       │   ├── DesignPreviewView.qml
 │       │   ├── EventPresentationQueue.qml
 │       │   ├── HistoryView.qml
 │       │   ├── HomeView.qml
 │       │   ├── I18n.qml
-│       │   ├── LiveCockpitView.qml
+│       │   ├── Illustrations.qml
 │       │   ├── MatchSetupView.qml
 │       │   ├── PreflightView.qml
 │       │   ├── ProviderSettingsView.qml
@@ -123,7 +158,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   ├── 2026-06-11-engine-visibility-single-source.md
 │   │   ├── 2026-06-11-fake-default-live-gate-testing-strategy.md
 │   │   ├── 2026-06-11-observer-visibility-layering.md
-│   │   └── 2026-06-11-role-facts-single-source.md
+│   │   ├── 2026-06-11-role-facts-single-source.md
+│   │   └── 2026-06-12-perspective-not-access-control-boundary.md
 │   ├── demo/
 │   │   ├── phase1-gold-demo.html
 │   │   ├── phase2-runtime-demo.html
@@ -226,9 +262,13 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   │   ├── 2026-06-11--provider-launcher-mechanical-refactor-plan.md
 │   │   │   ├── 2026-06-11--sys-a2-role-single-source-plan.md
 │   │   │   ├── 2026-06-11--sys-b1-prompt-renderer-registry-plan.md
+│   │   │   ├── 2026-06-12--audit-closeout-rules-invariants-docs-smoke-plan.md
 │   │   │   ├── 2026-06-12--b2-engine-failure-classification-plan.md
 │   │   │   ├── 2026-06-12--c12-score-id-race-plan.md
-│   │   │   └── 2026-06-12--l4-guard-witch-coord-arm-plan.md
+│   │   │   ├── 2026-06-12--l4-guard-witch-coord-arm-plan.md
+│   │   │   ├── 2026-06-12--p3a-replay-data-pipeline-c12-06-a45-7-plan.md
+│   │   │   ├── 2026-06-12-ablation-guardrails-plan.md
+│   │   │   └── 2026-06-13--audit-nongated-remainder-plan.md
 │   │   └── reviews/
 │   │       ├── 2026-06-01--g1c-project-healthcheck-final.md
 │   │       ├── 2026-06-01--g1c-project-healthcheck.md
@@ -259,7 +299,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   │   └── vulture.txt
 │   │   ├── 01-risks-bugs.md
 │   │   ├── 02-slimming-candidates.md
-│   │   └── 03-architecture-optimization.md
+│   │   ├── 03-architecture-optimization.md
+│   │   └── 2026-06-12-system-view-audit.md
 │   ├── prs/
 │   │   ├── 2026-05-30--phase2-next-step-research.md
 │   │   └── 2026-05-30--s5-semantic-label-research.md
@@ -270,8 +311,10 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   └── s5-label-prompts.md
 │   ├── specs/
 │   │   ├── agent-workflow.md
+│   │   ├── board-rule-rulings.md
 │   │   ├── review-guidelines.md
-│   │   └── review-packet-gate.md
+│   │   ├── review-packet-gate.md
+│   │   └── text-injection-channels.md
 │   ├── superpowers/
 │   │   ├── plans/
 │   │   │   ├── 2026-06-07-emergent-role-projection-snapshots.md
@@ -288,7 +331,9 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   │   ├── 2026-06-10-prompt-versioning.md
 │   │   │   ├── 2026-06-10-role-shuffle.md
 │   │   │   ├── 2026-06-11-sys-b1-context-repair.md
-│   │   │   └── 2026-06-11-sys-b4-claim-ledger-vote-scaffold.md
+│   │   │   ├── 2026-06-11-sys-b4-claim-ledger-vote-scaffold.md
+│   │   │   ├── 2026-06-13-game-client-redesign-phase1.md
+│   │   │   └── 2026-06-13-livecockpit-godseye-redesign-phase2.md
 │   │   └── specs/
 │   │       ├── 2026-06-04-g2d-2-qt-setup-ui-design.md
 │   │       ├── 2026-06-04-g2d-prompt-configuration-design.md
@@ -311,7 +356,9 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │       ├── 2026-06-11-l4-guard-arm-design.md
 │   │       ├── 2026-06-11-sys-b3-b5-closeout-design.md
 │   │       ├── 2026-06-11-sys-b4-claim-ledger-vote-scaffold-design.md
-│   │       └── 2026-06-12-l4-guard-witch-coord-arm-design.md
+│   │       ├── 2026-06-12-l4-guard-witch-coord-arm-design.md
+│   │       ├── 2026-06-13-livecockpit-godseye-redesign-phase2-design.md
+│   │       └── 2026-06-13-werewolf-game-client-redesign-design.md
 │   ├── CHECKPOINT_TEMPLATE.md
 │   ├── EVALUATION_RUBRIC.md
 │   ├── GOLD_DEMO.md
@@ -495,6 +542,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── fake_scribe.py
 │   ├── parity_scripts.py
 │   ├── test_ablation_arms.py
+│   ├── test_ablation_guardrails.py
 │   ├── test_ablation_harness_fake.py
 │   ├── test_ablation_metrics.py
 │   ├── test_action_runtime_hunter.py
@@ -507,6 +555,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── test_anthropic_provider.py
 │   ├── test_artifacts.py
 │   ├── test_attribution.py
+│   ├── test_b1204_guard_prompt_floor.py
+│   ├── test_b5_closeout.py
 │   ├── test_build_review_packet.py
 │   ├── test_c3_negative_scan.py
 │   ├── test_consensus_log.py
@@ -534,12 +584,15 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── test_guard_resolver.py
 │   ├── test_guard_sentinels.py
 │   ├── test_guard_visibility.py
+│   ├── test_injection_registry_sentinel.py
 │   ├── test_inline_witch_hunter_failure.py
 │   ├── test_invariants_artifacts.py
 │   ├── test_invariants_bad_examples.py
 │   ├── test_invariants_checker.py
+│   ├── test_invariants_dangling.py
 │   ├── test_invariants_e2e.py
 │   ├── test_invariants_engine_wiring.py
+│   ├── test_invariants_fuzz_engine.py
 │   ├── test_invariants_fuzz.py
 │   ├── test_invariants_guards.py
 │   ├── test_invariants_i8.py
@@ -550,6 +603,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── test_observer_byo_key_launch.py
 │   ├── test_observer_credentials_endpoint.py
 │   ├── test_observer_emergent_bridge.py
+│   ├── test_observer_enrichment.py
 │   ├── test_observer_models_endpoint.py
 │   ├── test_observer_protocol.py
 │   ├── test_observer_routes.py
@@ -581,6 +635,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── test_role_shuffle.py
 │   ├── test_role_single_source.py
 │   ├── test_role_visibility.py
+│   ├── test_rule_rulings.py
 │   ├── test_rules_v1_2.py
 │   ├── test_run_emergent_deepseek_game.py
 │   ├── test_run_emergent_fake_runtime.py
@@ -594,9 +649,11 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── test_settlement_bundle.py
 │   ├── test_settlement_response.py
 │   ├── test_settler_guard_branches.py
+│   ├── test_settler_guard_oracle.py
 │   ├── test_source_labels.py
 │   ├── test_validate_clis.py
 │   ├── test_visibility_parity.py
+│   ├── test_visibility_two_side_sentinel.py
 │   └── test_witch_potion_one_shot_sentinel.py
 ├── tools/
 │   ├── backfill_seer_claim_metrics.py
@@ -606,6 +663,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 ├── .gitignore
 ├── AGENTS.md
 ├── CLAUDE.md
+├── DESIGN.md
 ├── launch-theater.bat
 ├── launch-theater.py
 ├── live-check.bat

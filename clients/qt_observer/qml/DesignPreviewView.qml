@@ -24,10 +24,11 @@ Item {
         { player_id: "8", display_role: "werewolf", display_team: "werewolf", visibility: "visible", alive: true }
     ])
     readonly property var _events: [
-        { t: "00:01", text: I18n.t("第二天开始", "Day 2 begins") },
-        { t: "00:07", text: I18n.t("4 号发言", "Seat 4 speaks") },
-        { t: "00:09", text: I18n.t("4 号 → 5 号", "4 -> 5") },
-        { t: "00:21", text: I18n.t("2 号附议", "2 seconds it") }
+        { tag: "R2 · " + I18n.t("公告", "Notice"), text: I18n.t("第二天开始", "Day 2 begins"), current: false },
+        { tag: "R2 · " + I18n.t("发言", "Speech"), text: I18n.t("p3 像真预言家，p1、p2 抱团更像狼。", "p3 reads as a real Seer; p1, p2 cluster like wolves."), current: false },
+        { tag: "R2 · " + I18n.t("投票", "Vote"), text: "p4 → p5", current: false },
+        { tag: "R2 · " + I18n.t("投票", "Vote"), text: "p2 → p5", current: false },
+        { tag: "R2 · " + I18n.t("发言", "Speech"), text: I18n.t("p5 正在发言，反驳指控。", "p5 is speaking, rebutting the accusation."), current: true }
     ]
 
     Rectangle { anchors.fill: parent; color: Theme.warm.canvas }
@@ -43,7 +44,8 @@ Item {
         votes: root.previewPhase === "voting" ? [ { target: "5", count: 3 }, { target: "1", count: 2 } ] : []
         majority: root.previewPhase === "voting" ? 4 : 0
         dataSourceText: I18n.t("设计样例", "Design Sample")
-        perspectiveText: I18n.t("上帝视角", "God's-Eye")
+        perspectiveText: I18n.t("视角：god", "View: god")
+        live: true
         perspectiveSlot: stubPerspective
         eventLogSlot: stubEventLog
         auditSlot: stubAudit
@@ -58,7 +60,7 @@ Item {
             color: Theme.withAlpha(Theme.warm.surfaceRaised, 0.9); border.width: 1; border.color: Theme.warm.hairline
             Text {
                 anchors.centerIn: parent
-                text: I18n.t("视角:上帝视角 ▾", "View: God's-Eye ▾")
+                text: I18n.t("视角：上帝视角  ▼", "View: God's-Eye  ▼")
                 color: Theme.warm.muted
                 font.family: Theme.fontFamilies.sans; font.contextFontMerging: true; font.pixelSize: Theme.size.micro
             }
@@ -66,17 +68,7 @@ Item {
     }
     Component {
         id: stubEventLog
-        ListView {
-            model: root._events; spacing: Theme.space.xs; clip: true
-            delegate: Row {
-                spacing: Theme.space.sm
-                Text { text: modelData.t; color: Theme.warm.muted; font.family: Theme.fontFamilies.mono; font.pixelSize: Theme.size.micro }
-                Text {
-                    text: modelData.text; color: Theme.warm.body
-                    font.family: Theme.fontFamilies.sans; font.contextFontMerging: true; font.pixelSize: Theme.size.caption
-                }
-            }
-        }
+        EventLogPanel { live: true; previewRows: root._events }
     }
     Component {
         id: stubAudit
@@ -93,21 +85,24 @@ Item {
     }
     Component {
         id: stubPlayback
-        Rectangle {
-            implicitHeight: 36; radius: Theme.radius.md
-            color: Theme.withAlpha(Theme.warm.surfaceRaised, 0.92); border.width: 1; border.color: Theme.warm.primary
-            Text {
-                anchors.centerIn: parent
-                text: "▶   ⏸   1x  2x  4x"
-                color: Theme.warm.ink
-                font.family: Theme.fontFamilies.sans; font.contextFontMerging: true; font.pixelSize: Theme.size.caption
+        // Static preview: a fake queue so the segmented speed control shows a
+        // highlighted "2x" without a backend EventPresentationQueue.
+        PlaybackBar {
+            queue: QtObject {
+                property bool playing: true
+                property int speed: 2
+                property bool instant: false
+                property bool waiting: false
+                function play() {} function pause() {}
+                function setSpeed(v) {} function setInstant() {}
+                function seekNextPhase() {} function seekQueueEnd() {}
             }
         }
     }
 
-    // 昼/夜/投票/(8座)切换(预览专用)
+    // 昼/夜/投票/(8座)切换(预览专用)。抬高到回放条之上,避免与底部控制条重叠。
     Row {
-        anchors { bottom: parent.bottom; horizontalCenter: parent.horizontalCenter; bottomMargin: Theme.space.lg }
+        anchors { bottom: parent.bottom; horizontalCenter: parent.horizontalCenter; bottomMargin: 84 }
         spacing: Theme.space.sm
         Repeater {
             model: [ { k: "day", t: I18n.t("白天", "Day") }, { k: "night", t: I18n.t("黑夜", "Night") }, { k: "voting", t: I18n.t("投票", "Voting") } ]

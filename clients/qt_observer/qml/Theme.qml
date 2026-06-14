@@ -115,6 +115,39 @@ QtObject {
         readonly property color error: "#c64545"
     }
 
+    // ---------------------------------- Parchment HUD palette (god-view redesign)
+    // ADDITIVE. The hand-drawn board-game spectator HUD: a deep warm-black side
+    // panel with gold hairlines, parchment cards over the wooden table, terracotta
+    // for LIVE / current-event / vote emphasis. Identity colours stay SMALL-area
+    // only (a seat-card icon, a vote badge) — never a large fill.
+    readonly property QtObject parchment: QtObject {
+        // Dark side-panel (left Event Log) — deep warm espresso, not pure black.
+        readonly property color bgDark: "#211a13"
+        readonly property color bgDarkElevated: "#2b2218"
+        readonly property color bgDarkInset: "#181208"      // entry wells / footer
+        // Parchment surfaces (entries, right-HUD cards) over wood / on dark.
+        readonly property color parchment: "#efe4cb"
+        readonly property color parchmentSoft: "#f6efdc"
+        readonly property color parchmentStrong: "#e6d8b8"
+        // Ink (warm near-black) + muted, reused from the warm ramp for consistency.
+        readonly property color ink: "#2a2118"
+        readonly property color inkSoft: "#54483a"
+        readonly property color mutedInk: "#8a7a63"
+        // Gold filigree hairlines (the signature decorative line).
+        readonly property color goldLine: "#b8975a"
+        readonly property color goldLineSoft: "#8a6d3c"
+        readonly property color goldText: "#d8b878"          // labels on the dark panel
+        // Terracotta — LIVE dot, current-event highlight, vote path + emphasis.
+        readonly property color terracotta: "#cc785c"
+        readonly property color terracottaDeep: "#b2543a"
+        readonly property color terracottaWash: "#f0d6c6"    // current-event row tint
+        // Seat status accents (small-area).
+        readonly property color alive: "#6f8f5a"             // muted sage "ALIVE"
+        readonly property color eliminated: "#a85b48"        // muted "ELIMINATED"
+        readonly property color textOnDark: "#f3ead4"
+        readonly property color textOnDarkSoft: "#b6a684"
+    }
+
     // Day / night phase surfaces (extracted from the home-scene illustrations).
     readonly property QtObject phase: QtObject {
         readonly property QtObject day: QtObject {

@@ -45,10 +45,15 @@ Item {
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.right: parent.right
-        // Home is a full-bleed warm hub with its own NavRail/chrome; hide the slim
-        // top bar there (and collapse its height) so HomeView reaches parent.top.
-        visible: root.currentView !== "home"
-        height: root.currentView !== "home" ? 52 : 0
+        // Home is a full-bleed warm hub with its own NavRail/chrome; the god-view
+        // cockpit + design preview are full-bleed board-game HUDs that carry their
+        // own brand block in the left panel. Hide the slim desktop top bar on all
+        // three so the spectator盘面 reaches parent.top (no generic toolbar).
+        readonly property bool _chromeless: root.currentView === "home"
+                                            || root.currentView === "cockpit"
+                                            || root.currentView === "designPreview"
+        visible: !_chromeless
+        height: !_chromeless ? 52 : 0
 
         Row {
             anchors.left: parent.left

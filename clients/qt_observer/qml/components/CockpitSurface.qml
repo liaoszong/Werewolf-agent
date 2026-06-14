@@ -1,8 +1,10 @@
 import QtQuick
 import qt_observer
 
-// 表现型直播面:左 20% 实体列(品牌/数据源/视角/事件流/审计) + 右 80%(PhaseBackground +
-// 椭圆头像环 + 悬浮 阶段/票数/倍速 + 多数线)。数据/控件全经属性与插槽注入,不直连后端 client。
+// 上帝视角圆桌观战盘面（手绘桌游 HUD 重做）。左 = 深色羊皮纸 Event Log 面板；
+// 右 80% = 木桌背景 + SeatCard 座位铭牌环 + 右纵向 HUD（阶段卡/直播/当前票数）+
+// 底部嵌入式回放控制条 + 桌面方向性投票线。数据/控件全经属性与插槽注入，绝不直连后端。
+// 契约逐字保留：properties / slots / cx,cy,ringRx,ringRy,depthK / _angle / _o6 不变。
 Item {
     id: root
     objectName: "cockpitSurface"
@@ -13,42 +15,40 @@ Item {
     property string phase: "day"
     property int round: 1
     property var votes: []
-    // 展示用:按票数降序(队列只给未排序聚合;排序属表现层)
+    // 展示用：按票数降序(队列只给未排序聚合;排序属表现层)
     readonly property var _votesSorted: (votes || []).slice().sort(function (a, b) { return b.count - a.count })
     property int majority: 0
     property string dataSourceText: ""
     property string perspectiveText: ""
+    property bool live: false
     property Component perspectiveSlot: null
     property Component eventLogSlot: null
     property Component auditSlot: null
     property Component playbackSlot: null
     signal backRequested()
 
-    // 椭圆落位 = 背景图(table-day.png)自身比例,对齐画里的桌沿(待真机微调)。
-    // cx/cy = 桌心在图中的比例;ringRx/ringRy = 头像环半径占图宽/高比例。
+    // 椭圆落位 = 背景图(table-day.png)自身比例，对齐画里的桌沿(待真机微调)。
     property real cx: 0.40
     property real cy: 0.55
-    property real ringRx: 0.30
-    property real ringRy: 0.27
+    property real ringRx: 0.275
+    property real ringRy: 0.26
     property real depthK: 0.18
 
-    // 像素级落位:绑定到 PhaseBackground 实际绘制出的图矩形(paintedX/Y/W/H),
-    // 这样无论窗口/aspect 怎么变,头像永远落在画里的桌沿上。
+    // 像素级落位：绑定到 PhaseBackground 实际绘制出的图矩形。
     readonly property real _cxPix: bg.paintedX + bg.paintedW * cx
     readonly property real _cyPix: bg.paintedY + bg.paintedH * cy
     readonly property real _rxPix: bg.paintedW * ringRx
     readonly property real _ryPix: bg.paintedH * ringRy
     readonly property real _avSize: bg.paintedW * 0.10
 
-    // 逐座微调(fraction of paintedW/H):手绘透视桌不是完美椭圆,按座位位置(非角色)
-    // 把个别座位推到画里的实际座位上。仅 6 座(当前唯一真实局型)生效;其它座数走纯椭圆。
+    // 逐座微调(fraction of paintedW/H)：手绘透视桌不是完美椭圆。仅 6 座生效。
     readonly property var _o6: [
-        { dx: -0.03, dy: -0.045 }, // 顶:狼人位 — 上+左(狼人再上移一点)
+        { dx: -0.03, dy: -0.045 }, // 顶:狼人位
         { dx:  0.00, dy:  0.00 },  // 右上:预言家位
         { dx:  0.00, dy:  0.00 },  // 右下:女巫位
-        { dx: -0.02, dy:  0.00 },  // 底:村民位 — 左(同守卫幅度)
-        { dx: -0.02, dy:  0.00 },  // 左下:守卫位 — 略左
-        { dx: -0.06, dy:  0.01 }   // 左上:猎人位 — 更左(到守卫左侧)+ 下到桌沿
+        { dx: -0.02, dy:  0.00 },  // 底:村民位
+        { dx: -0.02, dy:  0.00 },  // 左下:守卫位
+        { dx: -0.06, dy:  0.01 }   // 左上:猎人位
     ]
     function _offX(i) { return (players.length === 6 && _o6[i]) ? _o6[i].dx : 0 }
     function _offY(i) { return (players.length === 6 && _o6[i]) ? _o6[i].dy : 0 }
@@ -62,16 +62,65 @@ Item {
         })
         return m[role] || role
     }
+    function _voteCountFor(pid) {
+        for (var i = 0; i < (votes ? votes.length : 0); i++)
+            if (votes[i].target === pid) return votes[i].count
+        return 0
+    }
+    // Vote rows enriched with a faction accent for the Current Votes panel.
+    readonly property var _voteRows: {
+        var out = []
+        for (var i = 0; i < _votesSorted.length; i++) {
+            var v = _votesSorted[i]
+            var acc = Theme.parchment.mutedInk
+            for (var j = 0; j < players.length; j++)
+                if (players[j] && players[j].player_id === v.target
+                        && players[j].display_role && players[j].display_role !== "unknown") {
+                    acc = Theme.roleAccent(players[j].display_role); break
+                }
+            out.push({ target: v.target, count: v.count, accent: acc })
+        }
+        return out
+    }
 
     Rectangle { anchors.fill: parent; color: Theme.warm.canvas }
 
-    // ===== 左区 20% =====
+    // ===================== 左区：深色羊皮纸 Event Log 面板 =====================
     Rectangle {
         id: leftCol
         anchors { left: parent.left; top: parent.top; bottom: parent.bottom }
         width: Math.max(340, parent.width * 0.20)
-        color: Theme.warm.surfaceCard
-        Rectangle { anchors.right: parent.right; width: 1; height: parent.height; color: Theme.warm.hairline }
+        color: Theme.parchment.bgDark
+        // Gold hairline on the inner edge.
+        Rectangle { anchors.right: parent.right; width: 1; height: parent.height; color: Theme.withAlpha(Theme.parchment.goldLine, 0.5) }
+
+        // Compact 中/EN toggle folded into the panel (the global top bar is hidden
+        // on the cockpit). I18n is a module-global singleton — flipping it here is
+        // presentational, no backend coupling.
+        Row {
+            anchors { right: parent.right; top: parent.top; margins: Theme.space.md }
+            spacing: 0
+            z: 5
+            Repeater {
+                model: [{ code: "zh", label: "中" }, { code: "en", label: "EN" }]
+                delegate: Rectangle {
+                    required property var modelData
+                    width: 26; height: 20
+                    radius: Theme.radius.sm
+                    color: I18n.lang === modelData.code ? Theme.withAlpha(Theme.parchment.goldLine, 0.22) : "transparent"
+                    Text {
+                        anchors.centerIn: parent
+                        text: modelData.label
+                        color: I18n.lang === modelData.code ? Theme.parchment.goldText : Theme.parchment.textOnDarkSoft
+                        font.family: Theme.fontFamilies.sans; font.contextFontMerging: true
+                        font.pixelSize: Theme.size.micro
+                        font.weight: I18n.lang === modelData.code ? Theme.weight.bold : Theme.weight.regular
+                    }
+                    TapHandler { onTapped: I18n.lang = modelData.code }
+                    HoverHandler { cursorShape: Qt.PointingHandCursor }
+                }
+            }
+        }
 
         Column {
             id: leftStack
@@ -79,42 +128,109 @@ Item {
             anchors.margins: Theme.space.lg
             spacing: Theme.space.md
 
-            Text {
-                text: I18n.t("上帝视角观察", "God's-Eye Observer")
-                color: Theme.warm.ink
-                font.family: Theme.fontFamilies.serif; font.contextFontMerging: true
-                font.pixelSize: Theme.warmSize.titleMd; font.weight: Theme.weight.bold
+            // ---- Brand block (replaces the generic top toolbar) ----
+            Row {
+                width: parent.width
+                spacing: Theme.space.sm
+                Rectangle {
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 34; height: 34; radius: 17
+                    color: "transparent"
+                    border.width: 1.5; border.color: Theme.parchment.goldLine
+                    Text { anchors.centerIn: parent; text: "◉"; color: Theme.parchment.goldText; font.pixelSize: 16 }
+                }
+                Column {
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: 0
+                    Text {
+                        text: I18n.t("上帝视角观察", "GOD'S-EYE OBSERVER")
+                        color: Theme.parchment.textOnDark
+                        font.family: Theme.fontFamilies.serif; font.contextFontMerging: true
+                        font.pixelSize: Theme.warmSize.titleMd; font.weight: Theme.weight.bold; font.letterSpacing: 1
+                    }
+                    Text {
+                        text: I18n.t("AI 对抗 · 社会推理", "AI vs AI · Social Deduction")
+                        color: Theme.parchment.textOnDarkSoft
+                        font.family: Theme.fontFamilies.sans; font.contextFontMerging: true
+                        font.pixelSize: Theme.size.micro; font.letterSpacing: 1
+                    }
+                }
             }
-            AppButton {
-                objectName: "cockpitBackButton"
-                text: I18n.t("← 返回", "← Back"); variant: "ghost"; onLight: true
-                onClicked: root.backRequested()
+
+            Rectangle { width: parent.width; height: 1; color: Theme.withAlpha(Theme.parchment.goldLine, 0.35) }
+
+            // ---- Back + run meta ----
+            Row {
+                width: parent.width
+                spacing: Theme.space.md
+                Rectangle {
+                    objectName: "cockpitBackButton"
+                    height: 28; width: backText.implicitWidth + Theme.space.lg
+                    radius: Theme.radius.sm
+                    color: backHover.hovered ? Theme.withAlpha(Theme.parchment.goldLine, 0.16) : "transparent"
+                    border.width: 1; border.color: Theme.withAlpha(Theme.parchment.goldLine, 0.6)
+                    Text {
+                        id: backText; anchors.centerIn: parent
+                        text: I18n.t("← 返回", "← Back")
+                        color: Theme.parchment.goldText
+                        font.family: Theme.fontFamilies.sans; font.contextFontMerging: true; font.pixelSize: Theme.size.caption
+                    }
+                    HoverHandler { id: backHover; cursorShape: Qt.PointingHandCursor }
+                    TapHandler { onTapped: root.backRequested() }
+                }
+                Column {
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: 0
+                    Text {
+                        visible: root.dataSourceText !== ""
+                        text: root.dataSourceText
+                        color: Theme.parchment.textOnDarkSoft
+                        font.family: Theme.fontFamilies.mono; font.pixelSize: Theme.size.micro
+                    }
+                    Text {
+                        visible: root.perspectiveText !== ""
+                        text: root.perspectiveText
+                        color: Theme.parchment.textOnDarkSoft
+                        font.family: Theme.fontFamilies.sans; font.contextFontMerging: true; font.pixelSize: Theme.size.micro
+                    }
+                }
             }
-            Text {
-                visible: root.dataSourceText !== ""
-                text: root.dataSourceText
-                color: Theme.warm.muted
-                font.family: Theme.fontFamilies.mono; font.pixelSize: Theme.size.micro
-            }
-            Text {
-                visible: root.perspectiveText !== ""
-                text: root.perspectiveText
-                color: Theme.warm.muted
-                font.family: Theme.fontFamilies.sans; font.contextFontMerging: true
-                font.pixelSize: Theme.size.micro
-            }
+
             Loader { width: parent.width; sourceComponent: root.perspectiveSlot }
+
             Loader {
                 id: eventLogLoader
                 width: parent.width
-                height: Math.max(0, leftStack.height - y - auditLoader.height - leftStack.spacing)
+                height: Math.max(0, leftStack.height - y - footer.height - leftStack.spacing)
                 sourceComponent: root.eventLogSlot
             }
-            Loader { id: auditLoader; width: parent.width; sourceComponent: root.auditSlot }
+
+            // ---- Footer: spectating + audit slot ----
+            Column {
+                id: footer
+                width: parent.width
+                spacing: Theme.space.sm
+                Rectangle { width: parent.width; height: 1; color: Theme.withAlpha(Theme.parchment.goldLine, 0.35) }
+                Row {
+                    spacing: Theme.space.sm
+                    Rectangle {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 7; height: 7; radius: 3.5; color: Theme.parchment.terracotta
+                    }
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: root.live ? I18n.t("观战直播中", "SPECTATING LIVE") : I18n.t("回放观战", "REPLAY")
+                        color: Theme.parchment.textOnDarkSoft
+                        font.family: Theme.fontFamilies.sans; font.contextFontMerging: true
+                        font.pixelSize: Theme.size.micro; font.letterSpacing: 1.5
+                    }
+                }
+                Loader { width: parent.width; sourceComponent: root.auditSlot }
+            }
         }
     }
 
-    // ===== 右区 80% =====
+    // ===================== 右区 80%：木桌主舞台 =====================
     Item {
         id: stage
         anchors { left: leftCol.right; top: parent.top; right: parent.right; bottom: parent.bottom }
@@ -122,20 +238,11 @@ Item {
 
         PhaseBackground { id: bg; anchors.fill: parent; phase: root.phase }
 
-        PhaseIndicator {
-            phase: root.phase; round: root.round
-            x: root._cxPix - width / 2
-            y: root._cyPix - height / 2
-        }
-
-        // 投票/行动箭头(座位间珊瑚虚线;Task 7 细化朝向)
+        // 桌面方向性投票线（细、克制；从桌心指向被投目标，领先者更实）。
         Canvas {
             id: arrows
             anchors.fill: parent
             property var v: root.votes
-            // Repaint when votes OR the painted background rect changes — seat coords derive
-            // from bg.paintedW/H, which flip 0→actual on async image load without changing the
-            // (anchors.fill) Canvas size; without these the rings stay at fallback geometry.
             property real pw: bg.paintedW
             property real ph: bg.paintedH
             onVChanged: requestPaint()
@@ -154,118 +261,102 @@ Item {
             }
             onPaint: {
                 var ctx = getContext("2d"); ctx.reset()
-                if (!root.votes) return
-                // 每个被投目标画一圈珊瑚虚线环,半径随票数增大;领先者填充更实。
+                if (!root.votes || root.votes.length === 0) return
                 var lead = 0
                 for (var m = 0; m < root.votes.length; m++)
                     if (root.votes[m].count > lead) lead = root.votes[m].count
+                var cxp = root._cxPix, cyp = root._cyPix
                 for (var k = 0; k < root.votes.length; k++) {
-                    var v = root.votes[k]
-                    var pt = _seatPt(v.target)
+                    var vt = root.votes[k]
+                    var pt = _seatPt(vt.target)
                     if (!pt) continue
-                    var rad = root._avSize * 0.62 + v.count * (root._avSize * 0.10)
-                    ctx.strokeStyle = Theme.warm.primary
-                    ctx.lineWidth = (v.count === lead && lead > 0) ? 4 : 2
-                    ctx.setLineDash([7, 5])
-                    ctx.globalAlpha = (v.count === lead && lead > 0) ? 0.9 : 0.55
-                    ctx.beginPath(); ctx.arc(pt.x, pt.y, rad, 0, 2 * Math.PI); ctx.stroke()
+                    var isLead = (vt.count === lead && lead > 0)
+                    // Stop short of the seat card so the line points at it, not through it.
+                    var dx = pt.x - cxp, dy = pt.y - cyp
+                    var len = Math.sqrt(dx * dx + dy * dy) || 1
+                    var endx = pt.x - dx / len * (root._avSize * 0.62)
+                    var endy = pt.y - dy / len * (root._avSize * 0.62)
+                    ctx.strokeStyle = Theme.parchment.terracotta
+                    ctx.lineWidth = isLead ? 2.4 : 1.4
+                    ctx.globalAlpha = isLead ? 0.8 : 0.4
+                    ctx.setLineDash(isLead ? [] : [6, 5])
+                    // gentle curve via quadratic control offset perpendicular
+                    var mx = (cxp + endx) / 2, my = (cyp + endy) / 2
+                    var nx = -dy / len, ny = dx / len
+                    var bow = len * 0.10
+                    ctx.beginPath()
+                    ctx.moveTo(cxp, cyp)
+                    ctx.quadraticCurveTo(mx + nx * bow, my + ny * bow, endx, endy)
+                    ctx.stroke()
+                    // small arrowhead
+                    ctx.setLineDash([])
+                    var ang = Math.atan2(endy - (my + ny * bow), endx - (mx + nx * bow))
+                    var ah = root._avSize * 0.16
+                    ctx.beginPath()
+                    ctx.moveTo(endx, endy)
+                    ctx.lineTo(endx - ah * Math.cos(ang - 0.4), endy - ah * Math.sin(ang - 0.4))
+                    ctx.moveTo(endx, endy)
+                    ctx.lineTo(endx - ah * Math.cos(ang + 0.4), endy - ah * Math.sin(ang + 0.4))
+                    ctx.stroke()
                 }
             }
         }
 
-        // 椭圆头像环
+        // 桌心阶段徽记
+        PhaseIndicator {
+            phase: root.phase; round: root.round
+            x: root._cxPix - width / 2
+            y: root._cyPix - height / 2
+        }
+
+        // 椭圆座位铭牌环
         Repeater {
             model: root.players
-            delegate: CharacterAvatar {
+            delegate: SeatCard {
                 readonly property real _th: root._angle(index, root.players.length)
                 readonly property real _sin: Math.sin(_th)
-                diameter: root._avSize * (1 + root.depthK * _sin)
+                cardW: root._avSize * 1.4 * (1 + root.depthK * _sin)
                 x: root._cxPix + root._rxPix * Math.cos(_th) + bg.paintedW * root._offX(index) - width / 2
-                y: root._cyPix + root._ryPix * _sin + bg.paintedH * root._offY(index) - diameter / 2
+                y: root._cyPix + root._ryPix * _sin + bg.paintedH * root._offY(index) - implicitHeight / 2
                 z: 10 + _sin
                 roleKey: (modelData.display_role && modelData.display_role !== "unknown") ? modelData.display_role : ""
                 roleLabel: roleKey ? root._roleName(modelData.display_role) : ""
                 seatLabel: modelData.player_id
-                accent: roleKey ? Theme.roleAccent(modelData.display_role) : Theme.warm.hairline
+                seatNumber: index + 1
+                accent: roleKey ? Theme.roleAccent(modelData.display_role) : Theme.parchment.goldLine
                 alive: root.deadIds.indexOf(modelData.player_id) < 0
                 speaking: root.speakingId === modelData.player_id
+                voteCount: root._voteCountFor(modelData.player_id)
             }
         }
 
-        // 悬浮:阶段(右上)
-        Rectangle {
-            id: phaseChip
+        // ---- 右纵向 HUD 栈 ----
+        Column {
+            id: hud
             anchors { right: parent.right; top: parent.top; margins: Theme.space.lg }
-            width: stage.width * 0.28
-            implicitHeight: phaseChipText.implicitHeight + Theme.space.md
-            radius: Theme.radius.lg
-            color: Theme.withAlpha(Theme.warm.surfaceRaised, 0.9)
-            border.width: 1; border.color: Theme.warm.hairline
-            Text {
-                id: phaseChipText; anchors.centerIn: parent
-                text: (root.phase === "night" ? "☾ " + I18n.t("黑夜", "Night") : "☀ " + I18n.t("白天", "Day"))
-                      + " · " + I18n.t("第 ", "R") + root.round
-                color: Theme.warm.ink
-                font.family: Theme.fontFamilies.sans; font.contextFontMerging: true
-                font.pixelSize: Theme.size.caption
+            width: Math.min(258, stage.width * 0.25)
+            spacing: Theme.space.md
+
+            PhaseCard { width: parent.width; phase: root.phase; round: root.round }
+            LiveStatusCard {
+                width: parent.width
+                liveText: root.dataSourceText
+                live: root.live
+                perspectiveLabel: root.perspectiveText
+            }
+            VotesPanel {
+                width: parent.width
+                visible: root._voteRows.length > 0
+                rows: root._voteRows
+                majority: root.majority
             }
         }
 
-        // 悬浮:当前票数(右)
-        Rectangle {
-            id: votesPanel
-            anchors { right: parent.right; top: phaseChip.bottom; topMargin: Theme.space.sm; rightMargin: Theme.space.lg }
-            width: stage.width * 0.28
-            implicitHeight: votesCol.implicitHeight + Theme.space.lg
-            radius: Theme.radius.lg
-            color: Theme.withAlpha(Theme.warm.surfaceRaised, 0.9)
-            border.width: 1; border.color: Theme.warm.hairline
-            visible: root._votesSorted.length > 0
-            Column {
-                id: votesCol
-                anchors { left: parent.left; right: parent.right; top: parent.top; margins: Theme.space.md }
-                spacing: 2
-                Text {
-                    text: I18n.t("当前票数", "Current Votes")
-                    color: Theme.warm.primary
-                    font.family: Theme.fontFamilies.sans; font.contextFontMerging: true
-                    font.pixelSize: Theme.size.micro; font.weight: Theme.weight.bold
-                }
-                Repeater {
-                    model: root._votesSorted
-                    delegate: Text {
-                        text: modelData.target + "  ●×" + modelData.count
-                        color: Theme.warm.body
-                        font.family: Theme.fontFamilies.sans; font.contextFontMerging: true
-                        font.pixelSize: Theme.size.caption
-                    }
-                }
-            }
-        }
-
-        // 悬浮:倍速/播放(右,票数下)— 宿主插槽
+        // ---- 底部居中：嵌入式回放控制条（宿主插槽）----
         Loader {
-            anchors { right: parent.right; top: votesPanel.bottom; topMargin: Theme.space.sm; rightMargin: Theme.space.lg }
-            width: stage.width * 0.28
+            id: playbackHost
+            anchors { bottom: parent.bottom; horizontalCenter: parent.horizontalCenter; bottomMargin: Theme.space.lg }
             sourceComponent: root.playbackSlot
-        }
-
-        // 底部居中:多数线
-        Rectangle {
-            visible: root.majority > 0
-            anchors { bottom: parent.bottom; bottomMargin: Theme.space.lg }
-            x: root._cxPix - width / 2
-            implicitWidth: majText.implicitWidth + Theme.space.xxxl
-            implicitHeight: majText.implicitHeight + Theme.space.sm
-            radius: Theme.radius.pill
-            color: Theme.withAlpha(Theme.warm.surfaceDark, 0.55)
-            Text {
-                id: majText; anchors.centerIn: parent
-                text: "──  " + I18n.t("多数线 ", "Majority ") + root.majority + "  ──"
-                color: Theme.warm.canvas
-                font.family: Theme.fontFamilies.sans; font.contextFontMerging: true
-                font.pixelSize: Theme.size.caption
-            }
         }
     }
 }
