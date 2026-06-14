@@ -18,9 +18,9 @@ Item {
     readonly property real paintedY: (height - paintedH) / 2
 
     // The new table art is a soft watercolor vignette that dissolves into warm cream
-    // paper at its edges; this fallback fill matches that cream (#f5e3c1) so the
-    // PreserveAspectFit letterbox blends seamlessly into one continuous storybook
-    // page — no visible top/bottom bands.
+    // paper at its edges; this fallback fill matches that cream so that, while the art
+    // loads (or if it is missing), the PreserveAspectCrop board blends seamlessly into
+    // one continuous storybook page — no visible seams.
     Rectangle {
         anchors.fill: parent
         gradient: Gradient {

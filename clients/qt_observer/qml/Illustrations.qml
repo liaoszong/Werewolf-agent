@@ -15,21 +15,12 @@ QtObject {
     readonly property url tableNight: Qt.resolvedUrl("../assets/illustrations/scene/table-night.png")
 
     // Material-system textures (subtle overlays; render in screenshots, unlike GPU
-    // shadow effects). parchment/headerWeave = paper/cloth grain; vignette/glow =
-    // night lighting (peripheral darkening + warm centre focus).
+    // shadow effects). parchment = paper grain; headerWeave = cloth grain.
+    // (Night vignette / warm-glow overlays and the ornamental band/tray frames were
+    // retired with the full-bleed watercolor board — lighting is now baked into the
+    // table art and the HUD floats as parchment cards, no header/tray plaques.)
     readonly property url texParchment: Qt.resolvedUrl("../assets/textures/parchment.png")
     readonly property url texHeaderWeave: Qt.resolvedUrl("../assets/textures/header-weave.png")
-    readonly property url texNightVignette: Qt.resolvedUrl("../assets/textures/night-vignette.png")
-    readonly property url texWarmGlow: Qt.resolvedUrl("../assets/textures/warm-glow.png")
-
-    // Ornamental band/tray frames (gold-filigree plaques) — used as 9-slice
-    // BorderImage backgrounds for the top header (day/night) and bottom control tray.
-    readonly property url bandDay: Qt.resolvedUrl("../assets/ornament/band-day.png")
-    readonly property url bandNight: Qt.resolvedUrl("../assets/ornament/band-night.png")
-    readonly property url tray: Qt.resolvedUrl("../assets/ornament/tray.png")
-    function band(phaseName) {
-        return ("" + phaseName).toLowerCase() === "night" ? bandNight : bandDay
-    }
 
     readonly property var _avatar: ({
         "werewolf": Qt.resolvedUrl("../assets/illustrations/avatars/werewolf.png"),

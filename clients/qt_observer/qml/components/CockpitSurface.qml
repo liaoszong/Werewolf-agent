@@ -47,12 +47,6 @@ Item {
     readonly property real _ryPix: bg.paintedH * ringRy
     readonly property real _avSize: bg.paintedW * 0.10
 
-    // PreserveAspectFit letterbox bands (top/bottom). We deliberately KEEP the fit
-    // (no crop, no stretch) and absorb the empty bands with floating HUD: the top
-    // band hosts the phase timeline, the bottom band hosts the playback controls.
-    readonly property real _topBandH: bg.paintedY
-    readonly property real _botBandH: stage.height - (bg.paintedY + bg.paintedH)
-
     // 逐座微调(fraction of paintedW/H)：手绘透视桌不是完美椭圆。仅 6 座生效。
     // Per-seat nudges re-tuned for the new centered table (symmetric -> near zero).
     readonly property var _o6: [
@@ -364,9 +358,6 @@ Item {
                 voteCount: root._voteCountFor(modelData.player_id)
             }
         }
-
-        // 右侧（绘制区）外边距 = 桌面绘制右沿到舞台右沿的留白(通常为 0,fit 到宽时)
-        readonly property real _rightGap: stage.width - (bg.paintedX + bg.paintedW)
 
         // ---- 浮动阶段卡（满幅盘面上,无水平带底板）：阶段标题 · 仪表时间轴 · LIVE ----
         // 背景已满幅铺(PreserveAspectCrop),无 letterbox,故不再需要顶/底装饰横带。
