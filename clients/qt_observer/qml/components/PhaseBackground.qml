@@ -1,9 +1,10 @@
 import QtQuick
 import qt_observer
 
-// 圆桌房间背景:table-day/night 随 phase 交叉淡入。PreserveAspectFit 保住原图构图
-// (桌子偏左 + 右留白不被裁掉)。暴露实际绘制矩形 painted*,供上层把头像环精确对到画里的桌沿。
-// 资产缺失 → phase 暖渐变兜底。
+// 圆桌房间背景:table-day/night 随 phase 交叉淡入。PreserveAspectCrop 满幅铺盘面(无
+// letterbox 空带),新水彩图四边自带奶油晕染,裁到的边仍是奶油纸,无突兀硬边。暴露实际
+// 绘制矩形 painted*(Crop 下为覆盖缩放尺寸,offset 可为负),供上层把头像环对到画里的桌沿。
+// 资产缺失 → 奶油兜底。
 Item {
     id: root
     objectName: "phaseBackground"
@@ -16,47 +17,30 @@ Item {
     readonly property real paintedX: (width - paintedW) / 2
     readonly property real paintedY: (height - paintedH) / 2
 
+    // The new table art is a soft watercolor vignette that dissolves into warm cream
+    // paper at its edges; this fallback fill matches that cream (#f5e3c1) so the
+    // PreserveAspectFit letterbox blends seamlessly into one continuous storybook
+    // page — no visible top/bottom bands.
     Rectangle {
         anchors.fill: parent
         gradient: Gradient {
-            GradientStop { position: 0.0; color: root._night ? Theme.phase.night.sky : Theme.phase.day.bg }
-            GradientStop { position: 1.0; color: root._night ? Theme.warm.surfaceDark : Theme.phase.day.ambient }
+            GradientStop { position: 0.0; color: "#f6e6c6" }
+            GradientStop { position: 1.0; color: "#f1ddb6" }
         }
     }
     Image {
         id: dayImg; anchors.fill: parent
-        source: Illustrations.tableDay; fillMode: Image.PreserveAspectFit
+        source: Illustrations.tableDay; fillMode: Image.PreserveAspectCrop
         opacity: (!root._night && status === Image.Ready) ? 1 : 0
         Behavior on opacity { NumberAnimation { duration: Theme.motion.base } }
     }
     Image {
         id: nightImg; anchors.fill: parent
-        source: Illustrations.tableNight; fillMode: Image.PreserveAspectFit
+        source: Illustrations.tableNight; fillMode: Image.PreserveAspectCrop
         opacity: (root._night && status === Image.Ready) ? 1 : 0
         Behavior on opacity { NumberAnimation { duration: Theme.motion.base } }
     }
 
-    // Lighting pass — a real phase mood instead of a flat blue filter:
-    //   warm centre glow (candle/window light focused on the table) +,
-    //   at night, a peripheral vignette so the edges sink into shadow.
-    // Both align to the painted table rect (not the letterboxed item).
-    Image {
-        id: warmGlow
-        source: Illustrations.texWarmGlow
-        readonly property real _cx: root.paintedX + root.paintedW * 0.40
-        readonly property real _cy: root.paintedY + root.paintedH * 0.52
-        width: root.paintedW * 0.98; height: width
-        x: _cx - width / 2; y: _cy - height / 2
-        opacity: root._night ? 0.85 : 0.20
-        Behavior on opacity { NumberAnimation { duration: Theme.motion.slow } }
-    }
-    Image {
-        id: nightVignette
-        source: Illustrations.texNightVignette
-        x: root.paintedX; y: root.paintedY
-        width: root.paintedW; height: root.paintedH
-        fillMode: Image.Stretch
-        opacity: root._night ? 0.92 : 0.0
-        Behavior on opacity { NumberAnimation { duration: Theme.motion.slow } }
-    }
+    // (Lighting is baked into the new day/night watercolor art — no extra glow /
+    // vignette overlays needed; they would fight the painting's own cream edges.)
 }

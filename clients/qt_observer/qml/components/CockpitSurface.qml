@@ -32,10 +32,12 @@ Item {
     signal backRequested()
 
     // 椭圆落位 = 背景图(table-day.png)自身比例，对齐画里的桌沿(待真机微调)。
-    property real cx: 0.40
-    property real cy: 0.55
-    property real ringRx: 0.275
-    property real ringRy: 0.26
+    // New centered watercolor table art: table sits at the horizontal centre, lower
+    // third (3/4 top-down). Seats ride the chair ellipse around it.
+    property real cx: 0.50
+    property real cy: 0.60
+    property real ringRx: 0.31
+    property real ringRy: 0.245
     property real depthK: 0.18
 
     // 像素级落位：绑定到 PhaseBackground 实际绘制出的图矩形。
@@ -52,13 +54,14 @@ Item {
     readonly property real _botBandH: stage.height - (bg.paintedY + bg.paintedH)
 
     // 逐座微调(fraction of paintedW/H)：手绘透视桌不是完美椭圆。仅 6 座生效。
+    // Per-seat nudges re-tuned for the new centered table (symmetric -> near zero).
     readonly property var _o6: [
-        { dx: -0.03, dy: -0.045 }, // 顶:狼人位
-        { dx:  0.00, dy:  0.00 },  // 右上:预言家位
-        { dx:  0.00, dy:  0.00 },  // 右下:女巫位
-        { dx: -0.02, dy:  0.00 },  // 底:村民位
-        { dx: -0.02, dy:  0.00 },  // 左下:守卫位
-        { dx: -0.06, dy:  0.01 }   // 左上:猎人位
+        { dx:  0.00, dy: -0.02 },  // 顶:后排中
+        { dx:  0.00, dy:  0.00 },  // 右上
+        { dx:  0.00, dy:  0.00 },  // 右下
+        { dx:  0.00, dy:  0.02 },  // 底:前排中
+        { dx:  0.00, dy:  0.00 },  // 左下
+        { dx:  0.00, dy:  0.00 }   // 左上
     ]
     function _offX(i) { return (players.length === 6 && _o6[i]) ? _o6[i].dx : 0 }
     function _offY(i) { return (players.length === 6 && _o6[i]) ? _o6[i].dy : 0 }
@@ -365,122 +368,89 @@ Item {
         // 右侧（绘制区）外边距 = 桌面绘制右沿到舞台右沿的留白(通常为 0,fit 到宽时)
         readonly property real _rightGap: stage.width - (bg.paintedX + bg.paintedW)
 
-        // ============ 顶部装饰檐口（ornate header eave）============
-        // 用金线檐口装饰底板(day/night 两张资产,9-slice BorderImage 横向拉伸,边角金饰
-        // 保持清晰),只覆盖座位上方的空桌面区。内容墨色随昼/夜自适应(day 米底=深墨,
-        // night 海军底=亮墨)。中段=仪表式紧凑时间轴(节点+当前高亮),非普通 slider。
-        Item {
-            id: topBand
-            anchors { left: parent.left; right: parent.right; top: parent.top }
-            height: Math.max(root._topBandH + 70, 152)
-            readonly property bool _onDark: root.phase === "night"
-            readonly property color _bandInk: _onDark ? Theme.parchment.textOnDark : Theme.parchment.ink
-            readonly property color _bandInkSoft: _onDark ? Theme.parchment.textOnDarkSoft : Theme.parchment.inkSecondary
-
-            BorderImage {
-                x: bg.paintedX; width: bg.paintedW
-                anchors.top: parent.top; height: parent.height
-                source: Illustrations.bandDay
-                opacity: topBand._onDark ? 0 : 1
-                Behavior on opacity { NumberAnimation { duration: Theme.motion.base } }
-                border { left: 210; right: 210; top: 74; bottom: 74 }
-                horizontalTileMode: BorderImage.Stretch; verticalTileMode: BorderImage.Stretch
-            }
-            BorderImage {
-                x: bg.paintedX; width: bg.paintedW
-                anchors.top: parent.top; height: parent.height
-                source: Illustrations.bandNight
-                opacity: topBand._onDark ? 1 : 0
-                Behavior on opacity { NumberAnimation { duration: Theme.motion.base } }
-                border { left: 210; right: 210; top: 74; bottom: 74 }
-                horizontalTileMode: BorderImage.Stretch; verticalTileMode: BorderImage.Stretch
-            }
-
-            // 内容垂直居中带(让左右内容落在金框内部区)
-            Item {
-                id: bandContent
-                anchors { left: parent.left; right: parent.right; top: parent.top }
-                anchors.leftMargin: bg.paintedX
-                anchors.rightMargin: stage._rightGap
-                height: parent.height - 18
-
-                // 左段：阶段标题 + 回合
-                Column {
-                    anchors { left: parent.left; leftMargin: 118; verticalCenter: parent.verticalCenter }
-                    spacing: 1
-                    Text {
-                        text: root._phaseTitle()
-                        color: topBand._bandInk
-                        font.family: Theme.fontFamilies.serif; font.contextFontMerging: true
-                        font.pixelSize: Theme.warmSize.titleMd; font.weight: Theme.weight.bold; font.letterSpacing: 1
+        // ---- 浮动阶段卡（满幅盘面上,无水平带底板）：阶段标题 · 仪表时间轴 · LIVE ----
+        // 背景已满幅铺(PreserveAspectCrop),无 letterbox,故不再需要顶/底装饰横带。
+        // HUD 一律作为羊皮纸浮卡压在画面上,与首页同语言。
+        HudCard {
+            id: phaseFloat
+            anchors { top: parent.top; horizontalCenter: parent.horizontalCenter; topMargin: Theme.space.lg }
+            width: Math.min(390, stage.width * 0.44)
+            Column {
+                anchors.left: parent.left; anchors.right: parent.right
+                spacing: 6
+                // 标题行：☀/☾ 阶段标题 · 回合  +  LIVE
+                Item {
+                    width: parent.width; height: phTitle.implicitHeight
+                    Row {
+                        anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
+                        spacing: 6
+                        Text {
+                            text: root.phase === "night" ? "☾" : "☀"
+                            color: root.phase === "night" ? Theme.parchment.goldLineSoft : Theme.parchment.terracottaDeep
+                            font.pixelSize: 16
+                        }
+                        Text {
+                            id: phTitle
+                            text: root._phaseTitle() + "  ·  " + I18n.t("第 ", "R") + root.round + I18n.t(" 回合", "")
+                            color: Theme.parchment.ink
+                            font.family: Theme.fontFamilies.serif; font.contextFontMerging: true
+                            font.pixelSize: Theme.warmSize.titleMd; font.weight: Theme.weight.bold
+                        }
                     }
-                    Text {
-                        text: I18n.t("第 ", "Round ") + root.round + I18n.t(" 回合", "")
-                        color: topBand._bandInkSoft
-                        font.family: Theme.fontFamilies.sans; font.contextFontMerging: true
-                        font.pixelSize: Theme.size.micro; font.letterSpacing: 1
+                    Row {
+                        anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
+                        spacing: 4
+                        Rectangle {
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: 7; height: 7; radius: 3.5; color: Theme.parchment.terracotta
+                            SequentialAnimation on opacity {
+                                running: root.live; loops: Animation.Infinite
+                                NumberAnimation { from: 1; to: 0.3; duration: 650 }
+                                NumberAnimation { from: 0.3; to: 1; duration: 650 }
+                            }
+                        }
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: root.live ? "LIVE" : I18n.t("回放", "REPLAY")
+                            color: Theme.parchment.terracottaDeep
+                            font.family: Theme.fontFamilies.sans; font.contextFontMerging: true
+                            font.pixelSize: Theme.size.micro; font.letterSpacing: 1.5; font.weight: Theme.weight.bold
+                        }
                     }
                 }
-
-                // 中段：仪表式紧凑时间轴
-                Column {
+                Rectangle { width: parent.width; height: 1; color: Theme.withAlpha(Theme.parchment.goldLine, 0.4) }
+                // 仪表式时间轴（节点 + 当前高亮）
+                Row {
                     anchors.horizontalCenter: parent.horizontalCenter
-                    anchors.verticalCenter: parent.verticalCenter
-                    spacing: 4
-                    Row {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        spacing: 18
-                        Repeater {
-                            model: root.phaseTimeline
-                            delegate: Row {
-                                spacing: 5
-                                readonly property bool _cur: index === (root.phaseTimeline ? root.phaseTimeline.length - 1 : -1)
-                                Rectangle {
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    width: _cur ? 9 : 6; height: width; radius: width / 2
-                                    color: _cur ? Theme.parchment.terracotta : Theme.withAlpha(topBand._bandInk, 0.4)
-                                }
-                                Text {
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    text: (modelData.phase === "night" ? I18n.t("夜", "N") : I18n.t("日", "D")) + modelData.round
-                                    color: _cur ? topBand._bandInk : topBand._bandInkSoft
-                                    font.family: Theme.fontFamilies.sans; font.contextFontMerging: true
-                                    font.pixelSize: Theme.size.micro; font.letterSpacing: 1
-                                    font.weight: _cur ? Theme.weight.bold : Theme.weight.regular
-                                }
+                    spacing: 16
+                    Repeater {
+                        model: root.phaseTimeline
+                        delegate: Row {
+                            spacing: 5
+                            readonly property bool _cur: index === (root.phaseTimeline ? root.phaseTimeline.length - 1 : -1)
+                            Rectangle {
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: _cur ? 9 : 6; height: width; radius: width / 2
+                                color: _cur ? Theme.parchment.terracotta : Theme.withAlpha(Theme.parchment.ink, 0.35)
+                            }
+                            Text {
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: (modelData.phase === "night" ? I18n.t("夜", "N") : I18n.t("日", "D")) + modelData.round
+                                color: _cur ? Theme.parchment.ink : Theme.parchment.mutedInk
+                                font.family: Theme.fontFamilies.sans; font.contextFontMerging: true
+                                font.pixelSize: Theme.size.micro; font.letterSpacing: 1
+                                font.weight: _cur ? Theme.weight.bold : Theme.weight.regular
                             }
                         }
                     }
-                    Text {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        visible: root._actionLabel() !== ""
-                        text: "—  " + root._actionLabel() + "  —"
-                        color: Theme.parchment.terracottaDeep
-                        font.family: Theme.fontFamilies.sans; font.contextFontMerging: true
-                        font.pixelSize: Theme.size.micro; font.letterSpacing: 1
-                    }
                 }
-
-                // 右段：LIVE / 观战
-                Row {
-                    anchors { right: parent.right; rightMargin: 118; verticalCenter: parent.verticalCenter }
-                    spacing: Theme.space.sm
-                    Rectangle {
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: 8; height: 8; radius: 4; color: Theme.parchment.terracotta
-                        SequentialAnimation on opacity {
-                            running: root.live; loops: Animation.Infinite
-                            NumberAnimation { from: 1; to: 0.3; duration: 650 }
-                            NumberAnimation { from: 0.3; to: 1; duration: 650 }
-                        }
-                    }
-                    Text {
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: (root.live ? "LIVE" : I18n.t("回放", "REPLAY")) + " · " + I18n.t("观战", "Spectating")
-                        color: topBand._bandInk
-                        font.family: Theme.fontFamilies.sans; font.contextFontMerging: true
-                        font.pixelSize: Theme.size.micro; font.letterSpacing: 1.5; font.weight: Theme.weight.bold
-                    }
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    visible: root._actionLabel() !== ""
+                    text: "—  " + root._actionLabel() + "  —"
+                    color: Theme.parchment.terracottaDeep
+                    font.family: Theme.fontFamilies.sans; font.contextFontMerging: true
+                    font.pixelSize: Theme.size.micro; font.letterSpacing: 1
                 }
             }
         }
@@ -489,8 +459,8 @@ Item {
         Column {
             id: infoTower
             anchors {
-                right: parent.right; top: topBand.bottom
-                topMargin: Theme.space.md; rightMargin: stage._rightGap + Theme.space.lg
+                right: parent.right; top: parent.top
+                topMargin: Theme.space.lg; rightMargin: Theme.space.lg
             }
             width: Math.min(258, stage.width * 0.25)
             spacing: Theme.space.md
@@ -583,14 +553,12 @@ Item {
             }
         }
 
-        // ============ 底部水平带：居中悬浮羊皮纸控制托盘（吃掉下露带 — Blocking 3）============
-        // 托盘略偏上「浮」在下带之上,下方留呼吸,不紧贴底边。
+        // ---- 底部居中浮动控制托盘（满幅盘面上,无底板横带,贴舞台底悬浮）----
         Loader {
             id: playbackHost
             sourceComponent: root.playbackSlot
-            x: bg.paintedX + (bg.paintedW - width) / 2
-            y: Math.min(stage.height - height - 8,
-                        bg.paintedY + bg.paintedH + Math.max(2, (root._botBandH - height) * 0.36))
+            x: (stage.width - width) / 2
+            y: stage.height - height - Theme.space.lg
         }
     }
 }
