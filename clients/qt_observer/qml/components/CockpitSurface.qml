@@ -343,25 +343,54 @@ Item {
         // 右侧（绘制区）外边距 = 桌面绘制右沿到舞台右沿的留白(通常为 0,fit 到宽时)
         readonly property real _rightGap: stage.width - (bg.paintedX + bg.paintedW)
 
-        // ============ 顶部水平带：阶段时间轴 HUD（吃掉 PreserveAspectFit 上露带）============
+        // ============ 顶部水平带：薄而高级的观战顶栏（吃掉 PreserveAspectFit 上露带）============
+        // 弱化「整条板」：深海军/褐蓝混色 + 半透明(木纹微透) + 中心微光材质 + 下缘柔和阴影
+        // 过渡进舞台 + 暖金细线/点缀。强化「带上的浮动模块」(标题/时间轴/LIVE)。
         Item {
             id: topBand
             anchors { left: parent.left; right: parent.right; top: parent.top }
-            height: Math.max(root._topBandH, 60)
+            height: Math.max(root._topBandH, 54)
 
-            // 深色半透明信息带,横跨桌面绘制宽度 — 让上露带看起来是故意设计的观战带。
             Rectangle {
+                id: bandBg
                 x: bg.paintedX; width: bg.paintedW
                 anchors.top: parent.top; height: parent.height
-                color: Theme.withAlpha(Theme.parchment.bgDark, 0.84)
+                gradient: Gradient {
+                    GradientStop { position: 0.0; color: Theme.withAlpha(Theme.parchment.bandNavy, 0.9) }
+                    GradientStop { position: 1.0; color: Theme.withAlpha(Theme.parchment.bandNavyDeep, 0.82) }
+                }
+                // 极轻中心提亮 — 材质微光(非现代 UI 渐变)
+                Rectangle {
+                    anchors.fill: parent
+                    gradient: Gradient {
+                        orientation: Gradient.Horizontal
+                        GradientStop { position: 0.0; color: "transparent" }
+                        GradientStop { position: 0.5; color: Theme.withAlpha("#ffffff", 0.035) }
+                        GradientStop { position: 1.0; color: "transparent" }
+                    }
+                }
+                // 底边暖金细线 + 两端小金色点缀
                 Rectangle {
                     anchors { bottom: parent.bottom; left: parent.left; right: parent.right }
-                    height: 1; color: Theme.withAlpha(Theme.parchment.goldLine, 0.5)
+                    height: 1; color: Theme.withAlpha(Theme.parchment.goldLine, 0.55)
+                }
+                Text { anchors { left: parent.left; leftMargin: Theme.space.md; bottom: parent.bottom; bottomMargin: 2 }
+                       text: "✦"; color: Theme.withAlpha(Theme.parchment.goldLine, 0.8); font.pixelSize: 8 }
+                Text { anchors { right: parent.right; rightMargin: Theme.space.md; bottom: parent.bottom; bottomMargin: 2 }
+                       text: "✦"; color: Theme.withAlpha(Theme.parchment.goldLine, 0.8); font.pixelSize: 8 }
+            }
+            // 下缘柔和阴影过渡(融入舞台,不硬切)
+            Rectangle {
+                x: bg.paintedX; width: bg.paintedW
+                anchors.top: bandBg.bottom; height: 12
+                gradient: Gradient {
+                    GradientStop { position: 0.0; color: Theme.withAlpha(Theme.parchment.bandNavyDeep, 0.40) }
+                    GradientStop { position: 1.0; color: "transparent" }
                 }
             }
-            // 左：当前阶段标题 + 第几天
+            // 左段：当前阶段标题 + 第几回合（字号收薄）
             Column {
-                anchors { left: parent.left; leftMargin: bg.paintedX + Theme.space.xl; verticalCenter: parent.verticalCenter }
+                anchors { left: parent.left; leftMargin: bg.paintedX + Theme.space.xl; verticalCenter: bandBg.verticalCenter }
                 spacing: 0
                 Text {
                     text: (root.phase === "night" ? "☾ " + I18n.t("夜晚行动", "Night Actions")
@@ -369,7 +398,7 @@ Item {
                          : "☀ " + I18n.t("白天辩论", "Daytime Debate"))
                     color: Theme.parchment.textOnDark
                     font.family: Theme.fontFamilies.serif; font.contextFontMerging: true
-                    font.pixelSize: Theme.warmSize.titleMd; font.weight: Theme.weight.bold
+                    font.pixelSize: 16; font.weight: Theme.weight.semibold
                 }
                 Text {
                     text: I18n.t("第 ", "Round ") + root.round + I18n.t(" 回合", "")
@@ -378,17 +407,18 @@ Item {
                     font.pixelSize: Theme.size.micro; font.letterSpacing: 1
                 }
             }
-            // 中：阶段时间轴（复用 PhaseTimeline,游标驱动:phaseTimeline/currentAction）
+            // 中段：阶段时间轴（复用 PhaseTimeline,游标驱动:phaseTimeline/currentAction）
             PhaseTimeline {
-                anchors.centerIn: parent
-                width: Math.min(bg.paintedW * 0.46, 460)
+                anchors.horizontalCenter: bandBg.horizontalCenter
+                anchors.verticalCenter: bandBg.verticalCenter
+                width: Math.min(bg.paintedW * 0.44, 440)
                 phases: root.phaseTimeline
                 action: root.currentAction
                 phase: root.phase
             }
-            // 右：LIVE / 观战
+            // 右段：LIVE / 观战
             Row {
-                anchors { right: parent.right; rightMargin: stage._rightGap + Theme.space.xl; verticalCenter: parent.verticalCenter }
+                anchors { right: parent.right; rightMargin: stage._rightGap + Theme.space.xl; verticalCenter: bandBg.verticalCenter }
                 spacing: Theme.space.sm
                 Rectangle {
                     anchors.verticalCenter: parent.verticalCenter
@@ -421,13 +451,14 @@ Item {
             majority: root.majority
         }
 
-        // ============ 底部水平带：嵌入式回放控制条（吃掉下露带 — Blocking 3）============
+        // ============ 底部水平带：居中悬浮羊皮纸控制托盘（吃掉下露带 — Blocking 3）============
+        // 托盘略偏上「浮」在下带之上,下方留呼吸,不紧贴底边。
         Loader {
             id: playbackHost
             sourceComponent: root.playbackSlot
             x: bg.paintedX + (bg.paintedW - width) / 2
-            y: Math.min(stage.height - height - 4,
-                        bg.paintedY + bg.paintedH + Math.max(2, (root._botBandH - height) / 2))
+            y: Math.min(stage.height - height - 8,
+                        bg.paintedY + bg.paintedH + Math.max(2, (root._botBandH - height) * 0.36))
         }
     }
 }

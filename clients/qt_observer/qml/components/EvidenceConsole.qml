@@ -188,7 +188,9 @@ Item {
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
             spacing: Theme.space.xs
-            AppButton { text: I18n.t("收起", "Hide"); variant: root.mode === 0 ? "secondary" : "ghost"; onLight: root.mode === 0; onClicked: root.mode = 0 }
+            // Quiet entry strip: collapsed = all ghost (low存在感, never fights the
+            // playback tray above); only the active expanded mode gets a filled chip.
+            AppButton { text: I18n.t("收起", "Hide"); variant: "ghost"; onLight: root.mode === 0; onClicked: root.mode = 0 }
             AppButton { text: I18n.t("预览", "Peek"); variant: root.mode === 1 ? "secondary" : "ghost"; onLight: root.mode === 0; onClicked: root.mode = 1 }
             AppButton { text: I18n.t("展开", "Expand"); variant: root.mode === 2 ? "secondary" : "ghost"; onLight: root.mode === 0; onClicked: root.mode = 2 }
             AppButton { text: I18n.t("审计", "Audit"); variant: root.mode === 3 ? "secondary" : "ghost"; onLight: root.mode === 0; onClicked: root.mode = 3 }

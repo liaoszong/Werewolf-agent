@@ -10,19 +10,28 @@ Rectangle {
     objectName: "playbackBar"
     property var queue: null
 
-    implicitHeight: 44
-    implicitWidth: bar.implicitWidth + Theme.space.xl
+    implicitHeight: 46
+    implicitWidth: bar.implicitWidth + Theme.space.xxl
     radius: Theme.radius.lg
-    color: Theme.withAlpha(Theme.parchment.parchmentSoft, 0.94)
+    color: Theme.withAlpha(Theme.parchment.parchmentSoft, 0.96)
     border.width: 1
-    border.color: Theme.withAlpha(Theme.parchment.goldLine, 0.7)
+    border.color: Theme.withAlpha(Theme.parchment.goldLineSoft, 0.85)
 
-    // Inset gold hairline (matches HudCard's engraved look).
+    // Inset gold hairline (engraved tray rule).
     Rectangle {
         anchors.fill: parent; anchors.margins: 3
         radius: Math.max(0, parent.radius - 2)
         color: "transparent"
         border.width: 1; border.color: Theme.withAlpha(Theme.parchment.goldLine, 0.35)
+    }
+    // Top inner shadow — gives the parchment tray a slight recessed/paper depth.
+    Rectangle {
+        anchors { top: parent.top; left: parent.left; right: parent.right; topMargin: 4; leftMargin: 5; rightMargin: 5 }
+        height: 7
+        gradient: Gradient {
+            GradientStop { position: 0.0; color: Theme.withAlpha("#3a2c1a", 0.15) }
+            GradientStop { position: 1.0; color: "transparent" }
+        }
     }
 
     Row {
@@ -59,6 +68,12 @@ Rectangle {
                     if (root.queue.playing) root.queue.pause(); else root.queue.play()
                 }
             }
+        }
+
+        // ---- Group divider (play | speeds) ----
+        Rectangle {
+            anchors.verticalCenter: parent.verticalCenter
+            width: 1; height: 22; color: Theme.withAlpha(Theme.parchment.goldLine, 0.4)
         }
 
         // ---- Segmented speed control: 1x | 2x | 4x | Instant ----

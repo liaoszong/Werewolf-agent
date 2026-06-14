@@ -125,6 +125,10 @@ QtObject {
         readonly property color bgDark: "#211a13"
         readonly property color bgDarkElevated: "#2b2218"
         readonly property color bgDarkInset: "#181208"      // entry wells / footer
+        // Header band — a deep navy/brown-blue mix (NOT pure black), so the top
+        // spectator strip reads cool-dark + premium, fading softly into the warm stage.
+        readonly property color bandNavy: "#23262f"
+        readonly property color bandNavyDeep: "#1a1c24"
         // Parchment surfaces (entries, right-HUD cards) over wood / on dark.
         readonly property color parchment: "#efe4cb"
         readonly property color parchmentSoft: "#f6efdc"
