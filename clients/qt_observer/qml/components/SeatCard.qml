@@ -23,6 +23,9 @@ Item {
     property bool speaking: false
     property int voteCount: 0
     property real cardW: 120
+    // 名牌横向偏移(px):仅移下方铭牌,头像/座号/票数徽章不动。用于把被相邻座头像压住的
+    // 名牌往外侧推开(见 CockpitSurface._plateDx)。
+    property real plateDx: 0
 
     readonly property real _dia: cardW
     readonly property real _plateH: 40
@@ -189,6 +192,7 @@ Item {
         anchors.top: medallion.bottom
         anchors.topMargin: root.speaking ? 9 : 6
         anchors.horizontalCenter: parent.horizontalCenter
+        anchors.horizontalCenterOffset: root.plateDx
         radius: Theme.radius.sm
         opacity: root.alive ? 1.0 : 0.9
         gradient: Gradient {

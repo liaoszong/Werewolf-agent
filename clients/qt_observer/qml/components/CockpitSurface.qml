@@ -31,34 +31,40 @@ Item {
     property Component playbackSlot: null
     signal backRequested()
 
-    // 椭圆落位 = 背景图(table-day.png)自身比例，对齐画里的桌沿(待真机微调)。
-    // New centered watercolor table art: table sits at the horizontal centre, lower
-    // third (3/4 top-down). Seats ride the chair ellipse around it.
-    property real cx: 0.50
-    property real cy: 0.60
-    property real ringRx: 0.31
-    property real ringRy: 0.245
-    property real depthK: 0.18
+    // 椭圆落位 = 背景图(table-day.png)自身比例，对齐画里的 6 个空座位。
+    property real cx: 0.435
+    property real cy: 0.585
+    property real ringRx: 0.165
+    property real ringRy: 0.195
+    property real depthK: 0.12
 
     // 像素级落位：绑定到 PhaseBackground 实际绘制出的图矩形。
     readonly property real _cxPix: bg.paintedX + bg.paintedW * cx
     readonly property real _cyPix: bg.paintedY + bg.paintedH * cy
     readonly property real _rxPix: bg.paintedW * ringRx
     readonly property real _ryPix: bg.paintedH * ringRy
-    readonly property real _avSize: bg.paintedW * 0.10
+    readonly property real _avSize: bg.paintedW * 0.072
 
     // 逐座微调(fraction of paintedW/H)：手绘透视桌不是完美椭圆。仅 6 座生效。
-    // Per-seat nudges re-tuned for the new centered table (symmetric -> near zero).
     readonly property var _o6: [
-        { dx:  0.00, dy: -0.02 },  // 顶:后排中
-        { dx:  0.00, dy:  0.00 },  // 右上
-        { dx:  0.00, dy:  0.00 },  // 右下
-        { dx:  0.00, dy:  0.02 },  // 底:前排中
-        { dx:  0.00, dy:  0.00 },  // 左下
-        { dx:  0.00, dy:  0.00 }   // 左上
+        { dx:  0.003, dy:  0.003 },  // 顶
+        { dx:  0.014, dy:  0.004 },  // 右上
+        { dx:  0.020, dy: -0.028 },  // 右下
+        { dx:  0.025, dy: -0.038 },  // 底
+        { dx:  0.007, dy: -0.025 },  // 左下
+        { dx:  0.021, dy:  0.001 }   // 左上
     ]
     function _offX(i) { return (players.length === 6 && _o6[i]) ? _o6[i].dx : 0 }
     function _offY(i) { return (players.length === 6 && _o6[i]) ? _o6[i].dy : 0 }
+
+    // 名牌外移:上排两座(右上 idx1 / 左上 idx5)的名牌会被下排座(右下/左下)头像压住,
+    // 把这两块名牌往外侧推(右上往右、左上往左)。头像/座号/票数徽章一律不动。仅 6 座生效。
+    function _plateDx(i) {
+        if (players.length !== 6) return 0
+        if (i === 1) return root._avSize * 0.75    // 座2(右上)名牌往右
+        if (i === 5) return -root._avSize * 0.75   // 座6(左上)名牌往左
+        return 0
+    }
 
     function _angle(i, n) { return (-90 + i * 360 / Math.max(1, n)) * Math.PI / 180 }
     function _roleName(role) {
@@ -344,9 +350,10 @@ Item {
             delegate: SeatCard {
                 readonly property real _th: root._angle(index, root.players.length)
                 readonly property real _sin: Math.sin(_th)
-                cardW: root._avSize * 1.4 * (1 + root.depthK * _sin)
+                cardW: root._avSize * 1.18 * (1 + root.depthK * _sin)
+                plateDx: root._plateDx(index)
                 x: root._cxPix + root._rxPix * Math.cos(_th) + bg.paintedW * root._offX(index) - width / 2
-                y: root._cyPix + root._ryPix * _sin + bg.paintedH * root._offY(index) - implicitHeight / 2
+                y: root._cyPix + root._ryPix * _sin + bg.paintedH * root._offY(index) - cardW / 2
                 z: 10 + _sin
                 roleKey: (modelData.display_role && modelData.display_role !== "unknown") ? modelData.display_role : ""
                 roleLabel: roleKey ? root._roleName(modelData.display_role) : ""
@@ -453,7 +460,7 @@ Item {
                 right: parent.right; top: parent.top
                 topMargin: Theme.space.lg; rightMargin: Theme.space.lg
             }
-            width: Math.min(258, stage.width * 0.25)
+            width: Math.min(205, stage.width * 0.22)
             spacing: Theme.space.md
 
             // 1) 当前票数（常驻,空态占位 — Blocking 2）
