@@ -66,7 +66,6 @@ qt_add_qml_module(appqt_observer
         qml/components/SettlementReport.qml
         qml/components/WinnerBanner.qml
         qml/components/SpeechTheater.qml
-        qml/components/PhaseTimeline.qml
         qml/components/EvidenceConsole.qml
         qml/components/PlaybackControls.qml
         qml/components/EventTimeline.qml
@@ -106,7 +105,6 @@ qt_add_qml_module(appqt_observer
         assets/illustrations/avatars/guard.png
         assets/illustrations/avatars/hunter.png
         assets/textures/parchment.png
-        assets/textures/header-weave.png
 )
 
 set_target_properties(appqt_observer PROPERTIES
