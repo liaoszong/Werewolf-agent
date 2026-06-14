@@ -180,8 +180,11 @@ QtObject {
     // = true so a missing CJK glyph in (e.g.) "Inter" is merged from the system CJK
     // font at render time. No multi-family arrays, no unverified font features, no subsetting.
     readonly property QtObject fontFamilies: QtObject {
+        // Titles / phase plaques / panel headers -> Source Han Serif SC (书卷感).
+        // Body / log / small labels -> Source Han Sans SC (清晰可读). Both fall back
+        // through contextFontMerging if a glyph is missing.
         readonly property string serif: "Source Han Serif SC"
-        readonly property string sans:  "Inter"
+        readonly property string sans:  "Source Han Sans SC"
         readonly property string mono:  "JetBrains Mono"
     }
 

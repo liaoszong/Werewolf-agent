@@ -104,6 +104,16 @@ Item {
              : phase === "voting" ? I18n.t("投票表决", "Voting")
              : I18n.t("白天辩论", "Daytime Debate")
     }
+    function _actionLabel() {
+        switch (currentAction) {
+        case "wolf":   return I18n.t("狼人行动", "Wolves act")
+        case "seer":   return I18n.t("预言家查验", "Seer checks")
+        case "witch":  return I18n.t("女巫用药", "Witch acts")
+        case "speech": return I18n.t("发言阶段", "Speeches")
+        case "vote":   return I18n.t("投票阶段", "Voting")
+        default:       return ""
+        }
+    }
 
     Rectangle { anchors.fill: parent; color: Theme.warm.canvas }
 
@@ -355,101 +365,122 @@ Item {
         // 右侧（绘制区）外边距 = 桌面绘制右沿到舞台右沿的留白(通常为 0,fit 到宽时)
         readonly property real _rightGap: stage.width - (bg.paintedX + bg.paintedW)
 
-        // ============ 顶部水平带：薄而高级的观战顶栏（吃掉 PreserveAspectFit 上露带）============
-        // 弱化「整条板」：深海军/褐蓝混色 + 半透明(木纹微透) + 中心微光材质 + 下缘柔和阴影
-        // 过渡进舞台 + 暖金细线/点缀。强化「带上的浮动模块」(标题/时间轴/LIVE)。
+        // ============ 顶部装饰檐口（ornate header eave）============
+        // 用金线檐口装饰底板(day/night 两张资产,9-slice BorderImage 横向拉伸,边角金饰
+        // 保持清晰),只覆盖座位上方的空桌面区。内容墨色随昼/夜自适应(day 米底=深墨,
+        // night 海军底=亮墨)。中段=仪表式紧凑时间轴(节点+当前高亮),非普通 slider。
         Item {
             id: topBand
             anchors { left: parent.left; right: parent.right; top: parent.top }
-            height: Math.max(root._topBandH, 54)
+            height: Math.max(root._topBandH + 70, 152)
+            readonly property bool _onDark: root.phase === "night"
+            readonly property color _bandInk: _onDark ? Theme.parchment.textOnDark : Theme.parchment.ink
+            readonly property color _bandInkSoft: _onDark ? Theme.parchment.textOnDarkSoft : Theme.parchment.inkSecondary
 
-            Rectangle {
-                id: bandBg
+            BorderImage {
                 x: bg.paintedX; width: bg.paintedW
                 anchors.top: parent.top; height: parent.height
-                gradient: Gradient {
-                    GradientStop { position: 0.0; color: Theme.withAlpha(Theme.parchment.bandNavy, 0.9) }
-                    GradientStop { position: 1.0; color: Theme.withAlpha(Theme.parchment.bandNavyDeep, 0.82) }
-                }
-                clip: true
-                // 细布/皮革织纹(低对比,做旧质感)
-                Image { anchors.fill: parent; source: Illustrations.texHeaderWeave; fillMode: Image.Tile; opacity: 0.9 }
-                // 极轻中心提亮 — 材质微光(非现代 UI 渐变)
-                Rectangle {
-                    anchors.fill: parent
-                    gradient: Gradient {
-                        orientation: Gradient.Horizontal
-                        GradientStop { position: 0.0; color: "transparent" }
-                        GradientStop { position: 0.5; color: Theme.withAlpha("#ffffff", 0.035) }
-                        GradientStop { position: 1.0; color: "transparent" }
-                    }
-                }
-                // 底边暖金细线 + 两端小金色点缀
-                Rectangle {
-                    anchors { bottom: parent.bottom; left: parent.left; right: parent.right }
-                    height: 1; color: Theme.withAlpha(Theme.parchment.goldLine, 0.55)
-                }
-                Text { anchors { left: parent.left; leftMargin: Theme.space.md; bottom: parent.bottom; bottomMargin: 2 }
-                       text: "✦"; color: Theme.withAlpha(Theme.parchment.goldLine, 0.8); font.pixelSize: 8 }
-                Text { anchors { right: parent.right; rightMargin: Theme.space.md; bottom: parent.bottom; bottomMargin: 2 }
-                       text: "✦"; color: Theme.withAlpha(Theme.parchment.goldLine, 0.8); font.pixelSize: 8 }
+                source: Illustrations.bandDay
+                opacity: topBand._onDark ? 0 : 1
+                Behavior on opacity { NumberAnimation { duration: Theme.motion.base } }
+                border { left: 210; right: 210; top: 74; bottom: 74 }
+                horizontalTileMode: BorderImage.Stretch; verticalTileMode: BorderImage.Stretch
             }
-            // 下缘柔和阴影过渡(融入舞台,不硬切)
-            Rectangle {
+            BorderImage {
                 x: bg.paintedX; width: bg.paintedW
-                anchors.top: bandBg.bottom; height: 12
-                gradient: Gradient {
-                    GradientStop { position: 0.0; color: Theme.withAlpha(Theme.parchment.bandNavyDeep, 0.40) }
-                    GradientStop { position: 1.0; color: "transparent" }
-                }
+                anchors.top: parent.top; height: parent.height
+                source: Illustrations.bandNight
+                opacity: topBand._onDark ? 1 : 0
+                Behavior on opacity { NumberAnimation { duration: Theme.motion.base } }
+                border { left: 210; right: 210; top: 74; bottom: 74 }
+                horizontalTileMode: BorderImage.Stretch; verticalTileMode: BorderImage.Stretch
             }
-            // 左段：当前阶段标题 + 第几回合（字号收薄）
-            Column {
-                anchors { left: parent.left; leftMargin: bg.paintedX + Theme.space.xl; verticalCenter: bandBg.verticalCenter }
-                spacing: 0
-                Text {
-                    text: (root.phase === "night" ? "☾ " + I18n.t("夜晚行动", "Night Actions")
-                         : root.phase === "voting" ? "☀ " + I18n.t("投票表决", "Voting")
-                         : "☀ " + I18n.t("白天辩论", "Daytime Debate"))
-                    color: Theme.parchment.textOnDark
-                    font.family: Theme.fontFamilies.serif; font.contextFontMerging: true
-                    font.pixelSize: 16; font.weight: Theme.weight.semibold
-                }
-                Text {
-                    text: I18n.t("第 ", "Round ") + root.round + I18n.t(" 回合", "")
-                    color: Theme.parchment.textOnDarkSoft
-                    font.family: Theme.fontFamilies.sans; font.contextFontMerging: true
-                    font.pixelSize: Theme.size.micro; font.letterSpacing: 1
-                }
-            }
-            // 中段：阶段时间轴（复用 PhaseTimeline,游标驱动:phaseTimeline/currentAction）
-            PhaseTimeline {
-                anchors.horizontalCenter: bandBg.horizontalCenter
-                anchors.verticalCenter: bandBg.verticalCenter
-                width: Math.min(bg.paintedW * 0.44, 440)
-                phases: root.phaseTimeline
-                action: root.currentAction
-                phase: root.phase
-            }
-            // 右段：LIVE / 观战
-            Row {
-                anchors { right: parent.right; rightMargin: stage._rightGap + Theme.space.xl; verticalCenter: bandBg.verticalCenter }
-                spacing: Theme.space.sm
-                Rectangle {
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: 8; height: 8; radius: 4; color: Theme.parchment.terracotta
-                    SequentialAnimation on opacity {
-                        running: root.live; loops: Animation.Infinite
-                        NumberAnimation { from: 1; to: 0.3; duration: 650 }
-                        NumberAnimation { from: 0.3; to: 1; duration: 650 }
+
+            // 内容垂直居中带(让左右内容落在金框内部区)
+            Item {
+                id: bandContent
+                anchors { left: parent.left; right: parent.right; top: parent.top }
+                anchors.leftMargin: bg.paintedX
+                anchors.rightMargin: stage._rightGap
+                height: parent.height - 18
+
+                // 左段：阶段标题 + 回合
+                Column {
+                    anchors { left: parent.left; leftMargin: 118; verticalCenter: parent.verticalCenter }
+                    spacing: 1
+                    Text {
+                        text: root._phaseTitle()
+                        color: topBand._bandInk
+                        font.family: Theme.fontFamilies.serif; font.contextFontMerging: true
+                        font.pixelSize: Theme.warmSize.titleMd; font.weight: Theme.weight.bold; font.letterSpacing: 1
+                    }
+                    Text {
+                        text: I18n.t("第 ", "Round ") + root.round + I18n.t(" 回合", "")
+                        color: topBand._bandInkSoft
+                        font.family: Theme.fontFamilies.sans; font.contextFontMerging: true
+                        font.pixelSize: Theme.size.micro; font.letterSpacing: 1
                     }
                 }
-                Text {
+
+                // 中段：仪表式紧凑时间轴
+                Column {
+                    anchors.horizontalCenter: parent.horizontalCenter
                     anchors.verticalCenter: parent.verticalCenter
-                    text: (root.live ? "LIVE" : I18n.t("回放", "REPLAY")) + " · " + I18n.t("观战", "Spectating")
-                    color: Theme.parchment.textOnDark
-                    font.family: Theme.fontFamilies.sans; font.contextFontMerging: true
-                    font.pixelSize: Theme.size.micro; font.letterSpacing: 1.5; font.weight: Theme.weight.bold
+                    spacing: 4
+                    Row {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        spacing: 18
+                        Repeater {
+                            model: root.phaseTimeline
+                            delegate: Row {
+                                spacing: 5
+                                readonly property bool _cur: index === (root.phaseTimeline ? root.phaseTimeline.length - 1 : -1)
+                                Rectangle {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    width: _cur ? 9 : 6; height: width; radius: width / 2
+                                    color: _cur ? Theme.parchment.terracotta : Theme.withAlpha(topBand._bandInk, 0.4)
+                                }
+                                Text {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: (modelData.phase === "night" ? I18n.t("夜", "N") : I18n.t("日", "D")) + modelData.round
+                                    color: _cur ? topBand._bandInk : topBand._bandInkSoft
+                                    font.family: Theme.fontFamilies.sans; font.contextFontMerging: true
+                                    font.pixelSize: Theme.size.micro; font.letterSpacing: 1
+                                    font.weight: _cur ? Theme.weight.bold : Theme.weight.regular
+                                }
+                            }
+                        }
+                    }
+                    Text {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        visible: root._actionLabel() !== ""
+                        text: "—  " + root._actionLabel() + "  —"
+                        color: Theme.parchment.terracottaDeep
+                        font.family: Theme.fontFamilies.sans; font.contextFontMerging: true
+                        font.pixelSize: Theme.size.micro; font.letterSpacing: 1
+                    }
+                }
+
+                // 右段：LIVE / 观战
+                Row {
+                    anchors { right: parent.right; rightMargin: 118; verticalCenter: parent.verticalCenter }
+                    spacing: Theme.space.sm
+                    Rectangle {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 8; height: 8; radius: 4; color: Theme.parchment.terracotta
+                        SequentialAnimation on opacity {
+                            running: root.live; loops: Animation.Infinite
+                            NumberAnimation { from: 1; to: 0.3; duration: 650 }
+                            NumberAnimation { from: 0.3; to: 1; duration: 650 }
+                        }
+                    }
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: (root.live ? "LIVE" : I18n.t("回放", "REPLAY")) + " · " + I18n.t("观战", "Spectating")
+                        color: topBand._bandInk
+                        font.family: Theme.fontFamilies.sans; font.contextFontMerging: true
+                        font.pixelSize: Theme.size.micro; font.letterSpacing: 1.5; font.weight: Theme.weight.bold
+                    }
                 }
             }
         }

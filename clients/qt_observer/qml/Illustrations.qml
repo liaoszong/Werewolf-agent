@@ -22,6 +22,15 @@ QtObject {
     readonly property url texNightVignette: Qt.resolvedUrl("../assets/textures/night-vignette.png")
     readonly property url texWarmGlow: Qt.resolvedUrl("../assets/textures/warm-glow.png")
 
+    // Ornamental band/tray frames (gold-filigree plaques) — used as 9-slice
+    // BorderImage backgrounds for the top header (day/night) and bottom control tray.
+    readonly property url bandDay: Qt.resolvedUrl("../assets/ornament/band-day.png")
+    readonly property url bandNight: Qt.resolvedUrl("../assets/ornament/band-night.png")
+    readonly property url tray: Qt.resolvedUrl("../assets/ornament/tray.png")
+    function band(phaseName) {
+        return ("" + phaseName).toLowerCase() === "night" ? bandNight : bandDay
+    }
+
     readonly property var _avatar: ({
         "werewolf": Qt.resolvedUrl("../assets/illustrations/avatars/werewolf.png"),
         "seer":     Qt.resolvedUrl("../assets/illustrations/avatars/seer.png"),

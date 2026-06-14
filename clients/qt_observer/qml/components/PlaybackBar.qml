@@ -5,30 +5,31 @@ import qt_observer
 // PlaybackControls (play/pause, speed 1x/2x/4x/Instant as a segmented control,
 // next-phase, jump-to-latest) but styled to sit inside the board-game HUD instead
 // of looking like a row of system buttons.
+// Control tray: a carved parchment capsule (paper grain + engraved gold rule +
+// inner shadow) holding the playback controls as segmented options. The bottom
+// letterbox is height-constrained (below the seats), so a clean parchment tray
+// reads better here than the tall ornate frame asset.
 Rectangle {
     id: root
     objectName: "playbackBar"
     property var queue: null
 
-    implicitHeight: 46
+    implicitHeight: 48
     implicitWidth: bar.implicitWidth + Theme.space.xxl
     radius: Theme.radius.lg
-    color: Theme.withAlpha(Theme.parchment.parchmentSoft, 0.96)
+    color: Theme.withAlpha(Theme.parchment.parchmentSoft, 0.97)
     border.width: 1
-    border.color: Theme.withAlpha(Theme.parchment.goldLineSoft, 0.85)
+    border.color: Theme.withAlpha(Theme.parchment.goldLineSoft, 0.9)
     clip: true
 
-    // Paper grain — the tray reads as carved parchment, not a flat capsule.
     Image { anchors.fill: parent; source: Illustrations.texParchment; fillMode: Image.Tile; opacity: 0.7 }
-
-    // Inset gold hairline (engraved tray rule).
+    // engraved inner gold rule
     Rectangle {
         anchors.fill: parent; anchors.margins: 3
         radius: Math.max(0, parent.radius - 2)
-        color: "transparent"
-        border.width: 1; border.color: Theme.withAlpha(Theme.parchment.goldLine, 0.35)
+        color: "transparent"; border.width: 1; border.color: Theme.withAlpha(Theme.parchment.goldLine, 0.4)
     }
-    // Top inner shadow — gives the parchment tray a slight recessed/paper depth.
+    // top inner shadow (paper depth)
     Rectangle {
         anchors { top: parent.top; left: parent.left; right: parent.right; topMargin: 4; leftMargin: 5; rightMargin: 5 }
         height: 7

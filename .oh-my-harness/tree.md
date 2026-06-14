@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 599
+- Entries: 602
 
 ```text
 ./
@@ -85,6 +85,10 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       │   │       ├── villager.png
 │       │   │       ├── werewolf.png
 │       │   │       └── witch.png
+│       │   ├── ornament/
+│       │   │   ├── band-day.png
+│       │   │   ├── band-night.png
+│       │   │   └── tray.png
 │       │   └── textures/
 │       │       ├── header-weave.png
 │       │       ├── night-vignette.png
