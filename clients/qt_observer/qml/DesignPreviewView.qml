@@ -46,6 +46,9 @@ Item {
         dataSourceText: I18n.t("设计样例", "Design Sample")
         perspectiveText: I18n.t("视角：god", "View: god")
         live: true
+        phaseTimeline: [ { round: 1, phase: "night" }, { round: 1, phase: "day" }, { round: 2, phase: "day" } ]
+        currentAction: root.previewPhase === "night" ? "wolf"
+                     : root.previewPhase === "voting" ? "vote" : "speech"
         perspectiveSlot: stubPerspective
         eventLogSlot: stubEventLog
         auditSlot: stubAudit

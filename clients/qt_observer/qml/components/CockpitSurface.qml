@@ -21,6 +21,10 @@ Item {
     property string dataSourceText: ""
     property string perspectiveText: ""
     property bool live: false
+    // Cursor-gated phase axis + current micro-action (from EventPresentationQueue).
+    // Drive the top-band timeline; presentational only (passed in, never read backend).
+    property var phaseTimeline: []
+    property string currentAction: ""
     property Component perspectiveSlot: null
     property Component eventLogSlot: null
     property Component auditSlot: null
@@ -40,6 +44,12 @@ Item {
     readonly property real _rxPix: bg.paintedW * ringRx
     readonly property real _ryPix: bg.paintedH * ringRy
     readonly property real _avSize: bg.paintedW * 0.10
+
+    // PreserveAspectFit letterbox bands (top/bottom). We deliberately KEEP the fit
+    // (no crop, no stretch) and absorb the empty bands with floating HUD: the top
+    // band hosts the phase timeline, the bottom band hosts the playback controls.
+    readonly property real _topBandH: bg.paintedY
+    readonly property real _botBandH: stage.height - (bg.paintedY + bg.paintedH)
 
     // 逐座微调(fraction of paintedW/H)：手绘透视桌不是完美椭圆。仅 6 座生效。
     readonly property var _o6: [
@@ -330,33 +340,94 @@ Item {
             }
         }
 
-        // ---- 右纵向 HUD 栈 ----
-        Column {
-            id: hud
-            anchors { right: parent.right; top: parent.top; margins: Theme.space.lg }
-            width: Math.min(258, stage.width * 0.25)
-            spacing: Theme.space.md
+        // 右侧（绘制区）外边距 = 桌面绘制右沿到舞台右沿的留白(通常为 0,fit 到宽时)
+        readonly property real _rightGap: stage.width - (bg.paintedX + bg.paintedW)
 
-            PhaseCard { width: parent.width; phase: root.phase; round: root.round }
-            LiveStatusCard {
-                width: parent.width
-                liveText: root.dataSourceText
-                live: root.live
-                perspectiveLabel: root.perspectiveText
+        // ============ 顶部水平带：阶段时间轴 HUD（吃掉 PreserveAspectFit 上露带）============
+        Item {
+            id: topBand
+            anchors { left: parent.left; right: parent.right; top: parent.top }
+            height: Math.max(root._topBandH, 60)
+
+            // 深色半透明信息带,横跨桌面绘制宽度 — 让上露带看起来是故意设计的观战带。
+            Rectangle {
+                x: bg.paintedX; width: bg.paintedW
+                anchors.top: parent.top; height: parent.height
+                color: Theme.withAlpha(Theme.parchment.bgDark, 0.84)
+                Rectangle {
+                    anchors { bottom: parent.bottom; left: parent.left; right: parent.right }
+                    height: 1; color: Theme.withAlpha(Theme.parchment.goldLine, 0.5)
+                }
             }
-            VotesPanel {
-                width: parent.width
-                visible: root._voteRows.length > 0
-                rows: root._voteRows
-                majority: root.majority
+            // 左：当前阶段标题 + 第几天
+            Column {
+                anchors { left: parent.left; leftMargin: bg.paintedX + Theme.space.xl; verticalCenter: parent.verticalCenter }
+                spacing: 0
+                Text {
+                    text: (root.phase === "night" ? "☾ " + I18n.t("夜晚行动", "Night Actions")
+                         : root.phase === "voting" ? "☀ " + I18n.t("投票表决", "Voting")
+                         : "☀ " + I18n.t("白天辩论", "Daytime Debate"))
+                    color: Theme.parchment.textOnDark
+                    font.family: Theme.fontFamilies.serif; font.contextFontMerging: true
+                    font.pixelSize: Theme.warmSize.titleMd; font.weight: Theme.weight.bold
+                }
+                Text {
+                    text: I18n.t("第 ", "Round ") + root.round + I18n.t(" 回合", "")
+                    color: Theme.parchment.textOnDarkSoft
+                    font.family: Theme.fontFamilies.sans; font.contextFontMerging: true
+                    font.pixelSize: Theme.size.micro; font.letterSpacing: 1
+                }
+            }
+            // 中：阶段时间轴（复用 PhaseTimeline,游标驱动:phaseTimeline/currentAction）
+            PhaseTimeline {
+                anchors.centerIn: parent
+                width: Math.min(bg.paintedW * 0.46, 460)
+                phases: root.phaseTimeline
+                action: root.currentAction
+                phase: root.phase
+            }
+            // 右：LIVE / 观战
+            Row {
+                anchors { right: parent.right; rightMargin: stage._rightGap + Theme.space.xl; verticalCenter: parent.verticalCenter }
+                spacing: Theme.space.sm
+                Rectangle {
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 8; height: 8; radius: 4; color: Theme.parchment.terracotta
+                    SequentialAnimation on opacity {
+                        running: root.live; loops: Animation.Infinite
+                        NumberAnimation { from: 1; to: 0.3; duration: 650 }
+                        NumberAnimation { from: 0.3; to: 1; duration: 650 }
+                    }
+                }
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: (root.live ? "LIVE" : I18n.t("回放", "REPLAY")) + " · " + I18n.t("观战", "Spectating")
+                    color: Theme.parchment.textOnDark
+                    font.family: Theme.fontFamilies.sans; font.contextFontMerging: true
+                    font.pixelSize: Theme.size.micro; font.letterSpacing: 1.5; font.weight: Theme.weight.bold
+                }
             }
         }
 
-        // ---- 底部居中：嵌入式回放控制条（宿主插槽）----
+        // ---- 右侧 HUD：当前票数（常驻,空态占位,绝不整块消失 — Blocking 2）----
+        VotesPanel {
+            id: votesHud
+            anchors {
+                right: parent.right; top: topBand.bottom
+                topMargin: Theme.space.md; rightMargin: stage._rightGap + Theme.space.lg
+            }
+            width: Math.min(258, stage.width * 0.25)
+            rows: root._voteRows
+            majority: root.majority
+        }
+
+        // ============ 底部水平带：嵌入式回放控制条（吃掉下露带 — Blocking 3）============
         Loader {
             id: playbackHost
-            anchors { bottom: parent.bottom; horizontalCenter: parent.horizontalCenter; bottomMargin: Theme.space.lg }
             sourceComponent: root.playbackSlot
+            x: bg.paintedX + (bg.paintedW - width) / 2
+            y: Math.min(stage.height - height - 4,
+                        bg.paintedY + bg.paintedH + Math.max(2, (root._botBandH - height) / 2))
         }
     }
 }

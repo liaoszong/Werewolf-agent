@@ -4,16 +4,27 @@ import qt_observer
 
 // Dark parchment Event Log for the god-view left column. Header (EVENT LOG · LIVE),
 // a scroll of parchment entry blocks (round/phase chip + type + narrated text), and
-// a "JUMP TO LATEST" affordance. Reads ObserverClient.projectionEvents live;
-// previewRows injects synthetic entries for the static design preview (no backend).
-//   previewRows item: { tag, text, current }
+// a "JUMP TO LATEST" affordance.
+//
+// SYNC CONTRACT: the log renders ONLY from `events` — the playback queue's
+// cursor-truncated presentedEvents (TheaterView binds eventQueue.presentedEvents).
+// It NEVER reads the full enriched projection stream directly, so an entry appears
+// in the log exactly when its event lands on the stage (same cursor, same pace, same
+// pause/seek). New entries are appended to an internal ListModel one-by-one and
+// fade in (no instant materialise / waterfall dump). previewRows injects synthetic
+// entries for the static design preview (no backend).
 Item {
     id: root
     objectName: "eventLogPanel"
 
     property bool live: false
-    property var previewRows: null          // non-null -> static/preview mode
+    property var events: []                  // queue.presentedEvents (cursor-gated)
+    property var previewRows: null           // non-null -> static/preview mode
     signal jumpToLatest()
+
+    onEventsChanged: Qt.callLater(_sync)
+    onPreviewRowsChanged: Qt.callLater(_sync)
+    Component.onCompleted: _sync()
 
     // ---- compact inline narration (UI strings; mirrors EvidenceConsole labels) ----
     function _typeLabel(t) {
@@ -46,26 +57,41 @@ Item {
         default:                  return _evSummary(ev) || _typeLabel(t)
         }
     }
-    readonly property var _rows: {
+    // Narrated rows in reveal order: [{ tag, text }] (current = last, set during _sync).
+    function _computeRows() {
         if (previewRows !== null) return previewRows
+        var src = events || []
         var out = []
-        var evs = ObserverClient.projectionEvents
-        for (var i = 0; i < evs.length; i++) {
-            var e = evs[i]
-            var t = _evType(e)
+        for (var i = 0; i < src.length; i++) {
+            var t = _evType(src[i])
             if (!t) continue
-            var n = _narrate(e)
+            var n = _narrate(src[i])
             if (!n || n === "") continue
-            out.push({
-                tag: "R" + (e.round !== undefined ? e.round : 0) + " · " + _typeLabel(t),
-                text: n,
-                current: (i === evs.length - 1)
-            })
+            out.push({ tag: "R" + (src[i].round !== undefined ? src[i].round : 0) + " · " + _typeLabel(t),
+                       text: n })
         }
         return out
     }
 
-    Rectangle { anchors.fill: parent; color: "transparent" }
+    // Incremental sync: append only the NEW tail rows so the bottom entry fades in
+    // one at a time; rebuild only on a shrink (reset / new generation / language flip).
+    ListModel { id: _logModel }
+    function _sync() {
+        var rows = _computeRows()
+        if (rows.length < _logModel.count)
+            _logModel.clear()
+        if (_logModel.count > 0)
+            _logModel.setProperty(_logModel.count - 1, "current", false)
+        for (var i = _logModel.count; i < rows.length; i++)
+            _logModel.append({ tag: rows[i].tag, text: rows[i].text, current: false })
+        if (_logModel.count > 0)
+            _logModel.setProperty(_logModel.count - 1, "current", true)
+    }
+    // Re-localize the whole log when the language flips.
+    Connections {
+        target: I18n
+        function onLangChanged() { _logModel.clear(); _sync() }
+    }
 
     // ---- Header: EVENT LOG · LIVE ----
     Item {
@@ -89,7 +115,6 @@ Item {
                 font.pixelSize: Theme.size.caption; font.letterSpacing: 2; font.weight: Theme.weight.bold
             }
         }
-        // LIVE pill
         Rectangle {
             anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
             width: liveRow.implicitWidth + Theme.space.md; height: 18
@@ -125,7 +150,7 @@ Item {
         height: 1; color: Theme.withAlpha(Theme.parchment.goldLine, 0.45)
     }
 
-    // ---- Entries ----
+    // ---- Entries (incremental, synced to the playback cursor) ----
     ListView {
         id: list
         objectName: "eventLogList"
@@ -134,18 +159,26 @@ Item {
         anchors.topMargin: Theme.space.sm; anchors.bottomMargin: Theme.space.sm
         clip: true
         spacing: Theme.space.sm
-        model: root._rows
-        onCountChanged: Qt.callLater(positionViewAtEnd)
+        model: _logModel
+        onCountChanged: Qt.callLater(positionViewAtEnd)   // keep the newest in view as it reveals
         ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+
+        // Smooth one-at-a-time reveal: each newly-appended entry fades + slides in.
+        add: Transition {
+            NumberAnimation { property: "opacity"; from: 0.0; to: 1.0; duration: 240; easing.type: Easing.OutCubic }
+            NumberAnimation { property: "x"; from: 16; to: 0; duration: 260; easing.type: Easing.OutCubic }
+        }
+        displaced: Transition { NumberAnimation { properties: "y"; duration: 200; easing.type: Easing.OutCubic } }
 
         delegate: Rectangle {
             width: ListView.view ? ListView.view.width : 0
             height: entryCol.implicitHeight + Theme.space.md
             radius: Theme.radius.sm
-            color: modelData.current ? Theme.parchment.terracottaWash : Theme.parchment.parchment
+            color: model.current ? Theme.parchment.terracottaWash : Theme.parchment.parchment
             border.width: 1
-            border.color: modelData.current ? Theme.withAlpha(Theme.parchment.terracotta, 0.6)
-                                             : Theme.withAlpha(Theme.parchment.goldLine, 0.35)
+            border.color: model.current ? Theme.withAlpha(Theme.parchment.terracotta, 0.6)
+                                         : Theme.withAlpha(Theme.parchment.goldLine, 0.35)
+            Behavior on color { ColorAnimation { duration: Theme.motion.base } }
 
             Column {
                 id: entryCol
@@ -154,15 +187,15 @@ Item {
                 anchors.margins: Theme.space.sm
                 spacing: 2
                 Text {
-                    text: modelData.tag
-                    color: modelData.current ? Theme.parchment.terracottaDeep : Theme.parchment.mutedInk
+                    text: model.tag
+                    color: model.current ? Theme.parchment.terracottaDeep : Theme.parchment.mutedInk
                     font.family: Theme.fontFamilies.mono
                     font.pixelSize: Theme.size.micro; font.letterSpacing: 0.5
                 }
                 Text {
                     width: parent.width
                     wrapMode: Text.WordWrap
-                    text: modelData.text
+                    text: model.text
                     color: Theme.parchment.ink
                     font.family: Theme.fontFamilies.serif; font.contextFontMerging: true
                     font.pixelSize: Theme.size.small
@@ -171,7 +204,6 @@ Item {
             }
         }
 
-        // Empty state on the dark panel.
         Text {
             anchors.centerIn: parent
             visible: list.count === 0

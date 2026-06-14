@@ -1080,9 +1080,22 @@ class QtObserverGameRedesignPhase2Tests(unittest.TestCase):
     def test_event_log_panel_contract(self) -> None:
         c = (QT / "qml/components/EventLogPanel.qml").read_text(encoding="utf-8")
         self.assertIn('objectName: "eventLogPanel"', c)
-        # reads enriched projection for live; previewRows injects static entries
-        self.assertIn("ObserverClient.projectionEvents", c)
+        # SYNC contract (2026-06-14 regression fix): the log renders from the
+        # cursor-gated `events` (queue.presentedEvents) so it reveals in lock-step
+        # with the stage; it must NOT scan the full projection directly (that raced
+        # ahead / dumped the whole waterfall). previewRows injects static entries.
+        self.assertIn("property var events", c)
+        self.assertNotIn("ObserverClient.projectionEvents", c)
         self.assertIn("previewRows", c)
+
+    def test_event_log_synced_to_playback_cursor(self) -> None:
+        # The queue exposes a cursor-truncated presentedEvents, and TheaterView wires
+        # it into the left log — single playback source of truth for both sides.
+        q = (QT / "qml/EventPresentationQueue.qml").read_text(encoding="utf-8")
+        self.assertIn("readonly property var presentedEvents", q)
+        self.assertIn("Math.min(_cursor, _ordered.length)", q)
+        t = (QT / "qml/TheaterView.qml").read_text(encoding="utf-8")
+        self.assertRegex(t, r"events:\s*eventQueue\.presentedEvents")
 
     def test_parchment_tokens_exist(self) -> None:
         c = (QT / "qml/Theme.qml").read_text(encoding="utf-8")

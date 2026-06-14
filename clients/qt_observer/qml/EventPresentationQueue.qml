@@ -118,6 +118,33 @@ QtObject {
         return out   // 不排序:队列绝不 reorder(presentation-only 不变量);展示层自行排序
     }
 
+    // Events the playback cursor has ALREADY revealed, in order (indices 0.._cursor-1),
+    // each enriched with summary/target. This is the SINGLE source of truth the left event
+    // log renders from, so the log reveals one entry exactly when its event lands on the
+    // stage — same cursor, same pace, same pause/seek as the right-side state. NEVER scans
+    // the full source/enriched (that would let the log race ahead of the stage).
+    readonly property var presentedEvents: {
+        var out = []
+        var n = Math.min(_cursor, _ordered.length)
+        for (var i = 0; i < n; i++) {
+            var raw = _ordered[i]
+            var gid = (raw && raw.payload) ? raw.payload.event_id : (raw ? raw.event_id : "")
+            var enr = (gid && _enrichedById[gid]) ? _enrichedById[gid] : { summary: "", target: "none" }
+            var ty = (raw && raw.payload) ? raw.payload.type : (raw ? raw.type : "")
+            out.push({
+                event_id: gid,
+                round: (raw && raw.round !== undefined && raw.round !== null) ? raw.round : 0,
+                phase: (raw && raw.phase) ? raw.phase : "",
+                type: ty,
+                actor: (raw && raw.actor) ? raw.actor : "",
+                target: enr.target,
+                summary: enr.summary,
+                current: (i === n - 1)
+            })
+        }
+        return out
+    }
+
     signal phaseBoundary(string phase, int round)   // UI marker ONLY — never a runtime event
 
     // --- enrichment lookup: game-log event_id -> {summary (from data.summary), target} ---

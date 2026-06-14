@@ -28,6 +28,16 @@ HudCard {
             font.pixelSize: Theme.size.micro; font.letterSpacing: 1.5; font.weight: Theme.weight.bold
         }
 
+        // Empty state — the panel stays mounted (never disappears); shows a quiet
+        // placeholder until votes arrive, instead of vanishing the whole HUD module.
+        Text {
+            visible: !root.rows || root.rows.length === 0
+            text: I18n.t("本轮暂无投票", "No votes this round")
+            color: Theme.parchment.mutedInk
+            font.family: Theme.fontFamilies.serif; font.contextFontMerging: true
+            font.italic: true; font.pixelSize: Theme.size.caption
+        }
+
         Repeater {
             model: root.rows
             delegate: Item {

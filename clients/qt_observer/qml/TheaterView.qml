@@ -64,6 +64,8 @@ Item {
                         ? I18n.t("真实 LIVE", "LIVE") : I18n.t("模拟", "SIMULATION")
         perspectiveText: I18n.t("视角：", "View: ") + ObserverClient.currentPerspective
         live: ObserverClient.connected
+        phaseTimeline: eventQueue.phaseTimeline
+        currentAction: eventQueue.currentAction
         perspectiveSlot: livePerspective
         eventLogSlot: liveEventLog
         playbackSlot: livePlayback
@@ -78,7 +80,9 @@ Item {
     // 不带 objectName：EvidenceConsole 里那个（隐藏）保留 "perspectiveSwitcher" 契约名,
     // 此处不复用同名,避免 findChild 歧义。
     Component { id: livePerspective; PerspectiveSwitcher { } }
-    Component { id: liveEventLog;   EventLogPanel { live: ObserverClient.connected } }
+    // Left event log shares the SAME playback cursor as the stage (presentedEvents),
+    // so a log entry reveals exactly when its event lands on the table.
+    Component { id: liveEventLog;   EventLogPanel { live: ObserverClient.connected; events: eventQueue.presentedEvents } }
     Component { id: livePlayback;   PlaybackBar { queue: eventQueue } }
 
     // ------------------------------------------------------ Bottom evidence console
