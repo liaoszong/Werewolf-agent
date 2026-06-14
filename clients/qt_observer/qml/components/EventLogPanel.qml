@@ -39,6 +39,37 @@ Item {
         })
         return m[t] || t
     }
+    // Small per-type emblem: a tinted disc + a safe (non-emoji) glyph.
+    function _typeColor(t) {
+        switch (t) {
+        case "player_speech":  return Theme.parchment.inkSoft
+        case "player_vote":    return Theme.parchment.terracotta
+        case "werewolf_kill":  return Theme.color.werewolf
+        case "seer_check":     return Theme.color.seer
+        case "witch_save":     return Theme.parchment.alive
+        case "witch_kill":
+        case "witch_poison":   return Theme.color.witch
+        case "player_died":
+        case "player_eliminated": return Theme.parchment.eliminated
+        case "role_revealed":  return Theme.parchment.goldLineSoft
+        default:               return Theme.parchment.mutedInk
+        }
+    }
+    function _typeGlyph(t) {
+        switch (t) {
+        case "player_speech":  return "❝"
+        case "player_vote":    return "✓"
+        case "werewolf_kill":  return "✕"
+        case "seer_check":     return "?"
+        case "witch_save":     return "✚"
+        case "witch_kill":
+        case "witch_poison":   return "✕"
+        case "player_died":
+        case "player_eliminated": return "✝"
+        case "role_revealed":  return "✦"
+        default:               return "•"
+        }
+    }
     function _evType(ev) { return (ev && ev.type !== undefined && ev.type !== "") ? ev.type : ((ev && ev.payload) ? ev.payload.type : "") }
     function _evSummary(ev) { return (ev && ev.summary !== undefined) ? ev.summary : ((ev && ev.data) ? (ev.data.summary || "") : "") }
     function _narrate(ev) {
@@ -68,7 +99,7 @@ Item {
             var n = _narrate(src[i])
             if (!n || n === "") continue
             out.push({ tag: "R" + (src[i].round !== undefined ? src[i].round : 0) + " · " + _typeLabel(t),
-                       text: n })
+                       text: n, type: t })
         }
         return out
     }
@@ -83,7 +114,7 @@ Item {
         if (_logModel.count > 0)
             _logModel.setProperty(_logModel.count - 1, "current", false)
         for (var i = _logModel.count; i < rows.length; i++)
-            _logModel.append({ tag: rows[i].tag, text: rows[i].text, current: false })
+            _logModel.append({ tag: rows[i].tag, text: rows[i].text, type: rows[i].type || "", current: false })
         if (_logModel.count > 0)
             _logModel.setProperty(_logModel.count - 1, "current", true)
     }
@@ -170,36 +201,73 @@ Item {
         }
         displaced: Transition { NumberAnimation { properties: "y"; duration: 200; easing.type: Easing.OutCubic } }
 
-        delegate: Rectangle {
+        delegate: Item {
             width: ListView.view ? ListView.view.width : 0
-            height: entryCol.implicitHeight + Theme.space.md
-            radius: Theme.radius.sm
-            color: model.current ? Theme.parchment.terracottaWash : Theme.parchment.parchment
-            border.width: 1
-            border.color: model.current ? Theme.withAlpha(Theme.parchment.terracotta, 0.6)
-                                         : Theme.withAlpha(Theme.parchment.goldLine, 0.35)
-            Behavior on color { ColorAnimation { duration: Theme.motion.base } }
+            height: card.height
 
-            Column {
-                id: entryCol
+            // left accent rule — terracotta for the current event, faint gold else
+            Rectangle {
+                anchors { left: card.left; top: card.top; bottom: card.bottom }
+                width: 3; radius: 1.5
+                color: model.current ? Theme.parchment.terracotta : Theme.withAlpha(Theme.parchment.goldLine, 0.4)
+            }
+
+            Rectangle {
+                id: card
                 anchors.left: parent.left; anchors.right: parent.right
-                anchors.top: parent.top
-                anchors.margins: Theme.space.sm
-                spacing: 2
-                Text {
-                    text: model.tag
-                    color: model.current ? Theme.parchment.terracottaDeep : Theme.parchment.mutedInk
-                    font.family: Theme.fontFamilies.mono
-                    font.pixelSize: Theme.size.micro; font.letterSpacing: 0.5
+                anchors.leftMargin: 3
+                height: entryRow.implicitHeight + Theme.space.md
+                radius: Theme.radius.sm
+                gradient: Gradient {
+                    GradientStop { position: 0.0; color: model.current ? Theme.parchment.terracottaWash : Qt.lighter(Theme.parchment.parchment, 1.03) }
+                    GradientStop { position: 1.0; color: model.current ? Qt.darker(Theme.parchment.terracottaWash, 1.04) : Qt.darker(Theme.parchment.parchment, 1.02) }
                 }
-                Text {
-                    width: parent.width
-                    wrapMode: Text.WordWrap
-                    text: model.text
-                    color: Theme.parchment.ink
-                    font.family: Theme.fontFamilies.serif; font.contextFontMerging: true
-                    font.pixelSize: Theme.size.small
-                    lineHeight: 1.25
+                border.width: 1
+                border.color: model.current ? Theme.withAlpha(Theme.parchment.terracotta, 0.6)
+                                             : Theme.withAlpha(Theme.parchment.goldLine, 0.32)
+                clip: true
+                Image { anchors.fill: parent; source: Illustrations.texParchment; fillMode: Image.Tile; opacity: 0.55 }
+
+                Row {
+                    id: entryRow
+                    anchors.left: parent.left; anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.margins: Theme.space.sm
+                    spacing: Theme.space.sm
+
+                    // type emblem
+                    Rectangle {
+                        width: 22; height: 22; radius: 11
+                        anchors.top: parent.top; anchors.topMargin: 1
+                        color: Theme.withAlpha(root._typeColor(model.type), 0.16)
+                        border.width: 1; border.color: Theme.withAlpha(root._typeColor(model.type), 0.6)
+                        Text {
+                            anchors.centerIn: parent
+                            text: root._typeGlyph(model.type)
+                            color: root._typeColor(model.type)
+                            font.pixelSize: Theme.size.caption
+                        }
+                    }
+
+                    Column {
+                        width: parent.width - 22 - Theme.space.sm
+                        spacing: 2
+                        Text {
+                            text: model.tag
+                            color: model.current ? Theme.parchment.terracottaDeep : Theme.parchment.mutedInk
+                            font.family: Theme.fontFamilies.mono
+                            font.pixelSize: Theme.size.micro; font.letterSpacing: 0.5
+                        }
+                        Text {
+                            width: parent.width
+                            wrapMode: Text.WordWrap
+                            text: model.text
+                            color: Theme.parchment.ink
+                            font.family: Theme.fontFamilies.serif; font.contextFontMerging: true
+                            font.pixelSize: Theme.size.small
+                            lineHeight: 1.25
+                        }
+                    }
                 }
             }
         }

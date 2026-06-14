@@ -35,4 +35,28 @@ Item {
         opacity: (root._night && status === Image.Ready) ? 1 : 0
         Behavior on opacity { NumberAnimation { duration: Theme.motion.base } }
     }
+
+    // Lighting pass — a real phase mood instead of a flat blue filter:
+    //   warm centre glow (candle/window light focused on the table) +,
+    //   at night, a peripheral vignette so the edges sink into shadow.
+    // Both align to the painted table rect (not the letterboxed item).
+    Image {
+        id: warmGlow
+        source: Illustrations.texWarmGlow
+        readonly property real _cx: root.paintedX + root.paintedW * 0.40
+        readonly property real _cy: root.paintedY + root.paintedH * 0.52
+        width: root.paintedW * 0.98; height: width
+        x: _cx - width / 2; y: _cy - height / 2
+        opacity: root._night ? 0.85 : 0.20
+        Behavior on opacity { NumberAnimation { duration: Theme.motion.slow } }
+    }
+    Image {
+        id: nightVignette
+        source: Illustrations.texNightVignette
+        x: root.paintedX; y: root.paintedY
+        width: root.paintedW; height: root.paintedH
+        fillMode: Image.Stretch
+        opacity: root._night ? 0.92 : 0.0
+        Behavior on opacity { NumberAnimation { duration: Theme.motion.slow } }
+    }
 }

@@ -1,12 +1,16 @@
 import QtQuick
 import qt_observer
 
-// Board-game seat nameplate. Replaces the bare floating circular avatar with a
-// card structure: number badge + portrait (role art) + parchment nameplate with
-// name/role and a status ribbon. Status is expressed through the card —
-// SPEAKING (terracotta ribbon + gold edge), ELIMINATED (dim + label), and an
-// optional vote-count badge near the seat — never a crude red ring.
-// Asset missing -> role-initial fallback (never a blank seat).
+// Tabletop seat plaque (席位铭牌). A carved identity card, not a sticker + label:
+//   · wax-seal seat medallion (gold ring + ink center + serif number)
+//   · portrait set INTO a parchment-grained frame with a bottom vignette (depth)
+//   · engraved nameplate (paper grain + fine gold rule) carrying name/role/status
+//   · SPEAKING = premium terracotta banner + gold-lit portrait edge
+//   · ELIMINATED = desaturating warm wash + a distressed "出局" seal (not a slash)
+//   · warm layered shadow lifts the plaque off the table
+// Faction colour only as a small accent (medallion ring tint, plate dot). Asset
+// missing -> role-initial fallback (never a blank seat). Contract: objectName +
+// roleKey/seatNumber/alive/speaking/voteCount preserved.
 Item {
     id: root
     objectName: "seatCard"
@@ -19,30 +23,32 @@ Item {
     property bool alive: true
     property bool speaking: false
     property int voteCount: 0
-    // Drives overall scale; the seat ring passes a depth-adjusted value.
     property real cardW: 120
 
-    readonly property real _portraitH: cardW * 0.86
-    readonly property real _plateH: 38
+    readonly property real _portraitH: cardW * 0.92
+    readonly property real _plateH: 40
     readonly property url _art: Illustrations.avatar(roleKey)
     readonly property bool _hasArt: String(_art) !== "" && portrait.status === Image.Ready
 
     implicitWidth: cardW
-    implicitHeight: _portraitH + _plateH + 8
-    opacity: alive ? 1.0 : 0.62
+    implicitHeight: _portraitH + _plateH + 12
 
-    // ---- SPEAKING glow ring behind the portrait (warm terracotta) ----
+    // ---- warm layered shadow ----
     Rectangle {
-        visible: root.speaking && root.alive
-        anchors.fill: portraitFrame
-        anchors.margins: -5
-        radius: portraitFrame.radius + 5
-        color: "transparent"
-        border.width: 3
-        border.color: Theme.withAlpha(Theme.parchment.terracotta, 0.55)
+        anchors.fill: portraitFrame; anchors.topMargin: 6; anchors.bottomMargin: -_plateH
+        radius: portraitFrame.radius; color: Theme.parchment.woodShadow; z: -1
     }
 
-    // ---- Portrait card (role art in a rounded frame) ----
+    // ---- SPEAKING outer glow ----
+    Rectangle {
+        visible: root.speaking && root.alive
+        anchors.fill: portraitFrame; anchors.margins: -5
+        radius: portraitFrame.radius + 5
+        color: "transparent"
+        border.width: 3; border.color: Theme.withAlpha(Theme.parchment.terracotta, 0.5)
+    }
+
+    // ---- Portrait set into a parchment frame ----
     Rectangle {
         id: portraitFrame
         width: root.cardW
@@ -52,20 +58,18 @@ Item {
         radius: Theme.radius.md
         color: Theme.parchment.parchmentStrong
         border.width: root.speaking ? 2 : 1.5
-        border.color: root.speaking ? Theme.parchment.goldLine
-                                    : Theme.withAlpha(root.accent, 0.7)
+        border.color: root.speaking ? Theme.parchment.goldLine : Theme.withAlpha(root.accent, 0.75)
         clip: true
 
         Image {
             id: portrait
-            anchors.fill: parent
-            anchors.margins: 1.5
+            anchors.fill: parent; anchors.margins: 2
             source: root._art
             fillMode: Image.PreserveAspectCrop
             verticalAlignment: Image.AlignTop
             visible: root._hasArt
         }
-        // Fallback: role-initial on parchment.
+        // fallback: role-initial on parchment
         Text {
             anchors.centerIn: parent
             visible: !root._hasArt
@@ -74,45 +78,79 @@ Item {
             font.family: Theme.fontFamilies.serif; font.contextFontMerging: true
             font.pixelSize: root.cardW * 0.4; font.weight: Theme.weight.bold
         }
-        // Eliminated wash + skull (no GPU desaturate needed; reads on screenshots).
+        // paper grain over the portrait card (very faint — unifies art + frame)
+        Image {
+            anchors.fill: parent
+            source: Illustrations.texParchment
+            fillMode: Image.Tile
+            opacity: 0.5
+        }
+        // bottom vignette — sinks the portrait INTO the card (not pasted on)
+        Rectangle {
+            anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
+            height: parent.height * 0.4
+            gradient: Gradient {
+                GradientStop { position: 0.0; color: "transparent" }
+                GradientStop { position: 1.0; color: Theme.withAlpha("#241a10", 0.5) }
+            }
+        }
+        // faction top accent hairline
+        Rectangle {
+            anchors { top: parent.top; left: parent.left; right: parent.right }
+            height: 2; color: Theme.withAlpha(root.accent, 0.85)
+        }
+
+        // ELIMINATED: desaturating warm wash + distressed seal
         Rectangle {
             visible: !root.alive
             anchors.fill: parent
-            color: Theme.withAlpha("#3a2c20", 0.45)
+            color: Theme.withAlpha("#4a3a28", 0.5)
         }
-        Text {
+        Item {
             visible: !root.alive
             anchors.centerIn: parent
-            text: "☠"
-            color: Theme.withAlpha("#ffffff", 0.85)
-            font.pixelSize: root.cardW * 0.32
+            width: root.cardW * 0.56; height: width; rotation: -14
+            Rectangle {
+                anchors.fill: parent; radius: width / 2
+                color: "transparent"; border.width: 2
+                border.color: Theme.withAlpha(Theme.parchment.eliminated, 0.92)
+            }
+            Text {
+                anchors.centerIn: parent
+                text: I18n.t("出局", "OUT")
+                color: Theme.withAlpha(Theme.parchment.eliminated, 0.95)
+                font.family: Theme.fontFamilies.serif; font.contextFontMerging: true
+                font.pixelSize: root.cardW * 0.18; font.weight: Theme.weight.bold; font.letterSpacing: 1
+            }
         }
     }
 
-    // ---- Seat number badge (overlaps portrait top-left) ----
+    // ---- Seat medallion (wax-seal: gold ring + ink center + serif number) ----
     Rectangle {
-        width: 24; height: 24; radius: 12
-        x: portraitFrame.x - 5
-        y: portraitFrame.y - 5
+        width: 26; height: 26; radius: 13
+        x: portraitFrame.x - 6; y: portraitFrame.y - 6
         color: Theme.parchment.bgDark
-        border.width: 1.5; border.color: Theme.parchment.goldLine
+        border.width: 2; border.color: Theme.parchment.goldLine
+        Rectangle {
+            anchors.fill: parent; anchors.margins: 3; radius: width / 2
+            color: "transparent"; border.width: 1; border.color: Theme.withAlpha(Theme.parchment.goldLine, 0.5)
+        }
         Text {
             anchors.centerIn: parent
             text: root.seatNumber > 0 ? root.seatNumber : root.seatLabel.replace(/\D/g, "")
-            color: Theme.parchment.textOnDark
+            color: Theme.parchment.goldText
             font.family: Theme.fontFamilies.serif; font.contextFontMerging: true
             font.pixelSize: Theme.size.caption; font.weight: Theme.weight.bold
         }
     }
 
-    // ---- Vote-count badge (overlaps portrait top-right; small, never dominant) ----
+    // ---- Vote-count badge (small; never dominant) ----
     Rectangle {
         visible: root.voteCount > 0
         width: 22; height: 22; radius: 11
-        x: portraitFrame.x + portraitFrame.width - 17
-        y: portraitFrame.y - 5
+        x: portraitFrame.x + portraitFrame.width - 16; y: portraitFrame.y - 6
         color: Theme.parchment.terracotta
-        border.width: 1.5; border.color: "#ffffff"
+        border.width: 1.5; border.color: Theme.withAlpha("#ffffff", 0.85)
         Text {
             anchors.centerIn: parent
             text: root.voteCount
@@ -122,17 +160,30 @@ Item {
         }
     }
 
-    // ---- SPEAKING ribbon (sits between portrait and plate) ----
-    Rectangle {
+    // ---- SPEAKING banner (premium ribbon with gold top edge) ----
+    Item {
         id: ribbon
         visible: root.speaking && root.alive
         anchors.horizontalCenter: parent.horizontalCenter
-        y: portraitFrame.y + portraitFrame.height - 9
-        width: ribbonText.implicitWidth + Theme.space.md
-        height: ribbonText.implicitHeight + 5
-        radius: Theme.radius.sm
-        color: Theme.parchment.terracotta
-        z: 5
+        y: portraitFrame.y + portraitFrame.height - 10
+        width: ribbonText.implicitWidth + Theme.space.lg
+        height: ribbonText.implicitHeight + 7
+        z: 6
+        Rectangle {
+            anchors.fill: parent
+            radius: 3
+            gradient: Gradient {
+                GradientStop { position: 0.0; color: Qt.lighter(Theme.parchment.terracotta, 1.08) }
+                GradientStop { position: 1.0; color: Theme.parchment.terracottaDeep }
+            }
+            Rectangle { anchors { top: parent.top; left: parent.left; right: parent.right }
+                        height: 1; color: Theme.withAlpha(Theme.parchment.goldText, 0.8) }
+        }
+        // banner tails
+        Rectangle { width: 7; height: 7; rotation: 45; color: Theme.parchment.terracottaDeep
+                    anchors { left: parent.left; leftMargin: -3; verticalCenter: parent.bottom } }
+        Rectangle { width: 7; height: 7; rotation: 45; color: Theme.parchment.terracottaDeep
+                    anchors { right: parent.right; rightMargin: -3; verticalCenter: parent.bottom } }
         Text {
             id: ribbonText
             anchors.centerIn: parent
@@ -143,18 +194,25 @@ Item {
         }
     }
 
-    // ---- Nameplate ----
+    // ---- Engraved nameplate (paper grain + fine gold rule) ----
     Rectangle {
         id: plate
-        width: root.cardW + 6
+        width: root.cardW + 8
         height: root._plateH
         anchors.top: portraitFrame.bottom
-        anchors.topMargin: 4
+        anchors.topMargin: 5
         anchors.horizontalCenter: parent.horizontalCenter
         radius: Theme.radius.sm
-        color: Theme.parchment.parchment
-        border.width: 1
-        border.color: Theme.withAlpha(Theme.parchment.goldLine, 0.7)
+        opacity: root.alive ? 1.0 : 0.9
+        gradient: Gradient {
+            GradientStop { position: 0.0; color: Qt.lighter(Theme.parchment.parchment, 1.03) }
+            GradientStop { position: 1.0; color: Qt.darker(Theme.parchment.parchment, 1.03) }
+        }
+        border.width: 1; border.color: Theme.withAlpha(Theme.parchment.goldLine, 0.7)
+        clip: true
+        Image { anchors.fill: parent; source: Illustrations.texParchment; fillMode: Image.Tile; opacity: 0.6 }
+        Rectangle { anchors.fill: parent; anchors.margins: 2; radius: 2; color: "transparent"
+                    border.width: 1; border.color: Theme.withAlpha(Theme.parchment.goldLine, 0.3) }
 
         Column {
             anchors.centerIn: parent
@@ -162,13 +220,10 @@ Item {
             Row {
                 anchors.horizontalCenter: parent.horizontalCenter
                 spacing: 5
-                Rectangle {
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: 7; height: 7; radius: 3.5; color: root.accent
-                }
+                Rectangle { anchors.verticalCenter: parent.verticalCenter; width: 7; height: 7; radius: 3.5; color: root.accent }
                 Text {
                     text: root.seatLabel + (root.roleLabel ? "  " + root.roleLabel : "")
-                    color: Theme.parchment.ink
+                    color: root.alive ? Theme.parchment.ink : Theme.parchment.inkSoft
                     font.family: Theme.fontFamilies.serif; font.contextFontMerging: true
                     font.pixelSize: Theme.size.body; font.weight: Theme.weight.bold
                 }

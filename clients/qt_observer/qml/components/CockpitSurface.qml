@@ -92,6 +92,18 @@ Item {
         }
         return out
     }
+    readonly property int _aliveCount: (players ? players.length : 0) - (deadIds ? deadIds.length : 0)
+    readonly property var _speaker: {
+        if (!speakingId) return null
+        for (var i = 0; i < (players ? players.length : 0); i++)
+            if (players[i] && players[i].player_id === speakingId) return players[i]
+        return null
+    }
+    function _phaseTitle() {
+        return phase === "night" ? I18n.t("夜晚行动", "Night Actions")
+             : phase === "voting" ? I18n.t("投票表决", "Voting")
+             : I18n.t("白天辩论", "Daytime Debate")
+    }
 
     Rectangle { anchors.fill: parent; color: Theme.warm.canvas }
 
@@ -359,6 +371,9 @@ Item {
                     GradientStop { position: 0.0; color: Theme.withAlpha(Theme.parchment.bandNavy, 0.9) }
                     GradientStop { position: 1.0; color: Theme.withAlpha(Theme.parchment.bandNavyDeep, 0.82) }
                 }
+                clip: true
+                // 细布/皮革织纹(低对比,做旧质感)
+                Image { anchors.fill: parent; source: Illustrations.texHeaderWeave; fillMode: Image.Tile; opacity: 0.9 }
                 // 极轻中心提亮 — 材质微光(非现代 UI 渐变)
                 Rectangle {
                     anchors.fill: parent
@@ -439,16 +454,102 @@ Item {
             }
         }
 
-        // ---- 右侧 HUD：当前票数（常驻,空态占位,绝不整块消失 — Blocking 2）----
-        VotesPanel {
-            id: votesHud
+        // ---- 右侧信息塔（常驻,结构化）：当前票数 + 当前发言者 + 局势摘要 ----
+        Column {
+            id: infoTower
             anchors {
                 right: parent.right; top: topBand.bottom
                 topMargin: Theme.space.md; rightMargin: stage._rightGap + Theme.space.lg
             }
             width: Math.min(258, stage.width * 0.25)
-            rows: root._voteRows
-            majority: root.majority
+            spacing: Theme.space.md
+
+            // 1) 当前票数（常驻,空态占位 — Blocking 2）
+            VotesPanel { width: parent.width; rows: root._voteRows; majority: root.majority }
+
+            // 2) 当前发言者
+            HudCard {
+                width: parent.width
+                Column {
+                    anchors.left: parent.left; anchors.right: parent.right
+                    spacing: 6
+                    Text {
+                        text: "↣  " + I18n.t("当前发言", "Speaker") + "  ↢"
+                        color: Theme.parchment.goldLineSoft
+                        font.family: Theme.fontFamilies.sans; font.contextFontMerging: true
+                        font.pixelSize: Theme.size.micro; font.letterSpacing: 1.5; font.weight: Theme.weight.bold
+                    }
+                    Row {
+                        visible: root._speaker !== null
+                        spacing: Theme.space.sm
+                        Rectangle {
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: 9; height: 9; radius: 4.5
+                            color: root._speaker && root._speaker.display_role ? Theme.roleAccent(root._speaker.display_role) : Theme.parchment.terracotta
+                        }
+                        Column {
+                            spacing: 0
+                            Text {
+                                text: root._speaker ? (root._speaker.player_id
+                                      + (root._speaker.display_role && root._speaker.display_role !== "unknown"
+                                         ? "  " + root._roleName(root._speaker.display_role) : "")) : ""
+                                color: Theme.parchment.ink
+                                font.family: Theme.fontFamilies.serif; font.contextFontMerging: true
+                                font.pixelSize: Theme.size.body; font.weight: Theme.weight.bold
+                            }
+                            Text {
+                                text: I18n.t("正在发言…", "is speaking…")
+                                color: Theme.parchment.terracottaDeep
+                                font.family: Theme.fontFamilies.sans; font.contextFontMerging: true
+                                font.pixelSize: Theme.size.micro
+                            }
+                        }
+                    }
+                    Text {
+                        visible: root._speaker === null
+                        text: I18n.t("暂无人发言", "No one speaking")
+                        color: Theme.parchment.mutedInk
+                        font.family: Theme.fontFamilies.serif; font.contextFontMerging: true
+                        font.italic: true; font.pixelSize: Theme.size.caption
+                    }
+                }
+            }
+
+            // 3) 局势摘要
+            HudCard {
+                width: parent.width
+                Column {
+                    anchors.left: parent.left; anchors.right: parent.right
+                    spacing: 6
+                    Text {
+                        text: "↣  " + I18n.t("局势", "Status") + "  ↢"
+                        color: Theme.parchment.goldLineSoft
+                        font.family: Theme.fontFamilies.sans; font.contextFontMerging: true
+                        font.pixelSize: Theme.size.micro; font.letterSpacing: 1.5; font.weight: Theme.weight.bold
+                    }
+                    Row {
+                        spacing: Theme.space.sm
+                        Text {
+                            text: I18n.t("存活", "Alive")
+                            color: Theme.parchment.mutedInk
+                            font.family: Theme.fontFamilies.sans; font.contextFontMerging: true
+                            font.pixelSize: Theme.size.caption
+                        }
+                        Text {
+                            text: root._aliveCount + " / " + (root.players ? root.players.length : 0)
+                            color: Theme.parchment.ink
+                            font.family: Theme.fontFamilies.serif; font.contextFontMerging: true
+                            font.pixelSize: Theme.size.body; font.weight: Theme.weight.bold
+                        }
+                    }
+                    Text {
+                        text: root._phaseTitle() + I18n.t("　·　第 ", "  ·  R") + root.round + I18n.t(" 回合", "")
+                        color: Theme.parchment.inkSecondary
+                        font.family: Theme.fontFamilies.sans; font.contextFontMerging: true
+                        font.pixelSize: Theme.size.caption
+                    }
+                }
+            }
         }
 
         // ============ 底部水平带：居中悬浮羊皮纸控制托盘（吃掉下露带 — Blocking 3）============

@@ -14,6 +14,14 @@ QtObject {
     readonly property url tableDay: Qt.resolvedUrl("../assets/illustrations/scene/table-day.png")
     readonly property url tableNight: Qt.resolvedUrl("../assets/illustrations/scene/table-night.png")
 
+    // Material-system textures (subtle overlays; render in screenshots, unlike GPU
+    // shadow effects). parchment/headerWeave = paper/cloth grain; vignette/glow =
+    // night lighting (peripheral darkening + warm centre focus).
+    readonly property url texParchment: Qt.resolvedUrl("../assets/textures/parchment.png")
+    readonly property url texHeaderWeave: Qt.resolvedUrl("../assets/textures/header-weave.png")
+    readonly property url texNightVignette: Qt.resolvedUrl("../assets/textures/night-vignette.png")
+    readonly property url texWarmGlow: Qt.resolvedUrl("../assets/textures/warm-glow.png")
+
     readonly property var _avatar: ({
         "werewolf": Qt.resolvedUrl("../assets/illustrations/avatars/werewolf.png"),
         "seer":     Qt.resolvedUrl("../assets/illustrations/avatars/seer.png"),

@@ -150,6 +150,15 @@ QtObject {
         readonly property color eliminated: "#a85b48"        // muted "ELIMINATED"
         readonly property color textOnDark: "#f3ead4"
         readonly property color textOnDarkSoft: "#b6a684"
+        // Warm soft shadow (NOT modern grey/black) — lifts cards/plates/tray with
+        // antique depth. Layered as low-alpha rects so it survives screenshots.
+        readonly property color woodShadow: Qt.rgba(46 / 255, 30 / 255, 16 / 255, 0.22)
+        readonly property color woodShadowSoft: Qt.rgba(46 / 255, 30 / 255, 16 / 255, 0.10)
+        // Aliases matching the material-system vocabulary (parchmentBase / inkPrimary…).
+        readonly property color parchmentBase: parchment
+        readonly property color inkPrimary: ink
+        readonly property color inkSecondary: inkSoft
+        readonly property color deepHeader: bandNavy
     }
 
     // Day / night phase surfaces (extracted from the home-scene illustrations).

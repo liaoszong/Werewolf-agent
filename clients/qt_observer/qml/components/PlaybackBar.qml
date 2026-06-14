@@ -16,6 +16,10 @@ Rectangle {
     color: Theme.withAlpha(Theme.parchment.parchmentSoft, 0.96)
     border.width: 1
     border.color: Theme.withAlpha(Theme.parchment.goldLineSoft, 0.85)
+    clip: true
+
+    // Paper grain — the tray reads as carved parchment, not a flat capsule.
+    Image { anchors.fill: parent; source: Illustrations.texParchment; fillMode: Image.Tile; opacity: 0.7 }
 
     // Inset gold hairline (engraved tray rule).
     Rectangle {

@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 594
+- Entries: 599
 
 ```text
 ./
@@ -47,6 +47,9 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       │   └── SKILL.md
 │       └── verifying-qt-observer-ui/
 │           └── SKILL.md
+├── .claude/
+│   └── hooks/
+│       └── config-protection.cjs
 ├── .codex/
 │   ├── hooks/
 │   │   └── tree.mjs
@@ -62,26 +65,31 @@ Use this file for navigation only. Verify implementation details by reading sour
 ├── clients/
 │   └── qt_observer/
 │       ├── assets/
-│       │   └── illustrations/
-│       │       ├── avatars/
-│       │       │   ├── guard.png
-│       │       │   ├── hunter.png
-│       │       │   ├── seer.png
-│       │       │   ├── villager.png
-│       │       │   ├── werewolf.png
-│       │       │   └── witch.png
-│       │       ├── scene/
-│       │       │   ├── home-day.png
-│       │       │   ├── home-night.png
-│       │       │   ├── table-day.png
-│       │       │   └── table-night.png
-│       │       └── tarot/
-│       │           ├── guard.png
-│       │           ├── hunter.png
-│       │           ├── seer.png
-│       │           ├── villager.png
-│       │           ├── werewolf.png
-│       │           └── witch.png
+│       │   ├── illustrations/
+│       │   │   ├── avatars/
+│       │   │   │   ├── guard.png
+│       │   │   │   ├── hunter.png
+│       │   │   │   ├── seer.png
+│       │   │   │   ├── villager.png
+│       │   │   │   ├── werewolf.png
+│       │   │   │   └── witch.png
+│       │   │   ├── scene/
+│       │   │   │   ├── home-day.png
+│       │   │   │   ├── home-night.png
+│       │   │   │   ├── table-day.png
+│       │   │   │   └── table-night.png
+│       │   │   └── tarot/
+│       │   │       ├── guard.png
+│       │   │       ├── hunter.png
+│       │   │       ├── seer.png
+│       │   │       ├── villager.png
+│       │   │       ├── werewolf.png
+│       │   │       └── witch.png
+│       │   └── textures/
+│       │       ├── header-weave.png
+│       │       ├── night-vignette.png
+│       │       ├── parchment.png
+│       │       └── warm-glow.png
 │       ├── qml/
 │       │   ├── components/
 │       │   │   ├── AppBackground.qml

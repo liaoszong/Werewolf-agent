@@ -105,6 +105,10 @@ qt_add_qml_module(appqt_observer
         assets/illustrations/avatars/villager.png
         assets/illustrations/avatars/guard.png
         assets/illustrations/avatars/hunter.png
+        assets/textures/parchment.png
+        assets/textures/header-weave.png
+        assets/textures/night-vignette.png
+        assets/textures/warm-glow.png
 )
 
 set_target_properties(appqt_observer PROPERTIES
