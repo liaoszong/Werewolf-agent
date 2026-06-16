@@ -1,10 +1,11 @@
 import QtQuick
+import QtQuick.Effects
 import qt_observer
 
 // Role seat card for the Match Ready Room.
 // Visual philosophy: the tarot CARD ART is the visual subject. The container is
 // nearly transparent — it owns only geometry, click/hover/selected affordances,
-// a soft warm contact shadow, and a thin scrim so the per-seat engine/model/state
+// a soft warm cast shadow, and a thin scrim so the per-seat engine/model/state
 // chips stay legible over the art. No thick white frame, no "card in a frame".
 Item {
     id: root
@@ -39,21 +40,32 @@ Item {
 
     Behavior on scale { NumberAnimation { duration: Theme.anim.press; easing.type: Easing.OutQuad } }
 
-    // --- Bottom-only warm contact shadow ---
-    // Previous side/full-card shadows could leak through transparent pixels near the
-    // tarot PNG corners and read as square corner artifacts. This shadow lives only
-    // below the visible card, restoring lift without any top-corner shadow.
-    Rectangle {
-        id: bottomShadow
-        width: cardClip.width * 0.88
-        height: 18
-        x: cardClip.x + cardClip.width * 0.10
-        y: cardClip.y + cardClip.height - 2
-        radius: height / 2
-        color: Theme.withAlpha(Theme.parchment.woodShadow, root.selected ? 0.34
-                                   : (hoverHandler.hovered ? 0.30 : 0.25))
+    // --- Tarot-alpha warm cast shadow ---
+    // Do NOT draw a Rectangle shadow: the tarot PNG has transparent rounded-corner
+    // pixels, and rectangular shadows leak through/around those corners. Match the
+    // HomeView pattern by applying MultiEffect to the tarot image alpha itself.
+    Image {
+        id: shadowArt
+        width: cardClip.width
+        height: cardClip.height
+        x: cardClip.x
+        y: cardClip.y
+        source: Illustrations.tarot(root.roleKey)
+        fillMode: Image.PreserveAspectFit
+        asynchronous: true
+        cache: true
+        visible: status === Image.Ready
         z: -3
-        Behavior on color { ColorAnimation { duration: Theme.anim.color; easing.type: Easing.OutCubic } }
+        layer.enabled: true
+        layer.effect: MultiEffect {
+            shadowEnabled: true
+            shadowColor: Qt.rgba(40 / 255, 30 / 255, 20 / 255, root.selected ? 0.36 : 0.30)
+            shadowBlur: root.selected ? 0.72 : (hoverHandler.hovered ? 0.62 : 0.52)
+            shadowHorizontalOffset: root.selected ? 6 : 5
+            shadowVerticalOffset: root.selected ? 12 : 8
+            Behavior on shadowBlur { NumberAnimation { duration: Theme.anim.color } }
+            Behavior on shadowVerticalOffset { NumberAnimation { duration: Theme.anim.color } }
+        }
     }
 
     // --- Selected ambient glow — soft wash only, not the primary outline ---
