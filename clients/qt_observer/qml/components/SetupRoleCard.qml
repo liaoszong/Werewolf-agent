@@ -39,31 +39,19 @@ Item {
 
     Behavior on scale { NumberAnimation { duration: Theme.anim.press; easing.type: Easing.OutQuad } }
 
-    // --- Warm contact shadows ---
-    // Do not draw a full card-sized shadow rectangle: transparent pixels in the
-    // tarot PNG corners can reveal it as hard square artifacts at the upper corners.
-    // These two contact shadows start below / beside the visible card only.
+    // --- Bottom-only warm contact shadow ---
+    // Previous side/full-card shadows could leak through transparent pixels near the
+    // tarot PNG corners and read as square corner artifacts. This shadow lives only
+    // below the visible card, restoring lift without any top-corner shadow.
     Rectangle {
         id: bottomShadow
-        width: cardClip.width * 0.92
-        height: 22
-        x: cardClip.x + cardClip.width * 0.08
-        y: cardClip.y + cardClip.height - 7
+        width: cardClip.width * 0.88
+        height: 18
+        x: cardClip.x + cardClip.width * 0.10
+        y: cardClip.y + cardClip.height - 2
         radius: height / 2
-        color: Theme.withAlpha(Theme.parchment.woodShadow, root.selected ? 0.30
-                                   : (hoverHandler.hovered ? 0.26 : 0.22))
-        z: -3
-        Behavior on color { ColorAnimation { duration: Theme.anim.color; easing.type: Easing.OutCubic } }
-    }
-    Rectangle {
-        id: rightShadow
-        width: 14
-        height: Math.max(0, cardClip.height - 54)
-        x: cardClip.x + cardClip.width - 2
-        y: cardClip.y + 34
-        radius: 7
-        color: Theme.withAlpha(Theme.parchment.woodShadow, root.selected ? 0.20
-                                   : (hoverHandler.hovered ? 0.17 : 0.14))
+        color: Theme.withAlpha(Theme.parchment.woodShadow, root.selected ? 0.34
+                                   : (hoverHandler.hovered ? 0.30 : 0.25))
         z: -3
         Behavior on color { ColorAnimation { duration: Theme.anim.color; easing.type: Easing.OutCubic } }
     }
