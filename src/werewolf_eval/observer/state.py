@@ -17,6 +17,7 @@ class ObserverServerState:
     runs_dir: Path
     launcher: RunLauncher
     profiles_dir: Path = field(default_factory=lambda: Path("profiles"))
+    configs_dir: Path = field(default_factory=lambda: Path(".runs/user-configs"))
     run_status: dict[str, str] = field(default_factory=dict)
     run_errors: dict[str, str] = field(default_factory=dict)
     lock: Lock = field(default_factory=Lock)

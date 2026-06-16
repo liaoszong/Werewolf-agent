@@ -43,6 +43,7 @@ def create_observer_server(
     runs_dir: Path,
     launcher: RunLauncher | None = None,
     profiles_dir: Path | None = None,
+    configs_dir: Path | None = None,
     live_enabled: bool = False,
     live_max_requests: int = 32,
     live_max_tokens: int = 256,
@@ -66,6 +67,9 @@ def create_observer_server(
     if profiles_dir is None:
         profiles_dir = runs_dir.parent / "profiles"
     profiles_dir.mkdir(parents=True, exist_ok=True)
+    if configs_dir is None:
+        configs_dir = runs_dir / "user-configs"
+    configs_dir.mkdir(parents=True, exist_ok=True)
     # Opt-in (the CLI passes True): a fresh server isn't an empty setup page. Tests
     # using this factory leave it off so their temp profiles dirs stay pristine.
     if seed_default_profile:
@@ -85,6 +89,7 @@ def create_observer_server(
         runs_dir=runs_dir,
         launcher=launcher,
         profiles_dir=profiles_dir,
+        configs_dir=configs_dir,
         live_enabled=live_enabled,
         multi_provider_launcher_factory=multi_provider_launcher_factory,
     )

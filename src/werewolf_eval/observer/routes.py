@@ -61,6 +61,9 @@ GET_ROUTES: tuple[Route, ...] = (
         "_route_provider_models",
         loopback_message="providers endpoint is loopback-only",
     ),
+    Route(("api", "configs"), "_route_configs_list"),
+    Route(("api", "configs", "{config_id}", "export"), "_route_config_export"),
+    Route(("api", "configs", "{config_id}"), "_route_config_detail"),
     Route(("api", "profiles"), "_route_profiles_list"),
     Route(("api", "profiles", "{name}"), "_route_profile_detail"),
     # Run group: validate_run_id → 404 "Run not found: {id}" → perspective →
@@ -95,6 +98,18 @@ POST_ROUTES: tuple[Route, ...] = (
     ),
     Route(("api", "runs"), "_route_runs_post", same_origin=True),
     Route(("api", "profiles", "validate"), "_route_profile_validate"),
+    Route(
+        ("api", "configs", "import"),
+        "_route_configs_import",
+        loopback_message="configs endpoint is loopback-only",
+        same_origin=True,
+    ),
+    Route(
+        ("api", "configs"),
+        "_route_configs_post",
+        loopback_message="configs endpoint is loopback-only",
+        same_origin=True,
+    ),
 )
 
 DELETE_ROUTES: tuple[Route, ...] = (

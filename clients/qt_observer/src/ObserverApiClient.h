@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QObject>
+#include <QJsonDocument>
 #include <QString>
 #include <QStringList>
 #include <QVariantList>
@@ -119,6 +120,11 @@ public slots:
     Q_INVOKABLE void refreshProfileSchema();
     Q_INVOKABLE void fetchProfile(const QString &name);
     Q_INVOKABLE void validateProfile(const QVariantMap &profile);
+    Q_INVOKABLE void fetchConfig(const QString &configId);
+    Q_INVOKABLE void saveConfig(const QString &displayName, const QVariantMap &profile);
+    Q_INVOKABLE void importConfigFromFile(const QString &fileUrl);
+    Q_INVOKABLE void exportConfigToFile(const QString &configId, const QString &fileUrl);
+    Q_INVOKABLE void exportProfileToFile(const QString &displayName, const QVariantMap &profile, const QString &fileUrl);
     // C2: QML always passes an explicit mode ("fake"|"live") — no C++ default arg.
     Q_INVOKABLE void launchFromProfile(const QVariantMap &profile, const QString &mode);
     // G3-2 read-only live posture (no key, no provider call).
@@ -159,6 +165,11 @@ signals:
     void profileValidationChanged();
     void launchSucceeded();
     void launchFailed();
+    void configLoaded(const QString &configId);
+    void configSaved(const QString &configId);
+    void configImported(const QString &configId);
+    void configExported(const QString &filePath);
+    void configActionFailed(const QString &message);
     // G3-2 capability + executed-truth signals
     void capabilitiesChanged();
     void currentExecutionModeChanged();
@@ -177,6 +188,9 @@ private:
     QNetworkReply *get(const QString &path);
     QNetworkReply *post(const QString &path, const QByteArray &body);
     void setError(const QString &msg);
+    void setConfigActionError(const QString &msg);
+    QString localPathFromFileUrl(const QString &fileUrl) const;
+    bool writeJsonDocumentToFile(const QJsonDocument &doc, const QString &fileUrl, QString *error) const;
     void startStreamRequest();
     void stopStream();
     // C1-bis: a run change must never inherit the prior run's executed truth.

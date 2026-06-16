@@ -4,10 +4,99 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QDateTime>
+#include <QFile>
 #include <QNetworkReply>
 #include <QNetworkRequest>
+#include <QSaveFile>
 #include <QUrl>
 #include <QUrlQuery>
+
+static QString replyErrorMessage(QNetworkReply *reply, const QString &fallback)
+{
+    const QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+    if (doc.isObject()) {
+        const QJsonObject obj = doc.object();
+        const QString message = obj.value(QStringLiteral("message")).toString();
+        if (!message.isEmpty())
+            return message;
+        const QString code = obj.value(QStringLiteral("code")).toString();
+        if (!code.isEmpty())
+            return code;
+    }
+    return fallback;
+}
+
+static QStringList secretKeyFragments()
+{
+    return {
+        QStringLiteral("api") + QStringLiteral("_key"),
+        QStringLiteral("api") + QStringLiteral("-") + QStringLiteral("key"),
+        QStringLiteral("apikey"),
+        QStringLiteral("authorization"),
+        QStringLiteral("secret"),
+        QStringLiteral("token"),
+        QStringLiteral("bearer"),
+        QStringLiteral("password"),
+        QStringLiteral("credential"),
+        QStringLiteral("access") + QStringLiteral("_key"),
+    };
+}
+
+static QStringList secretValueMarkers()
+{
+    return {
+        QStringLiteral("sk") + QStringLiteral("-"),
+        QStringLiteral("bearer "),
+        QStringLiteral("api") + QStringLiteral("_key"),
+        QStringLiteral("api") + QStringLiteral("-") + QStringLiteral("key"),
+        QStringLiteral("apikey"),
+        QStringLiteral("authorization"),
+        QStringLiteral("access") + QStringLiteral("_key"),
+        QStringLiteral("deepseek") + QStringLiteral("_api") + QStringLiteral("_key"),
+    };
+}
+
+static bool hasSecretLikeContent(const QJsonValue &value, QString *message)
+{
+    if (value.isObject()) {
+        const QStringList configKeys = {
+            QStringLiteral("provider"), QStringLiteral("model"), QStringLiteral("prompt"),
+            QStringLiteral("strategy"), QStringLiteral("temperature"), QStringLiteral("max_tokens"),
+        };
+        const QJsonObject obj = value.toObject();
+        for (auto it = obj.constBegin(); it != obj.constEnd(); ++it) {
+            const QString key = it.key().toLower();
+            if (!configKeys.contains(key)) {
+                for (const QString &fragment : secretKeyFragments()) {
+                    if (key.contains(fragment)) {
+                        if (message)
+                            *message = QStringLiteral("secret_detected");
+                        return true;
+                    }
+                }
+            }
+            if (hasSecretLikeContent(it.value(), message))
+                return true;
+        }
+    } else if (value.isArray()) {
+        const QJsonArray arr = value.toArray();
+        for (const QJsonValue &item : arr) {
+            if (hasSecretLikeContent(item, message))
+                return true;
+        }
+    } else if (value.isString()) {
+        const QString lowered = value.toString().toLower();
+        for (const QString &marker : secretValueMarkers()) {
+            if (lowered.contains(marker)) {
+                if (message)
+                    *message = QStringLiteral("secret_detected");
+                return true;
+            }
+        }
+    }
+    return false;
+}
 
 ObserverApiClient::ObserverApiClient(QObject *parent)
     : QObject(parent)
@@ -114,6 +203,43 @@ void ObserverApiClient::setError(const QString &msg)
 {
     m_lastError = msg;
     emit lastErrorChanged();
+}
+
+void ObserverApiClient::setConfigActionError(const QString &msg)
+{
+    setError(msg);
+    emit configActionFailed(msg);
+}
+
+QString ObserverApiClient::localPathFromFileUrl(const QString &fileUrl) const
+{
+    const QUrl url(fileUrl);
+    if (url.isLocalFile())
+        return url.toLocalFile();
+    return fileUrl;
+}
+
+bool ObserverApiClient::writeJsonDocumentToFile(const QJsonDocument &doc, const QString &fileUrl, QString *error) const
+{
+    const QString path = localPathFromFileUrl(fileUrl);
+    if (path.isEmpty()) {
+        if (error)
+            *error = QStringLiteral("No file selected");
+        return false;
+    }
+    QSaveFile file(path);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        if (error)
+            *error = file.errorString();
+        return false;
+    }
+    file.write(doc.toJson(QJsonDocument::Indented));
+    if (!file.commit()) {
+        if (error)
+            *error = file.errorString();
+        return false;
+    }
+    return true;
 }
 
 void ObserverApiClient::setCurrentRunId(const QString &runId)
@@ -573,10 +699,37 @@ void ObserverApiClient::refreshProfiles()
         QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
         if (!doc.isObject()) { setError(QStringLiteral("Invalid profiles response")); return; }
         QVariantList items;
-        for (const QJsonValue &v : doc.object().value(QStringLiteral("profiles")).toArray())
-            items.append(v.toObject().toVariantMap());
-        m_profileItems = items;
-        emit profileItemsChanged();
+        for (const QJsonValue &v : doc.object().value(QStringLiteral("profiles")).toArray()) {
+            QVariantMap item = v.toObject().toVariantMap();
+            const QString name = item.value(QStringLiteral("name")).toString();
+            item.insert(QStringLiteral("id"), name);
+            item.insert(QStringLiteral("source"), QStringLiteral("profile"));
+            item.insert(QStringLiteral("display_name"), name);
+            items.append(item);
+        }
+
+        QNetworkReply *configsReply = get(QStringLiteral("/api/configs"));
+        connect(configsReply, &QNetworkReply::finished, this, [this, configsReply, items]() {
+            configsReply->deleteLater();
+            QVariantList merged = items;
+            if (configsReply->error() == QNetworkReply::NoError) {
+                QJsonDocument configsDoc = QJsonDocument::fromJson(configsReply->readAll());
+                if (configsDoc.isObject()) {
+                    for (const QJsonValue &v : configsDoc.object().value(QStringLiteral("configs")).toArray()) {
+                        QVariantMap item = v.toObject().toVariantMap();
+                        item.insert(QStringLiteral("source"), QStringLiteral("config"));
+                        item.insert(QStringLiteral("name"), item.value(QStringLiteral("display_name")).toString());
+                        merged.append(item);
+                    }
+                } else {
+                    setError(QStringLiteral("Invalid configs response"));
+                }
+            } else {
+                setError(configsReply->errorString());
+            }
+            m_profileItems = merged;
+            emit profileItemsChanged();
+        });
     });
 }
 
@@ -624,6 +777,160 @@ void ObserverApiClient::validateProfile(const QVariantMap &profile)
         m_profileValidation = doc.object().toVariantMap();
         emit profileValidationChanged();
     });
+}
+
+void ObserverApiClient::fetchConfig(const QString &configId)
+{
+    if (configId.isEmpty())
+        return;
+    const quint64 serial = ++m_profileRequestSerial;
+    const QString encoded = QString::fromUtf8(QUrl::toPercentEncoding(configId));
+    QNetworkReply *reply = get(QStringLiteral("/api/configs/") + encoded);
+    connect(reply, &QNetworkReply::finished, this, [this, reply, serial, configId]() {
+        reply->deleteLater();
+        if (serial != m_profileRequestSerial) return;  // latest-wins with fetchProfile
+        if (reply->error() != QNetworkReply::NoError) {
+            setConfigActionError(replyErrorMessage(reply, reply->errorString()));
+            return;
+        }
+        QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+        if (!doc.isObject()) {
+            setConfigActionError(QStringLiteral("Invalid config response"));
+            return;
+        }
+        const QJsonObject profile = doc.object().value(QStringLiteral("profile")).toObject();
+        if (profile.isEmpty()) {
+            setConfigActionError(QStringLiteral("Invalid config profile"));
+            return;
+        }
+        m_loadedProfile = profile.toVariantMap();
+        emit loadedProfileChanged();
+        emit configLoaded(configId);
+    });
+}
+
+void ObserverApiClient::saveConfig(const QString &displayName, const QVariantMap &profile)
+{
+    QJsonObject profileObject = QJsonObject::fromVariantMap(profile);
+    QJsonObject body;
+    body[QStringLiteral("display_name")] = displayName;
+    body[QStringLiteral("profile")] = profileObject;
+    body[QStringLiteral("script_id")] = profileObject.value(QStringLiteral("template")).toString();
+    body[QStringLiteral("base_profile")] = profileObject.value(QStringLiteral("name")).toString();
+
+    QNetworkReply *reply = post(QStringLiteral("/api/configs"),
+                                QJsonDocument(body).toJson(QJsonDocument::Compact));
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        reply->deleteLater();
+        if (reply->error() != QNetworkReply::NoError) {
+            setConfigActionError(replyErrorMessage(reply, reply->errorString()));
+            return;
+        }
+        QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+        if (!doc.isObject()) {
+            setConfigActionError(QStringLiteral("Invalid save-config response"));
+            return;
+        }
+        const QString configId = doc.object().value(QStringLiteral("id")).toString();
+        if (configId.isEmpty()) {
+            setConfigActionError(QStringLiteral("Saved config response has no id"));
+            return;
+        }
+        emit configSaved(configId);
+    });
+}
+
+void ObserverApiClient::importConfigFromFile(const QString &fileUrl)
+{
+    const QString path = localPathFromFileUrl(fileUrl);
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        setConfigActionError(file.errorString());
+        return;
+    }
+    QJsonParseError parseError;
+    QJsonDocument doc = QJsonDocument::fromJson(file.readAll(), &parseError);
+    if (parseError.error != QJsonParseError::NoError || !doc.isObject()) {
+        setConfigActionError(QStringLiteral("invalid_config_file"));
+        return;
+    }
+
+    QNetworkReply *reply = post(QStringLiteral("/api/configs/import"),
+                                doc.toJson(QJsonDocument::Compact));
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        reply->deleteLater();
+        if (reply->error() != QNetworkReply::NoError) {
+            setConfigActionError(replyErrorMessage(reply, reply->errorString()));
+            return;
+        }
+        QJsonDocument result = QJsonDocument::fromJson(reply->readAll());
+        if (!result.isObject()) {
+            setConfigActionError(QStringLiteral("Invalid import-config response"));
+            return;
+        }
+        const QString configId = result.object().value(QStringLiteral("id")).toString();
+        if (configId.isEmpty()) {
+            setConfigActionError(QStringLiteral("Imported config response has no id"));
+            return;
+        }
+        emit configImported(configId);
+    });
+}
+
+void ObserverApiClient::exportConfigToFile(const QString &configId, const QString &fileUrl)
+{
+    if (configId.isEmpty()) {
+        setConfigActionError(QStringLiteral("No saved config selected"));
+        return;
+    }
+    const QString encoded = QString::fromUtf8(QUrl::toPercentEncoding(configId));
+    QNetworkReply *reply = get(QStringLiteral("/api/configs/") + encoded + QStringLiteral("/export"));
+    connect(reply, &QNetworkReply::finished, this, [this, reply, fileUrl]() {
+        reply->deleteLater();
+        if (reply->error() != QNetworkReply::NoError) {
+            setConfigActionError(replyErrorMessage(reply, reply->errorString()));
+            return;
+        }
+        QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+        if (!doc.isObject()) {
+            setConfigActionError(QStringLiteral("Invalid export-config response"));
+            return;
+        }
+        QString error;
+        if (!writeJsonDocumentToFile(doc, fileUrl, &error)) {
+            setConfigActionError(error);
+            return;
+        }
+        emit configExported(localPathFromFileUrl(fileUrl));
+    });
+}
+
+void ObserverApiClient::exportProfileToFile(const QString &displayName, const QVariantMap &profile, const QString &fileUrl)
+{
+    const QJsonObject profileObject = QJsonObject::fromVariantMap(profile);
+    const QString stamp = QDateTime::currentDateTimeUtc().toString(Qt::ISODate).replace(QStringLiteral("+00:00"), QStringLiteral("Z"));
+    QJsonObject payload;
+    payload[QStringLiteral("schema_version")] = 1;
+    payload[QStringLiteral("kind")] = QStringLiteral("werewolf_agent.match_config");
+    payload[QStringLiteral("display_name")] = displayName.trimmed().isEmpty()
+        ? profileObject.value(QStringLiteral("name")).toString(QStringLiteral("match-config"))
+        : displayName.trimmed();
+    payload[QStringLiteral("created_at")] = stamp;
+    payload[QStringLiteral("updated_at")] = stamp;
+    payload[QStringLiteral("script_id")] = profileObject.value(QStringLiteral("template")).toString();
+    payload[QStringLiteral("base_profile")] = profileObject.value(QStringLiteral("name")).toString();
+    payload[QStringLiteral("profile")] = profileObject;
+
+    QString error;
+    if (hasSecretLikeContent(QJsonValue(payload), &error)) {
+        setConfigActionError(error);
+        return;
+    }
+    if (!writeJsonDocumentToFile(QJsonDocument(payload), fileUrl, &error)) {
+        setConfigActionError(error);
+        return;
+    }
+    emit configExported(localPathFromFileUrl(fileUrl));
 }
 
 void ObserverApiClient::refreshCapabilities()

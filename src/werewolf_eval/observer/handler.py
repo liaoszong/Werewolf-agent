@@ -70,6 +70,14 @@ from werewolf_eval.profile_config import (
 )
 from werewolf_eval.runtime_events import redact_secret_values
 from werewolf_eval.settlement_bundle import build_settlement_response
+from werewolf_eval.user_config_library import (
+    UserConfigError,
+    export_user_config,
+    import_user_config,
+    list_user_configs,
+    load_user_config,
+    save_user_config,
+)
 
 _PROFILE_NAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,255}$")
 
@@ -268,6 +276,26 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
     def _route_profiles_list(self, params: dict[str, str]) -> None:
         profiles = list_profiles(self._get_state().profiles_dir)
         self._send_json(200, {"profiles": profiles})
+
+    def _route_configs_list(self, params: dict[str, str]) -> None:
+        configs = list_user_configs(self._get_state().configs_dir)
+        self._send_json(200, {"configs": configs})
+
+    def _route_config_detail(self, params: dict[str, str]) -> None:
+        try:
+            payload = load_user_config(self._get_state().configs_dir, params["config_id"])
+        except UserConfigError as exc:
+            self._send_user_config_error(exc)
+            return
+        self._send_json(200, redact_secret_values(payload))
+
+    def _route_config_export(self, params: dict[str, str]) -> None:
+        try:
+            payload = export_user_config(self._get_state().configs_dir, params["config_id"])
+        except UserConfigError as exc:
+            self._send_user_config_error(exc)
+            return
+        self._send_json(200, redact_secret_values(payload))
 
     def _route_profile_detail(self, params: dict[str, str]) -> None:
         name = params["name"]
@@ -538,6 +566,47 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
             200,
             {"valid": not errors, "errors": errors, "resolved_seats": resolved},
         )
+
+    def _route_configs_post(self, params: dict[str, str]) -> None:
+        body = self._read_json_body()
+        profile = body.get("profile")
+        if not isinstance(profile, dict):
+            self._send_error_json(400, "invalid_profile", "config profile must be a JSON object")
+            return
+        try:
+            item = save_user_config(
+                self._get_state().configs_dir,
+                display_name=str(body.get("display_name", "")),
+                profile=profile,
+                script_id=body.get("script_id") if isinstance(body.get("script_id"), str) else None,
+                base_profile=body.get("base_profile") if isinstance(body.get("base_profile"), str) else None,
+            )
+        except UserConfigError as exc:
+            self._send_user_config_error(exc)
+            return
+        self._send_json(201, item)
+
+    def _route_configs_import(self, params: dict[str, str]) -> None:
+        body = self._read_json_body()
+        try:
+            item = import_user_config(self._get_state().configs_dir, body)
+        except UserConfigError as exc:
+            self._send_user_config_error(exc)
+            return
+        self._send_json(201, item)
+
+    def _send_user_config_error(self, exc: UserConfigError) -> None:
+        status_by_code = {
+            "config_not_found": 404,
+            "config_write_failed": 500,
+            "config_import_failed": 400,
+            "invalid_config_file": 400,
+            "unsupported_config_version": 400,
+            "secret_detected": 400,
+            "invalid_profile": 400,
+            "config_name_required": 400,
+        }
+        self._send_error_json(status_by_code.get(exc.code, 400), exc.code, str(exc))
 
     # -- artifact file serving ---------------------------------------------
 

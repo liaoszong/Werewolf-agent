@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 597
+- Entries: 598
 
 ```text
 ./
@@ -484,6 +484,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       ├── semantic_labels.py
 │       ├── settlement_bundle.py
 │       ├── source_labels.py
+│       ├── user_config_library.py
 │       ├── validate_consensus_log.py
 │       ├── validate_decision_log.py
 │       ├── validate_failure_audit.py

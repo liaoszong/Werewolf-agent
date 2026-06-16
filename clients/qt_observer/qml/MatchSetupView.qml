@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Dialogs
 import qt_observer
 import "components"
 
@@ -13,6 +14,8 @@ Item {
     property int _validatedRevision: -1
     property bool _initialLoadDone: false
     property int _credRev: 0
+    property string currentConfigId: ""
+    property string configStatusMessage: ""
 
     readonly property var seatRoles: ObserverClient.profileSchema && ObserverClient.profileSchema.seat_roles
                                       ? ObserverClient.profileSchema.seat_roles : ({})
@@ -34,6 +37,53 @@ Item {
     Item {
         objectName: "setupValidateButton"
         visible: false
+    }
+
+    Dialog {
+        id: saveConfigDialog
+        objectName: "setupSaveConfigDialog"
+        modal: true
+        focus: true
+        width: 360
+        anchors.centerIn: Overlay.overlay
+        title: I18n.t("另存为配置", "Save as config")
+        standardButtons: Dialog.Ok | Dialog.Cancel
+        onAccepted: ObserverClient.saveConfig(saveConfigNameField.text, root.editedProfile)
+        contentItem: Column {
+            spacing: Theme.space.md
+            TextField {
+                id: saveConfigNameField
+                objectName: "setupConfigNameField"
+                width: parent.width
+                selectByMouse: true
+                placeholderText: I18n.t("配置名称", "Config name")
+            }
+        }
+    }
+
+    FileDialog {
+        id: exportConfigDialog
+        objectName: "setupExportConfigDialog"
+        title: I18n.t("导出配置", "Export config")
+        fileMode: FileDialog.SaveFile
+        nameFilters: [I18n.t("狼人配置 (*.werewolf-config.json)", "Werewolf config (*.werewolf-config.json)"),
+                      I18n.t("JSON 文件 (*.json)", "JSON files (*.json)")]
+        onAccepted: {
+            if (root.currentConfigId)
+                ObserverClient.exportConfigToFile(root.currentConfigId, selectedFile.toString())
+            else
+                ObserverClient.exportProfileToFile(root._currentDisplayName(), root.editedProfile, selectedFile.toString())
+        }
+    }
+
+    FileDialog {
+        id: importConfigDialog
+        objectName: "setupImportConfigDialog"
+        title: I18n.t("导入配置", "Import config")
+        fileMode: FileDialog.OpenFile
+        nameFilters: [I18n.t("狼人配置 (*.werewolf-config.json)", "Werewolf config (*.werewolf-config.json)"),
+                      I18n.t("JSON 文件 (*.json)", "JSON files (*.json)")]
+        onAccepted: ObserverClient.importConfigFromFile(selectedFile.toString())
     }
 
     Component.onCompleted: {
@@ -59,9 +109,13 @@ Item {
     Connections {
         target: ObserverClient
         function onProfileItemsChanged() {
+            if (root.currentConfigId) {
+                root._selectProfileItemByConfigId(root.currentConfigId)
+                return
+            }
             if (!root._initialLoadDone && ObserverClient.profileItems.length > 0) {
                 root._initialLoadDone = true
-                ObserverClient.fetchProfile(ObserverClient.profileItems[0].name)
+                root._loadProfileItem(ObserverClient.profileItems[0])
             }
         }
         function onLoadedProfileChanged() {
@@ -82,6 +136,28 @@ Item {
             ObserverClient.connectStream()
             root.StackView.view.parent.navigateCockpit()
         }
+        function onConfigSaved(configId) {
+            root.currentConfigId = configId
+            root.configStatusMessage = I18n.t("已保存为新配置", "Saved as new config")
+            configStatusTimer.restart()
+            ObserverClient.refreshProfiles()
+            ObserverClient.fetchConfig(configId)
+        }
+        function onConfigImported(configId) {
+            root.currentConfigId = configId
+            root.configStatusMessage = I18n.t("配置已导入", "Config imported")
+            configStatusTimer.restart()
+            ObserverClient.refreshProfiles()
+            ObserverClient.fetchConfig(configId)
+        }
+        function onConfigExported(filePath) {
+            root.configStatusMessage = I18n.t("配置已导出", "Config exported")
+            configStatusTimer.restart()
+        }
+        function onConfigActionFailed(message) {
+            root.configStatusMessage = message || ObserverClient.lastError
+            configStatusTimer.restart()
+        }
     }
 
     Timer {
@@ -96,8 +172,67 @@ Item {
         }
     }
 
+    Timer {
+        id: configStatusTimer
+        interval: 3200
+        repeat: false
+        onTriggered: root.configStatusMessage = ""
+    }
+
     function _scheduleAutoReady() {
         autoReadyTimer.restart()
+    }
+
+    function _loadProfileItem(item) {
+        if (!item)
+            return
+        root.editedProfile = ({})
+        root.selectedSeatId = ""
+        setupModeControl.resetToFake()
+        if (item.source === "config") {
+            root.currentConfigId = item.id || ""
+            ObserverClient.fetchConfig(root.currentConfigId)
+        } else {
+            root.currentConfigId = ""
+            ObserverClient.fetchProfile(item.name)
+        }
+    }
+
+    function _selectProfileItemByConfigId(configId) {
+        for (var i = 0; i < ObserverClient.profileItems.length; i++) {
+            var item = ObserverClient.profileItems[i]
+            if (item.source === "config" && item.id === configId) {
+                profilePicker.currentIndex = i
+                return
+            }
+        }
+    }
+
+    function _currentDisplayName() {
+        if (root.currentConfigId) {
+            for (var i = 0; i < ObserverClient.profileItems.length; i++) {
+                var item = ObserverClient.profileItems[i]
+                if (item.source === "config" && item.id === root.currentConfigId)
+                    return item.display_name || item.name || root.currentConfigId
+            }
+        }
+        if (root.editedProfile && root.editedProfile.name)
+            return root.editedProfile.name
+        return I18n.t("新配置", "New config")
+    }
+
+    function _openSaveDialog() {
+        saveConfigNameField.text = root._currentDisplayName()
+        saveConfigDialog.open()
+    }
+
+    function _openExportDialog() {
+        if (!root.editedProfile || Object.keys(root.editedProfile).length === 0) {
+            root.configStatusMessage = I18n.t("没有可导出的配置", "No config to export")
+            configStatusTimer.restart()
+            return
+        }
+        exportConfigDialog.open()
     }
 
     function _specFor(pid) {
@@ -183,6 +318,8 @@ Item {
     }
 
     function statusLine() {
+        if (configStatusMessage)
+            return configStatusMessage
         if (arrangedCount === seatTotal && autoReady)
             return I18n.t("所有角色已就绪，可以开始对局", "All seats are ready. You can begin.")
         if (arrangedCount === seatTotal)
@@ -347,10 +484,8 @@ Item {
                         font.family: Theme.fontFamilies.cjkSans
                         font.contextFontMerging: true
                         onActivated: {
-                            root.editedProfile = ({})
-                            root.selectedSeatId = ""
                             setupModeControl.resetToFake()
-                            ObserverClient.fetchProfile(ObserverClient.profileItems[currentIndex].name)
+                            root._loadProfileItem(ObserverClient.profileItems[currentIndex])
                         }
                     }
                 }
@@ -383,31 +518,55 @@ Item {
                             - pageHeader.spacing * 4 + Theme.space.lg
                     height: parent.height
                     anchors.verticalCenter: parent.verticalCenter
-                    Rectangle {
+                    Button {
                         id: saveLink
                         objectName: "setupSaveConfigButton"
                         width: saveLinkLabel.implicitWidth + Theme.space.xl
                         height: 44
                         anchors.right: parent.right
                         anchors.verticalCenter: parent.verticalCenter
-                        radius: 12
-                        color: Theme.withAlpha(Theme.parchment.parchment, 0.42)
-                        border.width: 1
-                        border.color: Theme.withAlpha(Theme.parchment.goldLineSoft, 0.26)
-                        Column {
-                            anchors.centerIn: parent
-                            spacing: 1
-                            Text {
-                                id: saveLinkLabel
-                                text: I18n.t("另存为配置 · 稍后开放", "Save as config · Coming soon")
-                                color: Theme.parchment.mutedInk
-                                font.family: Theme.fontFamilies.cjkSans
-                                font.contextFontMerging: true
-                                font.pixelSize: Theme.size.caption
-                                font.weight: Theme.weight.semibold
+                        enabled: true
+                        hoverEnabled: true
+                        onClicked: configActionMenu.popup(saveLink, 0, saveLink.height)
+                        background: Rectangle {
+                            radius: 12
+                            color: saveLink.hovered ? Theme.withAlpha(Theme.parchment.parchment, 0.60)
+                                                    : Theme.withAlpha(Theme.parchment.parchment, 0.42)
+                            border.width: 1
+                            border.color: Theme.withAlpha(Theme.parchment.goldLineSoft, 0.26)
+                        }
+                        contentItem: Text {
+                            id: saveLinkLabel
+                            text: I18n.t("另存为配置 ▼", "Save as config ▼")
+                            color: Theme.parchment.ink
+                            font.family: Theme.fontFamilies.cjkSans
+                            font.contextFontMerging: true
+                            font.pixelSize: Theme.size.caption
+                            font.weight: Theme.weight.semibold
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                        }
+                        Accessible.role: Accessible.Button
+                        Accessible.name: I18n.t("另存为配置", "Save as config")
+                        Menu {
+                            id: configActionMenu
+                            objectName: "setupConfigActionMenu"
+                            MenuItem {
+                                objectName: "setupSaveConfigMenuItem"
+                                text: I18n.t("另存为配置", "Save as config")
+                                onTriggered: root._openSaveDialog()
+                            }
+                            MenuItem {
+                                objectName: "setupExportConfigButton"
+                                text: I18n.t("导出配置", "Export config")
+                                onTriggered: root._openExportDialog()
+                            }
+                            MenuItem {
+                                objectName: "setupImportConfigButton"
+                                text: I18n.t("导入配置", "Import config")
+                                onTriggered: importConfigDialog.open()
                             }
                         }
-                        HoverHandler { cursorShape: Qt.PointingHandCursor }
                     }
                 }
             }

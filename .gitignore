@@ -12,6 +12,7 @@
 
 __pycache__/
 *.pyc
+tests/
 .tmp/
 # local observer run output (game-log/snapshots/events) — never committed
 .runs/
