@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Effects
 import qt_observer
 
 // Role seat card for the Match Ready Room.
@@ -21,8 +22,13 @@ Item {
 
     signal activated()
 
-    implicitWidth: 214
-    implicitHeight: 298
+    // Match the HomeView tarot strip's 2:3 card proportion. Delegates may allocate
+    // a wider click box in MatchSetupView, but the visible card, shadow, selected
+    // outline, and glow are all centered on this 2:3 visual card.
+    implicitWidth: 152
+    implicitHeight: 228
+    readonly property real _cardRatio: 2 / 3
+
     // Selected floats up; hover nudges gently; press dips. No bounce.
     scale: tapHandler.pressed ? 0.985
           : (root.selected ? 1.03 : (hoverHandler.hovered ? 1.015 : 1.0))
@@ -33,22 +39,6 @@ Item {
     readonly property color _selColor: Theme.warm.primary   // terracotta coral
 
     Behavior on scale { NumberAnimation { duration: Theme.anim.press; easing.type: Easing.OutQuad } }
-
-    // --- Single soft warm drop shadow ---
-    // Keep one natural cast shadow only. A previous near-card second shadow read as
-    // a hard rectangular block behind the art in screenshots.
-    Rectangle {
-        z: -3
-        anchors.fill: cardClip
-        anchors.topMargin: 12
-        anchors.leftMargin: 6
-        anchors.rightMargin: -6
-        anchors.bottomMargin: -12
-        radius: cardClip.radius + 4
-        color: Theme.withAlpha(Theme.parchment.woodShadow, root.selected ? 0.46
-                                   : (hoverHandler.hovered ? 0.40 : 0.32))
-        Behavior on color { ColorAnimation { duration: Theme.anim.color; easing.type: Easing.OutCubic } }
-    }
 
     // --- Selected ambient glow — soft wash only, not the primary outline ---
     Rectangle {
@@ -65,7 +55,12 @@ Item {
     // --- The clip that IS the card edge — transparent fill, just rounds corners ---
     Rectangle {
         id: cardClip
-        anchors.fill: parent
+        // Do not fill the delegate's rectangular allocation. The visible art keeps
+        // the exact tarot aspect ratio used on HomeView, so shadows and outlines do
+        // not draw around an invisible wider box.
+        width: Math.min(root.width, root.height * root._cardRatio)
+        height: Math.min(root.height, root.width / root._cardRatio)
+        anchors.centerIn: parent
         radius: 14
         color: "transparent"
         // Non-selected hairline only. The selected edge is drawn by selectedOutline
@@ -73,6 +68,20 @@ Item {
         border.width: root.selected ? 0 : 1
         border.color: Theme.withAlpha(Theme.parchment.goldLineSoft, 0.30)
         clip: true
+
+        // Use the same class of real effect as HomeView's tarot strip instead of
+        // fake shadow rectangles. This removes the hard rectangular block that was
+        // visible behind the setup cards.
+        layer.enabled: true
+        layer.effect: MultiEffect {
+            shadowEnabled: true
+            shadowColor: Qt.rgba(40 / 255, 30 / 255, 20 / 255, root.selected ? 0.34 : 0.26)
+            shadowBlur: root.selected ? 0.72 : (hoverHandler.hovered ? 0.60 : 0.48)
+            shadowHorizontalOffset: root.selected ? 5 : 4
+            shadowVerticalOffset: root.selected ? 10 : 7
+            Behavior on shadowBlur { NumberAnimation { duration: Theme.anim.color } }
+            Behavior on shadowVerticalOffset { NumberAnimation { duration: Theme.anim.color } }
+        }
 
         // 1) Card art bleeds to the very edge — the art IS the frame.
         Image {
