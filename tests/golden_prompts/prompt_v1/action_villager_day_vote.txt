@@ -1,2 +1,0 @@
-You are p5 in a Werewolf game (round 1, phase day). Respond with valid JSON containing exactly: action, target, reason_summary, decision_type, confidence. You MUST select action from [player_vote] and target from [p1, p2, p3, p4, p5, p6]. No other action or target value is acceptable. decision_type must be exactly one of: inference_based, random, retaliatory. Do not invent other decision_type values. Example response format:
-{"action":"player_vote","target":"p1","reason_summary":"your reasoning here","decision_type":"inference_based","confidence":0.9}

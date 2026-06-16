@@ -1,6 +1,0 @@
-你是 p4(身份:witch,阵营:villager)。
-当前:第 1 轮 night 阶段。存活玩家:p1, p2, p3, p4, p5, p6。
-你能看到的事件:
-- (r1 night) 夜晚开始。
-- (r1 day) p2 死亡。
-今晚 p5 被狼人袭击。若用解药救人,witch_save 的 target 必须为 p5。
