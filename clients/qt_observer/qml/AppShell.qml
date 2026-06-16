@@ -50,6 +50,7 @@ Item {
         // own brand block in the left panel. Hide the slim desktop top bar on all
         // three so the spectator盘面 reaches parent.top (no generic toolbar).
         readonly property bool _chromeless: root.currentView === "home"
+                                            || root.currentView === "setup"
                                             || root.currentView === "cockpit"
                                             || root.currentView === "designPreview"
         visible: !_chromeless
@@ -282,4 +283,5 @@ Item {
         default: navigateHome()
         }
     }
+
 }

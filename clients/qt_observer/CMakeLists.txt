@@ -84,6 +84,7 @@ qt_add_qml_module(appqt_observer
         qml/components/SectionHeader.qml
         qml/components/EmptyState.qml
         qml/components/SeatEditorPanel.qml
+        qml/components/SetupRoleCard.qml
         qml/components/ModeControl.qml
         qml/components/DataSourceChip.qml
         qml/components/ConfirmDialog.qml
@@ -104,6 +105,7 @@ qt_add_qml_module(appqt_observer
         assets/illustrations/avatars/villager.png
         assets/illustrations/avatars/guard.png
         assets/illustrations/avatars/hunter.png
+        assets/illustrations/scene/setup-room.png
         assets/textures/parchment.png
 )
 

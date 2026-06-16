@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 602
+- Entries: 597
 
 ```text
 ./
@@ -76,6 +76,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       │   │   ├── scene/
 │       │   │   │   ├── home-day.png
 │       │   │   │   ├── home-night.png
+│       │   │   │   ├── setup-room.png
 │       │   │   │   ├── table-day.png
 │       │   │   │   └── table-night.png
 │       │   │   └── tarot/
@@ -85,15 +86,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       │   │       ├── villager.png
 │       │   │       ├── werewolf.png
 │       │   │       └── witch.png
-│       │   ├── ornament/
-│       │   │   ├── band-day.png
-│       │   │   ├── band-night.png
-│       │   │   └── tray.png
 │       │   └── textures/
-│       │       ├── header-weave.png
-│       │       ├── night-vignette.png
-│       │       ├── parchment.png
-│       │       └── warm-glow.png
+│       │       └── parchment.png
 │       ├── qml/
 │       │   ├── components/
 │       │   │   ├── AppBackground.qml
@@ -118,7 +112,6 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       │   │   ├── PhaseBackground.qml
 │       │   │   ├── PhaseCard.qml
 │       │   │   ├── PhaseIndicator.qml
-│       │   │   ├── PhaseTimeline.qml
 │       │   │   ├── PlaybackBar.qml
 │       │   │   ├── PlaybackControls.qml
 │       │   │   ├── ProjectionProofPanel.qml
@@ -130,6 +123,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       │   │   ├── SectionHeader.qml
 │       │   │   ├── SettlementReport.qml
 │       │   │   ├── SettlementSpine.qml
+│       │   │   ├── SetupRoleCard.qml
 │       │   │   ├── SpeechTheater.qml
 │       │   │   ├── StatusBadge.qml
 │       │   │   ├── ViewBoundaryBadge.qml

@@ -1,156 +1,164 @@
 import QtQuick
 import qt_observer
 
-// G3-2 segmented live/fake arming control — INTENT (not executed truth).
-//
-// Two-click arming FSM (canonical):
-//   fake → (click LIVE API, available) → live_armed
-//   live_armed → (click ARM LIVE) → live_confirmed
-//   any of {DETERMINISTIC, profile/seat change, live→unavailable} → fake
-//
-// The FSM is the inherited string `state` property holding exactly the literal
-// tokens "fake" | "live_armed" | "live_confirmed".  resetToFake() is the SINGLE
-// disarm entry point (C3) — the parent calls it on profile/seat change and when
-// live becomes unavailable; the FSM state is never mutated externally.
-// The view launches with `resolvedMode` — "live" ONLY in live_confirmed (C2).
+// Launch-mode intent control. The FSM tokens and resolvedMode mapping are the
+// runtime contract; this component only changes visual language for setup.
 Item {
     id: root
 
+    property bool onLight: false
+    property bool compact: false
+
     state: "fake"
 
-    // The resolved launch mode — "live" ONLY when fully confirmed; else "fake".
     readonly property string resolvedMode: root.state === "live_confirmed" ? "live" : "fake"
 
-    // Posture comes from the read-only capabilities endpoint (server-supplied);
-    // the reason code/message are rendered verbatim (data-driven), never literals.
     readonly property bool liveAvailable: ObserverClient.liveAvailable
     readonly property string liveReasonCode: ObserverClient.liveReasonCode
     readonly property string liveReasonMessage: ObserverClient.liveReasonMessage
 
-    implicitWidth: 380
-    implicitHeight: col.implicitHeight
+    implicitWidth: root.compact ? 236 : 380
+    implicitHeight: content.implicitHeight
 
-    // C3: the ONE disarm entry point.
     function resetToFake() { root.state = "fake" }
 
     Column {
-        id: col
+        id: content
         width: parent.width
-        spacing: Theme.space.sm
+        spacing: Theme.space.xs
 
-        // ---- Segmented [ DETERMINISTIC | LIVE API ] ----
-        Row {
-            spacing: Theme.space.xs
+        Rectangle {
+            width: parent.width
+            height: root.compact ? 42 : 46
+            radius: Theme.radius.pill
+            color: root.onLight ? Theme.withAlpha(Theme.warm.surfaceRaised, 0.72)
+                                : Theme.color.surfaceInset
+            border.width: 1
+            border.color: root.onLight ? Theme.withAlpha(Theme.parchment.goldLine, 0.38)
+                                       : Theme.color.border
 
-            // DETERMINISTIC — the safe, unconditional default.
-            Rectangle {
-                id: segFake
-                width: 150; height: 34
-                radius: Theme.radius.sm
-                color: root.state === "fake" ? Theme.color.surfaceAlt : Theme.color.surfaceInset
-                border.width: 1
-                border.color: root.state === "fake" ? Theme.color.borderStrong : Theme.color.border
-                Behavior on color { ColorAnimation { duration: Theme.motion.fast } }
-                Text {
-                    anchors.centerIn: parent
-                    text: I18n.t("模拟（免费）", "SIMULATION (FREE)")
-                    color: root.state === "fake" ? Theme.color.text : Theme.color.textMuted
-                    font.family: Theme.font.family
-                    font.pixelSize: Theme.size.micro
-                    font.weight: Theme.weight.semibold
-                    font.letterSpacing: 1
+            Row {
+                anchors.fill: parent
+                anchors.margins: 3
+                spacing: 3
+
+                Segment {
+                    width: (parent.width - parent.spacing) / 2
+                    height: parent.height
+                    label: I18n.t("试玩", "Trial")
+                    caption: root.compact ? "" : I18n.t("休闲排练", "rehearsal")
+                    active: root.state === "fake"
+                    enabled: true
+                    onPicked: root.resetToFake()
                 }
-                TapHandler { onTapped: root.resetToFake() }
-                HoverHandler { cursorShape: Qt.PointingHandCursor }
-            }
 
-            // LIVE API — disabled + "UNAVAIL · <reason_code>" when unavailable.
-            Rectangle {
-                id: segLive
-                width: 218; height: 34
-                radius: Theme.radius.sm
-                readonly property bool engaged: root.state === "live_armed" || root.state === "live_confirmed"
-                opacity: root.liveAvailable ? 1.0 : 0.55
-                color: segLive.engaged ? Theme.color.surfaceAlt : Theme.color.surfaceInset
-                border.width: 1
-                border.color: segLive.engaged ? Theme.color.borderStrong : Theme.color.border
-                Behavior on color { ColorAnimation { duration: Theme.motion.fast } }
-                Row {
-                    anchors.centerIn: parent
-                    spacing: Theme.space.xs
-                    GlowDot {
-                        anchors.verticalCenter: parent.verticalCenter
-                        diameter: 7
-                        color: root.state === "live_confirmed" ? Theme.color.text : Theme.color.textMuted
-                        pulse: root.state === "live_confirmed"
-                        visible: segLive.engaged
-                    }
-                    Text {
-                        anchors.verticalCenter: parent.verticalCenter
-                        // Available → "LIVE API"; unavailable → "UNAVAIL · <reason_code>".
-                        // The <reason_code> is server-supplied (verbatim), so it is a
-                        // property reference here, never a client source literal (C4).
-                        text: root.liveAvailable
-                              ? I18n.t("真实AI（计费）", "LIVE AI (BILLED)")
-                              : I18n.t("不可用 · ", "UNAVAILABLE · ") + root.liveReasonCode
-                        color: segLive.engaged ? Theme.color.text : Theme.color.textMuted
-                        font.family: Theme.font.family
-                        font.pixelSize: Theme.size.micro
-                        font.weight: Theme.weight.semibold
-                        font.letterSpacing: 1
-                    }
-                }
-                // First click (from fake, available) arms — never confirms.
-                TapHandler {
+                Segment {
+                    width: (parent.width - parent.spacing) / 2
+                    height: parent.height
+                    label: root.liveAvailable ? I18n.t("实战", "Live")
+                                               : I18n.t("实战", "Live")
+                    caption: root.compact ? "" : (root.liveAvailable ? I18n.t("认真对局", "ranked")
+                                                                       : I18n.t("暂不可用", "unavailable"))
+                    active: root.state === "live_armed" || root.state === "live_confirmed"
                     enabled: root.liveAvailable
-                    onTapped: if (root.state === "fake") root.state = "live_armed"
+                    pulse: root.state === "live_confirmed"
+                    onPicked: if (root.state === "fake") root.state = "live_armed"
+                    Accessible.description: root.liveReasonCode
                 }
-                HoverHandler { enabled: root.liveAvailable; cursorShape: Qt.PointingHandCursor }
             }
         }
 
-        // ---- Two-click arming confirm (only while armed/confirmed) ----
         Rectangle {
-            id: armRow
-            width: 218; height: 30
+            width: parent.width
+            height: 28
             visible: root.state === "live_armed" || root.state === "live_confirmed"
-            readonly property bool confirmed: root.state === "live_confirmed"
-            radius: Theme.radius.sm
-            color: armRow.confirmed ? Theme.withAlpha(Theme.color.text, 0.12) : "transparent"
+            radius: Theme.radius.pill
+            color: root.state === "live_confirmed"
+                   ? Theme.withAlpha(Theme.warm.success, 0.18)
+                   : Theme.withAlpha(Theme.warm.primary, 0.12)
             border.width: 1
-            border.color: armRow.confirmed ? Theme.color.borderStrong : Theme.color.border
+            border.color: root.state === "live_confirmed" ? Theme.warm.success : Theme.warm.primary
             Text {
                 anchors.centerIn: parent
-                text: armRow.confirmed
-                      ? I18n.t("真实AI已启用", "LIVE AI ENGAGED")
-                      : I18n.t("确认使用真实AI（计费）", "CONFIRM LIVE AI (BILLED)")
-                color: Theme.color.text
-                font.family: Theme.font.family
-                font.pixelSize: Theme.size.micro
+                text: root.state === "live_confirmed"
+                      ? I18n.t("实战已启用", "Live enabled")
+                      : I18n.t("再次点击确认实战", "Click again to confirm live")
+                color: root.state === "live_confirmed" ? Theme.warm.success : Theme.warm.primaryActive
+                font.family: Theme.fontFamilies.cjkSans
+                font.contextFontMerging: true
+                font.pixelSize: Theme.size.caption
                 font.weight: Theme.weight.semibold
-                font.letterSpacing: 1
             }
-            // Second, deliberate click confirms billed live.
             TapHandler {
                 enabled: root.liveAvailable && root.state === "live_armed"
                 onTapped: root.state = "live_confirmed"
             }
-            HoverHandler { enabled: root.state === "live_armed"; cursorShape: Qt.PointingHandCursor }
+            HoverHandler {
+                enabled: root.liveAvailable && root.state === "live_armed"
+                cursorShape: Qt.PointingHandCursor
+            }
         }
 
-        // ---- Unavailable context — the server message, verbatim ----
-        // Gated on the MESSAGE (not the code): the reason code is already shown
-        // inline on the LIVE segment ("UNAVAIL · <code>"), and the "unreachable"
-        // posture has no server message — so this must NOT render an empty line
-        // (which previously opened a blank gap that pushed the page down).
         Text {
             width: parent.width
-            visible: !root.liveAvailable && root.liveReasonMessage.length > 0
+            visible: !root.liveAvailable && root.liveReasonMessage.length > 0 && !root.compact
             text: root.liveReasonMessage
             wrapMode: Text.WordWrap
-            color: Theme.color.textMuted
-            font.family: Theme.font.family
+            color: root.onLight ? Theme.warm.muted : Theme.color.textMuted
+            font.family: root.onLight ? Theme.fontFamilies.cjkSans : Theme.font.family
+            font.contextFontMerging: root.onLight
             font.pixelSize: Theme.size.micro
         }
+    }
+
+    component Segment: Rectangle {
+        id: seg
+        required property string label
+        property string caption: ""
+        property bool active: false
+        property bool pulse: false
+        signal picked()
+
+        radius: Theme.radius.pill
+        color: active ? Theme.warm.primary : "transparent"
+        opacity: enabled ? 1 : 0.48
+        Behavior on color { ColorAnimation { duration: Theme.anim.color; easing.type: Easing.OutCubic } }
+
+        Column {
+            anchors.centerIn: parent
+            spacing: 0
+            Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: seg.label
+                color: seg.active ? Theme.warm.textOnPrimary : Theme.warm.body
+                font.family: Theme.fontFamilies.cjkSans
+                font.contextFontMerging: true
+                font.pixelSize: Theme.size.body
+                font.weight: Theme.weight.semibold
+            }
+            Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                visible: seg.caption !== ""
+                text: seg.caption
+                color: seg.active ? Theme.withAlpha(Theme.warm.textOnPrimary, 0.78) : Theme.warm.mutedSoft
+                font.family: Theme.fontFamilies.cjkSans
+                font.contextFontMerging: true
+                font.pixelSize: Theme.size.micro
+            }
+        }
+
+        Rectangle {
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.margins: 8
+            width: 7
+            height: 7
+            radius: 4
+            visible: seg.pulse
+            color: Theme.warm.textOnPrimary
+        }
+
+        TapHandler { enabled: seg.enabled; onTapped: seg.picked() }
+        HoverHandler { enabled: seg.enabled; cursorShape: Qt.PointingHandCursor }
     }
 }

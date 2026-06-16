@@ -3,35 +3,24 @@ import QtQuick.Controls
 import qt_observer
 import "."
 
-// Per-seat editor (P2-B Q1/Q2/Q3). Provider/model come from the BYO-key data
-// (configured providers ∩ schema; live-fetched models). Q3 adds the per-seat
-// tuning knobs: persona-preset chips that seed the prompt (replacing the dead
-// "strategy" dropdown — the final value sent is only `prompt`), a temperature
-// slider and a max-tokens field in a collapsible Advanced section, and an
-// inherit/override badge. AppCard is a plain Rectangle (no `padding`), so the
-// content Column is inset with explicit margins.
-AppCard {
+Item {
     id: root
     objectName: "seatEditorPanel"
 
-    // { player_id, role, team }
     property var seat: ({})
-    // { provider, model, strategy, prompt, temperature?, max_tokens? }
     property var config: ({})
-    // ObserverClient.profileSchema
     property var schema: ({})
-    // Q3: does this seat carry a per-seat override (vs inheriting the role default)?
     property bool overridden: false
+    property string statusText: ""
+    property string statusKind: "empty"
 
-    // Q3: `value` is `var` (not `string`) so the numeric knobs carry real numbers
-    // (temperature/max_tokens) through to the profile, not stringified values.
     signal edited(string field, var value)
-    signal closed()                    // collapse the inspector back to the sandbox
-    signal requestProviderSettings()   // jump to the provider/model settings page
+    signal closed()
+    signal requestProviderSettings()
 
     property bool _ready: false
     property int _credRev: 0
-    property bool _advancedOpen: false
+
     Component.onCompleted: { _syncControls(); _ensureModels(); _ready = true }
     onConfigChanged: { _syncControls(); _ensureModels() }
 
@@ -44,11 +33,6 @@ AppCard {
         function onProviderModelsChanged() { root._syncModelBox() }
     }
 
-    // ---------------------------------------------------------- persona presets
-    // Client-side starter personas per role × tone. "default" mirrors
-    // profile_config.DEFAULT_ROLE_PROMPTS so the 默认 chip highlights when a seat
-    // still uses the seeded baseline. Clicking a chip OVERWRITES the prompt box
-    // (the user keeps editing from there); the final value sent is just `prompt`.
     readonly property var personaPresets: ({
         "werewolf": {
             "default": "你是狼人阵营的一员。夜晚与狼队友配合选择击杀目标;白天伪装成好人,用合理的逻辑误导其他玩家、把怀疑引向好人,并优先保护狼队友。发言冷静自然,不要暴露身份。",
@@ -73,10 +57,36 @@ AppCard {
     })
     readonly property var presetChips: [
         { key: "default",    label: I18n.t("默认", "Default") },
-        { key: "aggressive", label: I18n.t("激进", "Aggressive") },
-        { key: "cautious",   label: I18n.t("谨慎", "Cautious") },
+        { key: "aggressive", label: I18n.t("激进", "Assertive") },
+        { key: "cautious",   label: I18n.t("谨慎", "Careful") },
         { key: "custom",     label: I18n.t("自定义", "Custom") }
     ]
+
+    function _roleLabel(role) {
+        switch (("" + role).toLowerCase()) {
+        case "werewolf": return I18n.t("狼人", "Werewolf")
+        case "seer": return I18n.t("预言家", "Seer")
+        case "witch": return I18n.t("女巫", "Witch")
+        case "villager": return I18n.t("村民", "Villager")
+        case "guard": return I18n.t("守卫", "Guard")
+        case "hunter": return I18n.t("猎人", "Hunter")
+        default: return Theme.humanizeRole(role)
+        }
+    }
+
+    function _seatNumber(seatId) {
+        var m = ("" + seatId).match(/\d+/)
+        return m ? m[0] + I18n.t("号位", "") : seatId
+    }
+
+    function _statusColor() {
+        if (root.statusKind === "ready")
+            return Theme.warm.success
+        if (root.statusKind === "missing")
+            return Theme.warm.warning
+        return Theme.warm.error
+    }
+
     function _presetsForRole() {
         var r = (root.seat && root.seat.role) ? root.seat.role : ""
         return root.personaPresets[r] || ({})
@@ -84,7 +94,6 @@ AppCard {
     function _presetText(key) {
         return root._presetsForRole()[key] || ""
     }
-    // Which preset (if any) the CURRENT prompt text matches — drives chip highlight.
     function _activePreset() {
         var ps = root._presetsForRole()
         var t = promptArea.text
@@ -94,7 +103,6 @@ AppCard {
         return "custom"
     }
 
-    // ---- control sync (imperative: a user edit severs declarative `config` binds)
     function _syncControls() {
         providerBox.currentIndex = Math.max(0, root._providerIndex(root.config.provider))
         _syncModelBox()
@@ -105,17 +113,12 @@ AppCard {
             promptArea.text = p
             root._ready = was
         }
-        // Numeric knobs show a default position when unset; they are only PERSISTED
-        // when the user actually moves them (onMoved / onEditingFinished), so an
-        // untouched knob stays unset and the provider's own default is used.
         tempSlider.value = (root.config && root.config.temperature !== undefined)
             ? root.config.temperature : 0.7
         maxTokensField.text = (root.config && root.config.max_tokens !== undefined)
             ? String(root.config.max_tokens) : ""
     }
 
-    // Deferred so the lazy `modelList` binding (and the ComboBox's own model
-    // binding) have re-evaluated after a provider/seat switch before we read them.
     function _syncModelBox() {
         Qt.callLater(_doSyncModelBox)
     }
@@ -137,6 +140,8 @@ AppCard {
     }
 
     function providerConfigured(p) {
+        if (p === "fake_deterministic")
+            return true
         return (root._credRev, CredentialStore.configuredProviders()).indexOf(p) >= 0
     }
 
@@ -155,11 +160,11 @@ AppCard {
         return (spec && spec.default_models) ? spec.default_models : []
     }
 
-    function _providerLabel(p) {
-        if (p === "fake_deterministic") return I18n.t("模拟(无需 Key)", "Simulation (no key)")
+    function _engineLabel(p) {
+        if (p === "fake_deterministic") return I18n.t("试玩引擎", "Trial engine")
         var spec = _specFor(p)
         if (spec && spec.label) return spec.label
-        return p
+        return p || I18n.t("未配置", "Unset")
     }
 
     readonly property var providerList: {
@@ -185,7 +190,7 @@ AppCard {
         var out = []
         var list = root.providerList
         for (var i = 0; i < list.length; i++)
-            out.push({ value: list[i], label: root._providerLabel(list[i]) })
+            out.push({ value: list[i], label: root._engineLabel(list[i]) })
         return out
     }
     function _providerIndex(p) {
@@ -196,361 +201,532 @@ AppCard {
     }
 
     readonly property var modelList: {
-        var p = config && config.provider ? config.provider : ""
+        var p = root.config && root.config.provider ? root.config.provider : ""
         if (!p) return []
-        // live fetched list wins; else the registry's per-provider default_models;
-        // else empty (user types a model id).
         return root._modelsFor(p)
     }
     readonly property int promptMax: schema && schema.prompt_max_len ? schema.prompt_max_len : 8000
 
+    Rectangle {
+        anchors.fill: parent
+        radius: parent.radius
+        // Parchment card, not near-white. Lets the setup-room light leak in.
+        color: Theme.withAlpha(Theme.parchment.parchmentSoft, 0.90)
+        border.width: 1
+        border.color: Theme.withAlpha(Theme.parchment.goldLine, 0.30)
+    }
+
     Flickable {
         anchors.fill: parent
-        contentHeight: content.implicitHeight + Theme.space.lg * 2
+        anchors.margins: Theme.space.lg
         clip: true
         boundsBehavior: Flickable.StopAtBounds
+        contentHeight: detailContent.implicitHeight + Theme.space.xl
 
         Column {
-            id: content
-            x: Theme.space.lg
-            y: Theme.space.lg
-            width: parent.width - 2 * Theme.space.lg
-            spacing: Theme.space.md
+            id: detailContent
+            width: parent.width
+            spacing: Theme.space.sm
 
-            // -------- Header: seat label + inherit/override badge + close --------
-            Item {
-                width: parent.width
-                height: Math.max(headerCol.implicitHeight, headerRight.implicitHeight)
-                Column {
-                    id: headerCol
-                    anchors.left: parent.left
-                    anchors.right: headerRight.left
-                    anchors.rightMargin: Theme.space.sm
-                    anchors.verticalCenter: parent.verticalCenter
-                    SectionHeader {
-                        title: I18n.t("座位", "Seat") + " " + (root.seat.player_id || "")
-                        caption: (root.seat.role || "") + (root.seat.team ? " · " + root.seat.team : "")
-                    }
-                }
-                Row {
-                    id: headerRight
-                    anchors.right: parent.right
-                    anchors.verticalCenter: parent.verticalCenter
-                    spacing: Theme.space.sm
-                    // inherit / override badge
-                    Rectangle {
-                        objectName: "seatEditorOverrideBadge"
-                        anchors.verticalCenter: parent.verticalCenter
-                        height: 20
-                        width: badgeText.implicitWidth + Theme.space.md
-                        radius: Theme.radius.pill
-                        color: root.overridden ? Theme.withAlpha(Theme.report.accent, 0.18)
-                                               : Theme.color.surfaceInset
-                        border.width: 1
-                        border.color: root.overridden ? Theme.report.accent : Theme.color.border
-                        Text {
-                            id: badgeText
-                            anchors.centerIn: parent
-                            text: root.overridden ? I18n.t("已覆盖", "Overridden")
-                                                  : I18n.t("继承默认", "Inherited")
-                            color: root.overridden ? Theme.report.accent : Theme.color.textMuted
-                            font.family: Theme.font.family; font.pixelSize: Theme.size.micro
-                        }
-                    }
-                    // × close
-                    Rectangle {
-                        id: closeBtn
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: 28; height: 28
-                        radius: Theme.radius.sm
-                        color: closeHover.hovered ? Theme.color.surfaceInset : "transparent"
-                        Behavior on color { ColorAnimation { duration: Theme.motion.fast } }
-                        Text {
-                            anchors.centerIn: parent
-                            text: "✕"
-                            color: closeHover.hovered ? Theme.color.text : Theme.color.textMuted
-                            font.family: Theme.font.family; font.pixelSize: Theme.size.body
-                        }
-                        HoverHandler { id: closeHover; cursorShape: Qt.PointingHandCursor }
-                        TapHandler { onTapped: root.closed() }
-                    }
-                }
-            }
-
-            // -------- Empty hint: no LIVE provider configured (fake still usable) --
-            Rectangle {
-                width: parent.width
-                visible: !root.hasLiveProviders
-                height: hintCol.implicitHeight + Theme.space.md * 2
-                radius: Theme.radius.md
-                color: Theme.color.surfaceInset
-                border.width: 1; border.color: Theme.color.border
-                Column {
-                    id: hintCol
-                    anchors.centerIn: parent
-                    width: parent.width - Theme.space.md * 2
-                    spacing: Theme.space.sm
-                    Text {
-                        width: parent.width
-                        wrapMode: Text.WordWrap
-                        text: I18n.t("未配置真实 AI 供应商,当前仅可模拟。",
-                                     "No live AI provider configured — simulation only.")
-                        color: Theme.color.textMuted
-                        font.family: Theme.font.family; font.pixelSize: Theme.size.caption
-                    }
-                    AppButton {
-                        text: I18n.t("⚙  去设置添加供应商", "⚙  Open provider settings")
-                        variant: "secondary"
-                        onClicked: root.requestProviderSettings()
-                    }
-                }
-            }
-
-            // -------- Controls (fake_deterministic is always available) --------
-            Column {
+            Row {
                 width: parent.width
                 spacing: Theme.space.md
-                visible: root.providerList.length > 0
 
-                // Provider
-                Column {
-                    width: parent.width
-                    spacing: Theme.space.xs
+                Rectangle {
+                    width: 48
+                    height: 48
+                    radius: 24
+                    color: Theme.withAlpha(Theme.warm.surfaceCard, 0.92)
+                    border.width: 1
+                    border.color: Theme.withAlpha(Theme.parchment.goldLine, 0.55)
                     Text {
-                        text: I18n.t("供应方", "Provider")
-                        color: Theme.color.textSecondary
-                        font.family: Theme.font.family; font.pixelSize: Theme.size.caption
-                    }
-                    ComboBox {
-                        id: providerBox
-                        objectName: "seatEditorProvider"
-                        width: parent.width
-                        model: root.providerOptions
-                        textRole: "label"
-                        onActivated: {
-                            var picked = root.providerOptions[currentIndex].value
-                            root.edited("provider", picked)
-                            if (root.providerConfigured(picked))
-                                ObserverClient.fetchProviderModels(picked)
-                        }
+                        anchors.centerIn: parent
+                        text: root._seatNumber(root.seat.player_id)
+                        color: Theme.parchment.ink
+                        font.family: Theme.fontFamilies.cjkSerif
+                        font.contextFontMerging: true
+                        font.pixelSize: Theme.warmSize.titleMd
+                        font.weight: Theme.weight.bold
                     }
                 }
 
-                // Model
                 Column {
-                    width: parent.width
-                    spacing: Theme.space.xs
+                    width: parent.width - 48 - closeButton.width - Theme.space.md * 2
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: 3
                     Text {
-                        text: I18n.t("模型", "Model")
-                        color: Theme.color.textSecondary
-                        font.family: Theme.font.family; font.pixelSize: Theme.size.caption
-                    }
-                    ComboBox {
-                        id: modelBox
-                        objectName: "seatEditorModel"
                         width: parent.width
-                        model: root.modelList
-                        onActivated: root.edited("model", root.modelList[currentIndex])
-                    }
-                }
-
-                // Persona presets (replaces the dead strategy dropdown)
-                Column {
-                    width: parent.width
-                    spacing: Theme.space.xs
-                    Text {
-                        text: I18n.t("性格", "Personality")
-                        color: Theme.color.textSecondary
-                        font.family: Theme.font.family; font.pixelSize: Theme.size.caption
+                        text: root._seatNumber(root.seat.player_id) + " · " + root._roleLabel(root.seat.role)
+                        color: Theme.warm.ink
+                        font.family: Theme.fontFamilies.cjkSerif
+                        font.contextFontMerging: true
+                        font.pixelSize: 24
+                        font.weight: Theme.weight.bold
+                        elide: Text.ElideRight
                     }
                     Row {
-                        objectName: "seatEditorPersona"
-                        width: parent.width
-                        spacing: Theme.space.sm
-                        Repeater {
-                            model: root.presetChips
-                            delegate: Rectangle {
-                                id: chip
-                                required property var modelData
-                                readonly property bool isCustom: modelData.key === "custom"
-                                readonly property bool active: root._activePreset() === modelData.key
-                                implicitWidth: chipLabel.implicitWidth + Theme.space.lg
-                                height: 28
-                                radius: Theme.radius.pill
-                                color: chip.active ? Theme.withAlpha(Theme.report.accent, 0.18)
-                                                   : Theme.color.surfaceInset
-                                border.width: 1
-                                border.color: chip.active ? Theme.report.accent : Theme.color.border
-                                opacity: (chip.isCustom && !chip.active) ? 0.55 : 1.0
-                                Behavior on color { ColorAnimation { duration: Theme.motion.fast } }
-                                Behavior on border.color { ColorAnimation { duration: Theme.motion.fast } }
-                                Text {
-                                    id: chipLabel
-                                    anchors.centerIn: parent
-                                    text: chip.modelData.label
-                                    color: chip.active ? Theme.color.text : Theme.color.textSecondary
-                                    font.family: Theme.font.family; font.pixelSize: Theme.size.caption
-                                    font.weight: chip.active ? Theme.weight.semibold : Theme.weight.regular
-                                }
-                                HoverHandler { cursorShape: Qt.PointingHandCursor }
-                                TapHandler {
-                                    onTapped: {
-                                        // "custom" isn't a template — just focus the box to edit.
-                                        if (chip.isCustom) { promptArea.forceActiveFocus(); return }
-                                        root.edited("prompt", root._presetText(chip.modelData.key))
-                                    }
-                                }
-                            }
+                        spacing: Theme.space.xs
+                        Rectangle {
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: 8
+                            height: 8
+                            radius: 4
+                            color: root._statusColor()
+                        }
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: root.statusText
+                            color: root._statusColor()
+                            font.family: Theme.fontFamilies.cjkSans
+                            font.contextFontMerging: true
+                            font.pixelSize: Theme.size.caption
+                            font.weight: Theme.weight.semibold
                         }
                     }
                 }
 
-                // Prompt + length counter
-                Column {
+                Rectangle {
+                    id: closeButton
+                    width: 30
+                    height: 30
+                    radius: 15
+                    anchors.verticalCenter: parent.verticalCenter
+                    color: closeHover.hovered ? Theme.withAlpha(Theme.warm.ink, 0.06) : "transparent"
+                    Text {
+                        anchors.centerIn: parent
+                        text: "×"
+                        color: Theme.warm.muted
+                        font.family: Theme.fontFamilies.cjkSans
+                        font.contextFontMerging: true
+                        font.pixelSize: Theme.warmSize.titleMd
+                    }
+                    HoverHandler { id: closeHover; cursorShape: Qt.PointingHandCursor }
+                    TapHandler { onTapped: root.closed() }
+                }
+            }
+
+            Rectangle {
+                width: parent.width
+                height: 1
+                color: Theme.withAlpha(Theme.parchment.goldLine, 0.25)
+            }
+
+            FormField {
+                label: I18n.t("AI 引擎", "AI Engine")
+                ParchmentCombo {
+                    id: providerBox
+                    objectName: "seatEditorProvider"
+                    anchors.fill: parent
+                    model: root.providerOptions
+                    textRole: "label"
+                    font.family: Theme.fontFamilies.cjkSans
+                    font.contextFontMerging: true
+                    onActivated: {
+                        var picked = root.providerOptions[currentIndex].value
+                        root.edited("provider", picked)
+                        if (root.providerConfigured(picked))
+                            ObserverClient.fetchProviderModels(picked)
+                    }
+                }
+            }
+
+            FormField {
+                label: I18n.t("模型", "Model")
+                ParchmentCombo {
+                    id: modelBox
+                    objectName: "seatEditorModel"
+                    anchors.fill: parent
+                    model: root.modelList
+                    font.family: Theme.fontFamilies.cjkSans
+                    font.contextFontMerging: true
+                    onActivated: root.edited("model", root.modelList[currentIndex])
+                }
+            }
+
+            // Weak text link to manage AI services — was a strong bordered button row.
+            Item {
+                width: parent.width
+                height: 26
+                Row {
+                    anchors.centerIn: parent
+                    spacing: 4
+                    Text {
+                        text: I18n.t("选择配置 / 管理 AI 服务", "Choose config / Manage AI Services")
+                        color: manageHover.hovered ? Theme.warm.primaryActive : Theme.parchment.inkSoft
+                        font.family: Theme.fontFamilies.cjkSans
+                        font.contextFontMerging: true
+                        font.pixelSize: Theme.size.caption
+                        font.weight: Theme.weight.semibold
+                        Behavior on color { ColorAnimation { duration: Theme.anim.color; easing.type: Easing.OutCubic } }
+                    }
+                    Text {
+                        text: "→"
+                        color: manageHover.hovered ? Theme.warm.primaryActive : Theme.parchment.inkSoft
+                        font.family: Theme.fontFamilies.cjkSans
+                        font.contextFontMerging: true
+                        font.pixelSize: Theme.size.caption
+                        font.weight: Theme.weight.semibold
+                    }
+                }
+                HoverHandler { id: manageHover; cursorShape: Qt.PointingHandCursor }
+                TapHandler { onTapped: root.requestProviderSettings() }
+            }
+
+            Column {
+                width: parent.width
+                spacing: Theme.space.xs
+                Text {
+                    text: I18n.t("扮演风格", "Role Style")
+                    color: Theme.parchment.inkSoft
+                    font.family: Theme.fontFamilies.cjkSerif
+                    font.contextFontMerging: true
+                    font.pixelSize: Theme.size.caption
+                }
+                Row {
+                    objectName: "seatEditorPersona"
                     width: parent.width
                     spacing: Theme.space.xs
-                    Item {
-                        width: parent.width
-                        height: promptLabel.implicitHeight
-                        Text {
-                            id: promptLabel
-                            anchors.left: parent.left
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: I18n.t("提示词", "Prompt")
-                            color: Theme.color.textSecondary
-                            font.family: Theme.font.family; font.pixelSize: Theme.size.caption
-                        }
-                        Text {
-                            anchors.right: parent.right
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: promptArea.text.length + " / " + root.promptMax
-                            color: promptArea.text.length > root.promptMax ? Theme.color.danger : Theme.color.textMuted
-                            font.family: Theme.font.mono; font.pixelSize: Theme.size.micro
-                        }
-                    }
-                    ScrollView {
-                        width: parent.width
-                        height: 110
-                        TextArea {
-                            id: promptArea
-                            objectName: "seatEditorPrompt"
-                            wrapMode: TextArea.Wrap
-                            color: Theme.color.text
-                            background: Rectangle {
-                                color: Theme.color.surfaceInset
-                                border.width: 1; border.color: Theme.color.border
-                                radius: Theme.radius.sm
+                    Repeater {
+                        model: root.presetChips
+                        delegate: Rectangle {
+                            id: chip
+                            required property var modelData
+                            readonly property bool isCustom: modelData.key === "custom"
+                            readonly property bool active: root._activePreset() === modelData.key
+                            implicitWidth: chipLabel.implicitWidth + Theme.space.lg
+                            height: 28
+                            radius: Theme.radius.pill
+                            color: chip.active ? Theme.withAlpha(Theme.warm.primary, 0.16)
+                                               : Theme.withAlpha(Theme.warm.surfaceCard, 0.86)
+                            border.width: 1
+                            border.color: chip.active ? Theme.warm.primary
+                                                      : Theme.withAlpha(Theme.parchment.goldLine, 0.26)
+                            opacity: (chip.isCustom && !chip.active) ? 0.68 : 1.0
+                            Text {
+                                id: chipLabel
+                                anchors.centerIn: parent
+                                text: chip.modelData.label
+                                color: chip.active ? Theme.warm.primaryActive : Theme.warm.body
+                                font.family: Theme.fontFamilies.cjkSans
+                                font.contextFontMerging: true
+                                font.pixelSize: Theme.size.caption
+                                font.weight: chip.active ? Theme.weight.semibold : Theme.weight.regular
                             }
-                            onTextChanged: if (root._ready) root.edited("prompt", text)
+                            HoverHandler { cursorShape: Qt.PointingHandCursor }
+                            TapHandler {
+                                onTapped: {
+                                    if (chip.isCustom) { promptArea.forceActiveFocus(); return }
+                                    root.edited("prompt", root._presetText(chip.modelData.key))
+                                }
+                            }
                         }
                     }
                 }
+            }
 
-                // -------- Advanced (collapsible): temperature + max tokens --------
-                Column {
+            Column {
+                width: parent.width
+                spacing: Theme.space.xs
+                Row {
                     width: parent.width
-                    spacing: Theme.space.sm
-
-                    Item {
-                        width: parent.width
-                        height: advHeader.implicitHeight + Theme.space.xs * 2
-                        Row {
-                            id: advHeader
-                            anchors.left: parent.left
-                            anchors.verticalCenter: parent.verticalCenter
-                            spacing: Theme.space.xs
-                            Text {
-                                text: root._advancedOpen ? "▾" : "▸"
-                                color: Theme.color.textSecondary
-                                font.family: Theme.font.family; font.pixelSize: Theme.size.caption
-                            }
-                            Text {
-                                text: I18n.t("高级", "Advanced")
-                                color: Theme.color.textSecondary
-                                font.family: Theme.font.family; font.pixelSize: Theme.size.caption
-                                font.weight: Theme.weight.medium
-                            }
-                        }
-                        HoverHandler { cursorShape: Qt.PointingHandCursor }
-                        TapHandler { onTapped: root._advancedOpen = !root._advancedOpen }
+                    Text {
+                        text: I18n.t("角色指令", "Role Instructions")
+                        color: Theme.parchment.inkSoft
+                        font.family: Theme.fontFamilies.cjkSerif
+                        font.contextFontMerging: true
+                        font.pixelSize: Theme.size.caption
                     }
-
-                    Column {
-                        width: parent.width
-                        spacing: Theme.space.md
-                        visible: root._advancedOpen
-
-                        // Temperature
-                        Column {
-                            width: parent.width
-                            spacing: Theme.space.xs
-                            Item {
-                                width: parent.width
-                                height: tempLabel.implicitHeight
-                                Text {
-                                    id: tempLabel
-                                    anchors.left: parent.left
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    text: I18n.t("温度 (Temperature)", "Temperature")
-                                    color: Theme.color.textSecondary
-                                    font.family: Theme.font.family; font.pixelSize: Theme.size.caption
-                                }
-                                Text {
-                                    anchors.right: parent.right
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    text: (root.config && root.config.temperature !== undefined)
-                                          ? tempSlider.value.toFixed(1)
-                                          : tempSlider.value.toFixed(1) + I18n.t("(未设)", " (unset)")
-                                    color: (root.config && root.config.temperature !== undefined)
-                                           ? Theme.color.text : Theme.color.textMuted
-                                    font.family: Theme.font.mono; font.pixelSize: Theme.size.micro
-                                }
-                            }
-                            Slider {
-                                id: tempSlider
-                                objectName: "seatEditorTemperature"
-                                width: parent.width
-                                from: 0.0; to: 2.0; stepSize: 0.1
-                                onMoved: root.edited("temperature", Math.round(value * 10) / 10)
+                    Text {
+                        anchors.right: parent.right
+                        text: promptArea.text.length + "/" + root.promptMax
+                        color: promptArea.text.length > root.promptMax ? Theme.warm.error : Theme.warm.muted
+                        font.family: Theme.fontFamilies.cjkSans
+                        font.contextFontMerging: true
+                        font.pixelSize: Theme.size.micro
+                    }
+                }
+                ScrollView {
+                    width: parent.width
+                    height: 92
+                    TextArea {
+                        id: promptArea
+                        objectName: "seatEditorPrompt"
+                        wrapMode: TextArea.Wrap
+                        color: Theme.parchment.ink
+                        font.family: Theme.fontFamilies.cjkSans
+                        font.contextFontMerging: true
+                        font.pixelSize: Theme.size.caption
+                        leftPadding: 10
+                        rightPadding: 10
+                        topPadding: 8
+                        bottomPadding: 8
+                        background: Rectangle {
+                            // Slightly deeper warm-grey paper + light inner shadow so
+                            // the instruction field reads as a recessed writing well.
+                            radius: 8
+                            color: Theme.withAlpha(Theme.parchment.parchmentStrong, 0.55)
+                            border.width: 1
+                            border.color: promptArea.activeFocus ? Theme.warm.primary
+                                                                 : Theme.withAlpha(Theme.parchment.goldLineSoft, 0.40)
+                            // Inner top shadow line for the "pressed in" feel.
+                            Rectangle {
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.top: parent.top
+                                height: 1
+                                color: Theme.withAlpha(Theme.parchment.woodShadow, 0.16)
                             }
                         }
+                        onTextChanged: if (root._ready) root.edited("prompt", text)
+                    }
+                }
+            }
 
-                        // Max tokens
-                        Column {
-                            width: parent.width
-                            spacing: Theme.space.xs
-                            Text {
-                                text: I18n.t("最大回复长度", "Max response length")
-                                color: Theme.color.textSecondary
-                                font.family: Theme.font.family; font.pixelSize: Theme.size.caption
+            Rectangle {
+                width: parent.width
+                height: 1
+                color: Theme.withAlpha(Theme.parchment.goldLine, 0.18)
+            }
+
+            Column {
+                width: parent.width
+                spacing: Theme.space.sm
+                Text {
+                    text: I18n.t("高级参数", "Advanced")
+                    color: Theme.parchment.ink
+                    font.family: Theme.fontFamilies.cjkSerif
+                    font.contextFontMerging: true
+                    font.pixelSize: Theme.warmSize.titleMd
+                    font.weight: Theme.weight.semibold
+                }
+
+                Row {
+                    width: parent.width
+                    spacing: Theme.space.md
+                    Text {
+                        width: 108
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: "Temperature"
+                        color: Theme.parchment.inkSoft
+                        font.family: Theme.fontFamilies.cjkSans
+                        font.contextFontMerging: true
+                        font.pixelSize: Theme.size.caption
+                    }
+                    Slider {
+                        id: tempSlider
+                        objectName: "seatEditorTemperature"
+                        width: parent.width - 108 - 64 - Theme.space.md * 2
+                        anchors.verticalCenter: parent.verticalCenter
+                        from: 0.0; to: 2.0; stepSize: 0.1
+                        // Warm parchment track + terracotta fill + coral handle.
+                        background: Rectangle {
+                            x: tempSlider.leftPadding
+                            y: tempSlider.topPadding + tempSlider.availableHeight / 2 - 3
+                            width: tempSlider.availableWidth
+                            height: 6
+                            radius: 3
+                            color: Theme.withAlpha(Theme.parchment.goldLineSoft, 0.30)
+                            Rectangle {
+                                width: tempSlider.visualPosition * parent.width
+                                height: parent.height
+                                radius: 3
+                                color: Theme.warm.primary
                             }
-                            TextField {
-                                id: maxTokensField
-                                objectName: "seatEditorMaxTokens"
-                                width: parent.width
-                                inputMethodHints: Qt.ImhDigitsOnly
-                                validator: IntValidator { bottom: 1; top: 8192 }
-                                color: Theme.color.text
-                                placeholderTextColor: Theme.color.textMuted
-                                placeholderText: I18n.t("未设(用模型默认),如 512", "unset (model default), e.g. 512")
-                                font.family: Theme.font.mono; font.pixelSize: Theme.size.small
-                                leftPadding: Theme.space.md; rightPadding: Theme.space.md
-                                background: Rectangle {
-                                    radius: Theme.radius.sm
-                                    color: Theme.color.surfaceInset
-                                    border.width: 1
-                                    border.color: maxTokensField.activeFocus ? Theme.color.borderStrong : Theme.color.border
-                                    Behavior on border.color { ColorAnimation { duration: Theme.motion.fast } }
-                                }
-                                onEditingFinished: {
-                                    var v = parseInt(text)
-                                    if (!isNaN(v))
-                                        root.edited("max_tokens", Math.max(1, Math.min(8192, v)))
-                                }
-                            }
+                        }
+                        handle: Rectangle {
+                            x: tempSlider.leftPadding + tempSlider.visualPosition
+                               * (tempSlider.availableWidth - width)
+                            y: tempSlider.topPadding + tempSlider.availableHeight / 2 - height / 2
+                            width: 18; height: 18; radius: 9
+                            color: Theme.warm.primary
+                            border.width: 2
+                            border.color: Theme.parchment.parchmentSoft
+                        }
+                        onMoved: root.edited("temperature", Math.round(value * 10) / 10)
+                    }
+                    Text {
+                        width: 64
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: tempSlider.value.toFixed(2)
+                        horizontalAlignment: Text.AlignRight
+                        color: Theme.parchment.ink
+                        font.family: Theme.fontFamilies.cjkSans
+                        font.contextFontMerging: true
+                        font.pixelSize: Theme.size.caption
+                    }
+                }
+
+                Row {
+                    width: parent.width
+                    spacing: Theme.space.md
+                    Text {
+                        width: 108
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: "Max Tokens"
+                        color: Theme.parchment.inkSoft
+                        font.family: Theme.fontFamilies.cjkSans
+                        font.contextFontMerging: true
+                        font.pixelSize: Theme.size.caption
+                    }
+                    TextField {
+                        id: maxTokensField
+                        objectName: "seatEditorMaxTokens"
+                        width: 116
+                        height: 34
+                        inputMethodHints: Qt.ImhDigitsOnly
+                        validator: IntValidator { bottom: 1; top: 8192 }
+                        color: Theme.parchment.ink
+                        placeholderTextColor: Theme.parchment.mutedInk
+                        placeholderText: "1024"
+                        font.family: Theme.fontFamilies.cjkSans
+                        font.contextFontMerging: true
+                        font.pixelSize: Theme.size.caption
+                        leftPadding: Theme.space.md
+                        rightPadding: Theme.space.md
+                        background: Rectangle {
+                            radius: 8
+                            color: Theme.withAlpha(Theme.warm.surfaceRaised, 0.62)
+                            border.width: 1
+                            border.color: maxTokensField.activeFocus ? Theme.warm.primary
+                                                                     : Theme.withAlpha(Theme.parchment.goldLineSoft, 0.40)
+                        }
+                        onEditingFinished: {
+                            var v = parseInt(text)
+                            if (!isNaN(v))
+                                root.edited("max_tokens", Math.max(1, Math.min(8192, v)))
                         }
                     }
                 }
+            }
+
+            Rectangle {
+                width: parent.width
+                height: 46
+                radius: Theme.radius.sm
+                color: Theme.withAlpha(root._statusColor(), 0.10)
+                border.width: 1
+                border.color: Theme.withAlpha(root._statusColor(), 0.42)
+                Row {
+                    anchors.fill: parent
+                    anchors.margins: Theme.space.md
+                    spacing: Theme.space.sm
+                    Rectangle {
+                        width: 18
+                        height: 18
+                        radius: 9
+                        anchors.verticalCenter: parent.verticalCenter
+                        color: root._statusColor()
+                    }
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: root.statusText
+                        color: root._statusColor()
+                        font.family: Theme.fontFamilies.cjkSans
+                        font.contextFontMerging: true
+                        font.pixelSize: Theme.size.caption
+                        font.weight: Theme.weight.semibold
+                    }
+                    Rectangle {
+                        anchors.verticalCenter: parent.verticalCenter
+                        height: 22
+                        width: overrideText.implicitWidth + Theme.space.md
+                        radius: Theme.radius.pill
+                        color: Theme.withAlpha(Theme.warm.surfaceRaised, 0.75)
+                        border.width: 1
+                        border.color: Theme.withAlpha(Theme.parchment.goldLine, 0.30)
+                        Text {
+                            id: overrideText
+                            anchors.centerIn: parent
+                            text: root.overridden ? I18n.t("席位覆盖", "Seat override")
+                                                  : I18n.t("继承角色默认", "Role default")
+                            color: Theme.warm.muted
+                            font.family: Theme.fontFamilies.cjkSans
+                            font.contextFontMerging: true
+                            font.pixelSize: Theme.size.micro
+                        }
+                    }
+                }
+            }
+
+        }
+    }
+
+    component FormField: Column {
+        default property alias content: slot.data
+        required property string label
+        width: parent.width
+        spacing: Theme.space.xs
+        Text {
+            text: label
+            color: Theme.parchment.inkSoft
+            font.family: Theme.fontFamilies.cjkSerif
+            font.contextFontMerging: true
+            font.pixelSize: Theme.size.caption
+        }
+        Item {
+            id: slot
+            width: parent.width
+            height: 36
+        }
+    }
+
+    // Local warm-parchment ComboBox for the detail pickers (mirrors the
+    // WarmCombo style in MatchSetupView; this file is a separate component so it
+    // cannot share the inline component there).
+    component ParchmentCombo: ComboBox {
+        id: _pc
+        background: Rectangle {
+            radius: 8
+            color: Theme.withAlpha(Theme.warm.surfaceRaised, 0.72)
+            border.width: 1
+            border.color: _pc.pressed || _pc.popup.visible
+                          ? Theme.withAlpha(Theme.warm.primary, 0.5)
+                          : Theme.withAlpha(Theme.parchment.goldLineSoft, 0.42)
+            Behavior on border.color { ColorAnimation { duration: Theme.anim.color; easing.type: Easing.OutCubic } }
+        }
+        indicator: Item {}
+        contentItem: Item {
+            Text {
+                anchors.left: parent.left
+                anchors.leftMargin: 12
+                anchors.verticalCenter: parent.verticalCenter
+                anchors.right: _pcChev.left
+                anchors.rightMargin: 6
+                text: _pc.displayText
+                color: _pc.enabled ? Theme.parchment.ink : Theme.parchment.mutedInk
+                font: _pc.font
+                elide: Text.ElideRight
+            }
+            Item {
+                id: _pcChev
+                anchors.right: parent.right
+                anchors.rightMargin: 10
+                anchors.verticalCenter: parent.verticalCenter
+                width: 8
+                height: 8
+                Rectangle { x: 0; y: 3; width: 5; height: 1.3; radius: 0.6;
+                            rotation: 45; transformOrigin: Item.Left;
+                            color: _pc.enabled ? Theme.parchment.inkSoft : Theme.parchment.mutedInk }
+                Rectangle { x: 3; y: 3; width: 5; height: 1.3; radius: 0.6;
+                            rotation: -45; transformOrigin: Item.Right;
+                            color: _pc.enabled ? Theme.parchment.inkSoft : Theme.parchment.mutedInk }
+            }
+        }
+        delegate: ItemDelegate {
+            width: _pc.width
+            height: 32
+            contentItem: Text {
+                text: _pc.textRole ? (modelData[_pc.textRole] || "") : modelData
+                color: highlighted ? Theme.warm.primaryActive : Theme.parchment.ink
+                font: _pc.font
+                verticalAlignment: Text.AlignVCenter
+                leftPadding: 12
+                elide: Text.ElideRight
+            }
+            background: Rectangle {
+                radius: 6
+                color: highlighted ? Theme.withAlpha(Theme.warm.primary, 0.10)
+                                   : (parent.hovered ? Theme.withAlpha(Theme.parchment.goldLine, 0.10) : "transparent")
             }
         }
     }

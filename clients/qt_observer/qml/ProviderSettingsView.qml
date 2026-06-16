@@ -70,8 +70,8 @@ Item {
     function reasonText(code) {
         switch (code) {
         case "missing_api_key": return I18n.t("服务器无此凭证 — 请先保存并同步", "No credential on server — save & sync first")
-        case "provider_unavailable": return I18n.t("无法连接供应商(检查 Key / Base URL)", "Provider unreachable (check key / base URL)")
-        case "unsupported_provider": return I18n.t("不支持的供应商", "Unsupported provider")
+        case "provider_unavailable": return I18n.t("无法连接 AI 服务(检查 Key / Base URL)", "AI service unreachable (check key / base URL)")
+        case "unsupported_provider": return I18n.t("不支持的 AI 服务", "Unsupported AI service")
         case "unreachable": return I18n.t("无法连接本地服务器", "Local server unreachable")
         default: return I18n.t("获取失败:", "Failed: ") + code
         }
@@ -131,7 +131,7 @@ Item {
             // came back — flag it rather than leaving the "Fetching…" line stuck.
             root.statusIsError = (n === 0)
             root.statusText = n > 0
-                ? I18n.t("校验成功 · 找到 " + n + " 个模型", "Validated · " + n + " models")
+                ? I18n.t("连接成功 · 找到 " + n + " 个模型", "Connected · " + n + " models")
                 : I18n.t("未返回模型(检查 Key / Base URL)", "No models returned (check key / base URL)")
         }
         function onProviderModelsFailed(p, reason) {
@@ -157,7 +157,7 @@ Item {
         spacing: Theme.space.xs
 
         Text {
-            text: I18n.t("供应商与模型", "Providers & Models")
+            text: I18n.t("AI 服务与模型", "AI Services & Models")
             color: Theme.color.text
             font.family: Theme.font.display
             font.pixelSize: Theme.size.h1
@@ -165,7 +165,7 @@ Item {
         }
         Text {
             text: I18n.t("配置各家 AI 的 API Key 与接入点,获取可用模型 —— 凭证仅在本机,不上传。",
-                         "Configure each AI provider's API key & endpoint, then fetch its models. Keys stay on your machine.")
+                         "Configure each AI service's API key & endpoint, then fetch its models. Keys stay on your machine.")
             color: Theme.color.textMuted
             font.family: Theme.font.family
             font.pixelSize: Theme.size.caption
@@ -197,9 +197,9 @@ Item {
                 spacing: Theme.space.lg
 
                 SectionHeader {
-                    title: I18n.t("供应商", "Providers")
-                    caption: I18n.t("绿=已校验 · 黄=已配置 · 灰=未配置",
-                                    "Green=validated · Amber=configured · Gray=unset")
+                    title: I18n.t("AI 引擎", "AI Engines")
+                    caption: I18n.t("绿=已连通 · 黄=已保存 · 灰=未配置",
+                                    "Green=connected · Amber=saved · Gray=unset")
                 }
 
                 ListView {
@@ -403,8 +403,8 @@ Item {
                             onClicked: {
                                 if (root.selectedSpec.requiresBase && baseField.text.trim() === "") {
                                     root.statusIsError = true
-                                    root.statusText = I18n.t("自定义供应商必须填写 Base URL",
-                                                             "Custom provider requires a Base URL")
+                                    root.statusText = I18n.t("自定义 AI 服务必须填写 Base URL",
+                                                             "Custom AI service requires a Base URL")
                                     return
                                 }
                                 if (keyField.text.trim() === "") {
@@ -472,8 +472,8 @@ Item {
                             anchors.centerIn: parent
                             visible: form.models.length === 0
                             title: I18n.t("尚未获取模型", "No models yet")
-                            subtitle: I18n.t("保存凭证后点击「获取模型列表」校验。",
-                                             "Save a credential, then Fetch models to validate.")
+                            subtitle: I18n.t("保存凭证后点击「获取模型列表」连通。",
+                                             "Save a credential, then fetch models to connect.")
                         }
 
                         Column {

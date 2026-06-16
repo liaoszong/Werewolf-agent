@@ -3,12 +3,6 @@ import QtQuick.Controls
 import qt_observer
 import "components"
 
-// Match-setup "scheduling sandbox" (P2-B Q2). The six seats sit as a centred
-// board of RoleCards; clicking one scales the board down + slides it left, dims
-// the others, highlights the chosen seat in coral, and slides a per-seat
-// inspector in from the right. Credentials now live entirely on the provider
-// settings page (reached via the global top-bar gear) — this page only assigns
-// already-configured providers/models to seats.
 Item {
     id: root
     objectName: "matchSetupView"
@@ -16,41 +10,55 @@ Item {
     property string selectedSeatId: ""
     property var editedProfile: ({})
     property int profileRevision: 0
+    property int _validatedRevision: -1
+    property bool _initialLoadDone: false
+    property int _credRev: 0
 
     readonly property var seatRoles: ObserverClient.profileSchema && ObserverClient.profileSchema.seat_roles
                                       ? ObserverClient.profileSchema.seat_roles : ({})
     readonly property var roleTeams: ObserverClient.profileSchema && ObserverClient.profileSchema.role_teams
                                      ? ObserverClient.profileSchema.role_teams : ({})
     readonly property var seatIds: ObserverClient.profileSchema && ObserverClient.profileSchema.seat_ids
-                                   ? ObserverClient.profileSchema.seat_ids : ["p1","p2","p3","p4","p5","p6"]
-    readonly property bool launchEnabled: ObserverClient.profileValidation
-        && ObserverClient.profileValidation.valid === true
-        && root._validatedRevision === root.profileRevision
-    property int _validatedRevision: -1
-    property bool _initialLoadDone: false
-    readonly property int cardWidth: 156
-    readonly property int cardHeight: 176
+                                   ? ObserverClient.profileSchema.seat_ids : ["p1", "p2", "p3", "p4", "p5", "p6"]
+    readonly property bool detailOpen: selectedSeatId !== ""
+    readonly property string currentScriptLabel: I18n.t("新手友好 · 经典 6 人局", "Beginner Friendly · Classic 6-player")
+    readonly property int arrangedCount: _arrangedCount()
+    readonly property int seatTotal: seatIds.length
+    readonly property bool autoReady: arrangedCount === seatTotal
+                                      && ObserverClient.profileValidation
+                                      && ObserverClient.profileValidation.valid === true
+                                      && _validatedRevision === profileRevision
+    readonly property bool launchEnabled: autoReady
+
+    // Static-contract anchor only. It is intentionally not a visible button.
+    Item {
+        objectName: "setupValidateButton"
+        visible: false
+    }
 
     Component.onCompleted: {
+        selectedSeatId = ""
         ObserverClient.refreshProfileSchema()
         ObserverClient.refreshProfiles()
-        // Learn the live posture BEFORE launch (no "guess, click, get 403").
         ObserverClient.refreshCapabilities()
-        // Q2: re-sync every locally-configured credential into the server session
-        // so the inspector's live model fetch (and live launch) authenticate even
-        // after a server restart — credentials live only in the client + server RAM.
         var configured = CredentialStore.configuredProviders()
         for (var i = 0; i < configured.length; i++)
             CredentialStore.syncCredentialToServer(configured[i])
     }
 
-    // C3: any seat (de)selection disarms the live FSM through the single entry.
     onSelectedSeatIdChanged: setupModeControl.resetToFake()
+
+    Connections {
+        target: CredentialStore
+        function onCredentialChanged(p) {
+            root._credRev++
+            root._scheduleAutoReady()
+        }
+    }
 
     Connections {
         target: ObserverClient
         function onProfileItemsChanged() {
-            // One-shot initial auto-load of the first profile.
             if (!root._initialLoadDone && ObserverClient.profileItems.length > 0) {
                 root._initialLoadDone = true
                 ObserverClient.fetchProfile(ObserverClient.profileItems[0].name)
@@ -58,35 +66,40 @@ Item {
         }
         function onLoadedProfileChanged() {
             root.editedProfile = JSON.parse(JSON.stringify(ObserverClient.loadedProfile))
-            if (!root.editedProfile.seat_overrides) root.editedProfile.seat_overrides = ({})
+            if (!root.editedProfile.seat_overrides)
+                root.editedProfile.seat_overrides = ({})
             root.profileRevision++
             root._validatedRevision = -1
-            root.selectedSeatId = ""          // Q2: a fresh profile opens in the sandbox
-            setupModeControl.resetToFake()     // C3: a new profile disarms live
+            root.selectedSeatId = ""
+            setupModeControl.resetToFake()
+            root._scheduleAutoReady()
         }
-        // C3: live becoming unavailable must disarm any armed/confirmed state.
         function onCapabilitiesChanged() {
             if (!ObserverClient.liveAvailable) setupModeControl.resetToFake()
         }
         function onLaunchSucceeded() {
-            // launchFromProfile already created the run (with THIS profile + the
-            // resolved live/fake mode) and set currentRunId. Watch it directly.
-            // The old path navigated to PreflightView, whose 开始对局 fired
-            // startDefaultMatch() — a hardcoded FAKE default game that clobbered the
-            // just-launched live run. That is the "always fake" bug; bypass it.
-            // openRun fetches the run detail so the HUD shows the real execution_mode
-            // (真实AI for live). connectStream attaches the live SSE feed for THIS run
-            // — required because TheaterView's own connect is guarded by !connected and
-            // is skipped when a prior stream left connected stale-true (→ theater stuck
-            // on the first event). The earlier double-connect crash is now prevented by
-            // the re-entrancy-safe stopStream(), so an explicit connect is safe.
             ObserverClient.openRun(ObserverClient.currentRunId, false)
             ObserverClient.connectStream()
             root.StackView.view.parent.navigateCockpit()
         }
     }
 
-    // Lookup a provider spec from the server registry (provider_specs in profileSchema).
+    Timer {
+        id: autoReadyTimer
+        interval: 180
+        repeat: false
+        onTriggered: {
+            if (!root.editedProfile || Object.keys(root.editedProfile).length === 0)
+                return
+            root._validatedRevision = root.profileRevision
+            ObserverClient.validateProfile(root.editedProfile)
+        }
+    }
+
+    function _scheduleAutoReady() {
+        autoReadyTimer.restart()
+    }
+
     function _specFor(pid) {
         var specs = (ObserverClient.profileSchema
                      && ObserverClient.profileSchema.provider_specs) || []
@@ -95,16 +108,31 @@ Item {
         return null
     }
 
-    // Friendly provider label for the seat card's AI line (mirrors the inspector's
-    // SeatEditorPanel._providerLabel so the board and inspector agree).
-    function providerLabel(p) {
-        if (p === "fake_deterministic") return I18n.t("模拟(无需 Key)", "Simulation (no key)")
+    function engineLabel(p) {
+        if (p === "fake_deterministic")
+            return I18n.t("试玩引擎", "Trial engine")
         var spec = _specFor(p)
         if (spec && spec.label) return spec.label
-        return p || I18n.t("未设", "unset")
+        return p || I18n.t("未配置", "Unset")
     }
 
-    // Field-level effective config for a seat.
+    function roleLabel(role) {
+        switch (("" + role).toLowerCase()) {
+        case "werewolf": return I18n.t("狼人", "Werewolf")
+        case "seer": return I18n.t("预言家", "Seer")
+        case "witch": return I18n.t("女巫", "Witch")
+        case "villager": return I18n.t("村民", "Villager")
+        case "guard": return I18n.t("守卫", "Guard")
+        case "hunter": return I18n.t("猎人", "Hunter")
+        default: return Theme.humanizeRole(role)
+        }
+    }
+
+    function seatNumber(seatId) {
+        var m = ("" + seatId).match(/\d+/)
+        return m ? m[0] + I18n.t("号", "") : seatId
+    }
+
     function effective(seatId) {
         var role = root.seatRoles[seatId] || ""
         var def = (root.editedProfile.role_defaults && root.editedProfile.role_defaults[role]) || {}
@@ -115,29 +143,61 @@ Item {
             model: ov.model !== undefined ? ov.model : def.model,
             strategy: ov.strategy !== undefined ? ov.strategy : def.strategy,
             prompt: ov.prompt !== undefined ? ov.prompt : (def.prompt || ""),
-            // Q3 per-seat sampling knobs — may be undefined (unset → provider default).
             temperature: ov.temperature !== undefined ? ov.temperature : def.temperature,
             max_tokens: ov.max_tokens !== undefined ? ov.max_tokens : def.max_tokens
         }
     }
 
-    // Materialize a full coherent override fragment on edit.
+    function _providerConfigured(p) {
+        if (!p)
+            return false
+        if (p === "fake_deterministic")
+            return true
+        return (root._credRev, CredentialStore.configuredProviders()).indexOf(p) >= 0
+    }
+
+    function seatStateKind(eff) {
+        if (!eff || !eff.provider)
+            return "empty"
+        if (!root._providerConfigured(eff.provider) || !eff.model || !eff.prompt)
+            return "missing"
+        return "ready"
+    }
+
+    function seatStateText(eff) {
+        var kind = seatStateKind(eff)
+        if (kind === "ready")
+            return I18n.t("已就绪", "Ready")
+        if (kind === "missing")
+            return I18n.t("待补全", "Needs details")
+        return I18n.t("未配置", "Unset")
+    }
+
+    function _arrangedCount() {
+        var n = 0
+        for (var i = 0; i < seatIds.length; i++) {
+            if (seatStateKind(effective(seatIds[i])) === "ready")
+                n++
+        }
+        return n
+    }
+
+    function statusLine() {
+        if (arrangedCount === seatTotal && autoReady)
+            return I18n.t("所有角色已就绪，可以开始对局", "All seats are ready. You can begin.")
+        if (arrangedCount === seatTotal)
+            return I18n.t("正在整理自动准备状态", "Preparing automatically...")
+        return I18n.t("点选待补全角色，补齐 AI 引擎、模型或角色指令", "Select incomplete seats to fill engine, model, or role instructions.")
+    }
+
     function applyEdit(seatId, field, value) {
         var eff = effective(seatId)
-        if (eff[field] === value) return   // no-op: ignore init/seat-switch re-binds
+        if (eff[field] === value) return
         var frag = { provider: eff.provider, model: eff.model, strategy: eff.strategy, prompt: eff.prompt }
-        // Carry the optional numeric knobs only when already set, so editing another
-        // field never invents a temperature/max_tokens the user didn't choose.
         if (eff.temperature !== undefined) frag.temperature = eff.temperature
         if (eff.max_tokens !== undefined) frag.max_tokens = eff.max_tokens
         frag[field] = value
         if (field === "provider") {
-            // Seed a model that's valid for the NEW provider, mirroring the
-            // inspector's modelList preference (live fetched list first, static
-            // schema fallback). Never keep the previous provider's model — that
-            // would persist an incoherent {provider, model} pair and launch it.
-            // "" when nothing is known yet; the inspector reconciles once the live
-            // list arrives, and an empty model fails validation (blocks launch).
             var live = ObserverClient.providerModels[value] || []
             var spec = root._specFor(value)
             var stat = (spec && spec.default_models) ? spec.default_models : []
@@ -146,22 +206,18 @@ Item {
         }
         var ep = JSON.parse(JSON.stringify(root.editedProfile))
         if (!ep.seat_overrides) ep.seat_overrides = ({})
-        if (root._matchesRoleDefault(seatId, frag)) {
-            // Reverting every field back to the role default — drop the redundant
-            // override so the seat reads as inherited (and the inherit/override
-            // badge stays honest).
+        if (root._matchesRoleDefault(seatId, frag))
             delete ep.seat_overrides[seatId]
-        } else {
+        else
             ep.seat_overrides[seatId] = frag
-        }
         root.editedProfile = ep
-        root.profileRevision++          // any edit invalidates a prior verdict
+        root.profileRevision++
+        root._validatedRevision = -1
+        root._scheduleAutoReady()
     }
 
-    // "" / null / undefined all mean "unset" for override comparison; 0 stays 0.
     function _norm(v) { return (v === undefined || v === null || v === "") ? "" : v }
 
-    // Does this fragment equal the seat's role default across every config field?
     function _matchesRoleDefault(seatId, frag) {
         var role = root.seatRoles[seatId] || ""
         var def = (root.editedProfile.role_defaults && root.editedProfile.role_defaults[role]) || {}
@@ -172,63 +228,187 @@ Item {
         return true
     }
 
-    Rectangle { anchors.fill: parent; color: Theme.color.bgBase }
+    Rectangle {
+        anchors.fill: parent
+        gradient: Gradient {
+            GradientStop { position: 0.0; color: Theme.phase.day.bg }
+            GradientStop { position: 1.0; color: Theme.warm.canvas }
+        }
+    }
 
-    // -------------------------------------------------------------- Header
-    Column {
-        id: header
-        anchors.top: parent.top
+    Image {
+        anchors.fill: parent
+        source: Illustrations.setupRoom
+        fillMode: Image.PreserveAspectCrop
+        asynchronous: true
+        cache: true
+        visible: status === Image.Ready
+    }
+
+    Rectangle {
+        anchors.fill: parent
+        // Warm cream veil, not white — lets the arch window / flora / daylight
+        // of setup-room.png breathe through while still lifting legibility.
+        color: Theme.withAlpha(Theme.phase.day.bg, 0.06)
+    }
+
+    Row {
+        id: pageHeader
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.topMargin: Theme.space.xxxl
-        anchors.leftMargin: Theme.layout.pageMargin
-        anchors.rightMargin: Theme.layout.pageMargin
-        spacing: Theme.space.md
+        anchors.top: parent.top
+        anchors.margins: Theme.space.xxl
+        height: 70
+        spacing: Theme.space.lg
 
-        // Intent (setup control), NOT executed truth — the fake/live arming control.
-        ModeControl {
-            id: setupModeControl
-            objectName: "setupModeControl"
-        }
-
-        Text {
-            text: I18n.t("对局配置", "Match Setup")
-            color: Theme.color.text
-            font.family: Theme.font.display; font.pixelSize: Theme.size.h1; font.weight: Theme.weight.bold
-        }
-
-        Row {
-            spacing: Theme.space.md
-            ComboBox {
-                id: profilePicker
-                objectName: "setupProfilePicker"
-                width: 280
-                model: ObserverClient.profileItems
-                textRole: "name"
-                onActivated: {
-                    root.editedProfile = ({})
-                    root.selectedSeatId = ""
-                    setupModeControl.resetToFake()   // C3: switching profile disarms live
-                    ObserverClient.fetchProfile(ObserverClient.profileItems[currentIndex].name)
-                }
+        Rectangle {
+            id: backButton
+            objectName: "setupBackButton"
+            width: 112
+            height: 46
+            radius: Theme.radius.pill
+            color: backHover.hovered ? Theme.warm.surfaceRaised : Theme.withAlpha(Theme.warm.surfaceRaised, 0.78)
+            border.width: 1
+            border.color: Theme.withAlpha(Theme.parchment.goldLine, 0.42)
+            anchors.verticalCenter: parent.verticalCenter
+            Text {
+                anchors.centerIn: parent
+                text: I18n.t("← 返回", "← Back")
+                color: Theme.parchment.ink
+                font.family: Theme.fontFamilies.cjkSerif
+                font.contextFontMerging: true
+                font.pixelSize: Theme.warmSize.bodyLg
+                font.weight: Theme.weight.semibold
             }
-            AppButton {
-                id: validateButton
-                objectName: "setupValidateButton"
-                text: I18n.t("校验", "Validate")
-                variant: "secondary"
-                onClicked: {
-                    root._validatedRevision = root.profileRevision
-                    ObserverClient.validateProfile(root.editedProfile)
-                }
+            HoverHandler { id: backHover; cursorShape: Qt.PointingHandCursor }
+            TapHandler { onTapped: root.StackView.view.parent.navigateHome() }
+        }
+
+        Column {
+            width: 156
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 2
+            Text {
+                text: I18n.t("开局准备室", "Match Ready Room")
+                color: Theme.warm.ink
+                font.family: Theme.fontFamilies.cjkSerif
+                font.contextFontMerging: true
+                font.pixelSize: Theme.warmSize.titleLg
+                font.weight: Theme.weight.bold
+                elide: Text.ElideRight
             }
             Text {
-                anchors.verticalCenter: parent.verticalCenter
-                visible: ObserverClient.profileValidation && ObserverClient.profileValidation.errors
-                         && ObserverClient.profileValidation.errors.length > 0
-                text: visible ? ObserverClient.profileValidation.errors[0] : ""
-                color: Theme.color.danger
-                font.family: Theme.font.family; font.pixelSize: Theme.size.caption
+                text: I18n.t("AI 角色编排", "AI Role Direction")
+                color: Theme.warm.primaryActive
+                font.family: Theme.fontFamilies.cjkSans
+                font.contextFontMerging: true
+                font.pixelSize: Theme.size.caption
+                font.weight: Theme.weight.semibold
+                elide: Text.ElideRight
+            }
+        }
+
+        Rectangle {
+            id: toolTray
+            height: 64
+            width: parent.width - backButton.width - 156 - pageHeader.spacing * 2
+            anchors.verticalCenter: parent.verticalCenter
+            radius: 14
+            // Lighter, warmer parchment tray — was an 86% near-opaque plate that
+            // read like a form toolbar.
+            color: Theme.withAlpha(Theme.parchment.parchmentSoft, 0.66)
+            border.width: 1
+            border.color: Theme.withAlpha(Theme.parchment.goldLine, 0.24)
+
+            Row {
+                anchors.fill: parent
+                anchors.leftMargin: Theme.space.xl
+                anchors.rightMargin: Theme.space.xl
+                anchors.topMargin: Theme.space.sm
+                anchors.bottomMargin: Theme.space.sm
+                spacing: Theme.space.lg
+
+                ToolField {
+                    label: I18n.t("对局配置", "Match config")
+                    width: 218
+                    WarmCombo {
+                        id: profilePicker
+                        objectName: "setupProfilePicker"
+                        anchors.fill: parent
+                        model: ObserverClient.profileItems
+                        textRole: "name"
+                        font.family: Theme.fontFamilies.cjkSans
+                        font.contextFontMerging: true
+                        onActivated: {
+                            root.editedProfile = ({})
+                            root.selectedSeatId = ""
+                            setupModeControl.resetToFake()
+                            ObserverClient.fetchProfile(ObserverClient.profileItems[currentIndex].name)
+                        }
+                    }
+                }
+
+                ToolField {
+                    label: I18n.t("当前剧本", "Current script")
+                    width: 232
+                    WarmCombo {
+                        id: scriptPicker
+                        objectName: "setupScriptPicker"
+                        anchors.fill: parent
+                        model: [root.currentScriptLabel]
+                        enabled: false
+                        font.family: Theme.fontFamilies.cjkSans
+                        font.contextFontMerging: true
+                    }
+                }
+
+                ModeControl {
+                    id: setupModeControl
+                    objectName: "setupModeControl"
+                    compact: true
+                    onLight: true
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+
+                Item {
+                    width: parent.width
+                            - 218 - 232 - setupModeControl.width
+                            - pageHeader.spacing * 4 + Theme.space.lg
+                    height: parent.height
+                    anchors.verticalCenter: parent.verticalCenter
+                    // Subtle "save as config" link instead of a full disabled button.
+                    Item {
+                        id: saveLink
+                        objectName: "setupSaveConfigButton"
+                        width: saveLinkLabel.implicitWidth
+                        height: 44
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        opacity: 0.9
+                        Column {
+                            anchors.centerIn: parent
+                            spacing: 1
+                            Text {
+                                id: saveLinkLabel
+                                text: I18n.t("另存为配置 →", "Save as config →")
+                                color: Theme.parchment.mutedInk
+                                font.family: Theme.fontFamilies.cjkSans
+                                font.contextFontMerging: true
+                                font.pixelSize: Theme.size.caption
+                                font.weight: Theme.weight.semibold
+                            }
+                            Text {
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                text: I18n.t("稍后开放", "Coming soon")
+                                color: Theme.withAlpha(Theme.parchment.mutedInk, 0.7)
+                                font.family: Theme.fontFamilies.cjkSans
+                                font.contextFontMerging: true
+                                font.pixelSize: Theme.size.micro
+                            }
+                        }
+                        HoverHandler { cursorShape: Qt.PointingHandCursor }
+                    }
+                }
             }
         }
     }
@@ -236,137 +416,326 @@ Item {
     EmptyState {
         anchors.centerIn: parent
         visible: ObserverClient.profileItems.length === 0
-        title: I18n.t("没有可用档案", "No profiles")
-        subtitle: I18n.t("在服务器 profiles/ 目录放入一个 JSON 档案。",
-                         "Drop a JSON into the server's profiles/ dir.")
+        title: I18n.t("没有可用对局配置", "No match configs")
+        subtitle: I18n.t("本地服务器暂未返回可编辑配置。", "The local server has not returned an editable config.")
     }
 
-    // -------------------------------------------------- Scheduling sandbox
     Item {
-        id: board
-        anchors.top: header.bottom
+        id: stage
+        anchors.top: pageHeader.bottom
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.bottom: actionBar.top
-        anchors.topMargin: Theme.space.xl
-        anchors.leftMargin: Theme.layout.pageMargin
-        anchors.rightMargin: Theme.layout.pageMargin
+        anchors.bottom: bottomBar.top
+        anchors.topMargin: Theme.space.md
+        anchors.leftMargin: Theme.space.xxl
+        anchors.rightMargin: Theme.space.xxl
         anchors.bottomMargin: Theme.space.lg
         visible: ObserverClient.profileItems.length > 0
-        clip: true
-        state: root.selectedSeatId !== "" ? "editing" : ""
 
-        // Card board — centred in the sandbox, scaled + shifted left when editing.
-        Item {
-            id: gridStage
-            width: setupRoleCards.width
-            height: setupRoleCards.height
-            anchors.verticalCenter: parent.verticalCenter
-            x: (board.width - width) / 2
-            transformOrigin: Item.Left
+        Rectangle {
+            id: boardPaper
+            // NOTE: deliberately NO left anchor — `anchors.left` + `x` conflict
+            // and the anchor wins, which pinned the board to the left in the
+            // default (overview) state. Pure positional `x` lets the overview
+            // center and the detail state slide left + shrink.
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            height: parent.height
+            width: root.detailOpen ? Math.min(820, parent.width - detailPanel.width - Theme.space.lg)
+                                   : Math.min(1040, parent.width)
+            radius: 18
+            color: Theme.withAlpha(Theme.warm.surfaceSoft, 0.42)
+            border.width: 1
+            border.color: Theme.withAlpha(Theme.parchment.goldLine, 0.16)
+            x: root.detailOpen ? 0 : (parent.width - width) / 2
+            Behavior on x { NumberAnimation { duration: Theme.motion.slow; easing.type: Easing.OutCubic } }
+            Behavior on width { NumberAnimation { duration: Theme.motion.slow; easing.type: Easing.OutCubic } }
 
             Grid {
                 id: setupRoleCards
                 objectName: "setupRoleCards"
+                anchors.centerIn: parent
                 columns: 3
-                spacing: Theme.space.lg
+                rowSpacing: root.detailOpen ? Theme.space.lg : Theme.space.xxl
+                columnSpacing: root.detailOpen ? Theme.space.xl : Theme.space.huge
+
                 Repeater {
                     model: root.seatIds
-                    // RoleCard public API: seatId, roleName, displayRole, displayTeam,
-                    // visibilityLabel, aiLabel, statusText, accentText, selected,
-                    // selectedAccent.
-                    delegate: RoleCard {
+                    delegate: SetupRoleCard {
                         required property var modelData
                         property var eff: root.effective(modelData)
-                        seatId: modelData
-                        roleName: eff.role
-                        displayRole: eff.role
-                        displayTeam: eff.team || ""
-                        aiLabel: root.providerLabel(eff.provider) + " · " + (eff.model || I18n.t("未设","unset"))
+                        width: root.detailOpen ? 166 : 192
+                        height: root.detailOpen ? 232 : 262
+                        seatLabel: root.seatNumber(modelData)
+                        roleKey: eff.role
+                        roleLabel: root.roleLabel(eff.role)
+                        engineLabel: root.engineLabel(eff.provider)
+                        modelLabel: eff.model || I18n.t("未配置", "Unset")
+                        stateKind: root.seatStateKind(eff)
+                        stateLabel: root.seatStateText(eff)
                         selected: root.selectedSeatId === modelData
-                        selectedAccent: Theme.report.accent   // coral
-                        // Non-selected seats dim while a seat is being edited.
-                        opacity: (board.state === "editing" && root.selectedSeatId !== modelData) ? 0.4 : 1.0
-                        width: root.cardWidth
-                        height: root.cardHeight
-                        MouseArea { anchors.fill: parent; onClicked: root.selectedSeatId = modelData }
+                        opacity: root.detailOpen && root.selectedSeatId !== modelData ? 0.82 : 1.0
+                        onActivated: root.selectedSeatId = modelData
                     }
                 }
             }
         }
 
-        // Sandbox hint (only while nothing is selected).
-        Text {
-            anchors.top: gridStage.bottom
-            anchors.topMargin: Theme.space.xl
-            anchors.horizontalCenter: board.horizontalCenter
-            visible: root.selectedSeatId === ""
-            text: I18n.t("点击座位卡进行配置", "Click a seat to configure it")
-            color: Theme.color.textMuted
-            font.family: Theme.font.family; font.pixelSize: Theme.size.caption
-        }
-
-        // Per-seat inspector — parked off-screen right, slides in when editing.
         SeatEditorPanel {
-            id: inspector
-            width: 380
+            id: detailPanel
+            objectName: "setupDetailPanel"
+            width: Math.min(360, parent.width * 0.30)
             anchors.top: parent.top
             anchors.bottom: parent.bottom
-            x: board.width
-            seat: root.selectedSeatId ? root.effective(root.selectedSeatId) : ({})
-            config: root.selectedSeatId ? root.effective(root.selectedSeatId) : ({})
+            anchors.right: parent.right
+            visible: root.detailOpen
+            opacity: root.detailOpen ? 1 : 0
+            x: root.detailOpen ? parent.width - width : parent.width + Theme.space.xl
+            seat: root.detailOpen ? root.effective(root.selectedSeatId) : ({})
+            config: root.detailOpen ? root.effective(root.selectedSeatId) : ({})
             schema: ObserverClient.profileSchema
-            // Q3: a per-seat override exists once seat_overrides carries this seat.
             overridden: root.selectedSeatId !== "" && root.editedProfile.seat_overrides
                         && root.editedProfile.seat_overrides[root.selectedSeatId] !== undefined
+            statusText: root.detailOpen ? root.seatStateText(root.effective(root.selectedSeatId)) : ""
+            statusKind: root.detailOpen ? root.seatStateKind(root.effective(root.selectedSeatId)) : "empty"
             onEdited: function(field, value) { root.applyEdit(root.selectedSeatId, field, value) }
             onClosed: root.selectedSeatId = ""
             onRequestProviderSettings: root.StackView.view.parent.navigateProviderSettings()
+            Behavior on opacity { NumberAnimation { duration: Theme.motion.base; easing.type: Easing.OutCubic } }
+        }
+    }
+
+    // Floating HUD-style status bar — rounded parchment pill lifted off the
+    // board, not a full-bleed footer.
+    Rectangle {
+        // Soft warm shadow under the floating bar.
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: bottomBar.bottom
+        anchors.leftMargin: Theme.space.xxl
+        anchors.rightMargin: Theme.space.xxl
+        anchors.bottomMargin: -8
+        height: bottomBar.height
+        radius: bottomBar.radius
+        color: Theme.parchment.woodShadowSoft
+        visible: bottomBar.visible
+        z: bottomBar.z - 1
+    }
+
+    Rectangle {
+        id: bottomBar
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.leftMargin: Theme.space.xxxl
+        anchors.rightMargin: Theme.space.xxxl
+        anchors.bottomMargin: Theme.space.xxl
+        height: 72
+        radius: 18
+        color: Theme.withAlpha(Theme.parchment.parchmentSoft, 0.86)
+        border.width: 1
+        border.color: Theme.withAlpha(Theme.parchment.goldLine, 0.30)
+        visible: ObserverClient.profileItems.length > 0
+
+        Row {
+            anchors.left: parent.left
+            anchors.leftMargin: Theme.space.xl
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: Theme.space.md
+
+            Rectangle {
+                width: 42
+                height: 42
+                radius: 21
+                color: root.autoReady ? Theme.withAlpha(Theme.warm.success, 0.16)
+                                      : Theme.withAlpha(Theme.warm.warning, 0.14)
+                border.width: 1
+                border.color: root.autoReady ? Theme.warm.success : Theme.warm.warning
+                Text {
+                    anchors.centerIn: parent
+                    text: root.autoReady ? "✓" : "…"
+                    color: root.autoReady ? Theme.warm.success : Theme.warm.warning
+                    font.family: Theme.fontFamilies.cjkSans
+                    font.contextFontMerging: true
+                    font.pixelSize: 22
+                    font.weight: Theme.weight.bold
+                }
+            }
+
+            Column {
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 3
+                Row {
+                    spacing: Theme.space.sm
+                    Text {
+                        text: I18n.t("准备进度", "Ready")
+                        color: Theme.parchment.inkSoft
+                        font.family: Theme.fontFamilies.cjkSerif
+                        font.contextFontMerging: true
+                        font.pixelSize: Theme.warmSize.bodyLg
+                    }
+                    Text {
+                        text: root.arrangedCount + " / " + root.seatTotal
+                        color: Theme.parchment.ink
+                        font.family: Theme.fontFamilies.cjkSerif
+                        font.contextFontMerging: true
+                        font.pixelSize: 22
+                        font.weight: Theme.weight.bold
+                    }
+                }
+                Text {
+                    text: root.statusLine()
+                    color: Theme.parchment.inkSoft
+                    font.family: Theme.fontFamilies.cjkSans
+                    font.contextFontMerging: true
+                    font.pixelSize: Theme.size.caption
+                }
+            }
         }
 
-        states: State {
-            name: "editing"
-            PropertyChanges { target: gridStage; x: board.width * 0.03; scale: 0.86 }
-            PropertyChanges { target: inspector; x: board.width - inspector.width }
-        }
-        transitions: Transition {
-            ParallelAnimation {
-                NumberAnimation { target: gridStage; properties: "x,scale"; duration: Theme.motion.slow; easing.type: Easing.OutCubic }
-                NumberAnimation { target: inspector; property: "x"; duration: Theme.motion.slow; easing.type: Easing.OutCubic }
+        // Begin-match button as a physical game button: terracotta face, thin
+        // gold rim, layered warm shadow, press dip.
+        Item {
+            id: setupContinueButton
+            objectName: "setupContinueButton"
+            width: 220
+            height: 52
+            anchors.right: parent.right
+            anchors.rightMargin: Theme.space.lg
+            anchors.verticalCenter: parent.verticalCenter
+            opacity: root.launchEnabled ? 1.0 : 0.5
+
+            // Layered shadow for "lifted piece" feel.
+            Rectangle {
+                anchors.fill: parent
+                anchors.topMargin: 6
+                anchors.leftMargin: 3
+                anchors.rightMargin: -3
+                anchors.bottomMargin: -6
+                radius: parent.height / 2
+                color: root.launchEnabled ? Theme.parchment.woodShadow : "transparent"
+            }
+            Rectangle {
+                id: beginFace
+                anchors.fill: parent
+                radius: height / 2
+                color: root.launchEnabled
+                       ? (beginHover.hovered ? Theme.warm.primaryActive : Theme.warm.primary)
+                       : Theme.warm.primaryDisabled
+                border.width: 1
+                border.color: Theme.withAlpha(Theme.parchment.goldText, 0.55)
+                scale: beginTap.pressed ? 0.97 : 1.0
+                Behavior on color { ColorAnimation { duration: Theme.anim.color; easing.type: Easing.OutCubic } }
+                Behavior on scale { NumberAnimation { duration: Theme.anim.press; easing.type: Easing.OutQuad } }
+                Row {
+                    anchors.centerIn: parent
+                    spacing: Theme.space.sm
+                    Text {
+                        text: I18n.t("开始对局", "Begin Match")
+                        color: Theme.warm.textOnPrimary
+                        font.family: Theme.fontFamilies.cjkSans
+                        font.contextFontMerging: true
+                        font.pixelSize: Theme.warmSize.bodyLg
+                        font.weight: Theme.weight.bold
+                    }
+                    Text {
+                        text: "→"
+                        color: Theme.warm.textOnPrimary
+                        font.family: Theme.fontFamilies.cjkSans
+                        font.contextFontMerging: true
+                        font.pixelSize: Theme.warmSize.bodyLg
+                        font.weight: Theme.weight.bold
+                    }
+                }
+            }
+            HoverHandler { id: beginHover; enabled: root.launchEnabled; cursorShape: Qt.PointingHandCursor }
+            TapHandler {
+                id: beginTap
+                enabled: root.launchEnabled
+                onTapped: ObserverClient.launchFromProfile(root.editedProfile, setupModeControl.resolvedMode)
             }
         }
     }
 
-    // ------------------------------------------------------ Bottom action bar
-    Rectangle {
-        id: actionBar
-        anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
-        height: Theme.layout.actionBarHeight
-        color: Theme.color.surface
-        Rectangle { anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; height: 1; color: Theme.color.border }
-
-        AppButton {
-            text: I18n.t("返回", "Back")
-            variant: "ghost"
-            anchors.left: parent.left; anchors.leftMargin: Theme.layout.pageMargin
-            anchors.verticalCenter: parent.verticalCenter
-            onClicked: root.StackView.view.parent.navigateHome()
+    component ToolField: Column {
+        default property alias content: controlSlot.data
+        required property string label
+        spacing: 3
+        Text {
+            text: label
+            color: Theme.parchment.mutedInk
+            font.family: Theme.fontFamilies.cjkSerif
+            font.contextFontMerging: true
+            font.pixelSize: Theme.size.caption
         }
-        AppButton {
-            id: setupContinueButton
-            objectName: "setupContinueButton"
-            text: I18n.t("启动", "Launch")
-            variant: "primary"
-            width: 200
-            enabled: root.launchEnabled
-            anchors.right: parent.right; anchors.rightMargin: Theme.layout.pageMargin
-            anchors.verticalCenter: parent.verticalCenter
-            // Advances to Preflight only via onLaunchSucceeded (202 + currentRunId).
-            // C2: pass an EXPLICIT resolved mode ("fake"|"live"). Credentials are
-            // configured + synced on the settings page (and re-synced on load above),
-            // so there is no inline credential gate here — a missing per-seat server
-            // credential surfaces as the server's 403 on launch.
-            onClicked: ObserverClient.launchFromProfile(root.editedProfile, setupModeControl.resolvedMode)
+        Item {
+            id: controlSlot
+            width: parent.width
+            height: 34
+        }
+    }
+
+    // Warm-parchment ComboBox: transparent base (no Qt chrome), a pill background
+    // with a thin gold hairline, and a small hand-drawn chevron — de-tables the
+    // top config tray and the detail-panel pickers.
+    component WarmCombo: ComboBox {
+        id: _wc
+        // Pill background replaces native Qt dropdown chrome.
+        background: Rectangle {
+            radius: 10
+            color: Theme.withAlpha(Theme.warm.surfaceRaised, _wc.enabled ? 0.80 : 0.55)
+            border.width: 1
+            border.color: _wc.pressed || _wc.popup.visible
+                          ? Theme.withAlpha(Theme.warm.primary, 0.5)
+                          : Theme.withAlpha(Theme.parchment.goldLine, 0.34)
+            Behavior on border.color { ColorAnimation { duration: Theme.anim.color; easing.type: Easing.OutCubic } }
+        }
+        // Hide the default indicator (we draw our own chevron in contentItem).
+        indicator: Item {}
+        contentItem: Item {
+            Text {
+                anchors.left: parent.left
+                anchors.leftMargin: 12
+                anchors.verticalCenter: parent.verticalCenter
+                anchors.right: _wcChevron.left
+                anchors.rightMargin: 6
+                text: _wc.displayText
+                color: _wc.enabled ? Theme.parchment.ink : Theme.parchment.mutedInk
+                font: _wc.font
+                elide: Text.ElideRight
+            }
+            Item {
+                id: _wcChevron
+                anchors.right: parent.right
+                anchors.rightMargin: 10
+                anchors.verticalCenter: parent.verticalCenter
+                width: 9
+                height: 9
+                Rectangle { x: 0; y: 3; width: 6; height: 1.4; radius: 0.7;
+                            rotation: 45; transformOrigin: Item.Left;
+                            color: _wc.enabled ? Theme.parchment.inkSoft : Theme.parchment.mutedInk }
+                Rectangle { x: 4; y: 3; width: 6; height: 1.4; radius: 0.7;
+                            rotation: -45; transformOrigin: Item.Right;
+                            color: _wc.enabled ? Theme.parchment.inkSoft : Theme.parchment.mutedInk }
+            }
+        }
+        // Popup items styled warm too.
+        delegate: ItemDelegate {
+            width: _wc.width
+            height: 32
+            contentItem: Text {
+                text: _wc.textRole ? (modelData[_wc.textRole] || "") : modelData
+                color: highlighted ? Theme.warm.primaryActive : Theme.parchment.ink
+                font: _wc.font
+                verticalAlignment: Text.AlignVCenter
+                leftPadding: 12
+                elide: Text.ElideRight
+            }
+            background: Rectangle {
+                radius: 6
+                color: highlighted ? Theme.withAlpha(Theme.warm.primary, 0.10)
+                                   : (parent.hovered ? Theme.withAlpha(Theme.parchment.goldLine, 0.10) : "transparent")
+            }
         }
     }
 }

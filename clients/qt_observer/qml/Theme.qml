@@ -185,6 +185,9 @@ QtObject {
         // through contextFontMerging if a glyph is missing.
         readonly property string serif: "Source Han Serif SC"
         readonly property string sans:  "Source Han Sans SC"
+        // Windows/offscreen-safe CJK fallbacks for local visual verification.
+        readonly property string cjkSerif: "Microsoft YaHei"
+        readonly property string cjkSans:  "Microsoft YaHei UI"
         readonly property string mono:  "JetBrains Mono"
     }
 

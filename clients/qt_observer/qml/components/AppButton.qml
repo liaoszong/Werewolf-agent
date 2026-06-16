@@ -75,7 +75,7 @@ Item {
             anchors.centerIn: parent
             text: root.text
             color: root._fg
-            font.family: root.onLight ? Theme.fontFamilies.sans : Theme.font.family
+            font.family: root.onLight ? Theme.fontFamilies.cjkSans : Theme.font.family
             font.contextFontMerging: root.onLight
             font.pixelSize: root.onLight ? Theme.warmSize.bodyLg : Theme.size.body
             font.weight: Theme.weight.semibold
