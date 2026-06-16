@@ -1,5 +1,4 @@
 import QtQuick
-import QtQuick.Effects
 import qt_observer
 
 // Role seat card for the Match Ready Room.
@@ -40,12 +39,29 @@ Item {
 
     Behavior on scale { NumberAnimation { duration: Theme.anim.press; easing.type: Easing.OutQuad } }
 
+    // --- Single lower-right warm cast shadow ---
+    // Avoid MultiEffect here: on this composition it can render a hard rectangular
+    // halo around the card's top corners. This hand-shaped shadow starts below the
+    // top edge, so only the pleasant lower/right lift remains visible.
+    Rectangle {
+        anchors.fill: cardClip
+        anchors.topMargin: 14
+        anchors.leftMargin: 8
+        anchors.rightMargin: -8
+        anchors.bottomMargin: -14
+        radius: cardClip.radius + 3
+        color: Theme.withAlpha(Theme.parchment.woodShadow, root.selected ? 0.34
+                                   : (hoverHandler.hovered ? 0.30 : 0.24))
+        z: -3
+        Behavior on color { ColorAnimation { duration: Theme.anim.color; easing.type: Easing.OutCubic } }
+    }
+
     // --- Selected ambient glow — soft wash only, not the primary outline ---
     Rectangle {
         anchors.fill: cardClip
-        anchors.margins: -4
-        radius: cardClip.radius + 4
-        color: Theme.withAlpha(root._selColor, 0.12)
+        anchors.margins: -5
+        radius: cardClip.radius + 5
+        color: Theme.withAlpha(root._selColor, 0.15)
         border.width: 0
         opacity: root.selected ? 1 : 0
         Behavior on opacity { NumberAnimation { duration: Theme.motion.base; easing.type: Easing.OutCubic } }
@@ -68,20 +84,6 @@ Item {
         border.width: root.selected ? 0 : 1
         border.color: Theme.withAlpha(Theme.parchment.goldLineSoft, 0.30)
         clip: true
-
-        // Use the same class of real effect as HomeView's tarot strip instead of
-        // fake shadow rectangles. This removes the hard rectangular block that was
-        // visible behind the setup cards.
-        layer.enabled: true
-        layer.effect: MultiEffect {
-            shadowEnabled: true
-            shadowColor: Qt.rgba(40 / 255, 30 / 255, 20 / 255, root.selected ? 0.34 : 0.26)
-            shadowBlur: root.selected ? 0.72 : (hoverHandler.hovered ? 0.60 : 0.48)
-            shadowHorizontalOffset: root.selected ? 5 : 4
-            shadowVerticalOffset: root.selected ? 10 : 7
-            Behavior on shadowBlur { NumberAnimation { duration: Theme.anim.color } }
-            Behavior on shadowVerticalOffset { NumberAnimation { duration: Theme.anim.color } }
-        }
 
         // 1) Card art bleeds to the very edge — the art IS the frame.
         Image {
@@ -261,8 +263,8 @@ Item {
         anchors.fill: cardClip
         radius: cardClip.radius
         color: "transparent"
-        border.width: root.selected ? 2 : 0
-        border.color: root._selColor
+        border.width: root.selected ? 3 : 0
+        border.color: Theme.warm.primaryActive
         opacity: root.selected ? 1 : 0
         z: 8
         Behavior on opacity { NumberAnimation { duration: Theme.motion.base; easing.type: Easing.OutCubic } }
