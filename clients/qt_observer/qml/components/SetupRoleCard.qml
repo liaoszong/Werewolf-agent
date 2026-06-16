@@ -4,7 +4,7 @@ import qt_observer
 // Role seat card for the Match Ready Room.
 // Visual philosophy: the tarot CARD ART is the visual subject. The container is
 // nearly transparent — it owns only geometry, click/hover/selected affordances,
-// a soft warm drop shadow, and a thin scrim so the per-seat engine/model/state
+// a soft warm contact shadow, and a thin scrim so the per-seat engine/model/state
 // chips stay legible over the art. No thick white frame, no "card in a frame".
 Item {
     id: root
@@ -39,19 +39,31 @@ Item {
 
     Behavior on scale { NumberAnimation { duration: Theme.anim.press; easing.type: Easing.OutQuad } }
 
-    // --- Single lower-right warm cast shadow ---
-    // Avoid MultiEffect here: on this composition it can render a hard rectangular
-    // halo around the card's top corners. This hand-shaped shadow starts below the
-    // top edge, so only the pleasant lower/right lift remains visible.
+    // --- Warm contact shadows ---
+    // Do not draw a full card-sized shadow rectangle: transparent pixels in the
+    // tarot PNG corners can reveal it as hard square artifacts at the upper corners.
+    // These two contact shadows start below / beside the visible card only.
     Rectangle {
-        anchors.fill: cardClip
-        anchors.topMargin: 14
-        anchors.leftMargin: 8
-        anchors.rightMargin: -8
-        anchors.bottomMargin: -14
-        radius: cardClip.radius + 3
-        color: Theme.withAlpha(Theme.parchment.woodShadow, root.selected ? 0.34
-                                   : (hoverHandler.hovered ? 0.30 : 0.24))
+        id: bottomShadow
+        width: cardClip.width * 0.92
+        height: 22
+        x: cardClip.x + cardClip.width * 0.08
+        y: cardClip.y + cardClip.height - 7
+        radius: height / 2
+        color: Theme.withAlpha(Theme.parchment.woodShadow, root.selected ? 0.30
+                                   : (hoverHandler.hovered ? 0.26 : 0.22))
+        z: -3
+        Behavior on color { ColorAnimation { duration: Theme.anim.color; easing.type: Easing.OutCubic } }
+    }
+    Rectangle {
+        id: rightShadow
+        width: 14
+        height: Math.max(0, cardClip.height - 54)
+        x: cardClip.x + cardClip.width - 2
+        y: cardClip.y + 34
+        radius: 7
+        color: Theme.withAlpha(Theme.parchment.woodShadow, root.selected ? 0.20
+                                   : (hoverHandler.hovered ? 0.17 : 0.14))
         z: -3
         Behavior on color { ColorAnimation { duration: Theme.anim.color; easing.type: Easing.OutCubic } }
     }
@@ -59,16 +71,16 @@ Item {
     // --- Selected ambient glow — soft wash only, not the primary outline ---
     Rectangle {
         anchors.fill: cardClip
-        anchors.margins: -5
-        radius: cardClip.radius + 5
-        color: Theme.withAlpha(root._selColor, 0.15)
+        anchors.margins: -6
+        radius: cardClip.radius + 6
+        color: Theme.withAlpha(root._selColor, 0.18)
         border.width: 0
         opacity: root.selected ? 1 : 0
         Behavior on opacity { NumberAnimation { duration: Theme.motion.base; easing.type: Easing.OutCubic } }
         z: -1
     }
 
-    // --- The clip that IS the card edge — transparent fill, just rounds corners ---
+    // --- The clip that IS the card edge ---
     Rectangle {
         id: cardClip
         // Do not fill the delegate's rectangular allocation. The visible art keeps
@@ -77,10 +89,14 @@ Item {
         width: Math.min(root.width, root.height * root._cardRatio)
         height: Math.min(root.height, root.width / root._cardRatio)
         anchors.centerIn: parent
-        radius: 14
-        color: "transparent"
+        // Slightly larger radius matches the actual tarot asset corners better and
+        // prevents selected strokes from cutting into the card art at the corners.
+        radius: 17
+        // Warm backing fills any transparent pixels in the tarot PNG corners so the
+        // shadow behind the card cannot show through them.
+        color: Theme.parchment.parchmentSoft
         // Non-selected hairline only. The selected edge is drawn by selectedOutline
-        // after the art, so it cannot be swallowed by the image.
+        // outside the card, so it cannot be swallowed by the image.
         border.width: root.selected ? 0 : 1
         border.color: Theme.withAlpha(Theme.parchment.goldLineSoft, 0.30)
         clip: true
@@ -256,12 +272,13 @@ Item {
         }
     }
 
-    // True selected outline: drawn above the card art and pinned to the actual card
-    // edge. The glow behind the card remains only a soft ambient wash.
+    // True selected outline: drawn outside the card so it does not cut into the art.
+    // The glow behind the card remains only a soft ambient wash.
     Rectangle {
         id: selectedOutline
         anchors.fill: cardClip
-        radius: cardClip.radius
+        anchors.margins: -3
+        radius: cardClip.radius + 3
         color: "transparent"
         border.width: root.selected ? 3 : 0
         border.color: Theme.warm.primaryActive
