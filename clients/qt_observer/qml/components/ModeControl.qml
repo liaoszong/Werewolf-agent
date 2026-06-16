@@ -62,40 +62,9 @@ Item {
                     active: root.state === "live_armed" || root.state === "live_confirmed"
                     enabled: root.liveAvailable
                     pulse: root.state === "live_confirmed"
-                    onPicked: if (root.state === "fake") root.state = "live_armed"
+                    onPicked: if (root.liveAvailable) root.state = "live_confirmed"
                     Accessible.description: root.liveReasonCode
                 }
-            }
-        }
-
-        Rectangle {
-            width: parent.width
-            height: 28
-            visible: root.state === "live_armed" || root.state === "live_confirmed"
-            radius: Theme.radius.pill
-            color: root.state === "live_confirmed"
-                   ? Theme.withAlpha(Theme.warm.success, 0.18)
-                   : Theme.withAlpha(Theme.warm.primary, 0.12)
-            border.width: 1
-            border.color: root.state === "live_confirmed" ? Theme.warm.success : Theme.warm.primary
-            Text {
-                anchors.centerIn: parent
-                text: root.state === "live_confirmed"
-                      ? I18n.t("实战已启用", "Live enabled")
-                      : I18n.t("再次点击确认实战", "Click again to confirm live")
-                color: root.state === "live_confirmed" ? Theme.warm.success : Theme.warm.primaryActive
-                font.family: Theme.fontFamilies.cjkSans
-                font.contextFontMerging: true
-                font.pixelSize: Theme.size.caption
-                font.weight: Theme.weight.semibold
-            }
-            TapHandler {
-                enabled: root.liveAvailable && root.state === "live_armed"
-                onTapped: root.state = "live_confirmed"
-            }
-            HoverHandler {
-                enabled: root.liveAvailable && root.state === "live_armed"
-                cursorShape: Qt.PointingHandCursor
             }
         }
 
@@ -149,8 +118,8 @@ Item {
 
         Rectangle {
             anchors.right: parent.right
-            anchors.top: parent.top
-            anchors.margins: 8
+            anchors.rightMargin: 8
+            anchors.verticalCenter: parent.verticalCenter
             width: 7
             height: 7
             radius: 4

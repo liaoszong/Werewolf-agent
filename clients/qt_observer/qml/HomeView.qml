@@ -134,13 +134,16 @@ Item {
             }
         }
 
-        Row {
-            spacing: Theme.space.md
+        Column {
+            id: heroActions
+            width: Math.max(startNewMatchButton.implicitWidth, historyButton.implicitWidth)
+            spacing: Theme.space.sm
             topPadding: Theme.space.lg
             AppButton {
                 id: startNewMatchButton
                 objectName: "startNewMatchButton"
                 onLight: true
+                width: parent.width
                 text: I18n.t("进入今夜对局", "Enter Tonight's Match")
                 variant: "primary"
                 onClicked: root.StackView.view.parent.navigateSetup()
@@ -149,20 +152,13 @@ Item {
                 id: historyButton
                 objectName: "historyButton"
                 onLight: true
+                width: parent.width
                 text: I18n.t("查看昨夜复盘", "Last Night's Replay")
                 variant: "secondary"
                 onClicked: {
                     ObserverClient.refreshRuns()
                     root.StackView.view.parent.navigateHistory()
                 }
-            }
-            AppButton {
-                id: designPreviewButton
-                objectName: "designPreviewButton"
-                onLight: true
-                text: I18n.t("🎴 设计预览", "🎴 Design Preview")
-                variant: "ghost"
-                onClicked: root.StackView.view.parent.navigateDesignPreview()
             }
         }
     }

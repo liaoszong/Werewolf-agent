@@ -210,10 +210,26 @@ Item {
     Rectangle {
         anchors.fill: parent
         radius: parent.radius
-        // Parchment card, not near-white. Lets the setup-room light leak in.
-        color: Theme.withAlpha(Theme.parchment.parchmentSoft, 0.90)
+        color: Theme.withAlpha(Theme.parchment.parchmentSoft, 0.94)
         border.width: 1
-        border.color: Theme.withAlpha(Theme.parchment.goldLine, 0.30)
+        border.color: Theme.withAlpha(Theme.parchment.goldLine, 0.48)
+
+        Image {
+            anchors.fill: parent
+            anchors.margins: 2
+            source: Illustrations.texParchment
+            fillMode: Image.Tile
+            opacity: 0.22
+        }
+
+        Rectangle {
+            anchors.fill: parent
+            anchors.margins: 1
+            radius: parent.radius - 1
+            color: "transparent"
+            border.width: 1
+            border.color: Qt.rgba(1, 248 / 255, 234 / 255, 0.42)
+        }
     }
 
     Flickable {
@@ -311,60 +327,76 @@ Item {
                 color: Theme.withAlpha(Theme.parchment.goldLine, 0.25)
             }
 
-            FormField {
-                label: I18n.t("AI 引擎", "AI Engine")
-                ParchmentCombo {
-                    id: providerBox
-                    objectName: "seatEditorProvider"
+            Rectangle {
+                width: parent.width
+                height: 128
+                radius: 10
+                color: Theme.withAlpha(Theme.parchment.parchment, 0.46)
+                border.width: 1
+                border.color: Theme.withAlpha(Theme.parchment.goldLineSoft, 0.28)
+
+                Column {
                     anchors.fill: parent
-                    model: root.providerOptions
-                    textRole: "label"
-                    font.family: Theme.fontFamilies.cjkSans
-                    font.contextFontMerging: true
-                    onActivated: {
-                        var picked = root.providerOptions[currentIndex].value
-                        root.edited("provider", picked)
-                        if (root.providerConfigured(picked))
-                            ObserverClient.fetchProviderModels(picked)
+                        anchors.leftMargin: Theme.space.sm
+                        anchors.rightMargin: Theme.space.sm
+                        anchors.topMargin: Theme.space.sm
+                        anchors.bottomMargin: Theme.space.xl
+                    spacing: Theme.space.xs
+
+                    FormField {
+                        label: I18n.t("AI 引擎", "AI Engine")
+                        ParchmentCombo {
+                            id: providerBox
+                            objectName: "seatEditorProvider"
+                            anchors.fill: parent
+                            model: root.providerOptions
+                            textRole: "label"
+                            font.family: Theme.fontFamilies.cjkSans
+                            font.contextFontMerging: true
+                            onActivated: {
+                                var picked = root.providerOptions[currentIndex].value
+                                root.edited("provider", picked)
+                                if (root.providerConfigured(picked))
+                                    ObserverClient.fetchProviderModels(picked)
+                            }
+                        }
+                    }
+
+                    FormField {
+                        label: I18n.t("模型", "Model")
+                        ParchmentCombo {
+                            id: modelBox
+                            objectName: "seatEditorModel"
+                            anchors.fill: parent
+                            model: root.modelList
+                            font.family: Theme.fontFamilies.cjkSans
+                            font.contextFontMerging: true
+                            onActivated: root.edited("model", root.modelList[currentIndex])
+                        }
                     }
                 }
-            }
 
-            FormField {
-                label: I18n.t("模型", "Model")
-                ParchmentCombo {
-                    id: modelBox
-                    objectName: "seatEditorModel"
-                    anchors.fill: parent
-                    model: root.modelList
-                    font.family: Theme.fontFamilies.cjkSans
-                    font.contextFontMerging: true
-                    onActivated: root.edited("model", root.modelList[currentIndex])
-                }
-            }
-
-            // Weak text link to manage AI services — was a strong bordered button row.
-            Item {
-                width: parent.width
-                height: 26
                 Row {
-                    anchors.centerIn: parent
+                    anchors.right: parent.right
+                    anchors.rightMargin: Theme.space.sm
+                    anchors.bottom: parent.bottom
+                    anchors.bottomMargin: 4
                     spacing: 4
                     Text {
                         text: I18n.t("选择配置 / 管理 AI 服务", "Choose config / Manage AI Services")
-                        color: manageHover.hovered ? Theme.warm.primaryActive : Theme.parchment.inkSoft
+                        color: manageHover.hovered ? Theme.warm.primaryActive : Theme.parchment.mutedInk
                         font.family: Theme.fontFamilies.cjkSans
                         font.contextFontMerging: true
-                        font.pixelSize: Theme.size.caption
+                        font.pixelSize: Theme.size.micro
                         font.weight: Theme.weight.semibold
                         Behavior on color { ColorAnimation { duration: Theme.anim.color; easing.type: Easing.OutCubic } }
                     }
                     Text {
                         text: "→"
-                        color: manageHover.hovered ? Theme.warm.primaryActive : Theme.parchment.inkSoft
+                        color: manageHover.hovered ? Theme.warm.primaryActive : Theme.parchment.mutedInk
                         font.family: Theme.fontFamilies.cjkSans
                         font.contextFontMerging: true
-                        font.pixelSize: Theme.size.caption
+                        font.pixelSize: Theme.size.micro
                         font.weight: Theme.weight.semibold
                     }
                 }
@@ -445,9 +477,31 @@ Item {
                         font.pixelSize: Theme.size.micro
                     }
                 }
-                ScrollView {
+                Rectangle {
                     width: parent.width
-                    height: 92
+                    height: 100
+                    color: Theme.withAlpha(Theme.parchment.parchment, 0.54)
+                    border.width: 0
+
+                    Rectangle {
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.top: parent.top
+                        height: 1
+                        color: Theme.withAlpha(Theme.parchment.goldLineSoft, 0.42)
+                    }
+                    Rectangle {
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.bottom: parent.bottom
+                        height: 1
+                        color: Theme.withAlpha(Theme.parchment.goldLineSoft, 0.36)
+                    }
+
+                    ScrollView {
+                        anchors.fill: parent
+                        anchors.topMargin: 4
+                        anchors.bottomMargin: 4
                     TextArea {
                         id: promptArea
                         objectName: "seatEditorPrompt"
@@ -460,24 +514,9 @@ Item {
                         rightPadding: 10
                         topPadding: 8
                         bottomPadding: 8
-                        background: Rectangle {
-                            // Slightly deeper warm-grey paper + light inner shadow so
-                            // the instruction field reads as a recessed writing well.
-                            radius: 8
-                            color: Theme.withAlpha(Theme.parchment.parchmentStrong, 0.55)
-                            border.width: 1
-                            border.color: promptArea.activeFocus ? Theme.warm.primary
-                                                                 : Theme.withAlpha(Theme.parchment.goldLineSoft, 0.40)
-                            // Inner top shadow line for the "pressed in" feel.
-                            Rectangle {
-                                anchors.left: parent.left
-                                anchors.right: parent.right
-                                anchors.top: parent.top
-                                height: 1
-                                color: Theme.withAlpha(Theme.parchment.woodShadow, 0.16)
-                            }
-                        }
+                        background: Item {}
                         onTextChanged: if (root._ready) root.edited("prompt", text)
+                    }
                     }
                 }
             }
@@ -518,29 +557,41 @@ Item {
                         width: parent.width - 108 - 64 - Theme.space.md * 2
                         anchors.verticalCenter: parent.verticalCenter
                         from: 0.0; to: 2.0; stepSize: 0.1
-                        // Warm parchment track + terracotta fill + coral handle.
                         background: Rectangle {
                             x: tempSlider.leftPadding
-                            y: tempSlider.topPadding + tempSlider.availableHeight / 2 - 3
+                            y: tempSlider.topPadding + tempSlider.availableHeight / 2 - 4
                             width: tempSlider.availableWidth
-                            height: 6
-                            radius: 3
-                            color: Theme.withAlpha(Theme.parchment.goldLineSoft, 0.30)
+                            height: 8
+                            radius: 4
+                            color: Qt.rgba(157 / 255, 135 / 255, 100 / 255, 0.30)
+                            border.width: 1
+                            border.color: Theme.withAlpha(Theme.parchment.goldLineSoft, 0.42)
                             Rectangle {
                                 width: tempSlider.visualPosition * parent.width
                                 height: parent.height
-                                radius: 3
-                                color: Theme.warm.primary
+                                radius: 4
+                                color: Theme.warm.primaryActive
+                            }
+                            Repeater {
+                                model: 5
+                                Rectangle {
+                                    x: index * (parent.width - 2) / 4
+                                    y: -3
+                                    width: 1
+                                    height: 14
+                                    color: Theme.withAlpha(Theme.parchment.inkSoft, 0.28)
+                                }
                             }
                         }
                         handle: Rectangle {
                             x: tempSlider.leftPadding + tempSlider.visualPosition
                                * (tempSlider.availableWidth - width)
                             y: tempSlider.topPadding + tempSlider.availableHeight / 2 - height / 2
-                            width: 18; height: 18; radius: 9
-                            color: Theme.warm.primary
+                            width: 18; height: 18; radius: 5
+                            color: "#c79752"
                             border.width: 2
-                            border.color: Theme.parchment.parchmentSoft
+                            border.color: Qt.rgba(1, 244 / 255, 216 / 255, 0.82)
+                            rotation: 45
                         }
                         onMoved: root.edited("temperature", Math.round(value * 10) / 10)
                     }
@@ -583,12 +634,20 @@ Item {
                         font.pixelSize: Theme.size.caption
                         leftPadding: Theme.space.md
                         rightPadding: Theme.space.md
-                        background: Rectangle {
-                            radius: 8
-                            color: Theme.withAlpha(Theme.warm.surfaceRaised, 0.62)
-                            border.width: 1
-                            border.color: maxTokensField.activeFocus ? Theme.warm.primary
-                                                                     : Theme.withAlpha(Theme.parchment.goldLineSoft, 0.40)
+                        background: Item {
+                            Rectangle {
+                                anchors.fill: parent
+                                radius: 8
+                                color: Theme.withAlpha(Theme.parchment.parchmentStrong, 0.30)
+                            }
+                            Rectangle {
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.bottom: parent.bottom
+                                height: 2
+                                color: maxTokensField.activeFocus ? Theme.warm.primaryActive
+                                                                  : Theme.withAlpha(Theme.parchment.goldLineSoft, 0.58)
+                            }
                         }
                         onEditingFinished: {
                             var v = parseInt(text)
@@ -601,49 +660,44 @@ Item {
 
             Rectangle {
                 width: parent.width
-                height: 46
-                radius: Theme.radius.sm
-                color: Theme.withAlpha(root._statusColor(), 0.10)
-                border.width: 1
-                border.color: Theme.withAlpha(root._statusColor(), 0.42)
+                height: 32
+                radius: 0
+                color: "transparent"
+                border.width: 0
                 Row {
                     anchors.fill: parent
-                    anchors.margins: Theme.space.md
+                    anchors.leftMargin: Theme.space.xs
+                    anchors.rightMargin: Theme.space.xs
                     spacing: Theme.space.sm
-                    Rectangle {
+                    Item {
                         width: 18
                         height: 18
-                        radius: 9
                         anchors.verticalCenter: parent.verticalCenter
-                        color: root._statusColor()
+                        Rectangle {
+                            anchors.centerIn: parent
+                            width: 18
+                            height: 18
+                            radius: 9
+                            color: Theme.withAlpha(root._statusColor(), 0.18)
+                        }
+                        Rectangle {
+                            anchors.centerIn: parent
+                            width: 10
+                            height: 10
+                            radius: 5
+                            color: root._statusColor()
+                        }
                     }
                     Text {
                         anchors.verticalCenter: parent.verticalCenter
-                        text: root.statusText
-                        color: root._statusColor()
+                        text: I18n.t("状态：", "Status: ") + root.statusText + " · "
+                              + (root.overridden ? I18n.t("席位覆盖", "Seat override")
+                                                 : I18n.t("继承角色默认", "Role default"))
+                        color: Theme.parchment.inkSoft
                         font.family: Theme.fontFamilies.cjkSans
                         font.contextFontMerging: true
                         font.pixelSize: Theme.size.caption
                         font.weight: Theme.weight.semibold
-                    }
-                    Rectangle {
-                        anchors.verticalCenter: parent.verticalCenter
-                        height: 22
-                        width: overrideText.implicitWidth + Theme.space.md
-                        radius: Theme.radius.pill
-                        color: Theme.withAlpha(Theme.warm.surfaceRaised, 0.75)
-                        border.width: 1
-                        border.color: Theme.withAlpha(Theme.parchment.goldLine, 0.30)
-                        Text {
-                            id: overrideText
-                            anchors.centerIn: parent
-                            text: root.overridden ? I18n.t("席位覆盖", "Seat override")
-                                                  : I18n.t("继承角色默认", "Role default")
-                            color: Theme.warm.muted
-                            font.family: Theme.fontFamilies.cjkSans
-                            font.contextFontMerging: true
-                            font.pixelSize: Theme.size.micro
-                        }
                     }
                 }
             }
@@ -677,11 +731,20 @@ Item {
         id: _pc
         background: Rectangle {
             radius: 8
-            color: Theme.withAlpha(Theme.warm.surfaceRaised, 0.72)
+            color: Theme.withAlpha(Theme.parchment.parchmentStrong, 0.42)
             border.width: 1
             border.color: _pc.pressed || _pc.popup.visible
-                          ? Theme.withAlpha(Theme.warm.primary, 0.5)
+                          ? Theme.withAlpha(Theme.warm.primaryActive, 0.54)
                           : Theme.withAlpha(Theme.parchment.goldLineSoft, 0.42)
+            Rectangle {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.leftMargin: 8
+                anchors.rightMargin: 8
+                height: 1
+                color: Qt.rgba(1, 248 / 255, 234 / 255, 0.34)
+            }
             Behavior on border.color { ColorAnimation { duration: Theme.anim.color; easing.type: Easing.OutCubic } }
         }
         indicator: Item {}
@@ -697,19 +760,24 @@ Item {
                 font: _pc.font
                 elide: Text.ElideRight
             }
-            Item {
+            Rectangle {
                 id: _pcChev
                 anchors.right: parent.right
-                anchors.rightMargin: 10
+                anchors.rightMargin: 9
                 anchors.verticalCenter: parent.verticalCenter
-                width: 8
-                height: 8
-                Rectangle { x: 0; y: 3; width: 5; height: 1.3; radius: 0.6;
-                            rotation: 45; transformOrigin: Item.Left;
-                            color: _pc.enabled ? Theme.parchment.inkSoft : Theme.parchment.mutedInk }
-                Rectangle { x: 3; y: 3; width: 5; height: 1.3; radius: 0.6;
-                            rotation: -45; transformOrigin: Item.Right;
-                            color: _pc.enabled ? Theme.parchment.inkSoft : Theme.parchment.mutedInk }
+                width: 11
+                height: 11
+                radius: 6
+                color: Theme.withAlpha(Theme.parchment.goldLine, _pc.enabled ? 0.55 : 0.25)
+                Text {
+                    anchors.centerIn: parent
+                    anchors.verticalCenterOffset: -1
+                    text: "▾"
+                    color: Theme.parchment.ink
+                    font.family: Theme.fontFamilies.cjkSans
+                    font.contextFontMerging: true
+                    font.pixelSize: 9
+                }
             }
         }
         delegate: ItemDelegate {

@@ -61,7 +61,7 @@ REQUIRED_OBJECT_NAMES = {
     # Game-client redesign: recent-runs moved off the home (edge-floating HUD over
     # the illustration); recent runs now live on the History page. The two hero
     # action buttons keep their objectNames (text changed to 进入今夜对局 / 查看昨夜复盘).
-    "qml/HomeView.qml": ["homeView", "startNewMatchButton", "historyButton", "serverStatusBadge", "designPreviewButton"],
+    "qml/HomeView.qml": ["homeView", "startNewMatchButton", "historyButton", "serverStatusBadge"],
     # P2-B Q2: credentials moved OUT of the setup view to the dedicated provider
     # settings page (below); the setup view is now a pure scheduling sandbox.
     "qml/MatchSetupView.qml": ["matchSetupView", "setupRoleCards", "setupContinueButton",
@@ -1103,10 +1103,10 @@ class QtObserverGameRedesignPhase2Tests(unittest.TestCase):
         for tok in ["bgDark", "parchment", "goldLine", "terracotta"]:
             self.assertRegex(c, r'property color %s' % tok)
 
-    def test_home_has_design_preview_entry(self) -> None:
+    def test_home_does_not_expose_design_preview_entry(self) -> None:
         c = (QT / "qml/HomeView.qml").read_text(encoding="utf-8")
-        self.assertIn('objectName: "designPreviewButton"', c)
-        self.assertIn("navigateDesignPreview()", c)
+        self.assertNotIn('objectName: "designPreviewButton"', c)
+        self.assertNotIn("navigateDesignPreview()", c)
         a = (QT / "qml/AppShell.qml").read_text(encoding="utf-8")
         self.assertIn("function navigateDesignPreview", a)
         self.assertIn("DesignPreviewView", a)

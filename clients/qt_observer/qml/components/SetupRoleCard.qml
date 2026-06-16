@@ -3,10 +3,15 @@ import QtQuick.Effects
 import qt_observer
 
 // Role seat card for the Match Ready Room.
-// Visual philosophy: the tarot CARD ART is the visual subject. The container is
-// nearly transparent — it owns only geometry, click/hover/selected affordances,
-// a soft warm cast shadow, and a thin scrim so the per-seat engine/model/state
-// chips stay legible over the art. No thick white frame, no "card in a frame".
+// Visual philosophy: the tarot CARD ART is the visual subject — its alpha defines
+// the shadow shape. The container owns only geometry, click/hover/selected affordances,
+// and overlay elements (scrim, medallion, info strip, selected outline).
+// No Rectangle shadow, no visible shadowArt duplicate, no clip: true on a filled rect.
+//
+// Shadow strategy matches HomeView: MultiEffect is applied directly to the
+// tarot Image via layer.effect, so shadow follows the PNG's transparent rounded
+// corners naturally. This eliminates the "right-angle shadow at top corners"
+// visible when a separate shadow element or Rectangle backing is used.
 Item {
     id: root
     objectName: "setupRoleCard"
@@ -28,6 +33,8 @@ Item {
     implicitWidth: 152
     implicitHeight: 228
     readonly property real _cardRatio: 2 / 3
+    // Approximate corner radius matching the tarot PNG's transparent corners.
+    readonly property real _cardRadius: 17
 
     // Selected floats up; hover nudges gently; press dips. No bounce.
     scale: tapHandler.pressed ? 0.985
@@ -40,68 +47,17 @@ Item {
 
     Behavior on scale { NumberAnimation { duration: Theme.anim.press; easing.type: Easing.OutQuad } }
 
-    // --- Tarot-alpha warm cast shadow ---
-    // Do NOT draw a Rectangle shadow: the tarot PNG has transparent rounded-corner
-    // pixels, and rectangular shadows leak through/around those corners. Match the
-    // HomeView pattern by applying MultiEffect to the tarot image alpha itself.
-    Image {
-        id: shadowArt
-        width: cardClip.width
-        height: cardClip.height
-        x: cardClip.x
-        y: cardClip.y
-        source: Illustrations.tarot(root.roleKey)
-        fillMode: Image.PreserveAspectFit
-        asynchronous: true
-        cache: true
-        visible: status === Image.Ready
-        z: -3
-        layer.enabled: true
-        layer.effect: MultiEffect {
-            shadowEnabled: true
-            shadowColor: Qt.rgba(40 / 255, 30 / 255, 20 / 255, root.selected ? 0.36 : 0.30)
-            shadowBlur: root.selected ? 0.72 : (hoverHandler.hovered ? 0.62 : 0.52)
-            shadowHorizontalOffset: root.selected ? 6 : 5
-            shadowVerticalOffset: root.selected ? 12 : 8
-            Behavior on shadowBlur { NumberAnimation { duration: Theme.anim.color } }
-            Behavior on shadowVerticalOffset { NumberAnimation { duration: Theme.anim.color } }
-        }
-    }
-
-    // --- Selected ambient glow — soft wash only, not the primary outline ---
-    Rectangle {
-        anchors.fill: cardClip
-        anchors.margins: -6
-        radius: cardClip.radius + 6
-        color: Theme.withAlpha(root._selColor, 0.18)
-        border.width: 0
-        opacity: root.selected ? 1 : 0
-        Behavior on opacity { NumberAnimation { duration: Theme.motion.base; easing.type: Easing.OutCubic } }
-        z: -1
-    }
-
-    // --- The clip that IS the card edge ---
-    Rectangle {
-        id: cardClip
-        // Do not fill the delegate's rectangular allocation. The visible art keeps
-        // the exact tarot aspect ratio used on HomeView, so shadows and outlines do
-        // not draw around an invisible wider box.
+    // --- Card visual: centered 2:3 area ---------------------------------------
+    Item {
+        id: cardVisual
         width: Math.min(root.width, root.height * root._cardRatio)
         height: Math.min(root.height, root.width / root._cardRatio)
         anchors.centerIn: parent
-        // Slightly larger radius matches the actual tarot asset corners better and
-        // prevents selected strokes from cutting into the card art at the corners.
-        radius: 17
-        // Warm backing fills any transparent pixels in the tarot PNG corners so the
-        // shadow behind the card cannot show through them.
-        color: Theme.parchment.parchmentSoft
-        // Non-selected hairline only. The selected edge is drawn by selectedOutline
-        // outside the card, so it cannot be swallowed by the image.
-        border.width: root.selected ? 0 : 1
-        border.color: Theme.withAlpha(Theme.parchment.goldLineSoft, 0.30)
-        clip: true
 
-        // 1) Card art bleeds to the very edge — the art IS the frame.
+        // 1) Card art — shadow follows image alpha (same pattern as HomeView
+        //    tarot strip). The tarot PNGs have transparent rounded corners, so
+        //    MultiEffect shadow naturally traces the card silhouette — no
+        //    rectangular shadow bleed at the corners.
         Image {
             id: cardArt
             anchors.fill: parent
@@ -110,10 +66,23 @@ Item {
             asynchronous: true
             cache: true
             visible: status === Image.Ready
+            layer.enabled: true
+            layer.effect: MultiEffect {
+                shadowEnabled: true
+                shadowColor: Qt.rgba(48 / 255, 32 / 255, 18 / 255, root.selected ? 0.60 : 0.48)
+                shadowBlur: root.selected ? 1.02 : (hoverHandler.hovered ? 0.96 : 0.88)
+                shadowHorizontalOffset: root.selected ? 7 : 6
+                shadowVerticalOffset: root.selected ? 16 : (hoverHandler.hovered ? 15 : 13)
+                Behavior on shadowBlur { NumberAnimation { duration: Theme.anim.color } }
+                Behavior on shadowVerticalOffset { NumberAnimation { duration: Theme.anim.color } }
+            }
         }
+
+        // 2) Fallback when tarot art is not loaded (never blank).
         Rectangle {
             anchors.fill: parent
             visible: cardArt.status !== Image.Ready
+            radius: root._cardRadius
             color: Theme.warm.surfaceCard
             Text {
                 anchors.centerIn: parent
@@ -125,20 +94,36 @@ Item {
             }
         }
 
-        // 2) Top scrim — tiny vignette so the seat number medallion reads, NOT a
-        // white header band.
+        // 3) Selected ambient glow — soft wash behind the card, not the primary
+        //    outline. Drawn outside the art so it does not enter the shadow pass.
+        Rectangle {
+            anchors.fill: parent
+            anchors.margins: -6
+            radius: root._cardRadius + 6
+            color: Theme.withAlpha(root._selColor, 0.18)
+            border.width: 0
+            opacity: root.selected ? 1 : 0
+            Behavior on opacity { NumberAnimation { duration: Theme.motion.base; easing.type: Easing.OutCubic } }
+            z: -1
+        }
+
+        // 4) Top scrim — tiny vignette so the seat number medallion reads, NOT a
+        //    white header band. Sits on top of the art (z: 1) so the shadow
+        //    computed on layer 0 (the art) is unaffected.
         Rectangle {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: parent.top
             height: parent.height * 0.32
+            radius: root._cardRadius
             gradient: Gradient {
                 GradientStop { position: 0.0; color: Theme.withAlpha(Theme.parchment.woodShadow, 0.30) }
                 GradientStop { position: 1.0; color: "transparent" }
             }
+            z: 1
         }
 
-        // 3) Seat medallion — translucent parchment, sits on the art.
+        // 5) Seat medallion — translucent parchment, sits on the art.
         Rectangle {
             id: seatSeal
             x: 14
@@ -149,6 +134,7 @@ Item {
             color: Theme.withAlpha(Theme.warm.surfaceRaised, 0.82)
             border.width: 1
             border.color: Theme.withAlpha(Theme.parchment.goldLine, 0.55)
+            z: 2
             Text {
                 anchors.centerIn: parent
                 text: root.seatLabel
@@ -160,7 +146,7 @@ Item {
             }
         }
 
-        // 4) Selected check — coral dot, top-right, small.
+        // 6) Selected check — coral dot, top-right, small.
         Rectangle {
             anchors.right: parent.right
             anchors.top: parent.top
@@ -170,9 +156,10 @@ Item {
             radius: 12
             visible: root.selected
             color: root._selColor
+            z: 3
             Text {
                 anchors.centerIn: parent
-                text: "✓"
+                text: "\u2713"
                 color: Theme.warm.textOnPrimary
                 font.family: Theme.fontFamilies.cjkSans
                 font.contextFontMerging: true
@@ -181,8 +168,8 @@ Item {
             }
         }
 
-        // 5) Bottom info strip — LIGHT translucent parchment ribbon, never solid
-        // white block, never dark gradient. Two micro rows + state dot.
+        // 7) Bottom info strip — LIGHT translucent parchment ribbon, never solid
+        //    white block, never dark gradient. Two micro rows + state dot.
         Rectangle {
             id: infoPlate
             anchors.left: parent.left
@@ -194,6 +181,7 @@ Item {
             color: Theme.withAlpha(Theme.parchment.parchmentSoft, 0.80)
             border.width: 1
             border.color: Theme.withAlpha(Theme.parchment.goldLineSoft, 0.32)
+            z: 4
 
             Column {
                 anchors.fill: parent
@@ -272,13 +260,13 @@ Item {
         }
     }
 
-    // True selected outline: drawn outside the card so it does not cut into the art.
-    // The glow behind the card remains only a soft ambient wash.
+    // True selected outline: drawn outside cardVisual so it does not enter the
+    // shadow pass. The ambient glow behind the card is separate (z: -1).
     Rectangle {
         id: selectedOutline
-        anchors.fill: cardClip
+        anchors.fill: cardVisual
         anchors.margins: -3
-        radius: cardClip.radius + 3
+        radius: root._cardRadius + 3
         color: "transparent"
         border.width: root.selected ? 3 : 0
         border.color: Theme.warm.primaryActive

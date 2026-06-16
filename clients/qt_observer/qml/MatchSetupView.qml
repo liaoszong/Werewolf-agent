@@ -258,7 +258,7 @@ Item {
         anchors.right: parent.right
         anchors.top: parent.top
         anchors.margins: Theme.space.xxl
-        height: 70
+        height: 78
         spacing: Theme.space.lg
 
         Rectangle {
@@ -310,15 +310,22 @@ Item {
 
         Rectangle {
             id: toolTray
-            height: 64
+            height: 72
             width: parent.width - backButton.width - 156 - pageHeader.spacing * 2
             anchors.verticalCenter: parent.verticalCenter
             radius: 14
-            // Lighter, warmer parchment tray — was an 86% near-opaque plate that
-            // read like a form toolbar.
-            color: Theme.withAlpha(Theme.parchment.parchmentSoft, 0.66)
+            color: Theme.withAlpha(Theme.parchment.parchmentSoft, 0.42)
             border.width: 1
-            border.color: Theme.withAlpha(Theme.parchment.goldLine, 0.24)
+            border.color: Theme.withAlpha(Theme.parchment.goldLine, 0.22)
+
+            Rectangle {
+                anchors.fill: parent
+                anchors.margins: 1
+                radius: parent.radius - 1
+                color: "transparent"
+                border.width: 1
+                border.color: Qt.rgba(1, 248 / 255, 235 / 255, 0.32)
+            }
 
             Row {
                 anchors.fill: parent
@@ -376,34 +383,28 @@ Item {
                             - pageHeader.spacing * 4 + Theme.space.lg
                     height: parent.height
                     anchors.verticalCenter: parent.verticalCenter
-                    // Subtle "save as config" link instead of a full disabled button.
-                    Item {
+                    Rectangle {
                         id: saveLink
                         objectName: "setupSaveConfigButton"
-                        width: saveLinkLabel.implicitWidth
+                        width: saveLinkLabel.implicitWidth + Theme.space.xl
                         height: 44
                         anchors.right: parent.right
                         anchors.verticalCenter: parent.verticalCenter
-                        opacity: 0.9
+                        radius: 12
+                        color: Theme.withAlpha(Theme.parchment.parchment, 0.42)
+                        border.width: 1
+                        border.color: Theme.withAlpha(Theme.parchment.goldLineSoft, 0.26)
                         Column {
                             anchors.centerIn: parent
                             spacing: 1
                             Text {
                                 id: saveLinkLabel
-                                text: I18n.t("另存为配置 →", "Save as config →")
+                                text: I18n.t("另存为配置 · 稍后开放", "Save as config · Coming soon")
                                 color: Theme.parchment.mutedInk
                                 font.family: Theme.fontFamilies.cjkSans
                                 font.contextFontMerging: true
                                 font.pixelSize: Theme.size.caption
                                 font.weight: Theme.weight.semibold
-                            }
-                            Text {
-                                anchors.horizontalCenter: parent.horizontalCenter
-                                text: I18n.t("稍后开放", "Coming soon")
-                                color: Theme.withAlpha(Theme.parchment.mutedInk, 0.7)
-                                font.family: Theme.fontFamilies.cjkSans
-                                font.contextFontMerging: true
-                                font.pixelSize: Theme.size.micro
                             }
                         }
                         HoverHandler { cursorShape: Qt.PointingHandCursor }
@@ -444,12 +445,40 @@ Item {
             width: root.detailOpen ? Math.min(820, parent.width - detailPanel.width - Theme.space.lg)
                                    : Math.min(1040, parent.width)
             radius: 18
-            color: Theme.withAlpha(Theme.warm.surfaceSoft, 0.42)
+            color: Qt.rgba(248 / 255, 238 / 255, 220 / 255, 0.34)
             border.width: 1
-            border.color: Theme.withAlpha(Theme.parchment.goldLine, 0.16)
+            border.color: Theme.withAlpha(Theme.parchment.goldLine, 0.46)
             x: root.detailOpen ? 0 : (parent.width - width) / 2
             Behavior on x { NumberAnimation { duration: Theme.motion.slow; easing.type: Easing.OutCubic } }
             Behavior on width { NumberAnimation { duration: Theme.motion.slow; easing.type: Easing.OutCubic } }
+
+            Rectangle {
+                anchors.fill: parent
+                anchors.margins: 1
+                radius: parent.radius - 1
+                color: "transparent"
+                border.width: 1
+                border.color: Qt.rgba(1, 248 / 255, 234 / 255, 0.58)
+            }
+
+            Rectangle {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.leftMargin: parent.radius
+                anchors.rightMargin: parent.radius
+                height: 1
+                color: Qt.rgba(1, 250 / 255, 240 / 255, 0.62)
+            }
+            Rectangle {
+                anchors.left: parent.left
+                anchors.top: parent.top
+                anchors.bottom: parent.bottom
+                anchors.topMargin: parent.radius
+                anchors.bottomMargin: parent.radius
+                width: 1
+                color: Qt.rgba(1, 250 / 255, 240 / 255, 0.50)
+            }
 
             Grid {
                 id: setupRoleCards
@@ -517,7 +546,7 @@ Item {
         anchors.bottomMargin: -8
         height: bottomBar.height
         radius: bottomBar.radius
-        color: Theme.parchment.woodShadowSoft
+        color: Qt.rgba(48 / 255, 32 / 255, 18 / 255, 0.18)
         visible: bottomBar.visible
         z: bottomBar.z - 1
     }
@@ -532,10 +561,27 @@ Item {
         anchors.bottomMargin: Theme.space.xxl
         height: 72
         radius: 18
-        color: Theme.withAlpha(Theme.parchment.parchmentSoft, 0.86)
+        color: Theme.withAlpha(Theme.parchment.parchmentSoft, 0.82)
         border.width: 1
-        border.color: Theme.withAlpha(Theme.parchment.goldLine, 0.30)
+        border.color: Theme.withAlpha(Theme.parchment.goldLine, 0.46)
         visible: ObserverClient.profileItems.length > 0
+
+        Image {
+            anchors.fill: parent
+            anchors.margins: 2
+            source: Illustrations.texParchment
+            fillMode: Image.Tile
+            opacity: 0.18
+        }
+
+        Rectangle {
+            anchors.fill: parent
+            anchors.margins: 1
+            radius: parent.radius - 1
+            color: "transparent"
+            border.width: 1
+            border.color: Qt.rgba(1, 248 / 255, 234 / 255, 0.42)
+        }
 
         Row {
             anchors.left: parent.left
@@ -547,8 +593,8 @@ Item {
                 width: 42
                 height: 42
                 radius: 21
-                color: root.autoReady ? Theme.withAlpha(Theme.warm.success, 0.16)
-                                      : Theme.withAlpha(Theme.warm.warning, 0.14)
+                color: root.autoReady ? Theme.withAlpha(Theme.warm.success, 0.24)
+                                      : Theme.withAlpha(Theme.warm.warning, 0.18)
                 border.width: 1
                 border.color: root.autoReady ? Theme.warm.success : Theme.warm.warning
                 Text {
@@ -569,14 +615,14 @@ Item {
                     spacing: Theme.space.sm
                     Text {
                         text: I18n.t("准备进度", "Ready")
-                        color: Theme.parchment.inkSoft
+                        color: Theme.parchment.ink
                         font.family: Theme.fontFamilies.cjkSerif
                         font.contextFontMerging: true
                         font.pixelSize: Theme.warmSize.bodyLg
                     }
                     Text {
                         text: root.arrangedCount + " / " + root.seatTotal
-                        color: Theme.parchment.ink
+                        color: Theme.warm.primaryActive
                         font.family: Theme.fontFamilies.cjkSerif
                         font.contextFontMerging: true
                         font.pixelSize: 22
@@ -593,40 +639,67 @@ Item {
             }
         }
 
-        // Begin-match button as a physical game button: terracotta face, thin
-        // gold rim, layered warm shadow, press dip.
+        // Begin-match button as a matte terracotta seal: tactile, but restrained
+        // enough to stay in the parchment tabletop language.
         Item {
             id: setupContinueButton
             objectName: "setupContinueButton"
-            width: 220
-            height: 52
+            width: 210
+            height: 50
             anchors.right: parent.right
             anchors.rightMargin: Theme.space.lg
             anchors.verticalCenter: parent.verticalCenter
             opacity: root.launchEnabled ? 1.0 : 0.5
 
-            // Layered shadow for "lifted piece" feel.
             Rectangle {
                 anchors.fill: parent
-                anchors.topMargin: 6
-                anchors.leftMargin: 3
-                anchors.rightMargin: -3
-                anchors.bottomMargin: -6
-                radius: parent.height / 2
-                color: root.launchEnabled ? Theme.parchment.woodShadow : "transparent"
+                anchors.topMargin: 5
+                anchors.leftMargin: 2
+                anchors.rightMargin: -2
+                anchors.bottomMargin: -5
+                radius: 14
+                color: root.launchEnabled ? Qt.rgba(48 / 255, 32 / 255, 18 / 255, 0.20) : "transparent"
             }
             Rectangle {
                 id: beginFace
                 anchors.fill: parent
-                radius: height / 2
-                color: root.launchEnabled
-                       ? (beginHover.hovered ? Theme.warm.primaryActive : Theme.warm.primary)
-                       : Theme.warm.primaryDisabled
+                radius: 14
                 border.width: 1
-                border.color: Theme.withAlpha(Theme.parchment.goldText, 0.55)
+                border.color: Qt.rgba(129 / 255, 73 / 255, 49 / 255, 0.62)
                 scale: beginTap.pressed ? 0.97 : 1.0
-                Behavior on color { ColorAnimation { duration: Theme.anim.color; easing.type: Easing.OutCubic } }
                 Behavior on scale { NumberAnimation { duration: Theme.anim.press; easing.type: Easing.OutQuad } }
+                gradient: Gradient {
+                    GradientStop {
+                        position: 0.0
+                        color: root.launchEnabled
+                               ? (beginHover.hovered ? "#c6785f" : "#c8735b")
+                               : Theme.warm.primaryDisabled
+                    }
+                    GradientStop {
+                        position: 1.0
+                        color: root.launchEnabled
+                               ? (beginHover.hovered ? "#ae5f48" : "#b7654c")
+                               : Theme.warm.primaryDisabled
+                    }
+                }
+                Rectangle {
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.leftMargin: 18
+                    anchors.rightMargin: 18
+                    height: 1
+                    color: Qt.rgba(1, 246 / 255, 228 / 255, root.launchEnabled ? 0.26 : 0.14)
+                }
+                Rectangle {
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.bottom: parent.bottom
+                    anchors.leftMargin: 18
+                    anchors.rightMargin: 18
+                    height: 1
+                    color: Qt.rgba(91 / 255, 45 / 255, 30 / 255, root.launchEnabled ? 0.26 : 0.12)
+                }
                 Row {
                     anchors.centerIn: parent
                     spacing: Theme.space.sm
@@ -657,21 +730,36 @@ Item {
         }
     }
 
-    component ToolField: Column {
+    component ToolField: Rectangle {
         default property alias content: controlSlot.data
         required property string label
-        spacing: 3
+        height: 56
+        radius: 12
+        color: Theme.withAlpha(Theme.parchment.parchment, 0.50)
+        border.width: 1
+        border.color: Theme.withAlpha(Theme.parchment.goldLineSoft, 0.34)
         Text {
+            id: fieldLabel
+            anchors.left: parent.left
+            anchors.top: parent.top
+            anchors.leftMargin: 12
+            anchors.topMargin: 6
             text: label
-            color: Theme.parchment.mutedInk
+            color: Theme.withAlpha(Theme.parchment.mutedInk, 0.88)
             font.family: Theme.fontFamilies.cjkSerif
             font.contextFontMerging: true
-            font.pixelSize: Theme.size.caption
+            font.pixelSize: Theme.size.micro
+            font.weight: Theme.weight.semibold
         }
         Item {
             id: controlSlot
-            width: parent.width
-            height: 34
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            anchors.leftMargin: 8
+            anchors.rightMargin: 8
+            anchors.bottomMargin: 6
+            height: 30
         }
     }
 
@@ -680,14 +768,22 @@ Item {
     // top config tray and the detail-panel pickers.
     component WarmCombo: ComboBox {
         id: _wc
-        // Pill background replaces native Qt dropdown chrome.
         background: Rectangle {
-            radius: 10
-            color: Theme.withAlpha(Theme.warm.surfaceRaised, _wc.enabled ? 0.80 : 0.55)
+            radius: 8
+            color: Theme.withAlpha(Theme.parchment.parchmentStrong, _wc.enabled ? 0.56 : 0.38)
             border.width: 1
             border.color: _wc.pressed || _wc.popup.visible
-                          ? Theme.withAlpha(Theme.warm.primary, 0.5)
-                          : Theme.withAlpha(Theme.parchment.goldLine, 0.34)
+                          ? Theme.withAlpha(Theme.warm.primaryActive, 0.55)
+                          : Theme.withAlpha(Theme.parchment.goldLineSoft, 0.34)
+            Rectangle {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.leftMargin: 8
+                anchors.rightMargin: 8
+                height: 1
+                color: Qt.rgba(1, 248 / 255, 234 / 255, 0.42)
+            }
             Behavior on border.color { ColorAnimation { duration: Theme.anim.color; easing.type: Easing.OutCubic } }
         }
         // Hide the default indicator (we draw our own chevron in contentItem).
@@ -704,19 +800,24 @@ Item {
                 font: _wc.font
                 elide: Text.ElideRight
             }
-            Item {
+            Rectangle {
                 id: _wcChevron
                 anchors.right: parent.right
-                anchors.rightMargin: 10
+                anchors.rightMargin: 9
                 anchors.verticalCenter: parent.verticalCenter
-                width: 9
-                height: 9
-                Rectangle { x: 0; y: 3; width: 6; height: 1.4; radius: 0.7;
-                            rotation: 45; transformOrigin: Item.Left;
-                            color: _wc.enabled ? Theme.parchment.inkSoft : Theme.parchment.mutedInk }
-                Rectangle { x: 4; y: 3; width: 6; height: 1.4; radius: 0.7;
-                            rotation: -45; transformOrigin: Item.Right;
-                            color: _wc.enabled ? Theme.parchment.inkSoft : Theme.parchment.mutedInk }
+                width: 11
+                height: 11
+                radius: 6
+                color: Theme.withAlpha(Theme.parchment.goldLine, _wc.enabled ? 0.58 : 0.28)
+                Text {
+                    anchors.centerIn: parent
+                    anchors.verticalCenterOffset: -1
+                    text: "▾"
+                    color: Theme.parchment.ink
+                    font.family: Theme.fontFamilies.cjkSans
+                    font.contextFontMerging: true
+                    font.pixelSize: 9
+                }
             }
         }
         // Popup items styled warm too.
