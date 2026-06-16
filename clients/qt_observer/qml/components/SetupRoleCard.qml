@@ -34,36 +34,28 @@ Item {
 
     Behavior on scale { NumberAnimation { duration: Theme.anim.press; easing.type: Easing.OutQuad } }
 
-    // --- Soft warm drop shadow (layered low-alpha rects — survives screenshots) ---
+    // --- Single soft warm drop shadow ---
+    // Keep one natural cast shadow only. A previous near-card second shadow read as
+    // a hard rectangular block behind the art in screenshots.
     Rectangle {
-        z: -2
+        z: -3
         anchors.fill: cardClip
         anchors.topMargin: 12
         anchors.leftMargin: 6
         anchors.rightMargin: -6
         anchors.bottomMargin: -12
-        radius: cardClip.radius + 2
-        color: Theme.withAlpha(Theme.parchment.woodShadow, root.selected ? 0.58
-                                   : (hoverHandler.hovered ? 0.50 : 0.40))
+        radius: cardClip.radius + 4
+        color: Theme.withAlpha(Theme.parchment.woodShadow, root.selected ? 0.46
+                                   : (hoverHandler.hovered ? 0.40 : 0.32))
         Behavior on color { ColorAnimation { duration: Theme.anim.color; easing.type: Easing.OutCubic } }
     }
-    Rectangle {
-        z: -1
-        anchors.fill: cardClip
-        anchors.topMargin: 6
-        anchors.leftMargin: 3
-        anchors.rightMargin: -3
-        anchors.bottomMargin: -6
-        radius: cardClip.radius + 1
-        color: Theme.parchment.woodShadowSoft
-    }
 
-    // --- Coral outer glow (selected only) — soft wide wash, not a hard stroke ---
+    // --- Selected ambient glow — soft wash only, not the primary outline ---
     Rectangle {
         anchors.fill: cardClip
-        anchors.margins: -6
-        radius: cardClip.radius + 6
-        color: Theme.withAlpha(root._selColor, 0.22)
+        anchors.margins: -4
+        radius: cardClip.radius + 4
+        color: Theme.withAlpha(root._selColor, 0.12)
         border.width: 0
         opacity: root.selected ? 1 : 0
         Behavior on opacity { NumberAnimation { duration: Theme.motion.base; easing.type: Easing.OutCubic } }
@@ -76,12 +68,11 @@ Item {
         anchors.fill: parent
         radius: 14
         color: "transparent"
-        // Thin warm hairline; on selected it becomes a single coral line.
-        border.width: root.selected ? 1.5 : 1
-        border.color: root.selected ? root._selColor
-                                  : Theme.withAlpha(Theme.parchment.goldLineSoft, 0.30)
+        // Non-selected hairline only. The selected edge is drawn by selectedOutline
+        // after the art, so it cannot be swallowed by the image.
+        border.width: root.selected ? 0 : 1
+        border.color: Theme.withAlpha(Theme.parchment.goldLineSoft, 0.30)
         clip: true
-        Behavior on border.color { ColorAnimation { duration: Theme.anim.color; easing.type: Easing.OutCubic } }
 
         // 1) Card art bleeds to the very edge — the art IS the frame.
         Image {
@@ -252,6 +243,20 @@ Item {
                 }
             }
         }
+    }
+
+    // True selected outline: drawn above the card art and pinned to the actual card
+    // edge. The glow behind the card remains only a soft ambient wash.
+    Rectangle {
+        id: selectedOutline
+        anchors.fill: cardClip
+        radius: cardClip.radius
+        color: "transparent"
+        border.width: root.selected ? 2 : 0
+        border.color: root._selColor
+        opacity: root.selected ? 1 : 0
+        z: 8
+        Behavior on opacity { NumberAnimation { duration: Theme.motion.base; easing.type: Easing.OutCubic } }
     }
 
     HoverHandler {
