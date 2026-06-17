@@ -14,6 +14,8 @@ QtObject {
     readonly property url tableDay: Qt.resolvedUrl("../assets/illustrations/scene/table-day.png")
     readonly property url tableNight: Qt.resolvedUrl("../assets/illustrations/scene/table-night.png")
     readonly property url setupRoom: Qt.resolvedUrl("../assets/illustrations/scene/setup-room.png")
+    readonly property url settingsDesk: Qt.resolvedUrl("../assets/illustrations/scene/settings-desk.png")
+    readonly property url historyArchive: Qt.resolvedUrl("../assets/illustrations/scene/history-archive.png")
 
     // Material-system texture: subtle paper-grain overlay (renders in screenshots,
     // unlike GPU shadow effects). The header-weave / night-vignette / warm-glow

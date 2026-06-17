@@ -163,6 +163,64 @@ Item {
         }
     }
 
+    Rectangle {
+        id: homeLanguageToggle
+        objectName: "homeLanguageToggle"
+        anchors.right: parent.right
+        anchors.top: parent.top
+        anchors.rightMargin: Theme.space.xxl
+        anchors.topMargin: Theme.space.xxl
+        width: homeLanguageRow.implicitWidth + 10
+        height: 36
+        radius: Theme.radius.pill
+        color: Theme.withAlpha(Theme.parchment.parchmentSoft, 0.84)
+        border.width: 1
+        border.color: Theme.withAlpha(Theme.parchment.goldLine, 0.46)
+
+        Image {
+            anchors.fill: parent
+            anchors.margins: 1
+            source: Illustrations.texParchment
+            fillMode: Image.Tile
+            opacity: 0.14
+        }
+
+        Row {
+            id: homeLanguageRow
+            anchors.centerIn: parent
+            spacing: 0
+
+            Repeater {
+                model: [
+                    { code: "zh", label: "中文" },
+                    { code: "en", label: "EN" }
+                ]
+                delegate: Rectangle {
+                    required property var modelData
+                    width: modelData.code === "zh" ? 58 : 44
+                    height: 28
+                    radius: Theme.radius.pill
+                    readonly property bool selected: I18n.lang === modelData.code
+                    color: selected ? Theme.withAlpha(Theme.warm.primary, 0.88)
+                                    : "transparent"
+                    border.width: selected ? 1 : 0
+                    border.color: Theme.withAlpha(Theme.warm.primaryActive, 0.42)
+                    Text {
+                        anchors.centerIn: parent
+                        text: modelData.label
+                        color: parent.selected ? Theme.warm.textOnPrimary : Theme.warm.bodyStrong
+                        font.family: Theme.fontFamilies.sans
+                        font.contextFontMerging: true
+                        font.pixelSize: Theme.size.caption
+                        font.weight: Theme.weight.semibold
+                    }
+                    HoverHandler { cursorShape: Qt.PointingHandCursor }
+                    TapHandler { onTapped: I18n.lang = modelData.code }
+                }
+            }
+        }
+    }
+
     // ------------------------------------ Right floating panels (placeholder)
     // Semi-transparent parchment over the scene (no blur — Phase 1 rule). Static
     // structure for now; live "今夜对局 / 实时事件" data wired in a later phase.
@@ -171,7 +229,7 @@ Item {
         anchors.right: parent.right
         anchors.top: parent.top
         anchors.rightMargin: Theme.space.xxl
-        anchors.topMargin: Theme.space.xxl
+        anchors.topMargin: Theme.space.xxl + 48
         width: 264
         spacing: Theme.space.lg
 

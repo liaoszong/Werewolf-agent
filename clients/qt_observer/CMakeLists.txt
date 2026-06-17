@@ -101,6 +101,8 @@ qt_add_qml_module(appqt_observer
         assets/illustrations/tarot/hunter.png
         assets/illustrations/scene/table-day.png
         assets/illustrations/scene/table-night.png
+        assets/illustrations/scene/settings-desk.png
+        assets/illustrations/scene/history-archive.png
         assets/illustrations/avatars/werewolf.png
         assets/illustrations/avatars/seer.png
         assets/illustrations/avatars/witch.png

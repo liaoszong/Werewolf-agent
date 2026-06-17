@@ -52,6 +52,8 @@ Item {
         readonly property bool _chromeless: root.currentView === "home"
                                             || root.currentView === "setup"
                                             || root.currentView === "cockpit"
+                                            || root.currentView === "history"
+                                            || root.currentView === "providerSettings"
                                             || root.currentView === "designPreview"
         visible: !_chromeless
         height: !_chromeless ? 52 : 0

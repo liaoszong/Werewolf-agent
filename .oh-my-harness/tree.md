@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 600
+- Entries: 602
 
 ```text
 ./
@@ -74,8 +74,10 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       │   │   │   ├── werewolf.png
 │       │   │   │   └── witch.png
 │       │   │   ├── scene/
+│       │   │   │   ├── history-archive.png
 │       │   │   │   ├── home-day.png
 │       │   │   │   ├── home-night.png
+│       │   │   │   ├── settings-desk.png
 │       │   │   │   ├── setup-room.png
 │       │   │   │   ├── table-day.png
 │       │   │   │   └── table-night.png

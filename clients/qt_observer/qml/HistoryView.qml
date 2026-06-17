@@ -3,51 +3,340 @@ import QtQuick.Controls
 import qt_observer
 import "components"
 
-// History — recorded and in-progress matches, with a one-click replay flow.
-// Dark "Nightfall" surface; behaviour, bindings and navigation unchanged.
+// Match Archive — UI-only redesign of the history surface.
+// Data and actions remain on the existing ObserverClient run list / replay /
+// settlement / delete contract.
 Item {
     id: root
     objectName: "historyView"
 
     Component.onCompleted: ObserverClient.refreshRuns()
 
-    // ---- delete plumbing (spec §4) ----
-    property bool _batchActive: false                 // batch controller sets this
-
-    // Unified confirm callback — single and batch both set this before open().
-    property var _onDialogConfirm: null
-
-    ConfirmDialog {
-        id: confirmDialog
-        objectName: "historyConfirmDialog"
-        parent: Overlay.overlay
-        onConfirmed: {
-            var act = root._onDialogConfirm
-            root._onDialogConfirm = null
-            if (act) act()
-        }
-        onClosed: Qt.callLater(function() { root._onDialogConfirm = null })
-    }
-
-    // ---- batch selection (spec §4) ----
     property bool selecting: false
-    property var _selected: ({})                     // run_id -> true
+    property var _selected: ({})
     readonly property int selectedCount: Object.keys(_selected).length
+    property bool _batchActive: false
+    property var _onDialogConfirm: null
     property var _batchQueue: []
     property int _batchTotal: 0
     property int _batchFailed: 0
     property var _batchErrors: []
 
+    property string activeFilter: "all"          // all | completed | running | unknown
+    property string searchText: ""
+    property string executionFilter: "all"       // all | fake | live | local | unknown
+    property string resultFilter: "all"          // all | good | wolf | unknown
+    property string timeFilter: "all"            // all | recent | older (placeholder until API exposes dates)
+    property string selectedRunId: ""
+
+    readonly property var filteredRuns: _filteredRuns()
+    readonly property var selectedRun: _findRun(selectedRunId)
+    readonly property bool hasSelectedRun: selectedRunId !== ""
+                                           && selectedRun
+                                           && selectedRun.run_id !== undefined
+                                           && selectedRun.run_id !== ""
+    readonly property int completedCount: _countStatus("completed")
+    readonly property int runningCount: _countStatus("running")
+    readonly property int unknownCount: _countStatus("unknown")
+
+    function _runTitle(run) {
+        if (!run)
+            return I18n.t("未命名对局", "Untitled match")
+        var candidates = [run.display_name, run.name, run.title, run.profile_name,
+                          run.profile, run.template]
+        for (var i = 0; i < candidates.length; ++i) {
+            var value = candidates[i]
+            if (value !== undefined && value !== null && ("" + value).length > 0)
+                return "" + value
+        }
+        return run.run_id || I18n.t("未命名对局", "Untitled match")
+    }
+
+    function _shortRunId(run) {
+        var id = run && run.run_id ? "" + run.run_id : "Unknown"
+        if (id.length <= 24)
+            return id
+        return id.slice(0, 15) + "..." + id.slice(id.length - 6)
+    }
+
+    function _statusKey(status) {
+        var st = (status === undefined || status === null) ? "" : ("" + status).toLowerCase()
+        if (st === "completed")
+            return "completed"
+        if (st === "running" || st === "queued")
+            return "running"
+        return "unknown"
+    }
+
+    function _statusLabel(status) {
+        var st = (status === undefined || status === null) ? "" : ("" + status).toLowerCase()
+        if (st === "completed")
+            return I18n.t("已完成", "Completed")
+        if (st === "running")
+            return I18n.t("进行中", "Running")
+        if (st === "queued")
+            return I18n.t("排队中", "Queued")
+        if (st === "failed")
+            return I18n.t("失败", "Failed")
+        return "Unknown"
+    }
+
+    function _statusAccent(status) {
+        var st = _statusKey(status)
+        if (st === "completed")
+            return Theme.warm.success
+        if (st === "running")
+            return Theme.warm.primary
+        return Theme.parchment.mutedInk
+    }
+
+    function _canDelete(run) {
+        var st = run && run.status ? ("" + run.status).toLowerCase() : ""
+        return st !== "running" && st !== "queued"
+    }
+
+    function _executionKey(run) {
+        var mode = ""
+        if (run) {
+            mode = run.execution_mode || run.mode || run.runtime_mode || ""
+        }
+        mode = ("" + mode).toLowerCase()
+        if (mode === "live" || mode === "cloud" || mode === "remote")
+            return "live"
+        if (mode === "fake" || mode === "simulation" || mode === "simulated")
+            return "fake"
+        if (mode === "local")
+            return "local"
+        return "unknown"
+    }
+
+    function _executionLabel(run) {
+        var key = _executionKey(run)
+        if (key === "live")
+            return I18n.t("云端执行", "Cloud execution")
+        if (key === "fake")
+            return I18n.t("模拟", "Simulation")
+        if (key === "local")
+            return I18n.t("本地执行", "Local execution")
+        return "Unknown"
+    }
+
+    function _templateLabel(run) {
+        if (!run)
+            return "Unknown"
+        var value = run.profile_name || run.profile || run.template || run.script_id || ""
+        return value === "" ? "Unknown" : "" + value
+    }
+
+    function _timeLabel(run) {
+        if (!run)
+            return "Unknown"
+        var value = run.created_at || run.started_at || run.start_time || run.timestamp || ""
+        return value === "" ? "Unknown" : "" + value
+    }
+
+    function _endTimeLabel(run) {
+        if (!run)
+            return "Unknown"
+        var value = run.ended_at || run.completed_at || run.end_time || ""
+        return value === "" ? "Unknown" : "" + value
+    }
+
+    function _durationLabel(run) {
+        if (!run)
+            return "Unknown"
+        var value = run.duration || run.duration_text || run.elapsed || ""
+        return value === "" ? "Unknown" : "" + value
+    }
+
+    function _resultKey(run) {
+        if (!run)
+            return "unknown"
+        var raw = "" + (run.result || run.winner || run.winner_team || run.outcome || "")
+        var lower = raw.toLowerCase()
+        if (lower.indexOf("wolf") >= 0 || lower.indexOf("werewolf") >= 0)
+            return "wolf"
+        if (lower.indexOf("good") >= 0 || lower.indexOf("villager") >= 0
+                || lower.indexOf("village") >= 0 || lower.indexOf("human") >= 0)
+            return "good"
+        return "unknown"
+    }
+
+    function _resultLabel(run) {
+        if (!run)
+            return "Unknown"
+        var key = _resultKey(run)
+        if (key === "wolf")
+            return I18n.t("狼人阵营胜利", "Werewolf team victory")
+        if (key === "good")
+            return I18n.t("好人阵营胜利", "Good team victory")
+        var st = (run.status || "").toLowerCase()
+        if (st === "running" || st === "queued")
+            return I18n.t("对局记录中", "Recording")
+        if (st === "failed")
+            return I18n.t("运行失败", "Run failed")
+        return "Unknown"
+    }
+
+    function _summaryLabel(run) {
+        if (!run)
+            return I18n.t("暂无摘要", "No summary")
+        if (run.summary !== undefined && run.summary !== null && ("" + run.summary) !== "")
+            return "" + run.summary
+        if (run.reason !== undefined && run.reason !== null && ("" + run.reason) !== "")
+            return I18n.t("状态原因：", "Reason: ") + run.reason
+        var events = run.event_count !== undefined ? run.event_count : 0
+        var snaps = run.snapshot_count !== undefined ? run.snapshot_count : 0
+        var st = (run.status || "").toLowerCase()
+        if (st === "completed")
+            return I18n.t("已归档 ", "Archived ") + events + I18n.t(" 条事件 · ", " events · ")
+                   + snaps + I18n.t(" 份快照", " snapshots")
+        if (st === "running" || st === "queued")
+            return I18n.t("正在记录事件流", "Recording the event stream")
+        return I18n.t("暂无摘要", "No summary")
+    }
+
+    function _roleSummary(run) {
+        if (!run)
+            return I18n.t("暂无角色摘要", "No role summary")
+        if (run.role_summary !== undefined && run.role_summary !== null
+                && ("" + run.role_summary) !== "")
+            return "" + run.role_summary
+        var events = run.event_count !== undefined ? run.event_count : 0
+        var snaps = run.snapshot_count !== undefined ? run.snapshot_count : 0
+        if (events > 0 || snaps > 0)
+            return I18n.t("事件 ", "Events ") + events + I18n.t(" · 快照 ", " · snapshots ") + snaps
+        return I18n.t("暂无角色摘要", "No role summary")
+    }
+
+    function _versionLabel(run) {
+        if (!run)
+            return "Unknown"
+        if (run.version !== undefined && run.version !== null && ("" + run.version) !== "")
+            return "" + run.version
+        var bucket = run.evaluation_bucket
+        if (bucket !== undefined && bucket !== null) {
+            if (bucket.comparison_key !== undefined && bucket.comparison_key !== null)
+                return "" + bucket.comparison_key
+            var parts = []
+            if (bucket.rules_version)
+                parts.push(bucket.rules_version)
+            if (bucket.prompt_version)
+                parts.push(bucket.prompt_version)
+            if (bucket.scoring_version)
+                parts.push(bucket.scoring_version)
+            if (parts.length > 0)
+                return parts.join(" / ")
+        }
+        return "Unknown"
+    }
+
+    function _matchSearch(run) {
+        var q = (root.searchText || "").toLowerCase().trim()
+        if (q === "")
+            return true
+        var hay = [
+            run.run_id || "",
+            _runTitle(run),
+            run.profile || "",
+            run.profile_name || "",
+            run.template || ""
+        ].join(" ").toLowerCase()
+        return hay.indexOf(q) >= 0
+    }
+
+    function _matchFilters(run) {
+        if (!_matchSearch(run))
+            return false
+        if (root.activeFilter !== "all" && _statusKey(run.status) !== root.activeFilter)
+            return false
+        if (root.executionFilter !== "all" && _executionKey(run) !== root.executionFilter)
+            return false
+        if (root.resultFilter !== "all" && _resultKey(run) !== root.resultFilter)
+            return false
+        return true
+    }
+
+    function _filteredRuns() {
+        var out = []
+        var runs = ObserverClient.runItems || []
+        for (var i = 0; i < runs.length; ++i) {
+            if (_matchFilters(runs[i]))
+                out.push(runs[i])
+        }
+        return out
+    }
+
+    function _countStatus(key) {
+        var runs = ObserverClient.runItems || []
+        var n = 0
+        for (var i = 0; i < runs.length; ++i) {
+            if (_statusKey(runs[i].status) === key)
+                n += 1
+        }
+        return n
+    }
+
+    function _findRun(runId) {
+        var runs = ObserverClient.runItems || []
+        for (var i = 0; i < runs.length; ++i) {
+            if (runs[i].run_id === runId)
+                return runs[i]
+        }
+        return ({})
+    }
+
     function _toggleSelected(runId, on) {
         var m = _selected
-        if (on) m[runId] = true; else delete m[runId]
-        _selected = m                                 // reassign to fire bindings
-        if (Object.keys(_selected).length === 0) selectAllBox.checked = false
+        if (on)
+            m[runId] = true
+        else
+            delete m[runId]
+        _selected = m
+        if (Object.keys(_selected).length === 0)
+            selectAllBox.checked = false
     }
-    function _exitSelectMode() { selecting = false; _selected = ({}); selectAllBox.checked = false }
+
+    function _selectVisibleRuns(on) {
+        var m = ({})
+        if (on) {
+            var runs = root.filteredRuns
+            for (var i = 0; i < runs.length; ++i) {
+                if (_canDelete(runs[i]))
+                    m[runs[i].run_id] = true
+            }
+        }
+        _selected = m
+    }
+
+    function _exitSelectMode() {
+        selecting = false
+        _selected = ({})
+        selectAllBox.checked = false
+    }
+
+    function _openRun(run, forReport) {
+        if (!run || !run.run_id)
+            return
+        ObserverClient.openRun(run.run_id, forReport === true)
+        root.StackView.view.parent.navigateCockpit()
+    }
+
+    function _confirmDelete(run) {
+        if (!run || !run.run_id || !_canDelete(run))
+            return
+        var rid = run.run_id
+        root._onDialogConfirm = function() { ObserverClient.deleteRun(rid) }
+        confirmDialog.title = I18n.t("删除对局", "Delete run")
+        confirmDialog.message = I18n.t("确定删除对局 ", "Delete run ")
+                                + rid
+                                + I18n.t("?删除后不可恢复。", "? This cannot be undone.")
+        confirmDialog.open()
+    }
 
     function _startBatchDelete() {
-        if (_batchActive) return
+        if (_batchActive)
+            return
         _batchQueue = Object.keys(_selected)
         _batchTotal = _batchQueue.length
         _batchFailed = 0
@@ -55,16 +344,17 @@ Item {
         _batchActive = true
         _pumpBatch()
     }
+
     function _pumpBatch() {
         if (_batchQueue.length === 0) {
             _batchActive = false
             var okCount = _batchTotal - _batchFailed
             noticeBar.show(_batchFailed === 0
                 ? I18n.t("已删除 ", "Deleted ") + okCount + I18n.t(" 局", " runs")
-                : I18n.t("已删除 ", "Deleted ") + okCount + I18n.t(" 局,", " runs, ")
-                  + _batchFailed + I18n.t(" 局失败:", " failed: ") + _batchErrors.join("; "))
+                : I18n.t("已删除 ", "Deleted ") + okCount + I18n.t(" 局，", " runs, ")
+                  + _batchFailed + I18n.t(" 局失败：", " failed: ") + _batchErrors.join("; "))
             _exitSelectMode()
-            ObserverClient.refreshRuns()              // batch refreshes ONCE at the end (spec §4)
+            ObserverClient.refreshRuns()
             return
         }
         var q = _batchQueue
@@ -73,411 +363,1424 @@ Item {
         ObserverClient.deleteRun(next)
     }
 
-    // Transient notice (delete failures / batch summary). Auto-hides.
+    Connections {
+        target: ObserverClient
+        function onDeleteRunFinished(runId, ok, error) {
+            if (root._batchActive) {
+                if (!ok) {
+                    root._batchFailed += 1
+                    root._batchErrors.push(runId + ": " + error)
+                }
+                root._pumpBatch()
+                return
+            }
+            if (ok) {
+                if (root.selectedRunId === runId)
+                    root.selectedRunId = ""
+                ObserverClient.refreshRuns()
+            } else {
+                noticeBar.show(I18n.t("删除失败：", "Delete failed: ") + error)
+            }
+        }
+        function onRunItemsChanged() {
+            if (root.selectedRunId !== "" && !root._findRun(root.selectedRunId).run_id)
+                root.selectedRunId = ""
+        }
+    }
+
+    ConfirmDialog {
+        id: confirmDialog
+        objectName: "historyConfirmDialog"
+        parent: Overlay.overlay
+        onConfirmed: {
+            var act = root._onDialogConfirm
+            root._onDialogConfirm = null
+            if (act)
+                act()
+        }
+        onClosed: Qt.callLater(function() { root._onDialogConfirm = null })
+    }
+
+    Rectangle {
+        anchors.fill: parent
+        color: Theme.warm.canvas
+    }
+
+    Image {
+        anchors.fill: parent
+        source: Illustrations.historyArchive
+        fillMode: Image.PreserveAspectCrop
+        horizontalAlignment: Image.AlignHCenter
+        verticalAlignment: Image.AlignVCenter
+        asynchronous: true
+        cache: true
+        visible: status === Image.Ready
+    }
+
+    Rectangle {
+        anchors.fill: parent
+        color: Theme.withAlpha(Theme.warm.canvas, 0.26)
+    }
+
+    Rectangle {
+        anchors.fill: parent
+        gradient: Gradient {
+            orientation: Gradient.Vertical
+            GradientStop { position: 0.00; color: Qt.rgba(1.0, 246 / 255, 230 / 255, 0.24) }
+            GradientStop { position: 0.58; color: Qt.rgba(1.0, 241 / 255, 216 / 255, 0.08) }
+            GradientStop { position: 1.00; color: Qt.rgba(107 / 255, 67 / 255, 40 / 255, 0.18) }
+        }
+    }
+
     Rectangle {
         id: noticeBar
         objectName: "historyNoticeBar"
         property string text: ""
         anchors.horizontalCenter: parent.horizontalCenter
-        anchors.bottom: parent.bottom
-        anchors.bottomMargin: Theme.space.xl
-        z: 10
+        anchors.bottom: archiveTray.top
+        anchors.bottomMargin: Theme.space.md
+        z: 20
         visible: text !== ""
-        width: noticeLabel.implicitWidth + Theme.space.lg * 2
+        width: noticeLabel.implicitWidth + Theme.space.xl * 2
         height: noticeLabel.implicitHeight + Theme.space.md * 2
-        radius: Theme.radius.md
-        color: Theme.withAlpha(Theme.color.surface, 0.96)
+        radius: Theme.radius.pill
+        color: Theme.withAlpha(Theme.parchment.parchmentSoft, 0.97)
         border.width: 1
-        border.color: Theme.color.border
+        border.color: Theme.withAlpha(Theme.parchment.goldLine, 0.50)
+
+        Image {
+            anchors.fill: parent
+            anchors.margins: 1
+            source: Illustrations.texParchment
+            fillMode: Image.Tile
+            opacity: 0.14
+        }
+
         Text {
             id: noticeLabel
             anchors.centerIn: parent
             text: noticeBar.text
-            color: Theme.color.text
-            font.family: Theme.font.family
+            color: Theme.warm.bodyStrong
+            font.family: Theme.fontFamilies.sans
+            font.contextFontMerging: true
             font.pixelSize: Theme.size.caption
+            font.weight: Theme.weight.medium
         }
-        Timer { id: noticeTimer; interval: 5000; onTriggered: noticeBar.text = "" }
-        function show(msg) { text = msg; noticeTimer.restart() }
-    }
 
-    Connections {
-        target: ObserverClient
-        function onDeleteRunFinished(runId, ok, error) {
-            if (root._batchActive) {
-                if (!ok) { root._batchFailed += 1; root._batchErrors.push(runId + ": " + error) }
-                root._pumpBatch()                     // sequential: next delete only after this one
-                return
-            }
-            if (ok)
-                ObserverClient.refreshRuns()          // SINGLE delete refreshes per-op (spec §4)
-            else
-                noticeBar.show(I18n.t("删除失败:", "Delete failed: ") + error)
+        Timer {
+            id: noticeTimer
+            interval: 5000
+            onTriggered: noticeBar.text = ""
+        }
+        function show(msg) {
+            text = msg
+            noticeTimer.restart()
         }
     }
 
-    // Deep night backdrop so the centered content reads as a focused panel.
-    Rectangle {
-        anchors.fill: parent
-        color: Theme.color.bgBase
-    }
-
-    // Centered, max-width content region anchored toward the top.
     Item {
-        id: content
+        id: page
         anchors.fill: parent
-        anchors.topMargin: Theme.space.xxxl
-        anchors.bottomMargin: Theme.space.xxl
-        anchors.leftMargin: Theme.space.xxl
-        anchors.rightMargin: Theme.space.xxl
+        anchors.margins: Theme.space.xxl
+
+        readonly property int gap: Theme.space.lg
+        readonly property int railWidth: Math.min(232, Math.max(198, Math.round(width * 0.17)))
+        readonly property int detailWidth: Math.min(438, Math.max(342, Math.round(width * 0.34)))
 
         Item {
-            id: stack
-            anchors.horizontalCenter: parent.horizontalCenter
+            id: header
             anchors.top: parent.top
-            anchors.bottom: parent.bottom
-            width: Math.min(parent.width, 1000)
+            anchors.left: parent.left
+            anchors.right: parent.right
+            height: 116
 
-            // ---------------------------------------------------------- Header
-            Item {
-                id: header
-                anchors.top: parent.top
+            Column {
                 anchors.left: parent.left
-                anchors.right: parent.right
-                height: titleBlock.implicitHeight
+                anchors.top: parent.top
+                anchors.topMargin: Theme.space.sm
+                width: Math.max(300, parent.width - statsRow.width - headerActions.width - Theme.space.xxl * 2)
+                spacing: Theme.space.xs
 
-                Column {
-                    id: titleBlock
-                    anchors.left: parent.left
-                    anchors.verticalCenter: parent.verticalCenter
-                    anchors.right: refreshButton.left
-                    anchors.rightMargin: Theme.space.lg
-                    spacing: Theme.space.xs
+                Text {
+                    text: I18n.t("历史对局", "History")
+                    color: Theme.warm.ink
+                    font.family: Theme.fontFamilies.serif
+                    font.contextFontMerging: true
+                    font.pixelSize: 44
+                    font.weight: Theme.weight.bold
+                }
 
-                    Text {
-                        text: I18n.t("历史对局", "History")
-                        color: Theme.color.text
-                        font.family: Theme.font.family
-                        font.pixelSize: Theme.size.h1
-                        font.weight: Theme.weight.bold
-                    }
+                Text {
+                    width: parent.width
+                    text: I18n.t("重温已记录的对局，查看战报，管理本地档案",
+                                 "Revisit recorded matches, inspect reports, and manage local archives")
+                    color: Theme.warm.body
+                    font.family: Theme.fontFamilies.sans
+                    font.contextFontMerging: true
+                    font.pixelSize: Theme.warmSize.bodyLg
+                    elide: Text.ElideRight
+                }
+            }
 
-                    Text {
-                        text: I18n.t("已记录与进行中的对局", "Recorded and in-progress matches")
-                        color: Theme.color.textMuted
-                        font.family: Theme.font.family
-                        font.pixelSize: Theme.size.caption
+            Row {
+                id: statsRow
+                anchors.top: parent.top
+                anchors.topMargin: Theme.space.md
+                anchors.horizontalCenter: parent.horizontalCenter
+                spacing: Theme.space.sm
+
+                Repeater {
+                    model: [
+                        { label: I18n.t("全部", "All"), value: ObserverClient.runItems.length, key: "all" },
+                        { label: I18n.t("已完成", "Completed"), value: root.completedCount, key: "completed" },
+                        { label: I18n.t("进行中", "Running"), value: root.runningCount, key: "running" },
+                        { label: "Unknown", value: root.unknownCount, key: "unknown" }
+                    ]
+                    delegate: Rectangle {
+                        required property var modelData
+                        width: 106
+                        height: 70
+                        radius: 12
+                        color: root.activeFilter === modelData.key
+                               ? Theme.withAlpha(Theme.parchment.terracottaWash, 0.88)
+                               : Theme.withAlpha(Theme.parchment.parchmentSoft, 0.82)
+                        border.width: 1
+                        border.color: root.activeFilter === modelData.key
+                                      ? Theme.withAlpha(Theme.warm.primaryActive, 0.55)
+                                      : Theme.withAlpha(Theme.parchment.goldLine, 0.38)
+
+                        Image {
+                            anchors.fill: parent
+                            anchors.margins: 1
+                            source: Illustrations.texParchment
+                            fillMode: Image.Tile
+                            opacity: 0.12
+                        }
+
+                        Column {
+                            anchors.centerIn: parent
+                            spacing: 2
+                            Text {
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                text: modelData.label
+                                color: Theme.warm.muted
+                                font.family: Theme.fontFamilies.sans
+                                font.contextFontMerging: true
+                                font.pixelSize: Theme.size.caption
+                                font.weight: Theme.weight.medium
+                            }
+                            Text {
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                text: "" + modelData.value
+                                color: Theme.warm.ink
+                                font.family: Theme.fontFamilies.serif
+                                font.contextFontMerging: true
+                                font.pixelSize: Theme.warmSize.titleLg
+                                font.weight: Theme.weight.bold
+                            }
+                        }
+
+                        HoverHandler { id: statHover; cursorShape: Qt.PointingHandCursor }
+                        TapHandler { onTapped: root.activeFilter = modelData.key }
                     }
                 }
+            }
+
+            Row {
+                id: headerActions
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.topMargin: Theme.space.lg
+                spacing: Theme.space.md
 
                 AppButton {
                     id: refreshButton
                     objectName: "historyRefreshButton"
-                    anchors.right: parent.right
-                    anchors.verticalCenter: parent.verticalCenter
+                    onLight: true
                     text: I18n.t("刷新", "Refresh")
                     variant: "secondary"
                     onClicked: ObserverClient.refreshRuns()
                 }
+
+                AppButton {
+                    id: selectModeButton
+                    objectName: "selectModeButton"
+                    onLight: true
+                    text: root.selecting ? I18n.t("取消选择", "Cancel") : I18n.t("批量操作", "Batch actions")
+                    variant: root.selecting ? "primary" : "secondary"
+                    enabled: ObserverClient.runItems.length > 0 && !root._batchActive
+                    onClicked: root.selecting ? root._exitSelectMode() : root.selecting = true
+                }
+            }
+        }
+
+        Rectangle {
+            id: filterRail
+            anchors.left: parent.left
+            anchors.top: header.bottom
+            anchors.bottom: archiveTray.top
+            anchors.bottomMargin: Theme.space.lg
+            width: page.railWidth
+            radius: 18
+            color: Theme.withAlpha(Theme.parchment.parchmentSoft, 0.88)
+            border.width: 1
+            border.color: Theme.withAlpha(Theme.parchment.goldLine, 0.48)
+
+            Rectangle {
+                anchors.fill: parent
+                anchors.topMargin: 10
+                anchors.leftMargin: 5
+                anchors.rightMargin: -5
+                anchors.bottomMargin: -8
+                radius: parent.radius
+                color: Theme.withAlpha(Theme.parchment.woodShadow, 0.30)
+                z: -1
             }
 
-            // ----------------------------------------------------- Runs panel
-            AppCard {
-                id: runsPanel
-                anchors.top: header.bottom
-                anchors.topMargin: Theme.space.lg
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.bottom: footer.top
-                anchors.bottomMargin: Theme.space.lg
+            Image {
+                anchors.fill: parent
+                anchors.margins: 2
+                source: Illustrations.texParchment
+                fillMode: Image.Tile
+                opacity: 0.16
+            }
 
-                // Count chip + section label header inside the panel.
-                Item {
-                    id: panelHeader
-                    anchors.top: parent.top
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    anchors.margins: Theme.space.lg
-                    height: panelTitle.implicitHeight
+            Column {
+                anchors.fill: parent
+                anchors.margins: Theme.space.lg
+                spacing: Theme.space.md
 
-                    SectionHeader {
-                        id: panelTitle
-                        anchors.left: parent.left
-                        anchors.verticalCenter: parent.verticalCenter
-                        title: I18n.t("对局", "Runs")
-                    }
+                Text {
+                    text: I18n.t("档案筛选", "Archive Filter")
+                    color: Theme.warm.ink
+                    font.family: Theme.fontFamilies.serif
+                    font.contextFontMerging: true
+                    font.pixelSize: Theme.warmSize.titleLg
+                    font.weight: Theme.weight.semibold
+                }
 
-                    // Select-all checkbox — visible when in selection mode,
-                    // placed left of the count chip with a small gap.
-                    CheckBox {
-                        id: selectAllBox
-                        objectName: "selectAllBox"
-                        visible: root.selecting
-                        anchors.right: countChip.left
-                        anchors.rightMargin: Theme.space.sm
-                        anchors.verticalCenter: parent.verticalCenter
-                        onToggled: {
-                            var m = ({})
-                            if (checked)
-                                for (var i = 0; i < ObserverClient.runItems.length; i++) {
-                                    var it = ObserverClient.runItems[i]
-                                    var st = it.status || ""
-                                    if (st !== "running" && st !== "queued") m[it.run_id] = true
+                Column {
+                    width: parent.width
+                    spacing: Theme.space.xs
+
+                    Repeater {
+                        model: [
+                            { key: "all", label: I18n.t("全部", "All"), count: ObserverClient.runItems.length },
+                            { key: "completed", label: I18n.t("已完成", "Completed"), count: root.completedCount },
+                            { key: "running", label: I18n.t("进行中", "Running"), count: root.runningCount },
+                            { key: "unknown", label: "Unknown", count: root.unknownCount }
+                        ]
+                        delegate: Rectangle {
+                            required property var modelData
+                            width: parent.width
+                            height: 38
+                            radius: Theme.radius.md
+                            readonly property bool selected: root.activeFilter === modelData.key
+                            color: selected ? Theme.withAlpha(Theme.warm.primary, 0.82)
+                                            : (filterHover.hovered ? Theme.withAlpha(Theme.warm.ink, 0.04) : "transparent")
+                            border.width: selected ? 1 : 0
+                            border.color: Theme.withAlpha(Theme.warm.primaryActive, 0.36)
+
+                            Row {
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.verticalCenter: parent.verticalCenter
+                                anchors.leftMargin: Theme.space.md
+                                anchors.rightMargin: Theme.space.sm
+                                spacing: Theme.space.sm
+
+                                Text {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: "□"
+                                    color: parent.parent.selected ? Theme.warm.textOnPrimary : Theme.warm.primaryActive
+                                    font.family: Theme.fontFamilies.sans
+                                    font.pixelSize: Theme.size.caption
                                 }
-                            root._selected = m
-                        }
-                    }
+                                Text {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    width: parent.width - countPill.width - Theme.space.xl * 2
+                                    text: modelData.label
+                                    color: parent.parent.selected ? Theme.warm.textOnPrimary : Theme.warm.bodyStrong
+                                    font.family: Theme.fontFamilies.sans
+                                    font.contextFontMerging: true
+                                    font.pixelSize: Theme.size.body
+                                    font.weight: Theme.weight.semibold
+                                    elide: Text.ElideRight
+                                }
+                                Rectangle {
+                                    id: countPill
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    width: countText.implicitWidth + Theme.space.md
+                                    height: 22
+                                    radius: Theme.radius.pill
+                                    color: parent.parent.selected
+                                           ? Theme.withAlpha(Theme.warm.textOnPrimary, 0.16)
+                                           : Theme.withAlpha(Theme.parchment.goldLine, 0.13)
+                                    border.width: 1
+                                    border.color: parent.parent.selected
+                                                  ? Theme.withAlpha(Theme.warm.textOnPrimary, 0.24)
+                                                  : Theme.withAlpha(Theme.parchment.goldLine, 0.25)
+                                    Text {
+                                        id: countText
+                                        anchors.centerIn: parent
+                                        text: "" + modelData.count
+                                        color: countPill.parent.parent.selected ? Theme.warm.textOnPrimary : Theme.warm.muted
+                                        font.family: Theme.fontFamilies.sans
+                                        font.pixelSize: Theme.size.micro
+                                        font.weight: Theme.weight.bold
+                                    }
+                                }
+                            }
 
-                    // Select / Cancel toggle button, left of count chip.
-                    AppButton {
-                        id: selectModeButton
-                        objectName: "selectModeButton"
-                        anchors.right: countChip.left
-                        anchors.rightMargin: root.selecting ? Theme.space.xl * 2 : Theme.space.sm
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: root.selecting ? I18n.t("取消", "Cancel") : I18n.t("选择", "Select")
-                        variant: "ghost"
-                        visible: ObserverClient.runItems.length > 0
-                        onClicked: root.selecting ? root._exitSelectMode() : root.selecting = true
-                    }
-
-                    // Count chip — anchored to right edge.
-                    Rectangle {
-                        id: countChip
-                        anchors.right: parent.right
-                        anchors.verticalCenter: parent.verticalCenter
-                        height: 22
-                        width: countLabel.implicitWidth + Theme.space.md * 2
-                        radius: Theme.radius.pill
-                        color: Theme.withAlpha(Theme.color.primary, 0.14)
-                        border.width: 1
-                        border.color: Theme.withAlpha(Theme.color.primary, 0.30)
-                        visible: ObserverClient.runItems.length > 0
-
-                        Text {
-                            id: countLabel
-                            anchors.centerIn: parent
-                            text: "" + ObserverClient.runItems.length
-                            color: Theme.color.primary
-                            font.family: Theme.font.mono
-                            font.pixelSize: Theme.size.caption
-                            font.weight: Theme.weight.semibold
+                            HoverHandler {
+                                id: filterHover
+                                cursorShape: Qt.PointingHandCursor
+                            }
+                            TapHandler { onTapped: root.activeFilter = modelData.key }
                         }
                     }
                 }
 
                 Rectangle {
-                    id: panelDivider
-                    anchors.top: panelHeader.bottom
-                    anchors.topMargin: Theme.space.md
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    anchors.leftMargin: 1
-                    anchors.rightMargin: 1
+                    width: parent.width
                     height: 1
-                    color: Theme.color.border
-                    visible: ObserverClient.runItems.length > 0
+                    color: Theme.withAlpha(Theme.parchment.goldLineSoft, 0.35)
                 }
 
-                // The list of runs, or a friendly empty state.
-                ListView {
-                    id: historyRunsList
-                    objectName: "historyRunsList"
-                    anchors.top: panelDivider.bottom
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    anchors.bottom: parent.bottom
-                    anchors.topMargin: Theme.space.sm
-                    anchors.bottomMargin: Theme.space.sm
-                    model: ObserverClient.runItems
-                    clip: true
-                    visible: ObserverClient.runItems.length > 0
-                    boundsBehavior: Flickable.StopAtBounds
+                TextField {
+                    id: searchField
+                    width: parent.width
+                    height: 40
+                    text: root.searchText
+                    placeholderText: I18n.t("搜索对局名 / Run ID", "Search match name / Run ID")
+                    placeholderTextColor: Theme.warm.mutedSoft
+                    color: Theme.warm.ink
+                    selectedTextColor: Theme.warm.textOnPrimary
+                    selectionColor: Theme.warm.primary
+                    font.family: Theme.fontFamilies.sans
+                    font.contextFontMerging: true
+                    font.pixelSize: Theme.size.caption
+                    leftPadding: Theme.space.md
+                    rightPadding: Theme.space.xxl
+                    onTextEdited: root.searchText = text
+                    background: Rectangle {
+                        radius: Theme.radius.md
+                        color: Theme.withAlpha(Theme.parchment.parchment, 0.76)
+                        border.width: 1
+                        border.color: searchField.activeFocus
+                                      ? Theme.withAlpha(Theme.warm.primary, 0.55)
+                                      : Theme.withAlpha(Theme.parchment.goldLineSoft, 0.42)
+                    }
+                    Text {
+                        anchors.right: parent.right
+                        anchors.rightMargin: Theme.space.md
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: "⌕"
+                        color: Theme.warm.muted
+                        font.family: Theme.fontFamilies.sans
+                        font.pixelSize: Theme.size.body
+                    }
+                }
 
-                    ScrollBar.vertical: ScrollBar {
-                        policy: ScrollBar.AsNeeded
+                Text {
+                    text: I18n.t("进阶筛选", "Advanced filters")
+                    color: Theme.warm.bodyStrong
+                    font.family: Theme.fontFamilies.sans
+                    font.contextFontMerging: true
+                    font.pixelSize: Theme.size.caption
+                    font.weight: Theme.weight.semibold
+                }
+
+                Column {
+                    width: parent.width
+                    spacing: Theme.space.sm
+
+                    ParchmentComboBox {
+                        width: parent.width
+                        compact: true
+                        model: [
+                            I18n.t("全部模式", "All modes"),
+                            I18n.t("模拟", "Simulation"),
+                            I18n.t("云端执行", "Cloud execution"),
+                            I18n.t("本地执行", "Local execution"),
+                            "Unknown"
+                        ]
+                        onActivated: function(index) {
+                            root.executionFilter = ["all", "fake", "live", "local", "unknown"][index]
+                        }
                     }
 
-                    delegate: Item {
-                        id: runDelegate
-                        width: ListView.view.width
-                        height: 52
+                    ParchmentComboBox {
+                        width: parent.width
+                        compact: true
+                        model: [
+                            I18n.t("全部结果", "All results"),
+                            I18n.t("好人阵营", "Good team"),
+                            I18n.t("狼人阵营", "Werewolf team"),
+                            "Unknown"
+                        ]
+                        onActivated: function(index) {
+                            root.resultFilter = ["all", "good", "wolf", "unknown"][index]
+                        }
+                    }
 
-                        readonly property color _accent: Theme.statusColor(modelData.status || "")
+                    ParchmentComboBox {
+                        width: parent.width
+                        compact: true
+                        model: [
+                            I18n.t("全部时间", "All time"),
+                            I18n.t("最近创建", "Recent"),
+                            I18n.t("较早档案", "Older")
+                        ]
+                        onActivated: function(index) {
+                            root.timeFilter = ["all", "recent", "older"][index]
+                        }
+                    }
+                }
+
+                Item { width: 1; height: Math.max(0, parent.height - y - 48) }
+
+                Text {
+                    width: parent.width
+                    text: I18n.t("筛选仅作用于已载入的本地档案。", "Filters apply to loaded local archives only.")
+                    color: Theme.warm.muted
+                    font.family: Theme.fontFamilies.sans
+                    font.contextFontMerging: true
+                    font.pixelSize: Theme.size.micro
+                    wrapMode: Text.WordWrap
+                    lineHeightMode: Text.ProportionalHeight
+                    lineHeight: 1.25
+                }
+            }
+        }
+
+        Rectangle {
+            id: listPanel
+            anchors.left: filterRail.right
+            anchors.leftMargin: page.gap
+            anchors.top: header.bottom
+            anchors.bottom: archiveTray.top
+            anchors.bottomMargin: Theme.space.lg
+            width: Math.max(430, page.width - page.railWidth - page.detailWidth - page.gap * 2)
+            radius: 18
+            color: Theme.withAlpha(Theme.parchment.parchmentSoft, 0.90)
+            border.width: 1
+            border.color: Theme.withAlpha(Theme.parchment.goldLine, 0.44)
+
+            Rectangle {
+                anchors.fill: parent
+                anchors.topMargin: 12
+                anchors.leftMargin: 5
+                anchors.rightMargin: -5
+                anchors.bottomMargin: -9
+                radius: parent.radius
+                color: Theme.withAlpha(Theme.parchment.woodShadow, 0.28)
+                z: -1
+            }
+
+            Image {
+                anchors.fill: parent
+                anchors.margins: 2
+                source: Illustrations.texParchment
+                fillMode: Image.Tile
+                opacity: 0.13
+            }
+
+            Item {
+                id: listHeader
+                anchors.top: parent.top
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.margins: Theme.space.lg
+                height: 44
+
+                Row {
+                    anchors.left: parent.left
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: Theme.space.md
+
+                    CheckBox {
+                        id: selectAllBox
+                        objectName: "selectAllBox"
+                        visible: root.selecting
+                        enabled: root.filteredRuns.length > 0
+                        width: visible ? 24 : 0
+                        height: 24
+                        text: ""
+                        indicator: Rectangle {
+                            x: 3
+                            y: 3
+                            width: 18
+                            height: 18
+                            radius: 5
+                            color: selectAllBox.checked ? Theme.warm.primary : Theme.withAlpha(Theme.parchment.parchment, 0.72)
+                            border.width: 1
+                            border.color: selectAllBox.checked ? Theme.warm.primaryActive : Theme.withAlpha(Theme.parchment.goldLine, 0.48)
+                            Text {
+                                anchors.centerIn: parent
+                                visible: selectAllBox.checked
+                                text: "✓"
+                                color: Theme.warm.textOnPrimary
+                                font.family: Theme.fontFamilies.sans
+                                font.pixelSize: Theme.size.caption
+                                font.weight: Theme.weight.bold
+                            }
+                        }
+                        contentItem: Item {}
+                        onToggled: root._selectVisibleRuns(checked)
+                    }
+
+                    Column {
+                        anchors.verticalCenter: parent.verticalCenter
+                        spacing: 1
+                        Text {
+                            text: I18n.t("对局档案", "Match Archive")
+                            color: Theme.warm.ink
+                            font.family: Theme.fontFamilies.serif
+                            font.contextFontMerging: true
+                            font.pixelSize: Theme.warmSize.titleLg
+                            font.weight: Theme.weight.semibold
+                        }
+                        Text {
+                            text: I18n.t("共 ", "Showing ") + root.filteredRuns.length
+                                  + I18n.t(" 个对局", " matches")
+                            color: Theme.warm.muted
+                            font.family: Theme.fontFamilies.sans
+                            font.contextFontMerging: true
+                            font.pixelSize: Theme.size.caption
+                        }
+                    }
+                }
+
+                Rectangle {
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: localChipText.implicitWidth + Theme.space.lg
+                    height: 28
+                    radius: Theme.radius.pill
+                    color: Theme.withAlpha(Theme.parchment.goldLine, 0.13)
+                    border.width: 1
+                    border.color: Theme.withAlpha(Theme.parchment.goldLine, 0.32)
+                    Text {
+                        id: localChipText
+                        anchors.centerIn: parent
+                        text: I18n.t("本地档案", "Local archive")
+                        color: Theme.warm.muted
+                        font.family: Theme.fontFamilies.sans
+                        font.contextFontMerging: true
+                        font.pixelSize: Theme.size.micro
+                        font.weight: Theme.weight.bold
+                    }
+                }
+            }
+
+            Rectangle {
+                anchors.top: listHeader.bottom
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.leftMargin: Theme.space.lg
+                anchors.rightMargin: Theme.space.lg
+                height: 1
+                color: Theme.withAlpha(Theme.parchment.goldLineSoft, 0.34)
+            }
+
+            ListView {
+                id: historyRunsList
+                objectName: "historyRunsList"
+                anchors.top: listHeader.bottom
+                anchors.topMargin: Theme.space.md
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                anchors.leftMargin: Theme.space.md
+                anchors.rightMargin: Theme.space.sm
+                anchors.bottomMargin: Theme.space.md
+                model: root.filteredRuns
+                clip: true
+                visible: root.filteredRuns.length > 0
+                spacing: Theme.space.sm
+                boundsBehavior: Flickable.StopAtBounds
+
+                ScrollBar.vertical: ScrollBar {
+                    policy: ScrollBar.AsNeeded
+                    width: 9
+                    contentItem: Rectangle {
+                        implicitWidth: 7
+                        radius: 4
+                        color: Theme.withAlpha(Theme.parchment.goldLineSoft, 0.58)
+                    }
+                    background: Rectangle {
+                        radius: 4
+                        color: Theme.withAlpha(Theme.parchment.parchmentStrong, 0.38)
+                    }
+                }
+
+                delegate: Item {
+                    id: runDelegate
+                    required property var modelData
+                    width: historyRunsList.width - Theme.space.sm
+                    height: 112
+
+                    readonly property bool selected: root.selectedRunId === modelData.run_id
+                    readonly property color accent: root._statusAccent(modelData.status)
+
+                    Rectangle {
+                        anchors.fill: card
+                        anchors.topMargin: 8
+                        anchors.leftMargin: 4
+                        anchors.rightMargin: -4
+                        anchors.bottomMargin: -5
+                        radius: 16
+                        color: Theme.withAlpha(Theme.parchment.woodShadow, runDelegate.selected ? 0.34 : 0.22)
+                    }
+
+                    Rectangle {
+                        id: card
+                        anchors.fill: parent
+                        anchors.leftMargin: Theme.space.xs
+                        anchors.rightMargin: Theme.space.md
+                        radius: 16
+                        color: runCardHover.hovered || runDelegate.selected
+                               ? Theme.withAlpha(Theme.parchment.parchment, 0.94)
+                               : Theme.withAlpha(Theme.parchment.parchmentSoft, 0.86)
+                        border.width: runDelegate.selected ? 2 : 1
+                        border.color: runDelegate.selected
+                                      ? Theme.withAlpha(Theme.warm.primary, 0.82)
+                                      : Theme.withAlpha(Theme.parchment.goldLine, 0.38)
+
+                        Image {
+                            anchors.fill: parent
+                            anchors.margins: 2
+                            source: Illustrations.texParchment
+                            fillMode: Image.Tile
+                            opacity: 0.14
+                        }
 
                         Rectangle {
-                            id: rowHighlight
-                            anchors.fill: parent
-                            anchors.leftMargin: Theme.space.lg
-                            anchors.rightMargin: Theme.space.lg
-                            anchors.topMargin: 2
-                            anchors.bottomMargin: 2
-                            radius: Theme.radius.md
-                            color: rowHover.hovered ? Theme.color.surfaceAlt : "transparent"
+                            anchors.left: parent.left
+                            anchors.top: parent.top
+                            anchors.bottom: parent.bottom
+                            width: runDelegate.selected ? 5 : 3
+                            radius: 3
+                            color: runDelegate.selected ? Theme.warm.primary : runDelegate.accent
+                            opacity: runDelegate.selected ? 1.0 : 0.65
+                        }
 
-                            Behavior on color { ColorAnimation { duration: Theme.motion.fast } }
-
-                            // Per-row selection checkbox at the far left, visible in selection mode.
-                            CheckBox {
-                                objectName: "rowSelectBox"
-                                visible: root.selecting
-                                enabled: (modelData.status || "") !== "running"
-                                         && (modelData.status || "") !== "queued"
-                                anchors.left: parent.left
-                                anchors.leftMargin: Theme.space.md
-                                anchors.verticalCenter: parent.verticalCenter
-                                checked: root._selected[modelData.run_id] === true
-                                onToggled: root._toggleSelected(modelData.run_id, checked)
+                        CheckBox {
+                            id: rowSelectBox
+                            objectName: "rowSelectBox"
+                            visible: root.selecting
+                            enabled: root._canDelete(modelData)
+                            anchors.left: parent.left
+                            anchors.leftMargin: Theme.space.md
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: visible ? 24 : 0
+                            height: 24
+                            text: ""
+                            checked: root._selected[modelData.run_id] === true
+                            indicator: Rectangle {
+                                x: 3
+                                y: 3
+                                width: 18
+                                height: 18
+                                radius: 5
+                                color: rowSelectBox.checked ? Theme.warm.primary
+                                                            : Theme.withAlpha(Theme.parchment.parchment, 0.76)
+                                border.width: 1
+                                border.color: rowSelectBox.checked ? Theme.warm.primaryActive
+                                                                   : Theme.withAlpha(Theme.parchment.goldLine, 0.48)
+                                opacity: rowSelectBox.enabled ? 1.0 : 0.45
+                                Text {
+                                    anchors.centerIn: parent
+                                    visible: rowSelectBox.checked
+                                    text: "✓"
+                                    color: Theme.warm.textOnPrimary
+                                    font.family: Theme.fontFamilies.sans
+                                    font.pixelSize: Theme.size.caption
+                                    font.weight: Theme.weight.bold
+                                }
                             }
+                            contentItem: Item {}
+                            onToggled: root._toggleSelected(modelData.run_id, checked)
+                        }
 
-                            // Status-tinted leading accent bar.
+                        Rectangle {
+                            id: dossierSeal
+                            anchors.left: parent.left
+                            anchors.leftMargin: root.selecting ? 48 : 20
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: 70
+                            height: 70
+                            radius: 35
+                            color: Theme.withAlpha(runDelegate.accent, 0.15)
+                            border.width: 1
+                            border.color: Theme.withAlpha(runDelegate.accent, 0.52)
+
                             Rectangle {
-                                anchors.left: parent.left
-                                anchors.leftMargin: root.selecting ? 36 : 0
-                                anchors.verticalCenter: parent.verticalCenter
-                                width: 3
-                                height: 22
-                                radius: 1.5
-                                color: runDelegate._accent
-                                opacity: rowHover.hovered ? 1.0 : 0.55
-
-                                Behavior on opacity { NumberAnimation { duration: Theme.motion.fast } }
-                                Behavior on anchors.leftMargin { NumberAnimation { duration: Theme.motion.fast } }
-                            }
-
-                            // Run id (mono for a precise, trustworthy feel).
-                            Text {
-                                id: runIdText
-                                anchors.left: parent.left
-                                anchors.leftMargin: (root.selecting ? 36 : 0) + Theme.space.lg
-                                anchors.verticalCenter: parent.verticalCenter
-                                width: Math.max(120, parent.width
-                                    - statusBadge.width
-                                    - (root.selecting ? 0 : deleteButton.width + reportButton.width + openButton.width + Theme.space.xl * 3)
-                                    - Theme.space.xl * 2
-                                    - (root.selecting ? 36 : 0))
-                                elide: Text.ElideRight
-                                text: modelData.run_id || I18n.t("(未命名对局)", "(unnamed run)")
-                                color: Theme.color.text
-                                font.family: Theme.font.mono
-                                font.pixelSize: Theme.size.small
-
-                                Behavior on anchors.leftMargin { NumberAnimation { duration: Theme.motion.fast } }
-                            }
-
-                            StatusBadge {
-                                id: statusBadge
-                                anchors.right: root.selecting ? parent.right : deleteButton.left
-                                anchors.rightMargin: root.selecting ? Theme.space.md : Theme.space.lg
-                                anchors.verticalCenter: parent.verticalCenter
-                                status: modelData.status || ""
-                            }
-
-                            AppButton {
-                                id: deleteButton
-                                objectName: "deleteRunButton"
-                                anchors.right: reportButton.visible ? reportButton.left : openButton.left
-                                anchors.rightMargin: Theme.space.sm
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: I18n.t("删除", "Delete")
-                                variant: "ghost"
-                                visible: !root.selecting
-                                enabled: (modelData.status || "") !== "running"
-                                         && (modelData.status || "") !== "queued"
-                                onClicked: {
-                                    var rid = modelData.run_id
-                                    root._onDialogConfirm = function() { ObserverClient.deleteRun(rid) }
-                                    confirmDialog.title = I18n.t("删除对局", "Delete run")
-                                    confirmDialog.message = I18n.t("确定删除对局 ", "Delete run ")
-                                        + modelData.run_id
-                                        + I18n.t("?删除后不可恢复。", "? This cannot be undone.")
-                                    confirmDialog.open()
+                                anchors.centerIn: parent
+                                width: 54
+                                height: 54
+                                radius: 27
+                                color: Theme.withAlpha(Theme.parchment.parchmentSoft, 0.72)
+                                border.width: 1
+                                border.color: Theme.withAlpha(Theme.parchment.goldLine, 0.35)
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: root._statusKey(modelData.status) === "running" ? "月" : "档"
+                                    color: runDelegate.accent
+                                    font.family: Theme.fontFamilies.serif
+                                    font.contextFontMerging: true
+                                    font.pixelSize: 22
+                                    font.weight: Theme.weight.bold
                                 }
                             }
 
-                            // P2-D §7.7 — thin "查看战报" entry for finished runs. openRun's
-                            // forReport=true sets the settlement entry intent synchronously, so
-                            // the theater's settlement overlay opens straight to `report`
-                            // (history-direct), skipping the live freeze ceremony.
+                            Behavior on anchors.leftMargin { NumberAnimation { duration: Theme.motion.fast; easing.type: Easing.OutCubic } }
+                        }
+
+                        Column {
+                            id: cardText
+                            anchors.left: dossierSeal.right
+                            anchors.leftMargin: Theme.space.md
+                            anchors.right: cardActions.left
+                            anchors.rightMargin: Theme.space.md
+                            anchors.verticalCenter: parent.verticalCenter
+                            spacing: Theme.space.xs
+
+                            Row {
+                                width: parent.width
+                                spacing: Theme.space.sm
+                                Text {
+                                    width: parent.width - statusChip.width - Theme.space.sm
+                                    text: root._runTitle(modelData)
+                                    color: Theme.warm.ink
+                                    font.family: Theme.fontFamilies.serif
+                                    font.contextFontMerging: true
+                                    font.pixelSize: Theme.warmSize.titleMd
+                                    font.weight: Theme.weight.semibold
+                                    elide: Text.ElideRight
+                                }
+                                Rectangle {
+                                    id: statusChip
+                                    width: statusChipText.implicitWidth + Theme.space.md * 2
+                                    height: 24
+                                    radius: Theme.radius.pill
+                                    color: Theme.withAlpha(runDelegate.accent, 0.14)
+                                    border.width: 1
+                                    border.color: Theme.withAlpha(runDelegate.accent, 0.46)
+                                    Text {
+                                        id: statusChipText
+                                        anchors.centerIn: parent
+                                        text: root._statusLabel(modelData.status)
+                                        color: Qt.darker(runDelegate.accent, 1.25)
+                                        font.family: Theme.fontFamilies.sans
+                                        font.contextFontMerging: true
+                                        font.pixelSize: Theme.size.micro
+                                        font.weight: Theme.weight.bold
+                                    }
+                                }
+                            }
+
+                            Text {
+                                width: parent.width
+                                text: "Run ID: " + root._shortRunId(modelData)
+                                color: Theme.warm.muted
+                                font.family: Theme.fontFamilies.mono
+                                font.pixelSize: Theme.size.caption
+                                elide: Text.ElideRight
+                            }
+
+                            Text {
+                                width: parent.width
+                                text: root._templateLabel(modelData) + " · "
+                                      + root._executionLabel(modelData) + " · "
+                                      + root._timeLabel(modelData)
+                                color: Theme.warm.body
+                                font.family: Theme.fontFamilies.sans
+                                font.contextFontMerging: true
+                                font.pixelSize: Theme.size.caption
+                                elide: Text.ElideRight
+                            }
+
+                            Row {
+                                width: parent.width
+                                spacing: Theme.space.lg
+                                Text {
+                                    text: root._resultLabel(modelData)
+                                    color: Theme.warm.bodyStrong
+                                    font.family: Theme.fontFamilies.sans
+                                    font.contextFontMerging: true
+                                    font.pixelSize: Theme.size.caption
+                                    font.weight: Theme.weight.semibold
+                                    elide: Text.ElideRight
+                                }
+                                Text {
+                                    text: root._summaryLabel(modelData)
+                                    color: Theme.warm.muted
+                                    font.family: Theme.fontFamilies.sans
+                                    font.contextFontMerging: true
+                                    font.pixelSize: Theme.size.micro
+                                    elide: Text.ElideRight
+                                }
+                            }
+                        }
+
+                        Row {
+                            id: cardActions
+                            anchors.right: parent.right
+                            anchors.rightMargin: Theme.space.md
+                            anchors.verticalCenter: parent.verticalCenter
+                            spacing: Theme.space.xs
+                            visible: !root.selecting
+
                             AppButton {
                                 id: reportButton
                                 objectName: "openSettlementButton"
-                                anchors.right: openButton.left
-                                anchors.rightMargin: Theme.space.sm
-                                anchors.verticalCenter: parent.verticalCenter
-                                visible: !root.selecting && (modelData.status || "") === "completed"
+                                onLight: true
+                                width: visible ? 92 : 0
+                                height: 34
+                                visible: (modelData.status || "") === "completed"
                                 text: I18n.t("查看战报", "View report")
                                 variant: "secondary"
-                                onClicked: {
-                                    ObserverClient.openRun(modelData.run_id, true)
-                                    root.StackView.view.parent.navigateCockpit()
-                                }
+                                onClicked: root._openRun(modelData, true)
                             }
 
                             AppButton {
                                 id: openButton
                                 objectName: "openReplayButton"
-                                anchors.right: parent.right
-                                anchors.rightMargin: Theme.space.md
-                                anchors.verticalCenter: parent.verticalCenter
-                                visible: !root.selecting
+                                onLight: true
+                                width: 66
+                                height: 34
                                 text: I18n.t("打开", "Open")
-                                variant: "ghost"
-                                onClicked: {
-                                    ObserverClient.openRun(modelData.run_id)
-                                    root.StackView.view.parent.navigateCockpit()
+                                variant: "primary"
+                                onClicked: root._openRun(modelData, false)
+                            }
+
+                            AppButton {
+                                id: deleteButton
+                                objectName: "deleteRunButton"
+                                onLight: true
+                                width: 66
+                                height: 34
+                                enabled: root._canDelete(modelData)
+                                text: I18n.t("删除", "Delete")
+                                variant: "danger"
+                                onClicked: root._confirmDelete(modelData)
+                            }
+                        }
+
+                        HoverHandler {
+                            id: runCardHover
+                            cursorShape: Qt.PointingHandCursor
+                        }
+                        TapHandler {
+                            onTapped: root.selectedRunId = modelData.run_id
+                        }
+                    }
+                }
+            }
+
+            EmptyState {
+                anchors.centerIn: parent
+                visible: root.filteredRuns.length === 0
+                onLight: true
+                title: ObserverClient.runItems.length === 0
+                       ? I18n.t("暂无记录", "No runs recorded")
+                       : I18n.t("没有匹配的档案", "No matching archives")
+                subtitle: ObserverClient.runItems.length === 0
+                          ? I18n.t("已完成与进行中的对局将显示在此。", "Completed and in-progress matches will appear here.")
+                          : I18n.t("调整筛选或搜索词后再试。", "Try a different filter or search term.")
+            }
+        }
+
+        Rectangle {
+            id: detailPanel
+            anchors.left: listPanel.right
+            anchors.leftMargin: page.gap
+            anchors.top: header.bottom
+            anchors.right: parent.right
+            anchors.bottom: archiveTray.top
+            anchors.bottomMargin: Theme.space.lg
+            radius: 22
+            color: Theme.withAlpha(Theme.parchment.parchmentSoft, 0.91)
+            border.width: 1
+            border.color: Theme.withAlpha(Theme.parchment.goldLine, 0.52)
+
+            Rectangle {
+                anchors.fill: parent
+                anchors.topMargin: 14
+                anchors.leftMargin: 6
+                anchors.rightMargin: -6
+                anchors.bottomMargin: -10
+                radius: parent.radius
+                color: Theme.withAlpha(Theme.parchment.woodShadow, 0.32)
+                z: -1
+            }
+
+            Image {
+                anchors.fill: parent
+                anchors.margins: 2
+                source: Illustrations.texParchment
+                fillMode: Image.Tile
+                opacity: 0.17
+            }
+
+            Rectangle {
+                anchors.top: parent.top
+                anchors.right: parent.right
+                anchors.topMargin: -12
+                anchors.rightMargin: 28
+                width: 54
+                height: 54
+                radius: 27
+                color: Theme.withAlpha(Theme.warm.primaryActive, 0.92)
+                border.width: 2
+                border.color: Qt.rgba(245 / 255, 197 / 255, 141 / 255, 0.75)
+                Text {
+                    anchors.centerIn: parent
+                    text: "封"
+                    color: Theme.warm.textOnPrimary
+                    font.family: Theme.fontFamilies.serif
+                    font.contextFontMerging: true
+                    font.pixelSize: Theme.warmSize.titleMd
+                    font.weight: Theme.weight.bold
+                }
+            }
+
+            Column {
+                visible: !root.hasSelectedRun
+                anchors.centerIn: parent
+                width: Math.min(300, parent.width - Theme.space.xxl * 2)
+                spacing: Theme.space.md
+
+                Rectangle {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    width: 74
+                    height: 74
+                    radius: 37
+                    color: Theme.withAlpha(Theme.parchment.goldLine, 0.12)
+                    border.width: 1
+                    border.color: Theme.withAlpha(Theme.parchment.goldLine, 0.36)
+                    Text {
+                        anchors.centerIn: parent
+                        text: "档"
+                        color: Theme.warm.muted
+                        font.family: Theme.fontFamilies.serif
+                        font.contextFontMerging: true
+                        font.pixelSize: 30
+                        font.weight: Theme.weight.bold
+                    }
+                }
+
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: I18n.t("请选择一局对局", "No match selected")
+                    color: Theme.warm.ink
+                    font.family: Theme.fontFamilies.serif
+                    font.contextFontMerging: true
+                    font.pixelSize: Theme.warmSize.titleLg
+                    font.weight: Theme.weight.semibold
+                    horizontalAlignment: Text.AlignHCenter
+                }
+
+                Text {
+                    width: parent.width
+                    text: I18n.t("选择一局对局以查看详情、战报或回放。",
+                                 "Choose a match to inspect details, reports, or replay.")
+                    color: Theme.warm.body
+                    font.family: Theme.fontFamilies.sans
+                    font.contextFontMerging: true
+                    font.pixelSize: Theme.size.body
+                    wrapMode: Text.WordWrap
+                    horizontalAlignment: Text.AlignHCenter
+                    lineHeightMode: Text.ProportionalHeight
+                    lineHeight: 1.35
+                }
+            }
+
+            Flickable {
+                id: detailFlick
+                visible: root.hasSelectedRun
+                anchors.top: parent.top
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: detailActions.top
+                anchors.margins: Theme.space.xl
+                anchors.bottomMargin: Theme.space.md
+                clip: true
+                contentWidth: width
+                contentHeight: detailColumn.implicitHeight
+                boundsBehavior: Flickable.StopAtBounds
+
+                ScrollBar.vertical: ScrollBar {
+                    policy: ScrollBar.AsNeeded
+                    width: 8
+                    contentItem: Rectangle {
+                        implicitWidth: 6
+                        radius: 3
+                        color: Theme.withAlpha(Theme.parchment.goldLineSoft, 0.52)
+                    }
+                    background: Rectangle {
+                        radius: 3
+                        color: Theme.withAlpha(Theme.parchment.parchmentStrong, 0.34)
+                    }
+                }
+
+                Column {
+                    id: detailColumn
+                    width: detailFlick.width - Theme.space.sm
+                    spacing: Theme.space.md
+
+                    Row {
+                        width: parent.width
+                        spacing: Theme.space.md
+
+                        Rectangle {
+                            width: 86
+                            height: 86
+                            radius: 43
+                            color: Theme.withAlpha(root._statusAccent(root.selectedRun.status), 0.16)
+                            border.width: 1
+                            border.color: Theme.withAlpha(root._statusAccent(root.selectedRun.status), 0.56)
+                            Text {
+                                anchors.centerIn: parent
+                                text: "档"
+                                color: root._statusAccent(root.selectedRun.status)
+                                font.family: Theme.fontFamilies.serif
+                                font.contextFontMerging: true
+                                font.pixelSize: 30
+                                font.weight: Theme.weight.bold
+                            }
+                        }
+
+                        Column {
+                            width: parent.width - 86 - Theme.space.md
+                            anchors.verticalCenter: parent.verticalCenter
+                            spacing: Theme.space.xs
+
+                            Row {
+                                width: parent.width
+                                spacing: Theme.space.sm
+                                Text {
+                                    width: parent.width - detailStatusChip.width - Theme.space.sm
+                                    text: root._runTitle(root.selectedRun)
+                                    color: Theme.warm.ink
+                                    font.family: Theme.fontFamilies.serif
+                                    font.contextFontMerging: true
+                                    font.pixelSize: Theme.warmSize.titleLg
+                                    font.weight: Theme.weight.bold
+                                    elide: Text.ElideRight
+                                }
+                                Rectangle {
+                                    id: detailStatusChip
+                                    width: detailStatusText.implicitWidth + Theme.space.md * 2
+                                    height: 25
+                                    radius: Theme.radius.pill
+                                    color: Theme.withAlpha(root._statusAccent(root.selectedRun.status), 0.14)
+                                    border.width: 1
+                                    border.color: Theme.withAlpha(root._statusAccent(root.selectedRun.status), 0.48)
+                                    Text {
+                                        id: detailStatusText
+                                        anchors.centerIn: parent
+                                        text: root._statusLabel(root.selectedRun.status)
+                                        color: Qt.darker(root._statusAccent(root.selectedRun.status), 1.25)
+                                        font.family: Theme.fontFamilies.sans
+                                        font.contextFontMerging: true
+                                        font.pixelSize: Theme.size.micro
+                                        font.weight: Theme.weight.bold
+                                    }
                                 }
                             }
 
-                            HoverHandler {
-                                id: rowHover
+                            Text {
+                                width: parent.width
+                                text: "Run ID: " + (root.selectedRun.run_id || "Unknown")
+                                color: Theme.warm.muted
+                                font.family: Theme.fontFamilies.mono
+                                font.pixelSize: Theme.size.caption
+                                elide: Text.ElideRight
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        width: parent.width
+                        height: 1
+                        color: Theme.withAlpha(Theme.parchment.goldLineSoft, 0.36)
+                    }
+
+                    Rectangle {
+                        width: parent.width
+                        height: detailGrid.implicitHeight + Theme.space.lg * 2
+                        radius: 16
+                        color: Theme.withAlpha(Theme.parchment.parchment, 0.62)
+                        border.width: 1
+                        border.color: Theme.withAlpha(Theme.parchment.goldLineSoft, 0.38)
+
+                        Grid {
+                            id: detailGrid
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.top: parent.top
+                            anchors.margins: Theme.space.lg
+                            columns: 2
+                            rowSpacing: Theme.space.md
+                            columnSpacing: Theme.space.lg
+
+                            Repeater {
+                                model: [
+                                    { label: I18n.t("对局类型", "Match type"), value: root._templateLabel(root.selectedRun) },
+                                    { label: I18n.t("执行模式", "Execution mode"), value: root._executionLabel(root.selectedRun) },
+                                    { label: I18n.t("创建时间", "Created"), value: root._timeLabel(root.selectedRun) },
+                                    { label: I18n.t("结束时间", "Finished"), value: root._endTimeLabel(root.selectedRun) },
+                                    { label: I18n.t("总时长", "Duration"), value: root._durationLabel(root.selectedRun) },
+                                    { label: I18n.t("当前版本", "Version"), value: root._versionLabel(root.selectedRun) }
+                                ]
+                                delegate: Column {
+                                    required property var modelData
+                                    width: (detailGrid.width - Theme.space.lg) / 2
+                                    spacing: 2
+                                    Text {
+                                        width: parent.width
+                                        text: modelData.label
+                                        color: Theme.warm.muted
+                                        font.family: Theme.fontFamilies.sans
+                                        font.contextFontMerging: true
+                                        font.pixelSize: Theme.size.micro
+                                        font.weight: Theme.weight.bold
+                                        elide: Text.ElideRight
+                                    }
+                                    Text {
+                                        width: parent.width
+                                        text: "" + modelData.value
+                                        color: Theme.warm.bodyStrong
+                                        font.family: Theme.fontFamilies.sans
+                                        font.contextFontMerging: true
+                                        font.pixelSize: Theme.size.caption
+                                        elide: Text.ElideRight
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        width: parent.width
+                        height: 82
+                        radius: 16
+                        color: Theme.withAlpha(Theme.parchment.terracottaWash, 0.40)
+                        border.width: 1
+                        border.color: Theme.withAlpha(Theme.warm.primary, 0.28)
+
+                        Column {
+                            anchors.fill: parent
+                            anchors.margins: Theme.space.lg
+                            spacing: Theme.space.xs
+                            Text {
+                                text: I18n.t("对局结果", "Match result")
+                                color: Theme.warm.muted
+                                font.family: Theme.fontFamilies.sans
+                                font.contextFontMerging: true
+                                font.pixelSize: Theme.size.micro
+                                font.weight: Theme.weight.bold
+                            }
+                            Text {
+                                width: parent.width
+                                text: root._resultLabel(root.selectedRun)
+                                color: Theme.warm.primaryActive
+                                font.family: Theme.fontFamilies.serif
+                                font.contextFontMerging: true
+                                font.pixelSize: Theme.warmSize.titleMd
+                                font.weight: Theme.weight.bold
+                                elide: Text.ElideRight
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        width: parent.width
+                        height: 92
+                        radius: 16
+                        color: Theme.withAlpha(Theme.parchment.parchment, 0.60)
+                        border.width: 1
+                        border.color: Theme.withAlpha(Theme.parchment.goldLineSoft, 0.38)
+                        Column {
+                            anchors.fill: parent
+                            anchors.margins: Theme.space.lg
+                            spacing: Theme.space.xs
+                            Text {
+                                text: I18n.t("角色配置 / 阵营摘要", "Role setup / team summary")
+                                color: Theme.warm.ink
+                                font.family: Theme.fontFamilies.serif
+                                font.contextFontMerging: true
+                                font.pixelSize: Theme.warmSize.titleMd
+                                font.weight: Theme.weight.semibold
+                            }
+                            Text {
+                                width: parent.width
+                                text: root._roleSummary(root.selectedRun)
+                                color: Theme.warm.body
+                                font.family: Theme.fontFamilies.sans
+                                font.contextFontMerging: true
+                                font.pixelSize: Theme.size.caption
+                                wrapMode: Text.WordWrap
+                                elide: Text.ElideRight
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        width: parent.width
+                        height: 124
+                        radius: 16
+                        color: Theme.withAlpha(Theme.parchment.parchment, 0.60)
+                        border.width: 1
+                        border.color: Theme.withAlpha(Theme.parchment.goldLineSoft, 0.38)
+                        Column {
+                            anchors.fill: parent
+                            anchors.margins: Theme.space.lg
+                            spacing: Theme.space.xs
+                            Text {
+                                text: I18n.t("精彩摘要 / 最近日志", "Highlights / recent notes")
+                                color: Theme.warm.ink
+                                font.family: Theme.fontFamilies.serif
+                                font.contextFontMerging: true
+                                font.pixelSize: Theme.warmSize.titleMd
+                                font.weight: Theme.weight.semibold
+                            }
+                            Text {
+                                width: parent.width
+                                text: root._summaryLabel(root.selectedRun)
+                                color: Theme.warm.body
+                                font.family: Theme.fontFamilies.sans
+                                font.contextFontMerging: true
+                                font.pixelSize: Theme.size.caption
+                                wrapMode: Text.WordWrap
+                                lineHeightMode: Text.ProportionalHeight
+                                lineHeight: 1.35
                             }
                         }
                     }
                 }
-
-                EmptyState {
-                    anchors.centerIn: parent
-                    visible: ObserverClient.runItems.length === 0
-                    title: I18n.t("暂无记录", "No runs recorded")
-                    subtitle: I18n.t("已完成与进行中的对局将显示在此。", "Completed and in-progress matches will appear here.")
-                }
             }
 
-            // ---------------------------------------------------------- Footer
-            Item {
-                id: footer
-                anchors.bottom: parent.bottom
+            Row {
+                id: detailActions
+                visible: root.hasSelectedRun
                 anchors.left: parent.left
                 anchors.right: parent.right
-                height: Math.max(backButton.implicitHeight, batchDeleteButton.implicitHeight)
+                anchors.bottom: parent.bottom
+                anchors.margins: Theme.space.xl
+                spacing: Theme.space.sm
 
                 AppButton {
-                    id: backButton
-                    anchors.left: parent.left
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: I18n.t("返回首页", "Back to Home")
-                    variant: "ghost"
-                    onClicked: root.StackView.view.parent.navigateHome()
+                    onLight: true
+                    width: (parent.width - Theme.space.sm * 2) / 3
+                    text: I18n.t("打开", "Open")
+                    variant: "primary"
+                    onClicked: root._openRun(root.selectedRun, false)
                 }
 
-                // Batch delete action — visible in selection mode when ≥1 item selected.
+                AppButton {
+                    onLight: true
+                    width: (parent.width - Theme.space.sm * 2) / 3
+                    text: I18n.t("查看战报", "View report")
+                    variant: "secondary"
+                    enabled: root.hasSelectedRun && (root.selectedRun.status || "") === "completed"
+                    onClicked: root._openRun(root.selectedRun, true)
+                }
+
+                AppButton {
+                    onLight: true
+                    width: (parent.width - Theme.space.sm * 2) / 3
+                    text: I18n.t("删除", "Delete")
+                    variant: "danger"
+                    enabled: root.hasSelectedRun && root._canDelete(root.selectedRun)
+                    onClicked: root._confirmDelete(root.selectedRun)
+                }
+            }
+        }
+
+        Rectangle {
+            id: archiveTray
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            height: 64
+            radius: 18
+            color: Theme.withAlpha(Theme.parchment.parchmentSoft, 0.92)
+            border.width: 1
+            border.color: Theme.withAlpha(Theme.parchment.goldLine, 0.48)
+
+            Rectangle {
+                anchors.fill: parent
+                anchors.topMargin: 8
+                anchors.leftMargin: 4
+                anchors.rightMargin: -4
+                anchors.bottomMargin: -6
+                radius: parent.radius
+                color: Theme.withAlpha(Theme.parchment.woodShadow, 0.28)
+                z: -1
+            }
+
+            Image {
+                anchors.fill: parent
+                anchors.margins: 1
+                source: Illustrations.texParchment
+                fillMode: Image.Tile
+                opacity: 0.14
+            }
+
+            AppButton {
+                id: backButton
+                onLight: true
+                anchors.left: parent.left
+                anchors.leftMargin: Theme.space.lg
+                anchors.verticalCenter: parent.verticalCenter
+                text: I18n.t("返回首页", "Back Home")
+                variant: "secondary"
+                onClicked: root.StackView.view.parent.navigateHome()
+            }
+
+            Row {
+                anchors.right: parent.right
+                anchors.rightMargin: Theme.space.lg
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: Theme.space.md
+                visible: root.selecting
+
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: I18n.t("已选择 ", "Selected ") + root.selectedCount + I18n.t(" 项", " items")
+                    color: Theme.warm.bodyStrong
+                    font.family: Theme.fontFamilies.sans
+                    font.contextFontMerging: true
+                    font.pixelSize: Theme.size.body
+                    font.weight: Theme.weight.semibold
+                }
+
                 AppButton {
                     id: batchDeleteButton
                     objectName: "batchDeleteButton"
-                    visible: root.selecting && root.selectedCount > 0
-                    enabled: !root._batchActive
-                    anchors.right: parent.right
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: I18n.t("删除所选(", "Delete selected (") + root.selectedCount + ")"
+                    onLight: true
+                    enabled: root.selectedCount > 0 && !root._batchActive
+                    text: I18n.t("批量删除", "Batch delete")
                     variant: "danger"
                     onClicked: {
                         root._onDialogConfirm = root._startBatchDelete
                         confirmDialog.title = I18n.t("批量删除", "Batch delete")
                         confirmDialog.message = I18n.t("确定删除 ", "Delete ") + root.selectedCount
-                            + I18n.t(" 局?删除后不可恢复。", " runs? This cannot be undone.")
+                                                + I18n.t(" 局?删除后不可恢复。", " runs? This cannot be undone.")
                         confirmDialog.open()
                     }
+                }
+
+                AppButton {
+                    onLight: true
+                    enabled: !root._batchActive
+                    text: I18n.t("取消选择", "Cancel")
+                    variant: "secondary"
+                    onClicked: root._exitSelectMode()
                 }
             }
         }
