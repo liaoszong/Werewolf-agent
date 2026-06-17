@@ -337,11 +337,11 @@ Item {
             }
         }
 
-        // 桌心阶段徽记
+        // Contract anchor only; the visible center phase text is intentionally retired.
         PhaseIndicator {
-            phase: root.phase; round: root.round
-            x: root._cxPix - width / 2
-            y: root._cyPix - height / 2
+            visible: false
+            phase: root.phase
+            round: root.round
         }
 
         // 椭圆座位铭牌环
@@ -475,7 +475,7 @@ Item {
                     Text {
                         text: "↣  " + I18n.t("当前发言", "Speaker") + "  ↢"
                         color: Theme.parchment.goldLineSoft
-                        font.family: Theme.fontFamilies.sans; font.contextFontMerging: true
+                        font.family: Theme.fontFamilies.cjkSans; font.contextFontMerging: true
                         font.pixelSize: Theme.size.micro; font.letterSpacing: 1.5; font.weight: Theme.weight.bold
                     }
                     Row {
@@ -523,7 +523,7 @@ Item {
                     Text {
                         text: "↣  " + I18n.t("局势", "Status") + "  ↢"
                         color: Theme.parchment.goldLineSoft
-                        font.family: Theme.fontFamilies.sans; font.contextFontMerging: true
+                        font.family: Theme.fontFamilies.cjkSans; font.contextFontMerging: true
                         font.pixelSize: Theme.size.micro; font.letterSpacing: 1.5; font.weight: Theme.weight.bold
                     }
                     Row {

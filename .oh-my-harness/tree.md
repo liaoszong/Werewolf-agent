@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 598
+- Entries: 600
 
 ```text
 ./
@@ -108,6 +108,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       │   │   ├── LiveStatusCard.qml
 │       │   │   ├── ModeControl.qml
 │       │   │   ├── NavRail.qml
+│       │   │   ├── ParchmentComboBox.qml
+│       │   │   ├── ParchmentPopupMenu.qml
 │       │   │   ├── PerspectiveSwitcher.qml
 │       │   │   ├── PhaseBackground.qml
 │       │   │   ├── PhaseCard.qml

@@ -88,6 +88,8 @@ qt_add_qml_module(appqt_observer
         qml/components/ModeControl.qml
         qml/components/DataSourceChip.qml
         qml/components/ConfirmDialog.qml
+        qml/components/ParchmentComboBox.qml
+        qml/components/ParchmentPopupMenu.qml
     RESOURCES
         assets/illustrations/scene/home-day.png
         assets/illustrations/scene/home-night.png

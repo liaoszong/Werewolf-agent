@@ -13,6 +13,7 @@ Item {
     property bool overridden: false
     property string statusText: ""
     property string statusKind: "empty"
+    property real panelRadius: 22
 
     signal edited(string field, var value)
     signal closed()
@@ -209,26 +210,59 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        radius: parent.radius
-        color: Theme.withAlpha(Theme.parchment.parchmentSoft, 0.94)
+        anchors.topMargin: 12
+        anchors.leftMargin: 5
+        anchors.rightMargin: -5
+        anchors.bottomMargin: -9
+        radius: root.panelRadius
+        color: Theme.withAlpha(Theme.parchment.woodShadow, 0.72)
+        z: -3
+    }
+
+    Rectangle {
+        anchors.fill: parent
+        anchors.topMargin: 5
+        anchors.leftMargin: 2
+        anchors.rightMargin: -2
+        anchors.bottomMargin: -4
+        radius: root.panelRadius
+        color: Theme.withAlpha(Theme.parchment.woodShadowSoft, 0.82)
+        z: -2
+    }
+
+    Rectangle {
+        anchors.fill: parent
+        radius: root.panelRadius
+        color: Theme.withAlpha(Theme.parchment.parchmentSoft, 0.97)
         border.width: 1
-        border.color: Theme.withAlpha(Theme.parchment.goldLine, 0.48)
+        border.color: Theme.withAlpha(Theme.parchment.goldLine, 0.58)
+        z: -1
 
         Image {
             anchors.fill: parent
             anchors.margins: 2
             source: Illustrations.texParchment
             fillMode: Image.Tile
-            opacity: 0.22
+            opacity: 0.27
         }
 
         Rectangle {
             anchors.fill: parent
             anchors.margins: 1
-            radius: parent.radius - 1
+            radius: root.panelRadius - 1
             color: "transparent"
             border.width: 1
-            border.color: Qt.rgba(1, 248 / 255, 234 / 255, 0.42)
+            border.color: Qt.rgba(1, 248 / 255, 234 / 255, 0.48)
+        }
+
+        Rectangle {
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.leftMargin: root.panelRadius
+            anchors.rightMargin: root.panelRadius
+            height: 1
+            color: Qt.rgba(1, 250 / 255, 240 / 255, 0.56)
         }
     }
 
@@ -303,15 +337,17 @@ Item {
 
                 Rectangle {
                     id: closeButton
-                    width: 30
-                    height: 30
-                    radius: 15
+                    width: 32
+                    height: 32
+                    radius: 16
                     anchors.verticalCenter: parent.verticalCenter
-                    color: closeHover.hovered ? Theme.withAlpha(Theme.warm.ink, 0.06) : "transparent"
+                    color: closeHover.hovered ? Theme.withAlpha(Theme.parchment.goldLine, 0.14) : "transparent"
+                    border.width: closeHover.hovered ? 1 : 0
+                    border.color: Theme.withAlpha(Theme.parchment.goldLineSoft, 0.36)
                     Text {
                         anchors.centerIn: parent
                         text: "×"
-                        color: Theme.warm.muted
+                        color: closeHover.hovered ? Theme.parchment.inkSoft : Theme.parchment.mutedInk
                         font.family: Theme.fontFamilies.cjkSans
                         font.contextFontMerging: true
                         font.pixelSize: Theme.warmSize.titleMd
@@ -329,28 +365,50 @@ Item {
 
             Rectangle {
                 width: parent.width
-                height: 128
-                radius: 10
-                color: Theme.withAlpha(Theme.parchment.parchment, 0.46)
+                height: 134
+                radius: 16
+                color: Theme.withAlpha(Theme.parchment.parchment, 0.66)
                 border.width: 1
-                border.color: Theme.withAlpha(Theme.parchment.goldLineSoft, 0.28)
+                border.color: Theme.withAlpha(Theme.parchment.goldLineSoft, 0.40)
+
+                Image {
+                    anchors.fill: parent
+                    anchors.margins: 2
+                    source: Illustrations.texParchment
+                    fillMode: Image.Tile
+                    opacity: 0.10
+                }
+
+                Rectangle {
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.leftMargin: 16
+                    anchors.rightMargin: 16
+                    height: 1
+                    color: Qt.rgba(1, 248 / 255, 234 / 255, 0.38)
+                }
 
                 Column {
                     anchors.fill: parent
                         anchors.leftMargin: Theme.space.sm
                         anchors.rightMargin: Theme.space.sm
                         anchors.topMargin: Theme.space.sm
-                        anchors.bottomMargin: Theme.space.xl
+                        anchors.bottomMargin: Theme.space.sm
                     spacing: Theme.space.xs
 
                     FormField {
                         label: I18n.t("AI 引擎", "AI Engine")
-                        ParchmentCombo {
+                        ParchmentComboBox {
                             id: providerBox
                             objectName: "seatEditorProvider"
                             anchors.fill: parent
                             model: root.providerOptions
                             textRole: "label"
+                            compact: true
+                            controlRadius: 12
+                            surfaceOpacity: 0.58
+                            popupMaxHeight: 250
                             font.family: Theme.fontFamilies.cjkSans
                             font.contextFontMerging: true
                             onActivated: {
@@ -364,44 +422,21 @@ Item {
 
                     FormField {
                         label: I18n.t("模型", "Model")
-                        ParchmentCombo {
+                        ParchmentComboBox {
                             id: modelBox
                             objectName: "seatEditorModel"
                             anchors.fill: parent
                             model: root.modelList
+                            compact: true
+                            controlRadius: 12
+                            surfaceOpacity: 0.58
+                            popupMaxHeight: 250
                             font.family: Theme.fontFamilies.cjkSans
                             font.contextFontMerging: true
                             onActivated: root.edited("model", root.modelList[currentIndex])
                         }
                     }
                 }
-
-                Row {
-                    anchors.right: parent.right
-                    anchors.rightMargin: Theme.space.sm
-                    anchors.bottom: parent.bottom
-                    anchors.bottomMargin: 4
-                    spacing: 4
-                    Text {
-                        text: I18n.t("选择配置 / 管理 AI 服务", "Choose config / Manage AI Services")
-                        color: manageHover.hovered ? Theme.warm.primaryActive : Theme.parchment.mutedInk
-                        font.family: Theme.fontFamilies.cjkSans
-                        font.contextFontMerging: true
-                        font.pixelSize: Theme.size.micro
-                        font.weight: Theme.weight.semibold
-                        Behavior on color { ColorAnimation { duration: Theme.anim.color; easing.type: Easing.OutCubic } }
-                    }
-                    Text {
-                        text: "→"
-                        color: manageHover.hovered ? Theme.warm.primaryActive : Theme.parchment.mutedInk
-                        font.family: Theme.fontFamilies.cjkSans
-                        font.contextFontMerging: true
-                        font.pixelSize: Theme.size.micro
-                        font.weight: Theme.weight.semibold
-                    }
-                }
-                HoverHandler { id: manageHover; cursorShape: Qt.PointingHandCursor }
-                TapHandler { onTapped: root.requestProviderSettings() }
             }
 
             Column {
@@ -426,14 +461,19 @@ Item {
                             readonly property bool isCustom: modelData.key === "custom"
                             readonly property bool active: root._activePreset() === modelData.key
                             implicitWidth: chipLabel.implicitWidth + Theme.space.lg
-                            height: 28
-                            radius: Theme.radius.pill
-                            color: chip.active ? Theme.withAlpha(Theme.warm.primary, 0.16)
-                                               : Theme.withAlpha(Theme.warm.surfaceCard, 0.86)
+                            height: 30
+                            radius: 12
+                            color: chip.active ? Theme.withAlpha(Theme.parchment.terracottaWash, 0.72)
+                                               : (chipHover.hovered
+                                                  ? Theme.withAlpha(Theme.parchment.parchmentSoft, 0.82)
+                                                  : Theme.withAlpha(Theme.parchment.parchment, 0.72))
                             border.width: 1
-                            border.color: chip.active ? Theme.warm.primary
-                                                      : Theme.withAlpha(Theme.parchment.goldLine, 0.26)
+                            border.color: chip.active ? Theme.warm.primaryActive
+                                                      : Theme.withAlpha(Theme.parchment.goldLine, 0.34)
                             opacity: (chip.isCustom && !chip.active) ? 0.68 : 1.0
+                            scale: chipTap.pressed ? 0.97 : (chipHover.hovered ? 1.015 : 1.0)
+                            Behavior on scale { NumberAnimation { duration: Theme.anim.press; easing.type: Easing.OutQuad } }
+                            Behavior on color { ColorAnimation { duration: Theme.anim.color; easing.type: Easing.OutCubic } }
                             Text {
                                 id: chipLabel
                                 anchors.centerIn: parent
@@ -444,8 +484,9 @@ Item {
                                 font.pixelSize: Theme.size.caption
                                 font.weight: chip.active ? Theme.weight.semibold : Theme.weight.regular
                             }
-                            HoverHandler { cursorShape: Qt.PointingHandCursor }
+                            HoverHandler { id: chipHover; cursorShape: Qt.PointingHandCursor }
                             TapHandler {
+                                id: chipTap
                                 onTapped: {
                                     if (chip.isCustom) { promptArea.forceActiveFocus(); return }
                                     root.edited("prompt", root._presetText(chip.modelData.key))
@@ -480,34 +521,49 @@ Item {
                 Rectangle {
                     width: parent.width
                     height: 100
-                    color: Theme.withAlpha(Theme.parchment.parchment, 0.54)
-                    border.width: 0
+                    radius: 15
+                    color: Theme.withAlpha(Theme.parchment.parchmentStrong, 0.46)
+                    border.width: 1
+                    border.color: Theme.withAlpha(Theme.parchment.goldLineSoft, 0.34)
+
+                    Image {
+                        anchors.fill: parent
+                        anchors.margins: 2
+                        source: Illustrations.texParchment
+                        fillMode: Image.Tile
+                        opacity: 0.11
+                    }
 
                     Rectangle {
                         anchors.left: parent.left
                         anchors.right: parent.right
                         anchors.top: parent.top
+                        anchors.leftMargin: 14
+                        anchors.rightMargin: 14
                         height: 1
-                        color: Theme.withAlpha(Theme.parchment.goldLineSoft, 0.42)
+                        color: Qt.rgba(1, 248 / 255, 234 / 255, 0.42)
                     }
                     Rectangle {
                         anchors.left: parent.left
                         anchors.right: parent.right
                         anchors.bottom: parent.bottom
+                        anchors.leftMargin: 14
+                        anchors.rightMargin: 14
                         height: 1
-                        color: Theme.withAlpha(Theme.parchment.goldLineSoft, 0.36)
+                        color: Theme.withAlpha(Theme.parchment.goldLineSoft, 0.38)
                     }
 
                     ScrollView {
                         anchors.fill: parent
                         anchors.topMargin: 4
                         anchors.bottomMargin: 4
+                        clip: true
                     TextArea {
                         id: promptArea
                         objectName: "seatEditorPrompt"
                         wrapMode: TextArea.Wrap
                         color: Theme.parchment.ink
-                        font.family: Theme.fontFamilies.cjkSans
+                        font.family: Theme.fontFamilies.cjkSerif
                         font.contextFontMerging: true
                         font.pixelSize: Theme.size.caption
                         leftPadding: 10
@@ -563,14 +619,23 @@ Item {
                             width: tempSlider.availableWidth
                             height: 8
                             radius: 4
-                            color: Qt.rgba(157 / 255, 135 / 255, 100 / 255, 0.30)
+                            color: Qt.rgba(145 / 255, 122 / 255, 88 / 255, 0.28)
                             border.width: 1
                             border.color: Theme.withAlpha(Theme.parchment.goldLineSoft, 0.42)
+                            Rectangle {
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.top: parent.top
+                                anchors.leftMargin: 5
+                                anchors.rightMargin: 5
+                                height: 1
+                                color: Qt.rgba(1, 248 / 255, 234 / 255, 0.24)
+                            }
                             Rectangle {
                                 width: tempSlider.visualPosition * parent.width
                                 height: parent.height
                                 radius: 4
-                                color: Theme.warm.primaryActive
+                                color: Theme.parchment.terracottaDeep
                             }
                             Repeater {
                                 model: 5
@@ -588,10 +653,11 @@ Item {
                                * (tempSlider.availableWidth - width)
                             y: tempSlider.topPadding + tempSlider.availableHeight / 2 - height / 2
                             width: 18; height: 18; radius: 5
-                            color: "#c79752"
+                            color: tempHandleHover.hovered ? "#d3a35e" : "#c79752"
                             border.width: 2
                             border.color: Qt.rgba(1, 244 / 255, 216 / 255, 0.82)
                             rotation: 45
+                            HoverHandler { id: tempHandleHover; cursorShape: Qt.PointingHandCursor }
                         }
                         onMoved: root.edited("temperature", Math.round(value * 10) / 10)
                     }
@@ -637,13 +703,26 @@ Item {
                         background: Item {
                             Rectangle {
                                 anchors.fill: parent
-                                radius: 8
-                                color: Theme.withAlpha(Theme.parchment.parchmentStrong, 0.30)
+                                radius: 11
+                                color: Theme.withAlpha(Theme.parchment.parchmentStrong, 0.42)
+                                border.width: 1
+                                border.color: maxTokensField.activeFocus
+                                              ? Theme.withAlpha(Theme.warm.primaryActive, 0.42)
+                                              : Theme.withAlpha(Theme.parchment.goldLineSoft, 0.28)
+                                Image {
+                                    anchors.fill: parent
+                                    anchors.margins: 1
+                                    source: Illustrations.texParchment
+                                    fillMode: Image.Tile
+                                    opacity: 0.08
+                                }
                             }
                             Rectangle {
                                 anchors.left: parent.left
                                 anchors.right: parent.right
                                 anchors.bottom: parent.bottom
+                                anchors.leftMargin: 10
+                                anchors.rightMargin: 10
                                 height: 2
                                 color: maxTokensField.activeFocus ? Theme.warm.primaryActive
                                                                   : Theme.withAlpha(Theme.parchment.goldLineSoft, 0.58)
@@ -715,87 +794,12 @@ Item {
             color: Theme.parchment.inkSoft
             font.family: Theme.fontFamilies.cjkSerif
             font.contextFontMerging: true
-            font.pixelSize: Theme.size.caption
+            font.pixelSize: Theme.size.micro
         }
         Item {
             id: slot
             width: parent.width
             height: 36
-        }
-    }
-
-    // Local warm-parchment ComboBox for the detail pickers (mirrors the
-    // WarmCombo style in MatchSetupView; this file is a separate component so it
-    // cannot share the inline component there).
-    component ParchmentCombo: ComboBox {
-        id: _pc
-        background: Rectangle {
-            radius: 8
-            color: Theme.withAlpha(Theme.parchment.parchmentStrong, 0.42)
-            border.width: 1
-            border.color: _pc.pressed || _pc.popup.visible
-                          ? Theme.withAlpha(Theme.warm.primaryActive, 0.54)
-                          : Theme.withAlpha(Theme.parchment.goldLineSoft, 0.42)
-            Rectangle {
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.top: parent.top
-                anchors.leftMargin: 8
-                anchors.rightMargin: 8
-                height: 1
-                color: Qt.rgba(1, 248 / 255, 234 / 255, 0.34)
-            }
-            Behavior on border.color { ColorAnimation { duration: Theme.anim.color; easing.type: Easing.OutCubic } }
-        }
-        indicator: Item {}
-        contentItem: Item {
-            Text {
-                anchors.left: parent.left
-                anchors.leftMargin: 12
-                anchors.verticalCenter: parent.verticalCenter
-                anchors.right: _pcChev.left
-                anchors.rightMargin: 6
-                text: _pc.displayText
-                color: _pc.enabled ? Theme.parchment.ink : Theme.parchment.mutedInk
-                font: _pc.font
-                elide: Text.ElideRight
-            }
-            Rectangle {
-                id: _pcChev
-                anchors.right: parent.right
-                anchors.rightMargin: 9
-                anchors.verticalCenter: parent.verticalCenter
-                width: 11
-                height: 11
-                radius: 6
-                color: Theme.withAlpha(Theme.parchment.goldLine, _pc.enabled ? 0.55 : 0.25)
-                Text {
-                    anchors.centerIn: parent
-                    anchors.verticalCenterOffset: -1
-                    text: "▾"
-                    color: Theme.parchment.ink
-                    font.family: Theme.fontFamilies.cjkSans
-                    font.contextFontMerging: true
-                    font.pixelSize: 9
-                }
-            }
-        }
-        delegate: ItemDelegate {
-            width: _pc.width
-            height: 32
-            contentItem: Text {
-                text: _pc.textRole ? (modelData[_pc.textRole] || "") : modelData
-                color: highlighted ? Theme.warm.primaryActive : Theme.parchment.ink
-                font: _pc.font
-                verticalAlignment: Text.AlignVCenter
-                leftPadding: 12
-                elide: Text.ElideRight
-            }
-            background: Rectangle {
-                radius: 6
-                color: highlighted ? Theme.withAlpha(Theme.warm.primary, 0.10)
-                                   : (parent.hovered ? Theme.withAlpha(Theme.parchment.goldLine, 0.10) : "transparent")
-            }
         }
     }
 }

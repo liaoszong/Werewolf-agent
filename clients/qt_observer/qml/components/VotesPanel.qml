@@ -24,7 +24,7 @@ HudCard {
         Text {
             text: "↣  " + I18n.t("当前票数", "Current Votes") + "  ↢"
             color: Theme.parchment.goldLineSoft
-            font.family: Theme.fontFamilies.sans; font.contextFontMerging: true
+            font.family: Theme.fontFamilies.cjkSans; font.contextFontMerging: true
             font.pixelSize: Theme.size.micro; font.letterSpacing: 1.5; font.weight: Theme.weight.bold
         }
 

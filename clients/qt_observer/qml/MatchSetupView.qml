@@ -450,10 +450,18 @@ Item {
             height: 72
             width: parent.width - backButton.width - 156 - pageHeader.spacing * 2
             anchors.verticalCenter: parent.verticalCenter
-            radius: 14
-            color: Theme.withAlpha(Theme.parchment.parchmentSoft, 0.42)
+            radius: 18
+            color: Theme.withAlpha(Theme.parchment.parchmentSoft, 0.76)
             border.width: 1
-            border.color: Theme.withAlpha(Theme.parchment.goldLine, 0.22)
+            border.color: Theme.withAlpha(Theme.parchment.goldLine, 0.44)
+
+            Image {
+                anchors.fill: parent
+                anchors.margins: 2
+                source: Illustrations.texParchment
+                fillMode: Image.Tile
+                opacity: 0.14
+            }
 
             Rectangle {
                 anchors.fill: parent
@@ -475,12 +483,15 @@ Item {
                 ToolField {
                     label: I18n.t("对局配置", "Match config")
                     width: 218
-                    WarmCombo {
+                    ParchmentComboBox {
                         id: profilePicker
                         objectName: "setupProfilePicker"
                         anchors.fill: parent
                         model: ObserverClient.profileItems
                         textRole: "name"
+                        compact: true
+                        controlRadius: 12
+                        surfaceOpacity: 0.70
                         font.family: Theme.fontFamilies.cjkSans
                         font.contextFontMerging: true
                         onActivated: {
@@ -493,12 +504,15 @@ Item {
                 ToolField {
                     label: I18n.t("当前剧本", "Current script")
                     width: 232
-                    WarmCombo {
+                    ParchmentComboBox {
                         id: scriptPicker
                         objectName: "setupScriptPicker"
                         anchors.fill: parent
                         model: [root.currentScriptLabel]
                         enabled: false
+                        compact: true
+                        controlRadius: 12
+                        surfaceOpacity: 0.62
                         font.family: Theme.fontFamilies.cjkSans
                         font.contextFontMerging: true
                     }
@@ -524,16 +538,34 @@ Item {
                         width: saveLinkLabel.implicitWidth + Theme.space.xl
                         height: 44
                         anchors.right: parent.right
+                        anchors.rightMargin: Theme.space.lg
                         anchors.verticalCenter: parent.verticalCenter
                         enabled: true
                         hoverEnabled: true
                         onClicked: configActionMenu.popup(saveLink, 0, saveLink.height)
                         background: Rectangle {
-                            radius: 12
-                            color: saveLink.hovered ? Theme.withAlpha(Theme.parchment.parchment, 0.60)
-                                                    : Theme.withAlpha(Theme.parchment.parchment, 0.42)
+                            radius: 13
+                            color: saveLink.hovered ? Theme.withAlpha(Theme.parchment.parchmentSoft, 0.88)
+                                                    : Theme.withAlpha(Theme.parchment.parchment, 0.76)
                             border.width: 1
-                            border.color: Theme.withAlpha(Theme.parchment.goldLineSoft, 0.26)
+                            border.color: saveLink.hovered ? Theme.withAlpha(Theme.parchment.goldLine, 0.48)
+                                                           : Theme.withAlpha(Theme.parchment.goldLineSoft, 0.34)
+                            Image {
+                                anchors.fill: parent
+                                anchors.margins: 1
+                                source: Illustrations.texParchment
+                                fillMode: Image.Tile
+                                opacity: 0.10
+                            }
+                            Rectangle {
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.top: parent.top
+                                anchors.leftMargin: 12
+                                anchors.rightMargin: 12
+                                height: 1
+                                color: Qt.rgba(1, 248 / 255, 234 / 255, 0.36)
+                            }
                         }
                         contentItem: Text {
                             id: saveLinkLabel
@@ -548,23 +580,24 @@ Item {
                         }
                         Accessible.role: Accessible.Button
                         Accessible.name: I18n.t("另存为配置", "Save as config")
-                        Menu {
+                        ParchmentPopupMenu {
                             id: configActionMenu
                             objectName: "setupConfigActionMenu"
-                            MenuItem {
-                                objectName: "setupSaveConfigMenuItem"
-                                text: I18n.t("另存为配置", "Save as config")
-                                onTriggered: root._openSaveDialog()
-                            }
-                            MenuItem {
-                                objectName: "setupExportConfigButton"
-                                text: I18n.t("导出配置", "Export config")
-                                onTriggered: root._openExportDialog()
-                            }
-                            MenuItem {
-                                objectName: "setupImportConfigButton"
-                                text: I18n.t("导入配置", "Import config")
-                                onTriggered: importConfigDialog.open()
+                            actions: [
+                                { "key": "save", "objectName": "setupSaveConfigMenuItem",
+                                  "text": I18n.t("另存为配置", "Save as config") },
+                                { "key": "export", "objectName": "setupExportConfigButton",
+                                  "text": I18n.t("导出配置", "Export config") },
+                                { "key": "import", "objectName": "setupImportConfigButton",
+                                  "text": I18n.t("导入配置", "Import config") }
+                            ]
+                            onTriggered: function(key) {
+                                if (key === "save")
+                                    root._openSaveDialog()
+                                else if (key === "export")
+                                    root._openExportDialog()
+                                else if (key === "import")
+                                    importConfigDialog.open()
                             }
                         }
                     }
@@ -719,10 +752,10 @@ Item {
         anchors.rightMargin: Theme.space.xxxl
         anchors.bottomMargin: Theme.space.xxl
         height: 72
-        radius: 18
-        color: Theme.withAlpha(Theme.parchment.parchmentSoft, 0.82)
+        radius: 20
+        color: Theme.withAlpha(Theme.parchment.parchmentSoft, 0.90)
         border.width: 1
-        border.color: Theme.withAlpha(Theme.parchment.goldLine, 0.46)
+        border.color: Theme.withAlpha(Theme.parchment.goldLine, 0.56)
         visible: ObserverClient.profileItems.length > 0
 
         Image {
@@ -752,14 +785,24 @@ Item {
                 width: 42
                 height: 42
                 radius: 21
-                color: root.autoReady ? Theme.withAlpha(Theme.warm.success, 0.24)
-                                      : Theme.withAlpha(Theme.warm.warning, 0.18)
+                color: root.autoReady ? Theme.withAlpha(Theme.parchment.alive, 0.18)
+                                      : Theme.withAlpha(Theme.parchment.goldLine, 0.18)
                 border.width: 1
-                border.color: root.autoReady ? Theme.warm.success : Theme.warm.warning
+                border.color: root.autoReady ? Theme.withAlpha(Theme.parchment.alive, 0.72)
+                                             : Theme.withAlpha(Theme.parchment.goldLine, 0.62)
+                Rectangle {
+                    anchors.centerIn: parent
+                    width: 28
+                    height: 28
+                    radius: 14
+                    color: Theme.withAlpha(Theme.parchment.parchment, 0.42)
+                    border.width: 1
+                    border.color: Qt.rgba(1, 246 / 255, 220 / 255, 0.38)
+                }
                 Text {
                     anchors.centerIn: parent
                     text: root.autoReady ? "✓" : "…"
-                    color: root.autoReady ? Theme.warm.success : Theme.warm.warning
+                    color: root.autoReady ? Theme.parchment.alive : Theme.parchment.goldLineSoft
                     font.family: Theme.fontFamilies.cjkSans
                     font.contextFontMerging: true
                     font.pixelSize: 22
@@ -893,10 +936,17 @@ Item {
         default property alias content: controlSlot.data
         required property string label
         height: 56
-        radius: 12
-        color: Theme.withAlpha(Theme.parchment.parchment, 0.50)
+        radius: 15
+        color: Theme.withAlpha(Theme.parchment.parchment, 0.66)
         border.width: 1
-        border.color: Theme.withAlpha(Theme.parchment.goldLineSoft, 0.34)
+        border.color: Theme.withAlpha(Theme.parchment.goldLineSoft, 0.44)
+        Image {
+            anchors.fill: parent
+            anchors.margins: 1
+            source: Illustrations.texParchment
+            fillMode: Image.Tile
+            opacity: 0.10
+        }
         Text {
             id: fieldLabel
             anchors.left: parent.left
@@ -904,7 +954,7 @@ Item {
             anchors.leftMargin: 12
             anchors.topMargin: 6
             text: label
-            color: Theme.withAlpha(Theme.parchment.mutedInk, 0.88)
+            color: Theme.withAlpha(Theme.parchment.mutedInk, 0.82)
             font.family: Theme.fontFamilies.cjkSerif
             font.contextFontMerging: true
             font.pixelSize: Theme.size.micro
@@ -919,83 +969,6 @@ Item {
             anchors.rightMargin: 8
             anchors.bottomMargin: 6
             height: 30
-        }
-    }
-
-    // Warm-parchment ComboBox: transparent base (no Qt chrome), a pill background
-    // with a thin gold hairline, and a small hand-drawn chevron — de-tables the
-    // top config tray and the detail-panel pickers.
-    component WarmCombo: ComboBox {
-        id: _wc
-        background: Rectangle {
-            radius: 8
-            color: Theme.withAlpha(Theme.parchment.parchmentStrong, _wc.enabled ? 0.56 : 0.38)
-            border.width: 1
-            border.color: _wc.pressed || _wc.popup.visible
-                          ? Theme.withAlpha(Theme.warm.primaryActive, 0.55)
-                          : Theme.withAlpha(Theme.parchment.goldLineSoft, 0.34)
-            Rectangle {
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.top: parent.top
-                anchors.leftMargin: 8
-                anchors.rightMargin: 8
-                height: 1
-                color: Qt.rgba(1, 248 / 255, 234 / 255, 0.42)
-            }
-            Behavior on border.color { ColorAnimation { duration: Theme.anim.color; easing.type: Easing.OutCubic } }
-        }
-        // Hide the default indicator (we draw our own chevron in contentItem).
-        indicator: Item {}
-        contentItem: Item {
-            Text {
-                anchors.left: parent.left
-                anchors.leftMargin: 12
-                anchors.verticalCenter: parent.verticalCenter
-                anchors.right: _wcChevron.left
-                anchors.rightMargin: 6
-                text: _wc.displayText
-                color: _wc.enabled ? Theme.parchment.ink : Theme.parchment.mutedInk
-                font: _wc.font
-                elide: Text.ElideRight
-            }
-            Rectangle {
-                id: _wcChevron
-                anchors.right: parent.right
-                anchors.rightMargin: 9
-                anchors.verticalCenter: parent.verticalCenter
-                width: 11
-                height: 11
-                radius: 6
-                color: Theme.withAlpha(Theme.parchment.goldLine, _wc.enabled ? 0.58 : 0.28)
-                Text {
-                    anchors.centerIn: parent
-                    anchors.verticalCenterOffset: -1
-                    text: "▾"
-                    color: Theme.parchment.ink
-                    font.family: Theme.fontFamilies.cjkSans
-                    font.contextFontMerging: true
-                    font.pixelSize: 9
-                }
-            }
-        }
-        // Popup items styled warm too.
-        delegate: ItemDelegate {
-            width: _wc.width
-            height: 32
-            contentItem: Text {
-                text: _wc.textRole ? (modelData[_wc.textRole] || "") : modelData
-                color: highlighted ? Theme.warm.primaryActive : Theme.parchment.ink
-                font: _wc.font
-                verticalAlignment: Text.AlignVCenter
-                leftPadding: 12
-                elide: Text.ElideRight
-            }
-            background: Rectangle {
-                radius: 6
-                color: highlighted ? Theme.withAlpha(Theme.warm.primary, 0.10)
-                                   : (parent.hovered ? Theme.withAlpha(Theme.parchment.goldLine, 0.10) : "transparent")
-            }
         }
     }
 }

@@ -72,6 +72,20 @@ Item {
     }
     function _evType(ev) { return (ev && ev.type !== undefined && ev.type !== "") ? ev.type : ((ev && ev.payload) ? ev.payload.type : "") }
     function _evSummary(ev) { return (ev && ev.summary !== undefined) ? ev.summary : ((ev && ev.data) ? (ev.data.summary || "") : "") }
+    function _actorLabel(actor) {
+        var s = actor ? ("" + actor) : ""
+        if (s.length > 1 && s.charAt(0).toLowerCase() === "p")
+            return "P" + s.substring(1)
+        return s
+    }
+    function _tagFor(ev, t) {
+        if (t === "player_speech") {
+            var a = _actorLabel(ev && ev.actor ? ev.actor : "")
+            if (a !== "")
+                return a + " · " + _typeLabel(t)
+        }
+        return "R" + (ev && ev.round !== undefined ? ev.round : 0) + " · " + _typeLabel(t)
+    }
     function _narrate(ev) {
         var t = _evType(ev), a = (ev && ev.actor) ? ev.actor : "", tg = (ev && ev.target && ev.target !== "none") ? ev.target : ""
         switch (t) {
@@ -98,7 +112,7 @@ Item {
             if (!t) continue
             var n = _narrate(src[i])
             if (!n || n === "") continue
-            out.push({ tag: "R" + (src[i].round !== undefined ? src[i].round : 0) + " · " + _typeLabel(t),
+            out.push({ tag: _tagFor(src[i], t),
                        text: n, type: t })
         }
         return out
