@@ -2,7 +2,7 @@ import QtQuick
 import qt_observer
 
 // Compact status pill: a pulsing dot + capitalized label, tinted by status.
-// Callers bind running/completed/failed/queued/connected/disconnected/empty.
+// Callers bind running/completed/failed/interrupted/queued/connected/disconnected/empty.
 // Auto-sizes to content so existing callers need not set an explicit width.
 Rectangle {
     id: root
@@ -16,6 +16,7 @@ Rectangle {
         case "running": return I18n.t("进行中", "Running");
         case "completed": return I18n.t("已完成", "Completed");
         case "failed": return I18n.t("失败", "Failed");
+        case "interrupted": return I18n.t("中断", "Interrupted");
         case "queued": return I18n.t("排队中", "Queued");
         case "connected": return I18n.t("已连接", "Connected");
         case "disconnected": return I18n.t("未连接", "Disconnected");

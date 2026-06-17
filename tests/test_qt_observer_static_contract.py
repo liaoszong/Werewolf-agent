@@ -770,6 +770,15 @@ class QtObserverSettlementViewTests(unittest.TestCase):
         self.assertIn("SettlementView", t)               # hosted inside TheaterView
         self.assertIn('currentStatus === "completed"', t)  # failed → not activated (§2.5)
 
+    def test_client_and_launcher_interrupt_active_runs_on_shutdown(self) -> None:
+        h = (QT / "src/ObserverApiClient.h").read_text(encoding="utf-8")
+        cpp = (QT / "src/ObserverApiClient.cpp").read_text(encoding="utf-8")
+        launcher = (ROOT / "launch-theater.py").read_text(encoding="utf-8")
+        self.assertIn("Q_INVOKABLE void interruptRun", h)
+        self.assertIn("/interrupt", cpp)
+        self.assertIn("_interrupt_active_runs", launcher)
+        self.assertIn("/interrupt", launcher)
+
 
 class QtObserverCredentialPanelTests(unittest.TestCase):
     """P2-B BYO-key: credential panel objectNames exist and the raw key is

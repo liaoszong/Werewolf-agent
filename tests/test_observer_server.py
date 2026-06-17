@@ -1878,6 +1878,33 @@ class LiveRunStatusReasonTests(TestCase):
         self.assertEqual(detail["status"], "failed")
         self.assertEqual(detail["reason"], "provider_failure")
 
+    def test_restart_stale_running_run_becomes_interrupted(self) -> None:
+        from werewolf_eval.observer_protocol import read_run_status, write_run_status
+
+        run_dir = self._runs / "rr_stale"
+        run_dir.mkdir()
+        write_run_status(run_dir, "running")
+
+        h = self._handler()
+        self.assertEqual(h._get_status("rr_stale", run_dir), "interrupted")
+        self.assertEqual(read_run_status(run_dir), "interrupted")
+
+    def test_interrupt_wins_over_launcher_return(self) -> None:
+        from werewolf_eval.observer_protocol import read_run_status
+
+        run_dir = self._runs / "rr_interrupt"
+        run_dir.mkdir()
+        h = self._handler()
+
+        def _interrupt_then_finish(rid: str, rd: Path) -> int:
+            code, payload = h._run_manager().interrupt_run(rid, rd)
+            self.assertEqual((code, payload), (200, {"interrupted": rid}))
+            return 0
+
+        h._execute_run("rr_interrupt", run_dir, _interrupt_then_finish)
+        self.assertEqual(h._get_status("rr_interrupt", run_dir), "interrupted")
+        self.assertEqual(read_run_status(run_dir), "interrupted")
+
 
 # ---------------------------------------------------------------------------
 # G3-2 run-detail execution_mode — the server reads its OWN resolved-profile.json

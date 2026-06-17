@@ -1,8 +1,8 @@
 # Qt Observer Theater Client
 
-Status: P2 theater client — live spectating (P2-C theater), match setup / provider center (P2-B BYO-key), settlement battle report + history management (P2-D). (Formerly the G2b "Observer Cockpit MVP".)
+Status: P2 theater client — live spectating (P2-C theater), match setup / provider center (P2-B BYO-key), settlement battle report + Match Archive history management (P2-D). (Formerly the G2b "Observer Cockpit MVP".)
 
-`clients/qt_observer` is the local Qt/QML client that connects to the local observer server (REST/SSE) and provides the spectator surface for Werewolf games: theater view, match setup, settlement report, and history replay/management.
+`clients/qt_observer` is the local Qt/QML client that connects to the local observer server (REST/SSE) and provides the spectator surface for Werewolf games: theater view, match setup, settlement report, and Match Archive history replay/management.
 
 Before creating or redesigning Qt/QML UI, read the root [`DESIGN.md`](../../DESIGN.md).
 It records the current Home + Theater visual language: warm storybook tabletop art,
@@ -42,6 +42,8 @@ Fake-deterministic execution stays the **unconditional default**. The API key is
 - no local artifact file reads from the Qt client.
 
 > **P2-D settlement / battle report (shipped).** On a `completed` run the theater morphs into an in-theater settlement overlay (freeze → dock the ring → unfold a scrolling battle report), synced through a single source-of-truth cursor. It is an overlay only (no separate AppShell navigation), reads a server-computed `settlement-bundle.json` via `GET /api/runs/{id}/settlement`, and still does no Web client, no Python binding, no local artifact file reads, and carries no provider secrets. `failed` runs keep the existing failure HUD — they never enter settlement.
+
+> **History lifecycle.** Leaving the Theater for Home does not change run status; the run can still be reopened from History. Closing `launch-theater.py` / the one-click client marks still `queued` or `running` local runs as `interrupted`, which History displays as 中断. Interrupted runs are archive entries with no settlement report and are deletable like other terminal local records.
 
 ## Running locally
 

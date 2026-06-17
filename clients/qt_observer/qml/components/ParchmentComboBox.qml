@@ -10,11 +10,12 @@ ComboBox {
     property real insetOpacity: 0.30
     property int popupMaxHeight: 282
     property bool compact: false
+    property int arrowAreaWidth: compact ? 34 : 38
 
     hoverEnabled: true
     implicitHeight: compact ? 36 : 42
     leftPadding: compact ? 12 : 14
-    rightPadding: compact ? 36 : 40
+    rightPadding: arrowAreaWidth + (compact ? 10 : 12)
 
     function optionLabel(data) {
         if (control.textRole && data && data[control.textRole] !== undefined)
@@ -80,8 +81,8 @@ ComboBox {
         Text {
             anchors.left: parent.left
             anchors.leftMargin: control.leftPadding
-            anchors.right: chevronPlate.left
-            anchors.rightMargin: 8
+            anchors.right: arrowArea.left
+            anchors.rightMargin: 4
             anchors.verticalCenter: parent.verticalCenter
             text: control.displayText
             color: control.enabled ? Theme.parchment.ink : Theme.parchment.mutedInk
@@ -90,29 +91,64 @@ ComboBox {
             verticalAlignment: Text.AlignVCenter
         }
 
-        Rectangle {
-            id: chevronPlate
+        Item {
+            id: arrowArea
             anchors.right: parent.right
-            anchors.rightMargin: control.compact ? 9 : 11
-            anchors.verticalCenter: parent.verticalCenter
-            width: control.compact ? 18 : 20
-            height: control.compact ? 18 : 20
-            radius: 7
-            color: control.enabled
-                   ? Theme.withAlpha(Theme.parchment.goldLine, control.popup.visible ? 0.66 : 0.48)
-                   : Theme.withAlpha(Theme.parchment.goldLine, 0.22)
-            border.width: 1
-            border.color: Qt.rgba(1, 246 / 255, 220 / 255, control.enabled ? 0.42 : 0.18)
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            width: control.arrowAreaWidth
 
-            Text {
+            Rectangle {
                 anchors.centerIn: parent
-                anchors.verticalCenterOffset: -1
-                text: "▾"
-                color: control.enabled ? Theme.parchment.ink : Theme.parchment.mutedInk
-                font.family: Theme.fontFamilies.cjkSans
-                font.contextFontMerging: true
-                font.pixelSize: control.compact ? 12 : 13
-                font.weight: Theme.weight.bold
+                width: control.compact ? 21 : 23
+                height: control.compact ? 21 : 23
+                radius: control.compact ? 8 : 9
+                color: control.enabled
+                       ? Theme.withAlpha(Theme.parchment.goldLine, control.popup.visible ? 0.34 : 0.20)
+                       : Theme.withAlpha(Theme.parchment.goldLine, 0.13)
+                border.width: 1
+                border.color: control.enabled
+                              ? Theme.withAlpha(Theme.parchment.goldLine, control.popup.visible ? 0.58 : 0.38)
+                              : Theme.withAlpha(Theme.parchment.goldLine, 0.20)
+
+                Canvas {
+                    id: chevronGlyph
+                    anchors.centerIn: parent
+                    width: control.compact ? 10 : 11
+                    height: control.compact ? 7 : 8
+                    antialiasing: true
+                    rotation: control.popup.visible ? 180 : 0
+
+                    onPaint: {
+                        var ctx = getContext("2d")
+                        ctx.clearRect(0, 0, width, height)
+                        ctx.lineWidth = control.compact ? 1.35 : 1.45
+                        ctx.lineCap = "round"
+                        ctx.lineJoin = "round"
+                        ctx.strokeStyle = control.enabled
+                                ? Theme.withAlpha(Theme.parchment.ink, 0.82)
+                                : Theme.withAlpha(Theme.parchment.mutedInk, 0.62)
+                        ctx.beginPath()
+                        ctx.moveTo(1.2, 1.5)
+                        ctx.lineTo(width / 2, height - 1.4)
+                        ctx.lineTo(width - 1.2, 1.5)
+                        ctx.stroke()
+                    }
+
+                    Behavior on rotation {
+                        NumberAnimation { duration: Theme.motion.fast; easing.type: Easing.OutCubic }
+                    }
+
+                    Connections {
+                        target: control.popup
+                        function onVisibleChanged() { chevronGlyph.requestPaint() }
+                    }
+
+                    Connections {
+                        target: control
+                        function onEnabledChanged() { chevronGlyph.requestPaint() }
+                    }
+                }
             }
         }
     }

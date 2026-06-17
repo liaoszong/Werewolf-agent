@@ -507,6 +507,16 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
 
     # -- POST endpoints ----------------------------------------------------------
 
+    def _route_runs_interrupt(self, params: dict[str, str]) -> None:
+        run_id = params["run_id"]
+        run_dir = self._run_dir(run_id)          # validate_run_id -> raises on illegal id
+        code, payload = self._run_manager().interrupt_run(run_id, run_dir)
+        if code == 200:
+            self._send_json(200, payload)
+        else:
+            self._send_error_json(code, str(payload.get("error", "bad_request")),
+                                  str(payload.get("detail", "")))
+
     def _route_credentials_post(self, params: dict[str, str]) -> None:
         content_type = self.headers.get("Content-Type", "")
         content_length = int(self.headers.get("Content-Length", 0))

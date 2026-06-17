@@ -32,6 +32,7 @@ from werewolf_eval.observer.run_manager import (
     _read_execution_mode,
     _resolve_live_launcher_for_launch,
     _run_delete_result,
+    _run_interrupt_result,
     _sanitize_launcher_error,
     _schema_payload,
 )
@@ -65,6 +66,7 @@ __all__ = [
     "_read_execution_mode",
     "_resolve_live_launcher_for_launch",
     "_run_delete_result",
+    "_run_interrupt_result",
     "_sanitize_launcher_error",
     "_schema_payload",
     "_seed_default_profile",

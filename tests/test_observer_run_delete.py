@@ -10,7 +10,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from werewolf_eval.observer_server import _run_delete_result
+from werewolf_eval.observer_server import _run_delete_result, _run_interrupt_result
+from werewolf_eval.observer_protocol import read_run_status, write_run_status
 
 
 class RunDeleteResultTests(unittest.TestCase):
@@ -32,6 +33,11 @@ class RunDeleteResultTests(unittest.TestCase):
             d = self._mk_run(Path(tmp), "r1")
             self.assertEqual(_run_delete_result(d, "r1", "failed")[0], 200)
 
+    def test_interrupted_run_is_deletable(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            d = self._mk_run(Path(tmp), "r1")
+            self.assertEqual(_run_delete_result(d, "r1", "interrupted")[0], 200)
+
     def test_running_run_is_refused_409(self):
         with tempfile.TemporaryDirectory() as tmp:
             d = self._mk_run(Path(tmp), "r1")
@@ -50,6 +56,29 @@ class RunDeleteResultTests(unittest.TestCase):
             status, payload = _run_delete_result(Path(tmp) / "ghost", "ghost", "unknown")
             self.assertEqual(status, 404)
             self.assertEqual(payload["error"], "not_found")
+
+    def test_interrupted_status_round_trips_from_status_json(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            d = self._mk_run(Path(tmp), "r1")
+            write_run_status(d, "interrupted")
+            self.assertEqual(read_run_status(d), "interrupted")
+
+    def test_running_run_can_be_marked_interrupted(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            d = self._mk_run(Path(tmp), "r1")
+            write_run_status(d, "running")
+            status, payload = _run_interrupt_result(d, "r1", "running")
+            self.assertEqual((status, payload), (200, {"interrupted": "r1"}))
+            self.assertEqual(read_run_status(d), "interrupted")
+
+    def test_completed_run_is_not_interrupted(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            d = self._mk_run(Path(tmp), "r1")
+            write_run_status(d, "completed")
+            status, payload = _run_interrupt_result(d, "r1", "completed")
+            self.assertEqual(status, 409)
+            self.assertEqual(payload["error"], "run_not_active")
+            self.assertEqual(read_run_status(d), "completed")
 
     @unittest.skipUnless(sys.platform == "win32", "Windows lock semantics")
     def test_rmtree_failure_is_500_not_fake_success(self):

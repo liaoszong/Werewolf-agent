@@ -195,6 +195,26 @@ def _run_delete_result(run_dir: Path, run_id: str, status: str) -> tuple[int, di
     return (200, {"deleted": run_id})
 
 
+def _run_interrupt_result(
+    run_dir: Path, run_id: str, status: str
+) -> tuple[int, dict[str, object]]:
+    """Mark an active run interrupted without deleting local artifacts.
+
+    Only ``queued``/``running`` are active. ``interrupted`` is idempotent so
+    launcher shutdown can safely retry; completed/failed runs keep their terminal
+    truth and are not downgraded.
+    """
+    if not run_dir.is_dir():
+        return (404, {"error": "not_found"})
+    if status == "interrupted":
+        return (200, {"interrupted": run_id})
+    if status not in ("running", "queued"):
+        return (409, {"error": "run_not_active"})
+    write_run_status(run_dir, "interrupted")
+    _write_status_metadata(run_dir, {"reason": "user_interrupted"})
+    return (200, {"interrupted": run_id})
+
+
 def _read_execution_mode(run_dir: Path) -> str | None:
     """Read ``execution_mode`` from the run's OWN ``resolved-profile.json``.
 
@@ -328,7 +348,14 @@ class RunManager:
                 return state.run_status[run_id]
         # Not in memory (e.g. server restarted since the run finished) -> fall back to
         # the durable status.json so prior completed runs stay settleable.
-        return read_run_status(run_dir)
+        durable = read_run_status(run_dir)
+        if durable in ("running", "queued"):
+            # The server owns run threads. If it restarted and no in-memory entry
+            # exists, that run can no longer complete; archive it as interrupted
+            # instead of leaving an undeletable zombie.
+            _run_interrupt_result(run_dir, run_id, durable)
+            return "interrupted"
+        return durable
 
     def set_status(self, run_id: str, status: str) -> None:
         state = self._state
@@ -364,10 +391,14 @@ class RunManager:
         try:
             ret = launcher(run_id, run_dir)
         except Exception as exc:  # noqa: BLE001
+            if self.get_status(run_id, run_dir) == "interrupted":
+                return
             reason = _sanitize_launcher_error(exc)
             self.set_error(run_id, reason)
             self.set_status(run_id, "failed")
             _write_status_metadata(run_dir, {"reason": reason})
+            return
+        if self.get_status(run_id, run_dir) == "interrupted":
             return
         live_metadata = _read_live_success_metadata(run_dir)
         if ret == 0:
@@ -402,6 +433,17 @@ class RunManager:
             state = self._state
             with state.lock:  # drop stale in-memory entries
                 state.run_status.pop(run_id, None)
+                state.run_errors.pop(run_id, None)
+        return code, payload
+
+    def interrupt_run(self, run_id: str, run_dir: Path) -> tuple[int, dict[str, object]]:
+        """POST /api/runs/{run_id}/interrupt flow: active-only terminal mark."""
+        status_now = self.get_status(run_id, run_dir)
+        code, payload = _run_interrupt_result(run_dir, run_id, status_now)
+        if code == 200:
+            state = self._state
+            with state.lock:
+                state.run_status[run_id] = "interrupted"
                 state.run_errors.pop(run_id, None)
         return code, payload
 

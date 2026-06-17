@@ -389,6 +389,33 @@ void ObserverApiClient::deleteRun(const QString &runId)
     });
 }
 
+void ObserverApiClient::interruptRun(const QString &runId)
+{
+    if (runId.isEmpty())
+        return;
+    QNetworkReply *reply = post(QStringLiteral("/api/runs/") + runId + QStringLiteral("/interrupt"),
+                                QByteArrayLiteral("{}"));
+    connect(reply, &QNetworkReply::finished, this, [this, runId, reply]() {
+        reply->deleteLater();
+        const bool ok = (reply->error() == QNetworkReply::NoError);
+        QString err;
+        if (!ok)
+            err = replyErrorMessage(reply, reply->errorString());
+
+        if (ok) {
+            if (runId == m_currentRunId) {
+                stopStream();
+                if (m_currentStatus != QStringLiteral("interrupted")) {
+                    m_currentStatus = QStringLiteral("interrupted");
+                    emit currentStatusChanged();
+                }
+            }
+            refreshRuns();
+        }
+        emit interruptRunFinished(runId, ok, err);
+    });
+}
+
 void ObserverApiClient::openRun(const QString &runId, bool forReport)
 {
     m_pendingOpenRunId = runId;

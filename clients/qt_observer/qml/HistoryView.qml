@@ -22,12 +22,13 @@ Item {
     property int _batchFailed: 0
     property var _batchErrors: []
 
-    property string activeFilter: "all"          // all | completed | running | unknown
+    property string activeFilter: "all"          // all | completed | running | interrupted | unknown
     property string searchText: ""
     property string executionFilter: "all"       // all | fake | live | local | unknown
     property string resultFilter: "all"          // all | good | wolf | unknown
     property string timeFilter: "all"            // all | recent | older (placeholder until API exposes dates)
     property string selectedRunId: ""
+    readonly property int maxSupportedPlayers: 6
 
     readonly property var filteredRuns: _filteredRuns()
     readonly property var selectedRun: _findRun(selectedRunId)
@@ -37,20 +38,8 @@ Item {
                                            && selectedRun.run_id !== ""
     readonly property int completedCount: _countStatus("completed")
     readonly property int runningCount: _countStatus("running")
+    readonly property int interruptedCount: _countStatus("interrupted")
     readonly property int unknownCount: _countStatus("unknown")
-
-    function _runTitle(run) {
-        if (!run)
-            return I18n.t("未命名对局", "Untitled match")
-        var candidates = [run.display_name, run.name, run.title, run.profile_name,
-                          run.profile, run.template]
-        for (var i = 0; i < candidates.length; ++i) {
-            var value = candidates[i]
-            if (value !== undefined && value !== null && ("" + value).length > 0)
-                return "" + value
-        }
-        return run.run_id || I18n.t("未命名对局", "Untitled match")
-    }
 
     function _shortRunId(run) {
         var id = run && run.run_id ? "" + run.run_id : "Unknown"
@@ -59,12 +48,186 @@ Item {
         return id.slice(0, 15) + "..." + id.slice(id.length - 6)
     }
 
+    function _isObject(value) {
+        return value !== undefined && value !== null && typeof value === "object"
+    }
+
+    function _positiveInt(value) {
+        if (value === undefined || value === null || value === "")
+            return 0
+        var n = Number(value)
+        if (isNaN(n) || n <= 0 || n > root.maxSupportedPlayers)
+            return 0
+        return Math.floor(n)
+    }
+
+    function _collectionCount(value) {
+        if (!_isObject(value))
+            return 0
+        if (value.length !== undefined) {
+            var n = _positiveInt(value.length)
+            if (n > 0)
+                return n
+        }
+        var keys = Object.keys(value)
+        return keys.length > 0 && keys.length <= root.maxSupportedPlayers ? keys.length : 0
+    }
+
+    function _playerCountFromString(value) {
+        if (value === undefined || value === null)
+            return 0
+        var text = ("" + value).toLowerCase()
+        var match = text.match(/(?:^|[^0-9])([1-9][0-9]?)\s*p(?:[^a-z0-9]|$)/)
+        if (!match)
+            match = text.match(/(?:^|[^0-9])([1-9][0-9]?)\s*(?:player|players|seat|seats)(?:[^a-z0-9]|$)/)
+        if (!match)
+            match = text.match(/(?:^|[^0-9])([1-9][0-9]?)\s*人/)
+        return match ? _positiveInt(match[1]) : 0
+    }
+
+    function _extractPlayerCount(run) {
+        if (!run)
+            return 0
+
+        var countKeys = [
+            "player_count", "players_count", "seat_count", "seats_count",
+            "participant_count", "num_players", "playerCount", "seatCount"
+        ]
+        var collectionKeys = ["players", "seats", "seat_ids", "participants"]
+        var sources = [run, run.metadata, run.detail, run.snapshot, run.settlement,
+                       run.config, run.profile, run.template, run.summary]
+
+        for (var s = 0; s < sources.length; ++s) {
+            var source = sources[s]
+            if (!_isObject(source))
+                continue
+            for (var i = 0; i < countKeys.length; ++i) {
+                var n = _positiveInt(source[countKeys[i]])
+                if (n > 0)
+                    return n
+            }
+            for (var j = 0; j < collectionKeys.length; ++j) {
+                var c = _collectionCount(source[collectionKeys[j]])
+                if (c > 0)
+                    return c
+            }
+        }
+
+        var strings = [
+            run.run_id, run.profile, run.profile_name, run.profile_id, run.template,
+            run.template_id, run.script_id, run.mode, run.name, run.title
+        ]
+        for (var k = 0; k < strings.length; ++k) {
+            var parsed = _playerCountFromString(strings[k])
+            if (parsed > 0)
+                return parsed
+        }
+        return 0
+    }
+
+    function _timestampMs(value) {
+        if (value === undefined || value === null || value === "")
+            return NaN
+        if (typeof value === "number") {
+            if (value > 100000000000)
+                return value
+            if (value > 1000000000)
+                return value * 1000
+            return NaN
+        }
+
+        var text = ("" + value).trim()
+        if (text === "")
+            return NaN
+        if (/^[0-9]{13}$/.test(text))
+            return Number(text)
+        if (/^[0-9]{10}$/.test(text))
+            return Number(text) * 1000
+
+        var ms = Date.parse(text.replace(" ", "T"))
+        if (!isNaN(ms))
+            return ms
+
+        var match = text.match(/(20[0-9]{2})[-_]?([0-9]{2})[-_]?([0-9]{2})(?:[T_\- ]?([0-9]{2})[:_\-]?([0-9]{2}))?/)
+        if (match) {
+            var hour = match[4] !== undefined ? Number(match[4]) : 0
+            var minute = match[5] !== undefined ? Number(match[5]) : 0
+            return new Date(Number(match[1]), Number(match[2]) - 1,
+                            Number(match[3]), hour, minute).getTime()
+        }
+        return NaN
+    }
+
+    function _extractRunTimestamp(run) {
+        if (!run)
+            return NaN
+
+        var keys = [
+            "created_at", "createdAt", "started_at", "startedAt", "start_time",
+            "startTime", "timestamp", "mtime", "updated_at", "updatedAt",
+            "modified_at", "last_modified", "filesystem_mtime", "completed_at",
+            "ended_at", "end_time"
+        ]
+        var sources = [run, run.metadata, run.detail, run.snapshot, run.settlement, run.summary]
+        for (var s = 0; s < sources.length; ++s) {
+            var source = sources[s]
+            if (!_isObject(source))
+                continue
+            for (var i = 0; i < keys.length; ++i) {
+                var ms = _timestampMs(source[keys[i]])
+                if (!isNaN(ms))
+                    return ms
+            }
+        }
+
+        var strings = [run.run_id, run.name, run.title]
+        for (var j = 0; j < strings.length; ++j) {
+            var parsed = _timestampMs(strings[j])
+            if (!isNaN(parsed))
+                return parsed
+        }
+        return NaN
+    }
+
+    function _pad2(n) {
+        return n < 10 ? "0" + n : "" + n
+    }
+
+    function _formatHistoryTimestamp(ms) {
+        if (isNaN(ms))
+            return ""
+        var d = new Date(ms)
+        return d.getFullYear() + "-" + _pad2(d.getMonth() + 1) + "-"
+               + _pad2(d.getDate()) + " " + _pad2(d.getHours()) + ":"
+               + _pad2(d.getMinutes())
+    }
+
+    function formatHistoryRunTitle(run) {
+        var ms = _extractRunTimestamp(run)
+        var count = _extractPlayerCount(run)
+        if (!isNaN(ms)) {
+            var time = _formatHistoryTimestamp(ms)
+            if (count > 0)
+                return count + I18n.t("人对局 - ", "-player match - ") + time
+            return I18n.t("对局 - ", "Match - ") + time
+        }
+        if (count > 0)
+            return count + I18n.t("人对局", "-player match")
+        return I18n.t("对局 - ", "Match - ") + _shortRunId(run)
+    }
+
+    function _runTitle(run) {
+        return formatHistoryRunTitle(run)
+    }
+
     function _statusKey(status) {
         var st = (status === undefined || status === null) ? "" : ("" + status).toLowerCase()
         if (st === "completed")
             return "completed"
         if (st === "running" || st === "queued")
             return "running"
+        if (st === "interrupted")
+            return "interrupted"
         return "unknown"
     }
 
@@ -76,6 +239,8 @@ Item {
             return I18n.t("进行中", "Running")
         if (st === "queued")
             return I18n.t("排队中", "Queued")
+        if (st === "interrupted")
+            return I18n.t("中断", "Interrupted")
         if (st === "failed")
             return I18n.t("失败", "Failed")
         return "Unknown"
@@ -87,6 +252,8 @@ Item {
             return Theme.warm.success
         if (st === "running")
             return Theme.warm.primary
+        if (st === "interrupted")
+            return Theme.warm.warning
         return Theme.parchment.mutedInk
     }
 
@@ -131,7 +298,11 @@ Item {
     function _timeLabel(run) {
         if (!run)
             return "Unknown"
-        var value = run.created_at || run.started_at || run.start_time || run.timestamp || ""
+        var ms = _extractRunTimestamp(run)
+        if (!isNaN(ms))
+            return _formatHistoryTimestamp(ms)
+        var value = run.created_at || run.started_at || run.start_time
+                    || run.timestamp || run.mtime || run.updated_at || ""
         return value === "" ? "Unknown" : "" + value
     }
 
@@ -173,6 +344,8 @@ Item {
         var st = (run.status || "").toLowerCase()
         if (st === "running" || st === "queued")
             return I18n.t("对局记录中", "Recording")
+        if (st === "interrupted")
+            return I18n.t("中断", "Interrupted")
         if (st === "failed")
             return I18n.t("运行失败", "Run failed")
         return "Unknown"
@@ -193,6 +366,8 @@ Item {
                    + snaps + I18n.t(" 份快照", " snapshots")
         if (st === "running" || st === "queued")
             return I18n.t("正在记录事件流", "Recording the event stream")
+        if (st === "interrupted")
+            return I18n.t("对局已中断，无复盘报告", "Interrupted, no report")
         return I18n.t("暂无摘要", "No summary")
     }
 
@@ -264,6 +439,24 @@ Item {
             if (_matchFilters(runs[i]))
                 out.push(runs[i])
         }
+        out.sort(function(a, b) {
+            var at = _extractRunTimestamp(a)
+            var bt = _extractRunTimestamp(b)
+            var ah = !isNaN(at)
+            var bh = !isNaN(bt)
+            if (ah && bh && at !== bt)
+                return bt - at
+            if (ah !== bh)
+                return ah ? -1 : 1
+
+            var ar = a && a.run_id ? "" + a.run_id : ""
+            var br = b && b.run_id ? "" + b.run_id : ""
+            if (ar < br)
+                return -1
+            if (ar > br)
+                return 1
+            return 0
+        })
         return out
     }
 
@@ -534,11 +727,12 @@ Item {
                         { label: I18n.t("全部", "All"), value: ObserverClient.runItems.length, key: "all" },
                         { label: I18n.t("已完成", "Completed"), value: root.completedCount, key: "completed" },
                         { label: I18n.t("进行中", "Running"), value: root.runningCount, key: "running" },
+                        { label: I18n.t("中断", "Interrupted"), value: root.interruptedCount, key: "interrupted" },
                         { label: "Unknown", value: root.unknownCount, key: "unknown" }
                     ]
                     delegate: Rectangle {
                         required property var modelData
-                        width: 106
+                        width: 100
                         height: 70
                         radius: 12
                         color: root.activeFilter === modelData.key
@@ -668,6 +862,7 @@ Item {
                             { key: "all", label: I18n.t("全部", "All"), count: ObserverClient.runItems.length },
                             { key: "completed", label: I18n.t("已完成", "Completed"), count: root.completedCount },
                             { key: "running", label: I18n.t("进行中", "Running"), count: root.runningCount },
+                            { key: "interrupted", label: I18n.t("中断", "Interrupted"), count: root.interruptedCount },
                             { key: "unknown", label: "Unknown", count: root.unknownCount }
                         ]
                         delegate: Rectangle {
@@ -796,6 +991,8 @@ Item {
                     spacing: Theme.space.sm
 
                     ParchmentComboBox {
+                        id: executionModeCombo
+                        objectName: "historyExecutionModeCombo"
                         width: parent.width
                         compact: true
                         model: [
@@ -811,6 +1008,8 @@ Item {
                     }
 
                     ParchmentComboBox {
+                        id: resultCombo
+                        objectName: "historyResultCombo"
                         width: parent.width
                         compact: true
                         model: [
@@ -825,6 +1024,8 @@ Item {
                     }
 
                     ParchmentComboBox {
+                        id: timeCombo
+                        objectName: "historyTimeCombo"
                         width: parent.width
                         compact: true
                         model: [
@@ -964,7 +1165,7 @@ Item {
                     Text {
                         id: localChipText
                         anchors.centerIn: parent
-                        text: I18n.t("本地档案", "Local archive")
+                        text: I18n.t("按时间排序（最新）", "Newest first")
                         color: Theme.warm.muted
                         font.family: Theme.fontFamilies.sans
                         font.contextFontMerging: true
@@ -1126,7 +1327,8 @@ Item {
                                 border.color: Theme.withAlpha(Theme.parchment.goldLine, 0.35)
                                 Text {
                                     anchors.centerIn: parent
-                                    text: root._statusKey(modelData.status) === "running" ? "月" : "档"
+                                    text: root._statusKey(modelData.status) === "running"
+                                          ? "月" : (root._statusKey(modelData.status) === "interrupted" ? "断" : "档")
                                     color: runDelegate.accent
                                     font.family: Theme.fontFamilies.serif
                                     font.contextFontMerging: true
@@ -1323,28 +1525,6 @@ Item {
                 source: Illustrations.texParchment
                 fillMode: Image.Tile
                 opacity: 0.17
-            }
-
-            Rectangle {
-                anchors.top: parent.top
-                anchors.right: parent.right
-                anchors.topMargin: -12
-                anchors.rightMargin: 28
-                width: 54
-                height: 54
-                radius: 27
-                color: Theme.withAlpha(Theme.warm.primaryActive, 0.92)
-                border.width: 2
-                border.color: Qt.rgba(245 / 255, 197 / 255, 141 / 255, 0.75)
-                Text {
-                    anchors.centerIn: parent
-                    text: "封"
-                    color: Theme.warm.textOnPrimary
-                    font.family: Theme.fontFamilies.serif
-                    font.contextFontMerging: true
-                    font.pixelSize: Theme.warmSize.titleMd
-                    font.weight: Theme.weight.bold
-                }
             }
 
             Column {

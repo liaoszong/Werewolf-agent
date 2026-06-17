@@ -19,7 +19,8 @@ Item {
             // already loaded by openRun (avoids a redundant SSE replay storm on re-open).
             if (!ObserverClient.connected
                     && ObserverClient.currentStatus !== "completed"
-                    && ObserverClient.currentStatus !== "failed")
+                    && ObserverClient.currentStatus !== "failed"
+                    && ObserverClient.currentStatus !== "interrupted")
                 ObserverClient.connectStream()
         }
         Qt.callLater(theaterRoot._maybeAutoSeekReport)

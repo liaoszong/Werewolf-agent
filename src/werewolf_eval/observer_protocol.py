@@ -65,6 +65,7 @@ RUN_STATUS_VALUES: tuple[str, ...] = (
     "running",
     "completed",
     "failed",
+    "interrupted",
     "unknown",
 )
 

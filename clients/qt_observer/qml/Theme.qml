@@ -330,6 +330,8 @@ QtObject {
             return theme.color.completed;
         case "failed":
             return theme.color.danger;
+        case "interrupted":
+            return theme.color.warning;
         case "queued":
             return theme.color.warning;
         case "connected":

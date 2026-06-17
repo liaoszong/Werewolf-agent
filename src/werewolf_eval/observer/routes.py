@@ -97,6 +97,12 @@ POST_ROUTES: tuple[Route, ...] = (
         same_origin=True,
     ),
     Route(("api", "runs"), "_route_runs_post", same_origin=True),
+    Route(
+        ("api", "runs", "{run_id}", "interrupt"),
+        "_route_runs_interrupt",
+        loopback_message="runs interrupt is loopback-only",
+        same_origin=True,
+    ),
     Route(("api", "profiles", "validate"), "_route_profile_validate"),
     Route(
         ("api", "configs", "import"),

@@ -109,6 +109,7 @@ public slots:
     // ceremony and open straight to the report; default false = live freeze ceremony.
     Q_INVOKABLE void openRun(const QString &runId, bool forReport = false);
     Q_INVOKABLE void deleteRun(const QString &runId);
+    Q_INVOKABLE void interruptRun(const QString &runId);
     Q_INVOKABLE void connectStream();
     Q_INVOKABLE void disconnectStream();
     Q_INVOKABLE void refreshAuditLinks();
@@ -178,6 +179,7 @@ signals:
     void providerModelsFetched(const QString &provider);                       // a fetch for THIS provider succeeded
     void providerModelsFailed(const QString &provider, const QString &reason); // reason is key-free
     void deleteRunFinished(const QString &runId, bool ok, const QString &error);
+    void interruptRunFinished(const QString &runId, bool ok, const QString &error);
 
 private slots:
     void onStreamReadyRead();
