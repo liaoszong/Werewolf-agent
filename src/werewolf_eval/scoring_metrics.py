@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from werewolf_eval.decision_log import DecisionLog
 from werewolf_eval.game_log import Event, GameLog
 from werewolf_eval.gold_game_fixtures import (
     GOLD_GAME_ID,
@@ -12,7 +13,12 @@ from werewolf_eval.gold_game_fixtures import (
     GOLD_METRICS_ID_S5,
     GOLD_SOURCE_GAME_LOG,
 )
-from werewolf_eval.scoring_records import _player_by_id, _role_of, _team_of
+from werewolf_eval.scoring_records import (
+    _decision_by_event_id,
+    _player_by_id,
+    _role_of,
+    _team_of,
+)
 from werewolf_eval.scoring_types import (
     MetricsSummary,
     ProcessMetrics,
@@ -20,6 +26,14 @@ from werewolf_eval.scoring_types import (
     ScoreLog,
     ScoreSummary,
 )
+
+
+# Decision Log decision_types that do NOT represent a genuine model vote:
+# the seat produced no deliberate choice, so the vote is engine fallback noise
+# and must not enter model-vote process metrics (vote_accuracy / cohesion /
+# coordination). Only applied when a real Decision Log is supplied; without one
+# there is no reliable decision_type signal and historical behavior is kept.
+_FALLBACK_DECISION_TYPES = {"default", "random"}
 
 
 # ---------------------------------------------------------------------------
@@ -36,20 +50,48 @@ def _alive_players_after_game(game: GameLog) -> set[str]:
     return game.player_ids - dead
 
 
-def _vote_events(game: GameLog) -> list[Event]:
+def _vote_events(game: GameLog, decision_log: DecisionLog | None = None) -> list[Event]:
     # Only player-to-player votes participate in vote metrics. game_log validation
     # permits non-player actors ("system"/"wolf_team") and targets ("none"/"*_team")
     # on a player_vote; the engine never emits them, but replays / hand-written logs
     # can, and the role/team lookups in the metric helpers would KeyError on them.
     players = _player_by_id(game)
-    return [
+    events = [
         event
         for event in game.events
         if event.type == "player_vote" and event.actor in players and event.target in players
     ]
+    # scoring_v2: when a real Decision Log is supplied, drop default/random
+    # (engine-fallback) votes so they don't pollute model-vote metrics. Without a
+    # Decision Log there is no reliable signal and the historical set is returned.
+    if decision_log is not None:
+        decisions_by_event = _decision_by_event_id(game, decision_log)
+        events = [
+            event
+            for event in events
+            if event.event_id not in decisions_by_event
+            or decisions_by_event[event.event_id].decision_type not in _FALLBACK_DECISION_TYPES
+        ]
+    return events
 
 
-def _vote_accuracy_by_player(game: GameLog) -> dict[str, dict[str, float | int]]:
+def _vote_accuracy_by_player(game: GameLog, votes: list[Event] | None = None) -> dict[str, dict[str, float | int]]:
+    # `votes` is the already-filtered player-to-player vote set computed once in
+    # summarize_metrics. It may include scoring_v2 default/random filtering. The
+    # legacy form `_vote_accuracy_by_player(game)` recomputes the unfiltered set
+    # via _vote_events(game) so direct callers keep their old behavior.
+    events = votes if votes is not None else _vote_events(game)
+    result = {player.player_id: {"accurate_votes": 0, "total_votes": 0, "vote_accuracy": 0.0} for player in game.players}
+    for event in events:  # already filtered to player-to-player votes
+        actor_team = _team_of(game, event.actor)
+        target_team = _team_of(game, event.target)
+        result[event.actor]["total_votes"] += 1
+        if actor_team != target_team:
+            result[event.actor]["accurate_votes"] += 1
+    for item in result.values():
+        total = int(item["total_votes"])
+        item["vote_accuracy"] = _round_float(float(item["accurate_votes"]) / total) if total else 0.0
+    return result
     result = {player.player_id: {"accurate_votes": 0, "total_votes": 0, "vote_accuracy": 0.0} for player in game.players}
     for event in _vote_events(game):  # already filtered to player-to-player votes
         actor_team = _team_of(game, event.actor)
@@ -113,12 +155,26 @@ def _witch_metrics(game: GameLog) -> dict[str, Any]:
     }
 
 
-def _team_metrics(game: GameLog) -> dict[str, Any]:
+def _team_metrics(game: GameLog, votes: list[Event] | None = None) -> dict[str, Any]:
+    # `votes` is the already-filtered vote set computed once in summarize_metrics.
+    # The legacy form `_team_metrics(game)` recomputes the unfiltered set.
+    if votes is None:
+        votes = _vote_events(game)
     village_by_day: dict[str, float] = {}
     werewolf_by_day: dict[str, float] = {}
-    rounds = sorted({event.round for event in _vote_events(game)})
+    rounds = sorted({event.round for event in votes})
     for round_number in rounds:
-        votes = [event for event in _vote_events(game) if event.round == round_number]
+        round_votes = [event for event in votes if event.round == round_number]
+        village_votes = [event for event in round_votes if _team_of(game, event.actor) == "villager"]
+        if village_votes:
+            target_counts: dict[str, int] = {}
+            for vote in village_votes:
+                target_counts[vote.target] = target_counts.get(vote.target, 0) + 1
+            village_by_day[f"round_{round_number}"] = _round_float(max(target_counts.values()) / len(village_votes))
+        werewolf_votes = [event for event in round_votes if _team_of(game, event.actor) == "werewolf"]
+        if len(werewolf_votes) >= 2:
+            targets = {event.target for event in werewolf_votes}
+            werewolf_by_day[f"round_{round_number}"] = 1.0 if len(targets) == 1 else 0.0
         village_votes = [event for event in votes if _team_of(game, event.actor) == "villager"]
         if village_votes:
             target_counts: dict[str, int] = {}
@@ -180,7 +236,11 @@ def _score_summary(game: GameLog, score_log: ScoreLog) -> ScoreSummary:
     )
 
 
-def summarize_metrics(game: GameLog, score_log: ScoreLog) -> MetricsSummary:
+def summarize_metrics(
+    game: GameLog,
+    score_log: ScoreLog,
+    decision_log: DecisionLog | None = None,
+) -> MetricsSummary:
     s5_enabled = score_log.phase == "Phase 2B-S5"
     is_g001 = game.game_id == GOLD_GAME_ID
     if is_g001:
@@ -191,6 +251,10 @@ def summarize_metrics(game: GameLog, score_log: ScoreLog) -> MetricsSummary:
         metrics_id = f"{game.game_id}_metrics_summary"
         source_game_log = f"generated:{game.game_id}"
         source_score_log = f"score_log:{score_log.score_log_id}"
+    # scoring_v2: compute the filtered player-to-player vote set ONCE and feed it
+    # to both vote_accuracy and team metrics so the decision matcher runs a single
+    # time (it is the most expensive step here) and the two metrics stay consistent.
+    filtered_votes = _vote_events(game, decision_log)
     return MetricsSummary(
         metrics_id=metrics_id,
         game_id=game.game_id,
@@ -199,13 +263,13 @@ def summarize_metrics(game: GameLog, score_log: ScoreLog) -> MetricsSummary:
         source_label=score_log.source_label,
         result_metrics=_result_metrics(game),
         process_metrics=ProcessMetrics(
-            vote_accuracy_by_player=_vote_accuracy_by_player(game),
+            vote_accuracy_by_player=_vote_accuracy_by_player(game, filtered_votes),
             survival_rounds=_survival_rounds(game),
             contradiction_count_by_player=_zero_counts(game),
             info_leak_count_by_player=_zero_counts(game),
             seer_metrics=_seer_metrics(game),
             witch_metrics=_witch_metrics(game),
-            team_metrics=_team_metrics(game),
+            team_metrics=_team_metrics(game, filtered_votes),
         ),
         score_summary=_score_summary(game, score_log),
         metrics_deferred_to_later_spikes=[

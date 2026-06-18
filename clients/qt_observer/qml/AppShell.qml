@@ -220,13 +220,14 @@ Item {
         anchors.bottom: parent.bottom
         initialItem: homeComponent
 
-        // Gentle cross-fade between views
-        replaceEnter: Transition {
-            PropertyAnimation { property: "opacity"; from: 0.0; to: 1.0; duration: Theme.motion.base; easing.type: Easing.OutCubic }
-        }
-        replaceExit: Transition {
-            PropertyAnimation { property: "opacity"; from: 1.0; to: 0.0; duration: Theme.motion.fast; easing.type: Easing.InCubic }
-        }
+        // Full-bleed illustrated views do their own first-frame painting. Keep
+        // StackView swaps instant so the previous page does not flash underneath.
+        pushEnter: Transition {}
+        pushExit: Transition {}
+        popEnter: Transition {}
+        popExit: Transition {}
+        replaceEnter: Transition {}
+        replaceExit: Transition {}
     }
 
     Component { id: homeComponent; HomeView { objectName: "homeView" } }

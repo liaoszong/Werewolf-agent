@@ -52,7 +52,7 @@ def main() -> int:
         )
 
     score_log = score_game(game, decision_log=decision_log, semantic_label_log=semantic_label_log)
-    metrics = summarize_metrics(game, score_log)
+    metrics = summarize_metrics(game, score_log, decision_log=decision_log)
 
     score_payload = score_log_to_dict(score_log)
     metrics_payload = metrics_summary_to_dict(metrics)

@@ -655,7 +655,7 @@ Item {
         objectName: "historyNoticeBar"
         property string text: ""
         anchors.horizontalCenter: parent.horizontalCenter
-        anchors.bottom: archiveTray.top
+        anchors.bottom: parent.bottom
         anchors.bottomMargin: Theme.space.md
         z: 20
         visible: text !== ""
@@ -712,11 +712,77 @@ Item {
             anchors.right: parent.right
             height: 116
 
-            Column {
+            Rectangle {
+                id: topBackButton
+                objectName: "historyBackButton"
                 anchors.left: parent.left
                 anchors.top: parent.top
                 anchors.topMargin: Theme.space.sm
-                width: Math.max(300, parent.width - statsRow.width - headerActions.width - Theme.space.xxl * 2)
+                width: historyBackButtonContent.implicitWidth + Theme.space.lg * 2
+                height: 38
+                radius: Theme.radius.pill
+                color: historyBackHover.hovered ? Theme.withAlpha(Theme.parchment.parchmentSoft, 0.96)
+                                                : Theme.withAlpha(Theme.parchment.parchmentSoft, 0.86)
+                border.width: 1
+                border.color: historyBackHover.hovered ? Theme.withAlpha(Theme.warm.primary, 0.46)
+                                                       : Theme.withAlpha(Theme.parchment.goldLine, 0.48)
+
+                Rectangle {
+                    anchors.fill: parent
+                    anchors.topMargin: 4
+                    anchors.leftMargin: 3
+                    anchors.rightMargin: -3
+                    anchors.bottomMargin: -5
+                    radius: parent.radius
+                    color: Theme.withAlpha(Theme.parchment.woodShadow, 0.26)
+                    z: -1
+                }
+
+                Image {
+                    anchors.fill: parent
+                    anchors.margins: 1
+                    source: Illustrations.texParchment
+                    fillMode: Image.Tile
+                    opacity: 0.14
+                }
+
+                Row {
+                    id: historyBackButtonContent
+                    anchors.centerIn: parent
+                    spacing: Theme.space.md
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: "‹"
+                        color: Theme.warm.primaryActive
+                        font.family: Theme.fontFamilies.sans
+                        font.contextFontMerging: true
+                        font.pixelSize: 24
+                        font.weight: Theme.weight.bold
+                    }
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: I18n.t("返回", "Back")
+                        color: Theme.warm.bodyStrong
+                        font.family: Theme.fontFamilies.sans
+                        font.contextFontMerging: true
+                        font.pixelSize: Theme.size.caption
+                        font.weight: Theme.weight.semibold
+                    }
+                }
+
+                HoverHandler {
+                    id: historyBackHover
+                    cursorShape: Qt.PointingHandCursor
+                }
+                TapHandler { onTapped: root.StackView.view.parent.navigateHome() }
+            }
+
+            Column {
+                anchors.left: topBackButton.right
+                anchors.top: parent.top
+                anchors.topMargin: Theme.space.sm
+                anchors.leftMargin: Theme.space.lg
+                width: Math.max(300, parent.width - topBackButton.width - headerActions.width - Theme.space.xxl * 2)
                 spacing: Theme.space.xs
 
                 Text {
@@ -737,71 +803,6 @@ Item {
                     font.contextFontMerging: true
                     font.pixelSize: Theme.warmSize.bodyLg
                     elide: Text.ElideRight
-                }
-            }
-
-            Row {
-                id: statsRow
-                anchors.top: parent.top
-                anchors.topMargin: Theme.space.md
-                anchors.horizontalCenter: parent.horizontalCenter
-                spacing: Theme.space.sm
-
-                Repeater {
-                    model: [
-                        { label: I18n.t("全部", "All"), value: ObserverClient.runItems.length, key: "all" },
-                        { label: I18n.t("已完成", "Completed"), value: root.completedCount, key: "completed" },
-                        { label: I18n.t("进行中", "Running"), value: root.runningCount, key: "running" },
-                        { label: I18n.t("中断", "Interrupted"), value: root.interruptedCount, key: "interrupted" },
-                        { label: root._unknownLabel(), value: root.unknownCount, key: "unknown" }
-                    ]
-                    delegate: Rectangle {
-                        required property var modelData
-                        width: 100
-                        height: 70
-                        radius: 12
-                        color: root.activeFilter === modelData.key
-                               ? Theme.withAlpha(Theme.parchment.terracottaWash, 0.88)
-                               : Theme.withAlpha(Theme.parchment.parchmentSoft, 0.82)
-                        border.width: 1
-                        border.color: root.activeFilter === modelData.key
-                                      ? Theme.withAlpha(Theme.warm.primaryActive, 0.55)
-                                      : Theme.withAlpha(Theme.parchment.goldLine, 0.38)
-
-                        Image {
-                            anchors.fill: parent
-                            anchors.margins: 1
-                            source: Illustrations.texParchment
-                            fillMode: Image.Tile
-                            opacity: 0.12
-                        }
-
-                        Column {
-                            anchors.centerIn: parent
-                            spacing: 2
-                            Text {
-                                anchors.horizontalCenter: parent.horizontalCenter
-                                text: modelData.label
-                                color: Theme.warm.muted
-                                font.family: Theme.fontFamilies.sans
-                                font.contextFontMerging: true
-                                font.pixelSize: Theme.size.caption
-                                font.weight: Theme.weight.medium
-                            }
-                            Text {
-                                anchors.horizontalCenter: parent.horizontalCenter
-                                text: "" + modelData.value
-                                color: Theme.warm.ink
-                                font.family: Theme.fontFamilies.serif
-                                font.contextFontMerging: true
-                                font.pixelSize: Theme.warmSize.titleLg
-                                font.weight: Theme.weight.bold
-                            }
-                        }
-
-                        HoverHandler { id: statHover; cursorShape: Qt.PointingHandCursor }
-                        TapHandler { onTapped: root.activeFilter = modelData.key }
-                    }
                 }
             }
 
@@ -830,6 +831,34 @@ Item {
                     enabled: ObserverClient.runItems.length > 0 && !root._batchActive
                     onClicked: root.selecting ? root._exitSelectMode() : root.selecting = true
                 }
+
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    visible: root.selecting
+                    text: I18n.t("已选择 ", "Selected ") + root.selectedCount + I18n.t(" 项", " items")
+                    color: Theme.warm.bodyStrong
+                    font.family: Theme.fontFamilies.sans
+                    font.contextFontMerging: true
+                    font.pixelSize: Theme.size.caption
+                    font.weight: Theme.weight.semibold
+                }
+
+                AppButton {
+                    id: batchDeleteButton
+                    objectName: "batchDeleteButton"
+                    onLight: true
+                    visible: root.selecting
+                    enabled: root.selectedCount > 0 && !root._batchActive
+                    text: I18n.t("批量删除", "Batch delete")
+                    variant: "danger"
+                    onClicked: {
+                        root._onDialogConfirm = root._startBatchDelete
+                        confirmDialog.title = I18n.t("批量删除", "Batch delete")
+                        confirmDialog.message = I18n.t("确定删除 ", "Delete ") + root.selectedCount
+                                                + I18n.t(" 局?删除后不可恢复。", " runs? This cannot be undone.")
+                        confirmDialog.open()
+                    }
+                }
             }
         }
 
@@ -837,8 +866,7 @@ Item {
             id: filterRail
             anchors.left: parent.left
             anchors.top: header.bottom
-            anchors.bottom: archiveTray.top
-            anchors.bottomMargin: Theme.space.lg
+            anchors.bottom: parent.bottom
             width: page.railWidth
             radius: 18
             color: Theme.withAlpha(Theme.parchment.parchmentSoft, 0.88)
@@ -1085,8 +1113,7 @@ Item {
             anchors.left: filterRail.right
             anchors.leftMargin: page.gap
             anchors.top: header.bottom
-            anchors.bottom: archiveTray.top
-            anchors.bottomMargin: Theme.space.lg
+            anchors.bottom: parent.bottom
             width: Math.max(430, page.width - page.railWidth - page.detailWidth - page.gap * 2)
             radius: 18
             color: Theme.withAlpha(Theme.parchment.parchmentSoft, 0.90)
@@ -1526,8 +1553,7 @@ Item {
             anchors.leftMargin: page.gap
             anchors.top: header.bottom
             anchors.right: parent.right
-            anchors.bottom: archiveTray.top
-            anchors.bottomMargin: Theme.space.lg
+            anchors.bottom: parent.bottom
             radius: 22
             color: Theme.withAlpha(Theme.parchment.parchmentSoft, 0.91)
             border.width: 1
@@ -1907,88 +1933,5 @@ Item {
             }
         }
 
-        Rectangle {
-            id: archiveTray
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.bottom: parent.bottom
-            height: 64
-            radius: 18
-            color: Theme.withAlpha(Theme.parchment.parchmentSoft, 0.92)
-            border.width: 1
-            border.color: Theme.withAlpha(Theme.parchment.goldLine, 0.48)
-
-            Rectangle {
-                anchors.fill: parent
-                anchors.topMargin: 8
-                anchors.leftMargin: 4
-                anchors.rightMargin: -4
-                anchors.bottomMargin: -6
-                radius: parent.radius
-                color: Theme.withAlpha(Theme.parchment.woodShadow, 0.28)
-                z: -1
-            }
-
-            Image {
-                anchors.fill: parent
-                anchors.margins: 1
-                source: Illustrations.texParchment
-                fillMode: Image.Tile
-                opacity: 0.14
-            }
-
-            AppButton {
-                id: backButton
-                onLight: true
-                anchors.left: parent.left
-                anchors.leftMargin: Theme.space.lg
-                anchors.verticalCenter: parent.verticalCenter
-                text: I18n.t("返回首页", "Back Home")
-                variant: "secondary"
-                onClicked: root.StackView.view.parent.navigateHome()
-            }
-
-            Row {
-                anchors.right: parent.right
-                anchors.rightMargin: Theme.space.lg
-                anchors.verticalCenter: parent.verticalCenter
-                spacing: Theme.space.md
-                visible: root.selecting
-
-                Text {
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: I18n.t("已选择 ", "Selected ") + root.selectedCount + I18n.t(" 项", " items")
-                    color: Theme.warm.bodyStrong
-                    font.family: Theme.fontFamilies.sans
-                    font.contextFontMerging: true
-                    font.pixelSize: Theme.size.body
-                    font.weight: Theme.weight.semibold
-                }
-
-                AppButton {
-                    id: batchDeleteButton
-                    objectName: "batchDeleteButton"
-                    onLight: true
-                    enabled: root.selectedCount > 0 && !root._batchActive
-                    text: I18n.t("批量删除", "Batch delete")
-                    variant: "danger"
-                    onClicked: {
-                        root._onDialogConfirm = root._startBatchDelete
-                        confirmDialog.title = I18n.t("批量删除", "Batch delete")
-                        confirmDialog.message = I18n.t("确定删除 ", "Delete ") + root.selectedCount
-                                                + I18n.t(" 局?删除后不可恢复。", " runs? This cannot be undone.")
-                        confirmDialog.open()
-                    }
-                }
-
-                AppButton {
-                    onLight: true
-                    enabled: !root._batchActive
-                    text: I18n.t("取消选择", "Cancel")
-                    variant: "secondary"
-                    onClicked: root._exitSelectMode()
-                }
-            }
-        }
     }
 }
