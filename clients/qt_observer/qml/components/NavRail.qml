@@ -69,7 +69,7 @@ Item {
                 font.weight: Theme.weight.semibold
             }
             Text {
-                text: "WEREWOLF OBSERVER"
+                text: I18n.t("AI 对局观察台", "WEREWOLF OBSERVER")
                 color: Theme.warm.mutedSoft
                 font.family: Theme.fontFamilies.sans
                 font.contextFontMerging: true

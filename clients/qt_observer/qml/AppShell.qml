@@ -88,7 +88,7 @@ Item {
 
             Text {
                 anchors.verticalCenter: parent.verticalCenter
-                text: "WEREWOLF OBSERVER"
+                text: I18n.t("狼人杀观察席", "WEREWOLF OBSERVER")
                 color: Theme.color.text
                 font.family: Theme.font.family
                 font.pixelSize: Theme.size.caption

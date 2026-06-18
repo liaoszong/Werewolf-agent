@@ -55,8 +55,7 @@ Item {
                 Segment {
                     width: (parent.width - parent.spacing) / 2
                     height: parent.height
-                    label: root.liveAvailable ? I18n.t("实战", "Live")
-                                               : I18n.t("实战", "Live")
+                    label: I18n.t("实战", "Live")
                     caption: root.compact ? "" : (root.liveAvailable ? I18n.t("认真对局", "ranked")
                                                                        : I18n.t("暂不可用", "unavailable"))
                     active: root.state === "live_armed" || root.state === "live_confirmed"

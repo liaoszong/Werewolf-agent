@@ -43,10 +43,14 @@ Item {
     readonly property int unknownCount: _countStatus("unknown")
 
     function _shortRunId(run) {
-        var id = run && run.run_id ? "" + run.run_id : "Unknown"
+        var id = run && run.run_id ? "" + run.run_id : root._unknownLabel()
         if (id.length <= 24)
             return id
         return id.slice(0, 15) + "..." + id.slice(id.length - 6)
+    }
+
+    function _unknownLabel() {
+        return I18n.t("未知", "Unknown")
     }
 
     function _isObject(value) {
@@ -244,7 +248,7 @@ Item {
             return I18n.t("中断", "Interrupted")
         if (st === "failed")
             return I18n.t("失败", "Failed")
-        return "Unknown"
+        return root._unknownLabel()
     }
 
     function _statusAccent(status) {
@@ -286,39 +290,39 @@ Item {
             return I18n.t("模拟", "Simulation")
         if (key === "local")
             return I18n.t("本地执行", "Local execution")
-        return "Unknown"
+        return root._unknownLabel()
     }
 
     function _templateLabel(run) {
         if (!run)
-            return "Unknown"
+            return root._unknownLabel()
         var value = run.profile_name || run.profile || run.template || run.script_id || ""
-        return value === "" ? "Unknown" : "" + value
+        return value === "" ? root._unknownLabel() : "" + value
     }
 
     function _timeLabel(run) {
         if (!run)
-            return "Unknown"
+            return root._unknownLabel()
         var ms = _extractRunTimestamp(run)
         if (!isNaN(ms))
             return _formatHistoryTimestamp(ms)
         var value = run.created_at || run.started_at || run.start_time
                     || run.timestamp || run.mtime || run.updated_at || ""
-        return value === "" ? "Unknown" : "" + value
+        return value === "" ? root._unknownLabel() : "" + value
     }
 
     function _endTimeLabel(run) {
         if (!run)
-            return "Unknown"
+            return root._unknownLabel()
         var value = run.ended_at || run.completed_at || run.end_time || ""
-        return value === "" ? "Unknown" : "" + value
+        return value === "" ? root._unknownLabel() : "" + value
     }
 
     function _durationLabel(run) {
         if (!run)
-            return "Unknown"
+            return root._unknownLabel()
         var value = run.duration || run.duration_text || run.elapsed || ""
-        return value === "" ? "Unknown" : "" + value
+        return value === "" ? root._unknownLabel() : "" + value
     }
 
     function _resultKey(run) {
@@ -336,7 +340,7 @@ Item {
 
     function _resultLabel(run) {
         if (!run)
-            return "Unknown"
+            return root._unknownLabel()
         var key = _resultKey(run)
         if (key === "wolf")
             return I18n.t("狼人阵营胜利", "Werewolf team victory")
@@ -349,7 +353,7 @@ Item {
             return I18n.t("中断", "Interrupted")
         if (st === "failed")
             return I18n.t("运行失败", "Run failed")
-        return "Unknown"
+        return root._unknownLabel()
     }
 
     function _summaryLabel(run) {
@@ -387,7 +391,7 @@ Item {
 
     function _versionLabel(run) {
         if (!run)
-            return "Unknown"
+            return root._unknownLabel()
         if (run.version !== undefined && run.version !== null && ("" + run.version) !== "")
             return "" + run.version
         var bucket = run.evaluation_bucket
@@ -404,7 +408,7 @@ Item {
             if (parts.length > 0)
                 return parts.join(" / ")
         }
-        return "Unknown"
+        return root._unknownLabel()
     }
 
     function _matchSearch(run) {
@@ -749,7 +753,7 @@ Item {
                         { label: I18n.t("已完成", "Completed"), value: root.completedCount, key: "completed" },
                         { label: I18n.t("进行中", "Running"), value: root.runningCount, key: "running" },
                         { label: I18n.t("中断", "Interrupted"), value: root.interruptedCount, key: "interrupted" },
-                        { label: "Unknown", value: root.unknownCount, key: "unknown" }
+                        { label: root._unknownLabel(), value: root.unknownCount, key: "unknown" }
                     ]
                     delegate: Rectangle {
                         required property var modelData
@@ -884,7 +888,7 @@ Item {
                             { key: "completed", label: I18n.t("已完成", "Completed"), count: root.completedCount },
                             { key: "running", label: I18n.t("进行中", "Running"), count: root.runningCount },
                             { key: "interrupted", label: I18n.t("中断", "Interrupted"), count: root.interruptedCount },
-                            { key: "unknown", label: "Unknown", count: root.unknownCount }
+                            { key: "unknown", label: root._unknownLabel(), count: root.unknownCount }
                         ]
                         delegate: Rectangle {
                             required property var modelData
@@ -1021,7 +1025,7 @@ Item {
                             I18n.t("模拟", "Simulation"),
                             I18n.t("云端执行", "Cloud execution"),
                             I18n.t("本地执行", "Local execution"),
-                            "Unknown"
+                            root._unknownLabel()
                         ]
                         onActivated: function(index) {
                             root.executionFilter = ["all", "fake", "live", "local", "unknown"][index]
@@ -1037,7 +1041,7 @@ Item {
                             I18n.t("全部结果", "All results"),
                             I18n.t("好人阵营", "Good team"),
                             I18n.t("狼人阵营", "Werewolf team"),
-                            "Unknown"
+                            root._unknownLabel()
                         ]
                         onActivated: function(index) {
                             root.resultFilter = ["all", "good", "wolf", "unknown"][index]
@@ -1406,7 +1410,7 @@ Item {
 
                             Text {
                                 width: parent.width
-                                text: "Run ID: " + root._shortRunId(modelData)
+                                text: I18n.t("对局 ID: ", "Run ID: ") + root._shortRunId(modelData)
                                 color: Theme.warm.muted
                                 font.family: Theme.fontFamilies.mono
                                 font.pixelSize: Theme.size.caption
@@ -1695,7 +1699,8 @@ Item {
 
                             Text {
                                 width: parent.width
-                                text: "Run ID: " + (root.selectedRun.run_id || "Unknown")
+                                text: I18n.t("对局 ID: ", "Run ID: ")
+                                      + (root.selectedRun.run_id || root._unknownLabel())
                                 color: Theme.warm.muted
                                 font.family: Theme.fontFamilies.mono
                                 font.pixelSize: Theme.size.caption

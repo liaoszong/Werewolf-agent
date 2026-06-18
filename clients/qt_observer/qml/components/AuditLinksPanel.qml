@@ -72,13 +72,6 @@ Flow {
             MouseArea {
                 anchors.fill: parent
                 cursorShape: Qt.PointingHandCursor
-                onClicked: {
-                    var path = "/api/runs/" + ObserverClient.currentRunId + "/" + chip.modelData
-                    if (chip.modelData === "projection") {
-                        path += "?perspective=" + ObserverClient.currentPerspective
-                    }
-                    console.log("Audit link:", ObserverClient.baseUrl + path)
-                }
             }
         }
     }

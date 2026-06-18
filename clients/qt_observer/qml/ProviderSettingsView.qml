@@ -38,7 +38,7 @@ Item {
         { id: "deepseek", label: "DeepSeek", defaultBase: "https://api.deepseek.com", requiresBase: false, defaultModels: ["deepseek-chat", "deepseek-reasoner"] },
         { id: "openai", label: "OpenAI", defaultBase: "https://api.openai.com/v1", requiresBase: false, defaultModels: ["gpt-4o", "gpt-4o-mini"] },
         { id: "anthropic", label: "Anthropic", defaultBase: "https://api.anthropic.com", requiresBase: false, defaultModels: ["claude-sonnet-4-6", "claude-haiku-4-5-20251001"] },
-        { id: "openai_compatible", label: "OpenAI-compatible custom", defaultBase: "", requiresBase: true, defaultModels: [] },
+        { id: "openai_compatible", label: I18n.t("OpenAI 兼容自定义", "OpenAI-compatible custom"), defaultBase: "", requiresBase: true, defaultModels: [] },
         { id: "zhipu", label: "Zhipu GLM", defaultBase: "https://api.z.ai/api/paas/v4", requiresBase: false, defaultModels: ["glm-4.7", "glm-4.6", "glm-4.5-air"] },
         { id: "moonshot", label: "Moonshot Kimi", defaultBase: "https://api.moonshot.ai/v1", requiresBase: false, defaultModels: ["kimi-k2.6", "moonshot-v1-8k"] },
         { id: "qwen", label: "Alibaba Qwen", defaultBase: "https://dashscope.aliyuncs.com/compatible-mode/v1", requiresBase: false, defaultModels: ["qwen3-max", "qwen-plus", "qwen-flash"] },
@@ -136,7 +136,7 @@ Item {
             { label: I18n.t("QML 健康状态", "QML health"), value: I18n.t("预览", "Preview"), body: I18n.t("构建与截图检查覆盖此页面。", "Build and screenshot checks cover this page.") }
         ],
         about: [
-            { label: "Werewolf Observer", value: I18n.t("v1.2 预览", "v1.2 preview"), body: I18n.t("客户端无关的实时 AI 狼人杀观察席。", "Client-agnostic live AI Werewolf spectator.") },
+            { label: I18n.t("狼人杀观察席", "Werewolf Observer"), value: I18n.t("v1.2 预览", "v1.2 preview"), body: I18n.t("客户端无关的实时 AI 狼人杀观察席。", "Client-agnostic live AI Werewolf spectator.") },
             { label: I18n.t("设计语言", "Design language"), value: I18n.t("桌游剧场", "Tabletop theater"), body: I18n.t("暖色羊皮纸、水粉场景、珊瑚色强调。", "Warm parchment, gouache scenes, coral accents.") }
         ]
     })
@@ -150,7 +150,7 @@ Item {
         for (var i = 0; i < specs.length; i++) {
             out.push({
                 id: specs[i].id,
-                label: specs[i].label,
+                label: root.providerDisplayLabel(specs[i].id, specs[i].label),
                 defaultBase: specs[i].default_base_url,
                 requiresBase: specs[i].requires_base_url,
                 defaultModels: specs[i].default_models || []
@@ -167,6 +167,12 @@ Item {
         return { id: id, label: id, defaultBase: "", requiresBase: false, defaultModels: [] }
     }
     readonly property var selectedSpec: specFor(selectedProvider)
+
+    function providerDisplayLabel(id, fallback) {
+        if (id === "openai_compatible")
+            return I18n.t("OpenAI 兼容自定义", "OpenAI-compatible custom")
+        return fallback
+    }
 
     function sectionFor(key) {
         for (var i = 0; i < root.settingsSections.length; i++)
@@ -562,7 +568,7 @@ Item {
                         anchors.verticalCenter: parent.verticalCenter
                         spacing: 1
                         Text {
-                            text: "Werewolf"
+                            text: I18n.t("狼人杀", "Werewolf")
                             color: Theme.warm.ink
                             font.family: Theme.fontFamilies.serif
                             font.contextFontMerging: true
@@ -1199,7 +1205,7 @@ Item {
                                             spacing: Theme.space.md
 
                                             Text {
-                                                text: "API Key"
+                                                text: I18n.t("API 密钥", "API Key")
                                                 color: Theme.warm.bodyStrong
                                                 font.family: Theme.fontFamilies.sans
                                                 font.pixelSize: Theme.size.caption
@@ -1250,7 +1256,7 @@ Item {
                                             Row {
                                                 spacing: Theme.space.sm
                                                 Text {
-                                                    text: "Base URL"
+                                                    text: I18n.t("基础 URL", "Base URL")
                                                     color: Theme.warm.bodyStrong
                                                     font.family: Theme.fontFamilies.sans
                                                     font.pixelSize: Theme.size.caption

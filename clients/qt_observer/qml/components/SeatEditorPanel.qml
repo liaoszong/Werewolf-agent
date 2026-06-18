@@ -601,7 +601,7 @@ Item {
                     Text {
                         width: 108
                         anchors.verticalCenter: parent.verticalCenter
-                        text: "Temperature"
+                        text: I18n.t("温度", "Temperature")
                         color: Theme.parchment.inkSoft
                         font.family: Theme.fontFamilies.cjkSans
                         font.contextFontMerging: true
@@ -679,7 +679,7 @@ Item {
                     Text {
                         width: 108
                         anchors.verticalCenter: parent.verticalCenter
-                        text: "Max Tokens"
+                        text: I18n.t("最大 Token", "Max Tokens")
                         color: Theme.parchment.inkSoft
                         font.family: Theme.fontFamilies.cjkSans
                         font.contextFontMerging: true
