@@ -88,8 +88,14 @@ Item {
 
     Component.onCompleted: {
         selectedSeatId = ""
-        ObserverClient.refreshProfileSchema()
-        ObserverClient.refreshProfiles()
+        if (!ObserverClient.profileSchema || Object.keys(ObserverClient.profileSchema).length === 0)
+            ObserverClient.refreshProfileSchema()
+        if (ObserverClient.profileItems.length > 0) {
+            _initialLoadDone = true
+            _loadProfileItem(ObserverClient.profileItems[0])
+        } else {
+            ObserverClient.refreshProfiles()
+        }
         ObserverClient.refreshCapabilities()
         var configured = CredentialStore.configuredProviders()
         for (var i = 0; i < configured.length; i++)
@@ -379,6 +385,8 @@ Item {
         fillMode: Image.PreserveAspectCrop
         asynchronous: true
         cache: true
+        sourceSize.width: Math.max(1, Math.ceil(width * 2))
+        sourceSize.height: Math.max(1, Math.ceil(height * 2))
         visible: status === Image.Ready
     }
 

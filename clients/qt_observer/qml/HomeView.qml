@@ -61,7 +61,6 @@ Item {
             if (key === "seats")
                 root.StackView.view.parent.navigateSetup()
             else if (key === "replay") {
-                ObserverClient.refreshRuns()
                 root.StackView.view.parent.navigateHistory()
             }
             else if (key === "settings")
@@ -155,10 +154,7 @@ Item {
                 width: parent.width
                 text: I18n.t("查看昨夜复盘", "Last Night's Replay")
                 variant: "secondary"
-                onClicked: {
-                    ObserverClient.refreshRuns()
-                    root.StackView.view.parent.navigateHistory()
-                }
+                onClicked: root.StackView.view.parent.navigateHistory()
             }
         }
     }
@@ -374,8 +370,10 @@ Item {
 
                 source: Illustrations.tarot(cardWrapper.modelData)
                 fillMode: Image.PreserveAspectFit
-                asynchronous: false      // bundled + cached -> instant on re-entry (no pop)
+                asynchronous: true
                 cache: true
+                sourceSize.width: Math.max(1, Math.ceil(width * 2))
+                sourceSize.height: Math.max(1, Math.ceil(height * 2))
                 visible: status === Image.Ready
 
                 // Composite shadow: warm-brown (blends into the parchment), and

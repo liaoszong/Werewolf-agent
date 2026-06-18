@@ -31,12 +31,20 @@ Item {
     Image {
         id: dayImg; anchors.fill: parent
         source: Illustrations.tableDay; fillMode: Image.PreserveAspectCrop
+        asynchronous: true
+        cache: true
+        sourceSize.width: Math.max(1, Math.ceil(width * 2))
+        sourceSize.height: Math.max(1, Math.ceil(height * 2))
         opacity: (!root._night && status === Image.Ready) ? 1 : 0
         Behavior on opacity { NumberAnimation { duration: Theme.motion.base } }
     }
     Image {
         id: nightImg; anchors.fill: parent
         source: Illustrations.tableNight; fillMode: Image.PreserveAspectCrop
+        asynchronous: true
+        cache: true
+        sourceSize.width: Math.max(1, Math.ceil(width * 2))
+        sourceSize.height: Math.max(1, Math.ceil(height * 2))
         opacity: (root._night && status === Image.Ready) ? 1 : 0
         Behavior on opacity { NumberAnimation { duration: Theme.motion.base } }
     }

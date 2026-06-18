@@ -12,6 +12,7 @@ Item {
     // The view to return to when leaving the provider-settings page (it is reached
     // from any page via the global gear, so it remembers where it was opened from).
     property string _providerReturnView: "home"
+    property string _cockpitReturnView: "home"
 
     // CLI --open-run: auto-open a run straight into the theater (mirrors Preflight's
     // poll-then-navigate so currentRunId is set before the cockpit loads).
@@ -236,47 +237,94 @@ Item {
     Component { id: providerSettingsComponent; ProviderSettingsView { objectName: "providerSettingsView" } }
     Component { id: designPreviewComponent; DesignPreviewView { objectName: "designPreviewView" } }
 
+    function _finishNav(view) {
+        currentView = view
+    }
+
+    function _popToHome() {
+        if (stackView.depth > 1) {
+            while (stackView.depth > 2)
+                stackView.pop(StackView.Immediate)
+            stackView.pop()
+        }
+        _finishNav("home")
+    }
+
+    function _showPrimary(component, view) {
+        if (currentView === view)
+            return
+        if (currentView !== "home" || stackView.depth > 1) {
+            while (stackView.depth > 1)
+                stackView.pop(StackView.Immediate)
+        }
+        stackView.push(component)
+        _finishNav(view)
+    }
+
+    function _pushOverlay(component, view) {
+        if (currentView === view)
+            return
+        stackView.push(component)
+        _finishNav(view)
+    }
+
+    function _popOverlay(returnView) {
+        if (stackView.depth > 1)
+            stackView.pop()
+        _finishNav(returnView)
+    }
+
+    function _refreshSetupRuntimeState() {
+        ObserverClient.refreshCapabilities()
+        var configured = CredentialStore.configuredProviders()
+        for (var i = 0; i < configured.length; i++)
+            CredentialStore.syncCredentialToServer(configured[i])
+    }
+
     function navigateHome() {
-        stackView.replace(homeComponent)
-        currentView = "home"
+        _popToHome()
     }
 
     function navigateSetup() {
-        stackView.replace(setupComponent)
-        currentView = "setup"
+        _showPrimary(setupComponent, "setup")
     }
 
     function navigatePreflight() {
-        stackView.replace(preflightComponent)
-        currentView = "preflight"
+        _showPrimary(preflightComponent, "preflight")
     }
 
     function navigateCockpit() {
-        stackView.replace(cockpitComponent)
-        currentView = "cockpit"
+        _cockpitReturnView = currentView === "history" ? "history" : "home"
+        _pushOverlay(cockpitComponent, "cockpit")
     }
 
     function navigateHistory() {
-        stackView.replace(historyComponent)
-        currentView = "history"
+        if (currentView === "cockpit" && _cockpitReturnView === "history") {
+            _popOverlay("history")
+            return
+        }
+        _showPrimary(historyComponent, "history")
     }
 
     function navigateDesignPreview() {
-        stackView.replace(designPreviewComponent)
-        currentView = "designPreview"
+        _showPrimary(designPreviewComponent, "designPreview")
     }
 
     function navigateProviderSettings() {
         if (currentView === "providerSettings")
             return
         _providerReturnView = currentView
-        stackView.replace(providerSettingsComponent)
-        currentView = "providerSettings"
+        _pushOverlay(providerSettingsComponent, "providerSettings")
     }
 
-    // Return to whichever page opened the settings (a fresh replace re-runs that
-    // view's Component.onCompleted, so newly configured providers are picked up).
+    // Return to whichever page opened settings without rebuilding that source page.
     function returnFromProviderSettings() {
+        if (currentView === "providerSettings" && stackView.depth > 1) {
+            if (_providerReturnView === "setup")
+                _refreshSetupRuntimeState()
+            _popOverlay(_providerReturnView)
+            return
+        }
         switch (_providerReturnView) {
         case "setup": navigateSetup(); break
         case "history": navigateHistory(); break
@@ -284,6 +332,15 @@ Item {
         case "cockpit": navigateCockpit(); break
         default: navigateHome()
         }
+    }
+
+    function returnFromCockpit() {
+        if (_cockpitReturnView === "history" && currentView === "cockpit" && stackView.depth > 1) {
+            ObserverClient.refreshRuns()
+            _popOverlay("history")
+            return
+        }
+        navigateHome()
     }
 
 }

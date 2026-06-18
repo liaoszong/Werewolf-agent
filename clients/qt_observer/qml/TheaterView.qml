@@ -73,7 +73,7 @@ Item {
         // 审计在底部全宽 EvidenceConsole（下），左区不再放，故 auditSlot 不注入。
         onBackRequested: {
             ObserverClient.disconnectStream()
-            theaterRoot.StackView.view.parent.navigateHome()
+            theaterRoot.StackView.view.parent.returnFromCockpit()
         }
     }
 
@@ -140,7 +140,7 @@ Item {
                 ObserverClient.disconnectStream()
                 var nav = theaterRoot.StackView.view.parent
                 if (theaterRoot.settlementEntryMode === 1)
-                    nav.navigateHistory()
+                    nav.returnFromCockpit()
                 else
                     nav.navigateHome()
             }

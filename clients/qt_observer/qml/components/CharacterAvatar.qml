@@ -46,6 +46,10 @@ Item {
             source: root._art
             fillMode: Image.PreserveAspectCrop
             verticalAlignment: Image.AlignTop
+            asynchronous: true
+            cache: true
+            sourceSize.width: Math.max(1, Math.ceil(width * 2))
+            sourceSize.height: Math.max(1, Math.ceil(height * 2))
             visible: root._hasArt
             // 出局去色需 MultiEffect(真机);offscreen 不渲染,截图按彩色判读 alive 态
         }

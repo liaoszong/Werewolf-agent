@@ -73,6 +73,10 @@ Item {
                 source: root._art
                 fillMode: Image.PreserveAspectCrop
                 verticalAlignment: Image.AlignTop
+                asynchronous: true
+                cache: true
+                sourceSize.width: Math.max(1, Math.ceil(width * 2))
+                sourceSize.height: Math.max(1, Math.ceil(height * 2))
                 visible: root._hasArt
             }
         }
