@@ -107,6 +107,12 @@ ObserverApiClient::ObserverApiClient(QObject *parent)
     , m_sseParser(new ObserverSseParser)
 {
     m_baseUrl = QStringLiteral("http://127.0.0.1:8765");
+    m_streamReconnectTimer.setSingleShot(true);
+    connect(&m_streamReconnectTimer, &QTimer::timeout, this, [this]() {
+        if (!shouldReconnectStream())
+            return;
+        startStreamRequest(false);
+    });
 }
 
 ObserverApiClient::~ObserverApiClient()
@@ -142,7 +148,7 @@ void ObserverApiClient::setCurrentPerspective(const QString &perspective)
             m_projectionEvents.clear();
             emit projectionEventsChanged();
         }
-        if (m_connected && !m_currentRunId.isEmpty()) {
+        if (m_connected || shouldReconnectStream()) {
             startStreamRequest();
             refreshProjection();
         }
@@ -491,21 +497,31 @@ void ObserverApiClient::connectStream()
 {
     if (m_currentRunId.isEmpty())
         return;
+    m_streamDesired = true;
+    m_streamReconnectAttempts = 0;
+    m_streamReconnectTimer.stop();
+    if (m_streamReply)
+        return;
     startStreamRequest();
 }
 
 void ObserverApiClient::disconnectStream()
 {
+    m_streamDesired = false;
+    m_streamReconnectAttempts = 0;
+    m_streamReconnectTimer.stop();
     stopStream();
 }
 
-void ObserverApiClient::startStreamRequest()
+void ObserverApiClient::startStreamRequest(bool clearEvents)
 {
     stopStream();
 
     m_sseParser->reset();
-    m_eventItems.clear();
-    emit eventItemsChanged();
+    if (clearEvents) {
+        m_eventItems.clear();
+        emit eventItemsChanged();
+    }
 
     QUrl url(m_baseUrl + QStringLiteral("/api/runs/") + m_currentRunId + QStringLiteral("/stream"));
     QUrlQuery query;
@@ -550,6 +566,7 @@ void ObserverApiClient::onStreamReadyRead()
         m_connected = true;
         emit connectedChanged();
     }
+    m_streamReconnectAttempts = 0;
 
     QByteArray chunk = m_streamReply->readAll();
     QList<ObserverSseMessage> messages = m_sseParser->feed(chunk);
@@ -578,8 +595,15 @@ void ObserverApiClient::onStreamFinished()
         m_streamReply->deleteLater();
         m_streamReply = nullptr;
     }
-    m_connected = false;
-    emit connectedChanged();
+    if (m_connected) {
+        m_connected = false;
+        emit connectedChanged();
+    }
+    if (shouldReconnectStream()) {
+        scheduleStreamReconnect();
+    } else {
+        m_streamDesired = false;
+    }
 }
 
 void ObserverApiClient::onStreamError(QNetworkReply::NetworkError error)
@@ -590,8 +614,35 @@ void ObserverApiClient::onStreamError(QNetworkReply::NetworkError error)
         m_streamReply->deleteLater();
         m_streamReply = nullptr;
     }
-    m_connected = false;
-    emit connectedChanged();
+    if (m_connected) {
+        m_connected = false;
+        emit connectedChanged();
+    }
+    if (shouldReconnectStream()) {
+        scheduleStreamReconnect();
+    } else {
+        m_streamDesired = false;
+    }
+}
+
+bool ObserverApiClient::shouldReconnectStream() const
+{
+    if (!m_streamDesired || m_currentRunId.isEmpty())
+        return false;
+    return m_currentStatus == QStringLiteral("queued") || m_currentStatus == QStringLiteral("running");
+}
+
+void ObserverApiClient::scheduleStreamReconnect()
+{
+    if (!shouldReconnectStream())
+        return;
+    if (m_streamReconnectTimer.isActive())
+        return;
+    int delayMs = 1000;
+    for (int i = 0; i < m_streamReconnectAttempts && delayMs < 10000; ++i)
+        delayMs = qMin(delayMs * 2, 10000);
+    ++m_streamReconnectAttempts;
+    m_streamReconnectTimer.start(delayMs);
 }
 
 void ObserverApiClient::refreshAuditLinks()
