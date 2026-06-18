@@ -98,6 +98,16 @@ static bool hasSecretLikeContent(const QJsonValue &value, QString *message)
     return false;
 }
 
+static QString streamEventId(const QVariantMap &item)
+{
+    QString id = item.value(QStringLiteral("event_id")).toString();
+    if (!id.isEmpty())
+        return id;
+
+    const QVariantMap payload = item.value(QStringLiteral("payload")).toMap();
+    return payload.value(QStringLiteral("event_id")).toString();
+}
+
 ObserverApiClient::ObserverApiClient(QObject *parent)
     : QObject(parent)
     , m_connected(false)
@@ -117,7 +127,7 @@ ObserverApiClient::ObserverApiClient(QObject *parent)
 
 ObserverApiClient::~ObserverApiClient()
 {
-    stopStream();
+    disconnectStream();
     delete m_sseParser;
 }
 
@@ -254,6 +264,7 @@ void ObserverApiClient::setCurrentRunId(const QString &runId)
         return;
     m_currentRunId = runId;
     emit currentRunChanged();
+    m_seenStreamEventIds.clear();
     // P2-C-1 stale-data guard (P2-F): a new run must not inherit the prior run's
     // enriched projection events.
     if (!m_projectionEvents.isEmpty()) {
@@ -488,6 +499,7 @@ void ObserverApiClient::openRun(const QString &runId, bool forReport)
             for (const QJsonValue &v : events)
                 items.append(v.toObject().toVariantMap());
             m_eventItems = items;
+            rebuildSeenStreamEventIds();
             emit eventItemsChanged();
         });
     });
@@ -519,6 +531,7 @@ void ObserverApiClient::startStreamRequest(bool clearEvents)
 
     m_sseParser->reset();
     if (clearEvents) {
+        m_seenStreamEventIds.clear();
         m_eventItems.clear();
         emit eventItemsChanged();
     }
@@ -571,6 +584,7 @@ void ObserverApiClient::onStreamReadyRead()
     QByteArray chunk = m_streamReply->readAll();
     QList<ObserverSseMessage> messages = m_sseParser->feed(chunk);
 
+    bool appendedEvent = false;
     for (const ObserverSseMessage &msg : messages) {
         if (msg.eventName == QStringLiteral("run_status")) {
             QString status = msg.data.value(QStringLiteral("status")).toString();
@@ -578,14 +592,24 @@ void ObserverApiClient::onStreamReadyRead()
                 m_currentStatus = status;
                 emit currentStatusChanged();
             }
+            continue;
         }
 
         QVariantMap item = msg.data.toVariantMap();
         item[QStringLiteral("_eventType")] = msg.eventName;
+        if (msg.eventName == QStringLiteral("runtime_event")) {
+            const QString eventId = streamEventId(item);
+            if (!eventId.isEmpty()) {
+                if (m_seenStreamEventIds.contains(eventId))
+                    continue;
+                m_seenStreamEventIds.insert(eventId);
+            }
+        }
         m_eventItems.append(item);
+        appendedEvent = true;
     }
 
-    if (!messages.isEmpty())
+    if (appendedEvent)
         emit eventItemsChanged();
 }
 
@@ -643,6 +667,16 @@ void ObserverApiClient::scheduleStreamReconnect()
         delayMs = qMin(delayMs * 2, 10000);
     ++m_streamReconnectAttempts;
     m_streamReconnectTimer.start(delayMs);
+}
+
+void ObserverApiClient::rebuildSeenStreamEventIds()
+{
+    m_seenStreamEventIds.clear();
+    for (const QVariant &itemValue : m_eventItems) {
+        const QString eventId = streamEventId(itemValue.toMap());
+        if (!eventId.isEmpty())
+            m_seenStreamEventIds.insert(eventId);
+    }
 }
 
 void ObserverApiClient::refreshAuditLinks()

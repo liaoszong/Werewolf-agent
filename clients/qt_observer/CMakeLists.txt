@@ -142,3 +142,14 @@ qt_add_executable(tst_observer_sse_parser
 target_include_directories(tst_observer_sse_parser PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(tst_observer_sse_parser PRIVATE Qt6::Test Qt6::Core)
 add_test(NAME observer_sse_parser COMMAND tst_observer_sse_parser)
+
+qt_add_executable(tst_observer_api_client
+    tests/tst_observer_api_client.cpp
+    src/ObserverApiClient.cpp
+    src/ObserverApiClient.h
+    src/ObserverSseParser.cpp
+    src/ObserverSseParser.h
+)
+target_include_directories(tst_observer_api_client PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(tst_observer_api_client PRIVATE Qt6::Test Qt6::Core Qt6::Network)
+add_test(NAME observer_api_client COMMAND tst_observer_api_client)

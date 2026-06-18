@@ -24,6 +24,7 @@ Item {
         }
         Qt.callLater(theaterRoot._maybeAutoSeekReport)
     }
+    Component.onDestruction: ObserverClient.disconnectStream()
 
     // Re-fetch the (enriched) projection as new events arrive, throttled.
     Connections {
