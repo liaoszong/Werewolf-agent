@@ -64,7 +64,7 @@ Popup {
                 radius: 15
                 color: "transparent"
                 border.width: 1
-                border.color: Qt.rgba(1, 248 / 255, 234 / 255, 0.40)
+                border.color: Theme.withAlpha(Theme.parchment.highlightLine, 0.40)
             }
         }
     }

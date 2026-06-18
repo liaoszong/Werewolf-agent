@@ -56,7 +56,7 @@ Item {
             anchors { top: parent.top; left: parent.left; right: parent.right }
             height: parent.height * 0.4
             gradient: Gradient {
-                GradientStop { position: 0.0; color: Theme.withAlpha("#ffffff", 0.10) }
+                GradientStop { position: 0.0; color: Theme.withAlpha(Theme.warm.textOnPrimary, 0.10) }
                 GradientStop { position: 1.0; color: "transparent" }
             }
         }

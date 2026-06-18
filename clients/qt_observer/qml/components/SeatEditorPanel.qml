@@ -252,7 +252,7 @@ Item {
             radius: root.panelRadius - 1
             color: "transparent"
             border.width: 1
-            border.color: Qt.rgba(1, 248 / 255, 234 / 255, 0.48)
+            border.color: Theme.withAlpha(Theme.parchment.highlightLine, 0.48)
         }
 
         Rectangle {
@@ -262,7 +262,7 @@ Item {
             anchors.leftMargin: root.panelRadius
             anchors.rightMargin: root.panelRadius
             height: 1
-            color: Qt.rgba(1, 250 / 255, 240 / 255, 0.56)
+            color: Theme.withAlpha(Theme.parchment.highlightPale, 0.56)
         }
     }
 
@@ -386,7 +386,7 @@ Item {
                     anchors.leftMargin: 16
                     anchors.rightMargin: 16
                     height: 1
-                    color: Qt.rgba(1, 248 / 255, 234 / 255, 0.38)
+                    color: Theme.withAlpha(Theme.parchment.highlightLine, 0.38)
                 }
 
                 Column {
@@ -541,7 +541,7 @@ Item {
                         anchors.leftMargin: 14
                         anchors.rightMargin: 14
                         height: 1
-                        color: Qt.rgba(1, 248 / 255, 234 / 255, 0.42)
+                        color: Theme.withAlpha(Theme.parchment.highlightLine, 0.42)
                     }
                     Rectangle {
                         anchors.left: parent.left
@@ -619,7 +619,7 @@ Item {
                             width: tempSlider.availableWidth
                             height: 8
                             radius: 4
-                            color: Qt.rgba(145 / 255, 122 / 255, 88 / 255, 0.28)
+                            color: Theme.parchment.sliderTrack
                             border.width: 1
                             border.color: Theme.withAlpha(Theme.parchment.goldLineSoft, 0.42)
                             Rectangle {
@@ -629,7 +629,7 @@ Item {
                                 anchors.leftMargin: 5
                                 anchors.rightMargin: 5
                                 height: 1
-                                color: Qt.rgba(1, 248 / 255, 234 / 255, 0.24)
+                                color: Theme.withAlpha(Theme.parchment.highlightLine, 0.24)
                             }
                             Rectangle {
                                 width: tempSlider.visualPosition * parent.width
@@ -653,9 +653,9 @@ Item {
                                * (tempSlider.availableWidth - width)
                             y: tempSlider.topPadding + tempSlider.availableHeight / 2 - height / 2
                             width: 18; height: 18; radius: 5
-                            color: tempHandleHover.hovered ? "#d3a35e" : "#c79752"
+                            color: tempHandleHover.hovered ? Theme.parchment.sliderHandleHover : Theme.parchment.sliderHandle
                             border.width: 2
-                            border.color: Qt.rgba(1, 244 / 255, 216 / 255, 0.82)
+                            border.color: Theme.withAlpha(Theme.parchment.highlightWarm, 0.82)
                             rotation: 45
                             HoverHandler { id: tempHandleHover; cursorShape: Qt.PointingHandCursor }
                         }

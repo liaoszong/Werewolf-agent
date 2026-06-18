@@ -24,14 +24,14 @@ Item {
     readonly property int pageGap: Theme.space.lg
 
     readonly property var settingsSections: [
-        { key: "ai", label: I18n.t("AI 模型与凭证", "AI Models & Credentials"), caption: I18n.t("供应商访问", "Provider access"), glyph: "♜", preview: false },
-        { key: "usage", label: I18n.t("用量与费用", "Usage & Cost"), caption: I18n.t("预估账本", "Estimated ledger"), glyph: "▥", preview: true },
-        { key: "global", label: I18n.t("全局偏好", "Global Preferences"), caption: I18n.t("行为默认值", "Behavior defaults"), glyph: "⚙", preview: true },
-        { key: "appearance", label: I18n.t("外观", "Appearance"), caption: I18n.t("主题与布局", "Theme and layout"), glyph: "✧", preview: true },
-        { key: "privacy", label: I18n.t("隐私与数据", "Privacy & Data"), caption: I18n.t("留存控制", "Retention controls"), glyph: "◈", preview: true },
-        { key: "proxy", label: I18n.t("代理与网络", "Proxy & Network"), caption: I18n.t("连接设置", "Connection settings"), glyph: "◎", preview: true },
-        { key: "diagnostics", label: I18n.t("诊断", "Diagnostics"), caption: I18n.t("系统记录", "System notes"), glyph: "⌁", preview: true },
-        { key: "about", label: I18n.t("关于", "About"), caption: I18n.t("版本与许可", "Version and license"), glyph: "ⓘ", preview: true }
+        { key: "ai", label: I18n.t("AI 模型与凭证", "AI Models & Credentials"), caption: I18n.t("真实保存与同步", "Live save and sync"), glyph: "♜", preview: false },
+        { key: "usage", label: I18n.t("用量与费用", "Usage & Cost"), caption: I18n.t("示例账本", "Example ledger"), glyph: "▥", preview: true },
+        { key: "global", label: I18n.t("全局偏好", "Global Preferences"), caption: I18n.t("示例默认值", "Example defaults"), glyph: "⚙", preview: true },
+        { key: "appearance", label: I18n.t("外观", "Appearance"), caption: I18n.t("示例主题项", "Example theme items"), glyph: "✧", preview: true },
+        { key: "privacy", label: I18n.t("隐私与数据", "Privacy & Data"), caption: I18n.t("说明与示例", "Notes and examples"), glyph: "◈", preview: true },
+        { key: "proxy", label: I18n.t("代理与网络", "Proxy & Network"), caption: I18n.t("说明与示例", "Notes and examples"), glyph: "◎", preview: true },
+        { key: "diagnostics", label: I18n.t("诊断", "Diagnostics"), caption: I18n.t("示例状态", "Example status"), glyph: "⌁", preview: true },
+        { key: "about", label: I18n.t("关于", "About"), caption: I18n.t("说明信息", "Reference notes"), glyph: "ⓘ", preview: true }
     ]
 
     readonly property var fallbackProviderCatalog: [
@@ -181,6 +181,22 @@ Item {
         return root.settingsSections[0]
     }
 
+    function sectionModeLabel(section) {
+        return section.preview ? I18n.t("预览", "Preview") : I18n.t("可操作", "Live")
+    }
+
+    function sectionModeColor(section) {
+        return section.preview ? Theme.warm.primaryActive : Theme.warm.success
+    }
+
+    function sectionModeFill(section, selected) {
+        if (section.preview)
+            return selected ? Theme.withAlpha(Theme.warm.canvas, 0.72)
+                            : Theme.withAlpha(Theme.parchment.terracottaWash, 0.75)
+        return selected ? Theme.withAlpha(Theme.warm.success, 0.14)
+                        : Theme.withAlpha(Theme.warm.success, 0.10)
+    }
+
     function isPreviewProvider(id) {
         return ("" + id).indexOf("preview_") === 0
     }
@@ -244,16 +260,7 @@ Item {
     }
 
     function providerAccent(id) {
-        switch (id) {
-        case "openai": return "#41a47a"
-        case "anthropic": return "#b98a58"
-        case "deepseek": return "#6d8ec8"
-        case "qwen": return "#a9583e"
-        case "moonshot": return "#7d6ab3"
-        case "zhipu": return "#5db8a6"
-        case "minimax": return "#c98256"
-        default: return Theme.warm.primary
-        }
+        return Theme.providerAccent(id)
     }
 
     function providerIcon(id) {
@@ -629,7 +636,7 @@ Item {
 
                                 Column {
                                     anchors.verticalCenter: parent.verticalCenter
-                                    width: parent.width - 34 - (previewPill.visible ? previewPill.width + Theme.space.sm : 0)
+                                    width: parent.width - 34 - sectionModePill.width - Theme.space.sm
                                     spacing: 1
 
                                     Text {
@@ -654,22 +661,19 @@ Item {
                                 }
 
                                 Rectangle {
-                                    id: previewPill
-                                    visible: sectionRow.modelData.preview
+                                    id: sectionModePill
                                     anchors.verticalCenter: parent.verticalCenter
-                                    width: previewText.implicitWidth + 12
+                                    width: sectionModeText.implicitWidth + 12
                                     height: 20
                                     radius: Theme.radius.pill
-                                    color: sectionRow.selected ? Theme.withAlpha(Theme.warm.canvas, 0.72)
-                                                               : Theme.withAlpha(Theme.parchment.terracottaWash, 0.75)
+                                    color: root.sectionModeFill(sectionRow.modelData, sectionRow.selected)
                                     border.width: 1
-                                    border.color: sectionRow.selected ? Theme.withAlpha(Theme.warm.primary, 0.32)
-                                                                     : Theme.withAlpha(Theme.warm.primary, 0.35)
+                                    border.color: Theme.withAlpha(root.sectionModeColor(sectionRow.modelData), sectionRow.selected ? 0.42 : 0.35)
                                     Text {
-                                        id: previewText
+                                        id: sectionModeText
                                         anchors.centerIn: parent
-                                        text: I18n.t("预览", "Preview")
-                                        color: Theme.warm.primaryActive
+                                        text: root.sectionModeLabel(sectionRow.modelData)
+                                        color: root.sectionModeColor(sectionRow.modelData)
                                         font.family: Theme.fontFamilies.sans
                                         font.pixelSize: 9
                                         font.weight: Theme.weight.bold
@@ -787,7 +791,7 @@ Item {
 
                             SectionHeader {
                                 title: I18n.t("供应商索引", "Provider Index")
-                                caption: I18n.t("已连接、未配置和预览连接器。", "Connected, not configured, and preview connectors.")
+                                caption: I18n.t("真实供应商可保存凭证；预览连接器只用于示例。", "Live providers can save credentials; preview connectors are examples only.")
                                 onLight: true
                             }
 
@@ -1196,6 +1200,66 @@ Item {
                                         color: Theme.withAlpha(Theme.parchment.goldLine, 0.28)
                                     }
 
+                                    Rectangle {
+                                        width: parent.width
+                                        radius: 14
+                                        color: Theme.withAlpha(Theme.warm.success, 0.08)
+                                        border.width: 1
+                                        border.color: Theme.withAlpha(Theme.warm.success, 0.24)
+                                        implicitHeight: liveBoundaryRow.implicitHeight + Theme.space.md * 2
+
+                                        Row {
+                                            id: liveBoundaryRow
+                                            anchors.left: parent.left
+                                            anchors.right: parent.right
+                                            anchors.top: parent.top
+                                            anchors.margins: Theme.space.md
+                                            spacing: Theme.space.md
+
+                                            Rectangle {
+                                                width: 34
+                                                height: 34
+                                                radius: 17
+                                                anchors.verticalCenter: parent.verticalCenter
+                                                color: Theme.withAlpha(Theme.warm.success, 0.16)
+                                                border.width: 1
+                                                border.color: Theme.withAlpha(Theme.warm.success, 0.38)
+                                                Text {
+                                                    anchors.centerIn: parent
+                                                    text: "✓"
+                                                    color: Qt.darker(Theme.warm.success, 1.22)
+                                                    font.pixelSize: 15
+                                                    font.weight: Theme.weight.bold
+                                                }
+                                            }
+
+                                            Column {
+                                                width: parent.width - 46
+                                                anchors.verticalCenter: parent.verticalCenter
+                                                spacing: 2
+                                                Text {
+                                                    width: parent.width
+                                                    text: I18n.t("真实可操作区域", "Live actionable section")
+                                                    color: Theme.warm.bodyStrong
+                                                    font.family: Theme.fontFamilies.sans
+                                                    font.contextFontMerging: true
+                                                    font.pixelSize: Theme.size.caption
+                                                    font.weight: Theme.weight.semibold
+                                                }
+                                                Text {
+                                                    width: parent.width
+                                                    text: I18n.t("保存或清除 API Key 会写入本机凭证库，并同步到本地 observer server；下方价格、用量与预览连接器仍是示例信息。",
+                                                                 "Saving or clearing an API key writes to the local credential store and syncs to the local observer server; prices, usage, and preview connectors below remain example information.")
+                                                    color: Theme.warm.muted
+                                                    font.family: Theme.fontFamilies.sans
+                                                    font.contextFontMerging: true
+                                                    font.pixelSize: Theme.size.micro
+                                                    wrapMode: Text.WordWrap
+                                                }
+                                            }
+                                        }
+                                    }
+
                                     Row {
                                         width: parent.width
                                         spacing: Theme.space.lg
@@ -1429,7 +1493,7 @@ Item {
                                                     width: parent.width
                                                     text: I18n.t("最近验证 ", "Last validation ") + root.statFor(root.selectedProvider, "last")
                                                           + I18n.t(" · 可用模型 ", " · Available models ") + root.providerModelCount(root.selectedProvider)
-                                                          + I18n.t(" · 价格为预估 / 预览", " · Prices are Estimated / Preview")
+                                                          + I18n.t(" · 价格为参考示例", " · Prices are reference examples")
                                                     color: Theme.warm.muted
                                                     font.family: Theme.fontFamilies.sans
                                                     font.contextFontMerging: true
@@ -1680,7 +1744,7 @@ Item {
 
                                     Text {
                                         width: parent.width
-                                        text: I18n.t("预估 / 预览数据，实际供应商账单可能不同。", "Estimated / Preview only. Actual provider billing may vary.")
+                                        text: I18n.t("示例账本：这些数字不会写入凭证库，也不代表真实供应商账单。", "Example ledger: these numbers are not saved to credentials and do not represent real provider billing.")
                                         color: Theme.warm.muted
                                         font.family: Theme.fontFamilies.sans
                                         font.contextFontMerging: true
@@ -1866,7 +1930,7 @@ Item {
                                         Text {
                                             id: previewSectionPillText
                                             anchors.centerIn: parent
-                                            text: I18n.t("预览 / 即将推出", "Preview / Coming soon")
+                                            text: I18n.t("预览示例", "Preview example")
                                             color: Theme.warm.primaryActive
                                             font.family: Theme.fontFamilies.sans
                                             font.pixelSize: 9
@@ -1876,7 +1940,7 @@ Item {
                                 }
                                 Text {
                                     width: parent.width
-                                    text: I18n.t("此页面已完成样式与导航接线；未标明真实功能的控件暂不调用后端 API。", "This surface is styled and wired for navigation only. Controls here do not call backend APIs yet.")
+                                    text: I18n.t("此区域是说明或示例预览，不保存配置、不调用后端 API；真实凭证操作只在 AI 模型与凭证区。", "This area is reference or preview content. It does not save configuration or call backend APIs; live credential actions are only in AI Models & Credentials.")
                                     color: Theme.warm.muted
                                     font.family: Theme.fontFamilies.sans
                                     font.contextFontMerging: true
@@ -2069,7 +2133,7 @@ Item {
                             Text {
                                 anchors.fill: parent
                                 anchors.margins: Theme.space.lg
-                                text: I18n.t("预览控件在 observer server 暴露对应字段前不会持久化。", "Preview controls are intentionally non-persistent until the observer server exposes matching fields.")
+                                text: I18n.t("预览控件在 observer server 暴露对应字段前不会持久化；这里的数字与开关仅用于说明未来信息架构。", "Preview controls are intentionally non-persistent until the observer server exposes matching fields; numbers and switches here only explain the future information architecture.")
                                 color: Theme.warm.bodyStrong
                                 font.family: Theme.fontFamilies.sans
                                 font.contextFontMerging: true

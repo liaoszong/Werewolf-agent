@@ -34,7 +34,7 @@ Rectangle {
         anchors { top: parent.top; left: parent.left; right: parent.right; topMargin: 4; leftMargin: 5; rightMargin: 5 }
         height: 7
         gradient: Gradient {
-            GradientStop { position: 0.0; color: Theme.withAlpha("#3a2c1a", 0.15) }
+            GradientStop { position: 0.0; color: Theme.withAlpha(Theme.parchment.innerShadow, 0.15) }
             GradientStop { position: 1.0; color: "transparent" }
         }
     }
@@ -119,7 +119,7 @@ Rectangle {
                             id: segText
                             anchors.centerIn: parent
                             text: modelData.label
-                            color: parent._active ? "#ffffff" : Theme.parchment.inkSoft
+                            color: parent._active ? Theme.warm.textOnPrimary : Theme.parchment.inkSoft
                             font.family: Theme.fontFamilies.sans; font.contextFontMerging: true
                             font.pixelSize: Theme.size.caption
                             font.weight: parent._active ? Theme.weight.bold : Theme.weight.regular

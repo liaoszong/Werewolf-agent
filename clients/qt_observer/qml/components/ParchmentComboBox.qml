@@ -58,7 +58,7 @@ ComboBox {
             anchors.leftMargin: control.controlRadius
             anchors.rightMargin: control.controlRadius
             height: 1
-            color: Qt.rgba(1, 248 / 255, 234 / 255, control.enabled ? 0.45 : 0.20)
+            color: Theme.withAlpha(Theme.parchment.highlightLine, control.enabled ? 0.45 : 0.20)
         }
 
         Rectangle {
@@ -224,7 +224,7 @@ ComboBox {
                     radius: 14
                     color: "transparent"
                     border.width: 1
-                    border.color: Qt.rgba(1, 248 / 255, 234 / 255, 0.36)
+                    border.color: Theme.withAlpha(Theme.parchment.highlightLine, 0.36)
                 }
             }
         }

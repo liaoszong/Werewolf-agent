@@ -71,7 +71,7 @@ Item {
             layer.enabled: true
             layer.effect: MultiEffect {
                 shadowEnabled: true
-                shadowColor: Qt.rgba(48 / 255, 32 / 255, 18 / 255, root.selected ? 0.60 : 0.48)
+                    shadowColor: Theme.withAlpha(Theme.parchment.sealShadowBase, root.selected ? 0.60 : 0.48)
                 shadowBlur: root.selected ? 1.02 : (hoverHandler.hovered ? 0.96 : 0.88)
                 shadowHorizontalOffset: root.selected ? 7 : 6
                 shadowVerticalOffset: root.selected ? 16 : (hoverHandler.hovered ? 15 : 13)

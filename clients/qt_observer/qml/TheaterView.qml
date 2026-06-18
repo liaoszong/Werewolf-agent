@@ -17,14 +17,14 @@ Item {
             ObserverClient.refreshProjection()
             // Only tail the live stream for an active run; a completed run's events were
             // already loaded by openRun (avoids a redundant SSE replay storm on re-open).
-            if (!ObserverClient.connected
-                    && ObserverClient.currentStatus !== "completed"
+            if (ObserverClient.currentStatus !== "completed"
                     && ObserverClient.currentStatus !== "failed"
                     && ObserverClient.currentStatus !== "interrupted")
                 ObserverClient.connectStream()
         }
         Qt.callLater(theaterRoot._maybeAutoSeekReport)
     }
+    Component.onDestruction: ObserverClient.disconnectStream()
 
     // Re-fetch the (enriched) projection as new events arrive, throttled.
     Connections {

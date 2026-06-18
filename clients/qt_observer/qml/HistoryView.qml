@@ -20,7 +20,11 @@ Item {
     property var _batchQueue: []
     property int _batchTotal: 0
     property int _batchFailed: 0
+    property int _batchInFlight: 0
     property var _batchErrors: []
+    readonly property int _batchConcurrency: 4
+    readonly property int _batchErrorPreviewLimit: 3
+    readonly property int _batchCompleted: _batchTotal - _batchQueue.length - _batchInFlight
 
     property string activeFilter: "all"          // all | completed | running | interrupted | unknown
     property string searchText: ""
@@ -44,6 +48,11 @@ Item {
 
     function _shortRunId(run) {
         var id = run && run.run_id ? "" + run.run_id : root._unknownLabel()
+        return _shortRunIdValue(id)
+    }
+
+    function _shortRunIdValue(id) {
+        id = id !== undefined && id !== null ? "" + id : root._unknownLabel()
         if (id.length <= 24)
             return id
         return id.slice(0, 15) + "..." + id.slice(id.length - 6)
@@ -556,36 +565,56 @@ Item {
         _batchQueue = Object.keys(_selected)
         _batchTotal = _batchQueue.length
         _batchFailed = 0
+        _batchInFlight = 0
         _batchErrors = []
         _batchActive = true
         _pumpBatch()
     }
 
     function _pumpBatch() {
-        if (_batchQueue.length === 0) {
-            _batchActive = false
-            var okCount = _batchTotal - _batchFailed
-            noticeBar.show(_batchFailed === 0
-                ? I18n.t("已删除 ", "Deleted ") + okCount + I18n.t(" 局", " runs")
-                : I18n.t("已删除 ", "Deleted ") + okCount + I18n.t(" 局，", " runs, ")
-                  + _batchFailed + I18n.t(" 局失败：", " failed: ") + _batchErrors.join("; "))
-            _exitSelectMode()
-            ObserverClient.refreshRuns()
+        if (!_batchActive)
             return
+
+        while (_batchInFlight < _batchConcurrency && _batchQueue.length > 0) {
+            var q = _batchQueue
+            var next = q.shift()
+            _batchQueue = q
+            _batchInFlight += 1
+            ObserverClient.deleteRun(next)
         }
-        var q = _batchQueue
-        var next = q.shift()
-        _batchQueue = q
-        ObserverClient.deleteRun(next)
+
+        if (_batchQueue.length === 0 && _batchInFlight === 0)
+            _finishBatchDelete()
+    }
+
+    function _finishBatchDelete() {
+        _batchActive = false
+        var okCount = _batchTotal - _batchFailed
+        noticeBar.show(_batchFailed === 0
+            ? I18n.t("已删除 ", "Deleted ") + okCount + I18n.t(" 局", " runs")
+            : I18n.t("已删除 ", "Deleted ") + okCount + I18n.t(" 局，", " runs, ")
+              + _batchFailed + I18n.t(" 局失败：", " failed: ") + _formatBatchErrors())
+        _exitSelectMode()
+        ObserverClient.refreshRuns()
+    }
+
+    function _formatBatchErrors() {
+        var shown = _batchErrors.slice(0, _batchErrorPreviewLimit)
+        var message = shown.join("; ")
+        var hidden = _batchErrors.length - shown.length
+        if (hidden > 0)
+            message += I18n.t("；另有 ", "; plus ") + hidden + I18n.t(" 项", " more")
+        return message
     }
 
     Connections {
         target: ObserverClient
         function onDeleteRunFinished(runId, ok, error) {
             if (root._batchActive) {
+                root._batchInFlight = Math.max(0, root._batchInFlight - 1)
                 if (!ok) {
                     root._batchFailed += 1
-                    root._batchErrors.push(runId + ": " + error)
+                    root._batchErrors.push(root._shortRunIdValue(runId) + ": " + error)
                 }
                 root._pumpBatch()
                 return
@@ -644,9 +673,9 @@ Item {
         anchors.fill: parent
         gradient: Gradient {
             orientation: Gradient.Vertical
-            GradientStop { position: 0.00; color: Qt.rgba(1.0, 246 / 255, 230 / 255, 0.24) }
-            GradientStop { position: 0.58; color: Qt.rgba(1.0, 241 / 255, 216 / 255, 0.08) }
-            GradientStop { position: 1.00; color: Qt.rgba(107 / 255, 67 / 255, 40 / 255, 0.18) }
+            GradientStop { position: 0.00; color: Theme.withAlpha(Theme.parchment.highlightCream, 0.24) }
+            GradientStop { position: 0.58; color: Theme.withAlpha(Theme.parchment.highlightHoney, 0.08) }
+            GradientStop { position: 1.00; color: Theme.withAlpha(Theme.parchment.shadowBrown, 0.18) }
         }
     }
 
@@ -819,6 +848,7 @@ Item {
                     onLight: true
                     text: I18n.t("刷新", "Refresh")
                     variant: "secondary"
+                    enabled: !root._batchActive
                     onClicked: ObserverClient.refreshRuns()
                 }
 
@@ -835,7 +865,10 @@ Item {
                 Text {
                     anchors.verticalCenter: parent.verticalCenter
                     visible: root.selecting
-                    text: I18n.t("已选择 ", "Selected ") + root.selectedCount + I18n.t(" 项", " items")
+                    text: root._batchActive
+                          ? I18n.t("正在删除 ", "Deleting ") + Math.max(0, root._batchCompleted)
+                            + "/" + root._batchTotal
+                          : I18n.t("已选择 ", "Selected ") + root.selectedCount + I18n.t(" 项", " items")
                     color: Theme.warm.bodyStrong
                     font.family: Theme.fontFamilies.sans
                     font.contextFontMerging: true
@@ -855,7 +888,7 @@ Item {
                         root._onDialogConfirm = root._startBatchDelete
                         confirmDialog.title = I18n.t("批量删除", "Batch delete")
                         confirmDialog.message = I18n.t("确定删除 ", "Delete ") + root.selectedCount
-                                                + I18n.t(" 局?删除后不可恢复。", " runs? This cannot be undone.")
+                                                + I18n.t(" 局?删除后不可恢复。失败项会保留在列表中。", " runs? This cannot be undone. Failed items stay in the list.")
                         confirmDialog.open()
                     }
                 }

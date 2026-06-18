@@ -8,6 +8,8 @@
 #include <QVariantMap>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
+#include <QSet>
+#include <QTimer>
 
 class ObserverSseParser;
 
@@ -193,8 +195,11 @@ private:
     void setConfigActionError(const QString &msg);
     QString localPathFromFileUrl(const QString &fileUrl) const;
     bool writeJsonDocumentToFile(const QJsonDocument &doc, const QString &fileUrl, QString *error) const;
-    void startStreamRequest();
+    void startStreamRequest(bool clearEvents = true);
     void stopStream();
+    bool shouldReconnectStream() const;
+    void scheduleStreamReconnect();
+    void rebuildSeenStreamEventIds();
     // C1-bis: a run change must never inherit the prior run's executed truth.
     void setCurrentRunId(const QString &runId);
     void resetExecutionMode();
@@ -240,5 +245,9 @@ private:
 
     QNetworkAccessManager *m_network;
     QNetworkReply *m_streamReply;
+    bool m_streamDesired = false;
+    int m_streamReconnectAttempts = 0;
+    QTimer m_streamReconnectTimer;
+    QSet<QString> m_seenStreamEventIds;
     ObserverSseParser *m_sseParser;
 };
