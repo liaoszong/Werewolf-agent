@@ -92,17 +92,6 @@ def _vote_accuracy_by_player(game: GameLog, votes: list[Event] | None = None) ->
         total = int(item["total_votes"])
         item["vote_accuracy"] = _round_float(float(item["accurate_votes"]) / total) if total else 0.0
     return result
-    result = {player.player_id: {"accurate_votes": 0, "total_votes": 0, "vote_accuracy": 0.0} for player in game.players}
-    for event in _vote_events(game):  # already filtered to player-to-player votes
-        actor_team = _team_of(game, event.actor)
-        target_team = _team_of(game, event.target)
-        result[event.actor]["total_votes"] += 1
-        if actor_team != target_team:
-            result[event.actor]["accurate_votes"] += 1
-    for item in result.values():
-        total = int(item["total_votes"])
-        item["vote_accuracy"] = _round_float(float(item["accurate_votes"]) / total) if total else 0.0
-    return result
 
 
 def _survival_rounds(game: GameLog) -> dict[str, int]:
@@ -172,16 +161,6 @@ def _team_metrics(game: GameLog, votes: list[Event] | None = None) -> dict[str, 
                 target_counts[vote.target] = target_counts.get(vote.target, 0) + 1
             village_by_day[f"round_{round_number}"] = _round_float(max(target_counts.values()) / len(village_votes))
         werewolf_votes = [event for event in round_votes if _team_of(game, event.actor) == "werewolf"]
-        if len(werewolf_votes) >= 2:
-            targets = {event.target for event in werewolf_votes}
-            werewolf_by_day[f"round_{round_number}"] = 1.0 if len(targets) == 1 else 0.0
-        village_votes = [event for event in votes if _team_of(game, event.actor) == "villager"]
-        if village_votes:
-            target_counts: dict[str, int] = {}
-            for vote in village_votes:
-                target_counts[vote.target] = target_counts.get(vote.target, 0) + 1
-            village_by_day[f"round_{round_number}"] = _round_float(max(target_counts.values()) / len(village_votes))
-        werewolf_votes = [event for event in votes if _team_of(game, event.actor) == "werewolf"]
         if len(werewolf_votes) >= 2:
             targets = {event.target for event in werewolf_votes}
             werewolf_by_day[f"round_{round_number}"] = 1.0 if len(targets) == 1 else 0.0

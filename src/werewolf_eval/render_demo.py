@@ -308,7 +308,7 @@ def write_demo_html(game_log_path: str | Path, output_path: str | Path, decision
         )
 
     score_log = score_game(game, decision_log=decision_log, semantic_label_log=semantic_label_log)
-    metrics = summarize_metrics(game, score_log)
+    metrics = summarize_metrics(game, score_log, decision_log=decision_log)
     attribution = attribute_game(game, score_log, metrics)
     context = build_demo_context(game, score_log, metrics, attribution, game_source_label=game_source_label, bundle_result=bundle_result)
     Path(output_path).write_text(render_html(context), encoding="utf-8")

@@ -25,6 +25,12 @@ target_link_libraries(appqt_observer
     PRIVATE Qt6::Quick Qt6::QuickControls2 Qt6::Network
 )
 
+# TF-1: Windows Credential Manager (CredWriteW/CredReadW/CredDeleteW) lives in
+# Advapi32. Link it only on Windows; leave the non-Windows config untouched.
+if(WIN32)
+    target_link_libraries(appqt_observer PRIVATE Advapi32)
+endif()
+
 # Theme.qml (design tokens) and I18n.qml (runtime translations) are QML
 # singletons accessible module-wide as `Theme` and `I18n`.
 set_source_files_properties(qml/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)

@@ -348,7 +348,7 @@
   "evaluation_bucket": {
     "rules_version": "unknown",
     "prompt_version": "unknown",
-    "scoring_version": "scoring_v1",
-    "comparison_key": "unknown__unknown__scoring_v1"
+    "scoring_version": "scoring_v2",
+    "comparison_key": "unknown__unknown__scoring_v2"
   }
 }

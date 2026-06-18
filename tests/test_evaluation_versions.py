@@ -11,12 +11,16 @@ from werewolf_eval.evaluation_versions import (
     SCORING_VERSION,
     UNKNOWN_VERSION,
     evaluation_bucket,
+    rebase_bucket_to_current_scoring,
 )
 
 
 class EvaluationVersionsTests(unittest.TestCase):
-    def test_scoring_version_initial_value(self) -> None:
-        self.assertEqual(SCORING_VERSION, "scoring_v1")
+    def test_scoring_version_current_value(self) -> None:
+        # scoring_v2: default/random votes are filtered from model-vote process
+        # metrics when a Decision Log is supplied. Bumping the formula splits the
+        # comparison bucket so old/new results are never ranked together.
+        self.assertEqual(SCORING_VERSION, "scoring_v2")
 
     def test_unknown_version_sentinel(self) -> None:
         self.assertEqual(UNKNOWN_VERSION, "unknown")
@@ -32,14 +36,14 @@ class EvaluationVersionsTests(unittest.TestCase):
             {
                 "rules_version": "rules_v1_1",
                 "prompt_version": "prompt_v1",
-                "scoring_version": "scoring_v1",
-                "comparison_key": "rules_v1_1__prompt_v1__scoring_v1",
+                "scoring_version": "scoring_v2",
+                "comparison_key": "rules_v1_1__prompt_v1__scoring_v2",
             },
         )
 
     def test_bucket_requires_keyword_args(self) -> None:
         with self.assertRaises(TypeError):
-            evaluation_bucket("rules_v1_1", "prompt_v1", "scoring_v1")  # type: ignore[misc]
+            evaluation_bucket("rules_v1_1", "prompt_v1", "scoring_v2")  # type: ignore[misc]
 
     def test_unknown_components_form_browsable_key(self) -> None:
         b = evaluation_bucket(
@@ -47,7 +51,7 @@ class EvaluationVersionsTests(unittest.TestCase):
             prompt_version=UNKNOWN_VERSION,
             scoring_version=SCORING_VERSION,
         )
-        self.assertEqual(b["comparison_key"], "unknown__unknown__scoring_v1")
+        self.assertEqual(b["comparison_key"], "unknown__unknown__scoring_v2")
 
     def test_module_has_no_werewolf_eval_imports(self) -> None:
         # Anti-circular-import contract (spec §4.1): callers of the tuple must not
@@ -145,6 +149,50 @@ class ReadManifestBucketTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as td:
             self.assertIsNone(read_manifest_bucket(Path(td)))
+
+
+class RebaseBucketToCurrentScoringTests(unittest.TestCase):
+    """scoring_v2: re-scoring a historical run MUST stamp today's formula, never
+    the manifest's historical scoring_version. rules/prompt are run-input history
+    and are preserved; only scoring_version is forced current."""
+
+    def test_v1_manifest_bucket_is_rebased_to_current_scoring(self) -> None:
+        historical = {
+            "rules_version": "rules_v1_2",
+            "prompt_version": "prompt_v4",
+            "scoring_version": "scoring_v1",
+            "comparison_key": "rules_v1_2__prompt_v4__scoring_v1",
+        }
+        rebased = rebase_bucket_to_current_scoring(historical)
+        # rules + prompt preserved as legitimate run-input history.
+        self.assertEqual(rebased["rules_version"], "rules_v1_2")
+        self.assertEqual(rebased["prompt_version"], "prompt_v4")
+        # scoring forced to the current formula; key rebuilt by evaluation_bucket().
+        self.assertEqual(rebased["scoring_version"], "scoring_v2")
+        self.assertEqual(rebased["comparison_key"], "rules_v1_2__prompt_v4__scoring_v2")
+
+    def test_none_yields_unknown_unknown_current_bucket(self) -> None:
+        rebased = rebase_bucket_to_current_scoring(None)
+        self.assertEqual(rebased["scoring_version"], "scoring_v2")
+        self.assertEqual(rebased["comparison_key"], "unknown__unknown__scoring_v2")
+
+    def test_current_scoring_bucket_is_idempotent(self) -> None:
+        current = evaluation_bucket(
+            rules_version="rules_v1_1",
+            prompt_version="prompt_v1",
+            scoring_version="scoring_v2",
+        )
+        rebased = rebase_bucket_to_current_scoring(current)
+        self.assertEqual(rebased, current)
+        self.assertEqual(rebased["comparison_key"], "rules_v1_1__prompt_v1__scoring_v2")
+
+    def test_missing_or_non_str_components_fall_back_to_unknown(self) -> None:
+        rebased = rebase_bucket_to_current_scoring(
+            {"rules_version": "", "prompt_version": None, "scoring_version": "scoring_v1"}
+        )
+        self.assertEqual(rebased["rules_version"], "unknown")
+        self.assertEqual(rebased["prompt_version"], "unknown")
+        self.assertEqual(rebased["scoring_version"], "scoring_v2")
 
 
 if __name__ == "__main__":

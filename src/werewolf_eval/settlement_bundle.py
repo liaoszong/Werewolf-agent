@@ -28,6 +28,7 @@ from werewolf_eval.evaluation_versions import (
     UNKNOWN_VERSION,
     evaluation_bucket as _evaluation_bucket,
     read_manifest_bucket,
+    rebase_bucket_to_current_scoring,
 )
 from werewolf_eval.game_log import GameLog, load_game_log
 from werewolf_eval.provider_registry import PROVIDER_REGISTRY
@@ -275,7 +276,7 @@ def build_settlement_bundle(
     decision_available = decision_log_status == "present"
     try:
         score_log = score_game(game, decision_log if decision_available else None)
-        metrics = summarize_metrics(game, score_log)
+        metrics = summarize_metrics(game, score_log, decision_log=decision_log if decision_available else None)
         attribution = attribute_game(game, score_log, metrics)
     except Exception:  # reason CODE only — never raw text/path/stack
         bundle["degraded"] = True
@@ -361,9 +362,7 @@ def build_settlement_bundle(
         }
         for r in score_log.records
     ]
-    bundle["evaluation_bucket"] = (
-        dict(evaluation_bucket) if evaluation_bucket is not None else _unknown_bucket()
-    )
+    bundle["evaluation_bucket"] = rebase_bucket_to_current_scoring(evaluation_bucket)
     return bundle
 
 
@@ -448,14 +447,24 @@ def build_settlement_response(
     if not game_log_path.exists():
         return {"available": False, "reason": "no_game_log"}
 
+    # R-08 / scoring_v2: the cache is reusable ONLY when BOTH (a) the schema
+    # version matches AND (b) the bucket it would produce today matches the
+    # cached one. A bundle cached under scoring_v1 (or any older formula) has the
+    # same BUNDLE_VERSION (we intentionally did NOT bump it — no schema change)
+    # but carries a now-stale evaluation_bucket, so it MUST be recomputed. The
+    # comparison is on the rebuilt expected bucket, not the raw manifest, so a
+    # manifest stamped scoring_v1 still yields today's scoring_v2 expectation.
+    expected_bucket = rebase_bucket_to_current_scoring(read_manifest_bucket(run_dir))
+
     cache = run_dir / "settlement-bundle.json"
     if cache.exists():
         try:
             cached = json.loads(cache.read_text(encoding="utf-8"))
-            # Serve the cache ONLY if it's the current schema. A missing/mismatched
-            # bundle_version (a bundle written by an older/newer build) is recomputed
-            # so P3 never silently reads a stale schema (R-08).
-            if isinstance(cached, dict) and cached.get("bundle_version") == BUNDLE_VERSION:
+            if (
+                isinstance(cached, dict)
+                and cached.get("bundle_version") == BUNDLE_VERSION
+                and cached.get("evaluation_bucket") == expected_bucket
+            ):
                 return {"available": True, "bundle": cached}
         except (ValueError, OSError):
             pass  # corrupt/partial cache -> recompute below (self-heal, not 500)
@@ -481,7 +490,7 @@ def build_settlement_response(
         run_id=run_id,
         decision_log_status=status,
         seat_meta=_load_seat_meta(run_dir),
-        evaluation_bucket=read_manifest_bucket(run_dir),
+        evaluation_bucket=expected_bucket,
     )
     # Cache ONLY a COMPLETE bundle: not degraded AND decision-quality present. A
     # degraded bundle (scoring crash) OR a partial one (no decision-log yet) is a

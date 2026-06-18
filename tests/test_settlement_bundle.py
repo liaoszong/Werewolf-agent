@@ -219,7 +219,9 @@ class TestBuildSettlementBundle(unittest.TestCase):
 
 
 class TestSettlementBundleEvaluationBucket(unittest.TestCase):
-    """Spec 2026-06-10-prompt-versioning §4.5: bundle carries evaluation_bucket."""
+    """Spec 2026-06-10-prompt-versioning §4.5: bundle carries evaluation_bucket.
+    scoring_v2: the bucket is always rebased to the current formula, never the
+    manifest's historical one."""
 
     def _game(self):
         return load_game_log(_GAME_LOG_PATH)
@@ -231,21 +233,19 @@ class TestSettlementBundleEvaluationBucket(unittest.TestCase):
         bundle = build_settlement_bundle(self._game(), self._decision_log())
         self.assertEqual(
             bundle["evaluation_bucket"]["comparison_key"],
-            "unknown__unknown__scoring_v1",
+            "unknown__unknown__scoring_v2",
         )
 
-    def test_settle_entry_with_stamped_manifest_carries_real_bucket(self):
-        """build_settlement_response must read the manifest bucket and pass it
-        through; an unknown-tolerant assertion cannot catch wiring failures."""
+    def test_settle_entry_rebases_manifest_scoring_v1_to_current(self):
+        """A manifest stamped scoring_v1 must be rebased to scoring_v2 by
+        build_settlement_response — preserving rules/prompt from the manifest."""
         import tempfile
         import shutil
 
         with tempfile.TemporaryDirectory() as tmpdir:
             run_dir = Path(tmpdir)
-            # Copy game-log and decision-log so settlement can proceed.
             shutil.copy(_GAME_LOG_PATH, run_dir / "game-log.json")
             shutil.copy(_DECISION_LOG_PATH, run_dir / "decision-log.json")
-            # Write a stamped prompt-manifest.json with a real bucket.
             manifest = {
                 "evaluation_bucket": {
                     "rules_version": "rules_v1_1",
@@ -261,10 +261,122 @@ class TestSettlementBundleEvaluationBucket(unittest.TestCase):
             from werewolf_eval.settlement_bundle import build_settlement_response
             response = build_settlement_response(run_dir, "completed", "r_test")
             self.assertTrue(response["available"])
-            self.assertEqual(
-                response["bundle"]["evaluation_bucket"]["comparison_key"],
-                "rules_v1_1__prompt_v1__scoring_v1",
+            bucket = response["bundle"]["evaluation_bucket"]
+            self.assertEqual(bucket["rules_version"], "rules_v1_1")
+            self.assertEqual(bucket["prompt_version"], "prompt_v1")
+            self.assertEqual(bucket["scoring_version"], "scoring_v2")
+            self.assertEqual(bucket["comparison_key"], "rules_v1_1__prompt_v1__scoring_v2")
+
+    def test_stale_scoring_v1_cache_is_not_reused(self):
+        """A cached bundle with bundle_version=p2d.settlement.v2 but
+        evaluation_bucket.scoring_version=scoring_v1 MUST be recomputed."""
+        import tempfile
+        import shutil
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            run_dir = Path(tmpdir)
+            shutil.copy(_GAME_LOG_PATH, run_dir / "game-log.json")
+            shutil.copy(_DECISION_LOG_PATH, run_dir / "decision-log.json")
+            # Write a manifest with scoring_v1 bucket.
+            manifest = {
+                "evaluation_bucket": {
+                    "rules_version": "rules_v1_1",
+                    "prompt_version": "prompt_v1",
+                    "scoring_version": "scoring_v1",
+                    "comparison_key": "rules_v1_1__prompt_v1__scoring_v1",
+                },
+                "agents": [],
+            }
+            (run_dir / "prompt-manifest.json").write_text(
+                json.dumps(manifest), encoding="utf-8"
             )
+            # Plant a stale cache: same BUNDLE_VERSION but scoring_v1 bucket.
+            stale = {
+                "bundle_version": "p2d.settlement.v2",
+                "evaluation_bucket": {
+                    "rules_version": "rules_v1_1",
+                    "prompt_version": "prompt_v1",
+                    "scoring_version": "scoring_v1",
+                    "comparison_key": "rules_v1_1__prompt_v1__scoring_v1",
+                },
+                "game_id": "stale",
+                "degraded": False,
+                "decision_quality_available": True,
+                "decision_quality_reason": None,
+                "result": {"winner": "villager", "end_round": 2,
+                           "end_condition": "all_werewolves_eliminated",
+                           "survivors": [], "margin": 0,
+                           "source_label": "stale"},
+                "players": [],
+                "core_metrics": {},
+                "top_attribution": None,
+                "turning_points": [],
+                "score_records": [],
+                "board_timeline": [],
+                "usage_summary": {"seats": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+                                  "scaffold": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+                                  "total": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}},
+            }
+            (run_dir / "settlement-bundle.json").write_text(
+                json.dumps(stale), encoding="utf-8"
+            )
+            from werewolf_eval.settlement_bundle import build_settlement_response
+            response = build_settlement_response(run_dir, "completed", "r_test")
+            self.assertTrue(response["available"])
+            # Must have been recomputed under scoring_v2, not the stale v1 cache.
+            self.assertEqual(
+                response["bundle"]["evaluation_bucket"]["scoring_version"],
+                "scoring_v2",
+            )
+            # Must be the real g001, not the stale placeholder.
+            self.assertEqual(response["bundle"]["game_id"], "g001")
+
+    def test_current_scoring_v2_cache_is_reused(self):
+        """A cache whose evaluation_bucket already matches the expected
+        (current scoring) bucket MUST be served without recomputation."""
+        import tempfile
+        import shutil
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            run_dir = Path(tmpdir)
+            shutil.copy(_GAME_LOG_PATH, run_dir / "game-log.json")
+            shutil.copy(_DECISION_LOG_PATH, run_dir / "decision-log.json")
+            # No manifest → expected bucket is unknown/unknown/scoring_v2.
+            # Plant a pre-computed cache with that exact bucket.
+            cache = {
+                "bundle_version": "p2d.settlement.v2",
+                "evaluation_bucket": {
+                    "rules_version": "unknown",
+                    "prompt_version": "unknown",
+                    "scoring_version": "scoring_v2",
+                    "comparison_key": "unknown__unknown__scoring_v2",
+                },
+                "game_id": "g001",
+                "degraded": False,
+                "decision_quality_available": True,
+                "decision_quality_reason": None,
+                "result": {"winner": "villager", "end_round": 2,
+                           "end_condition": "all_werewolves_eliminated",
+                           "survivors": [], "margin": 0,
+                           "source_label": "[scripted deterministic output]"},
+                "players": [],
+                "core_metrics": {},
+                "top_attribution": None,
+                "turning_points": [],
+                "score_records": [],
+                "board_timeline": [],
+                "usage_summary": {"seats": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+                                  "scaffold": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+                                  "total": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}},
+            }
+            (run_dir / "settlement-bundle.json").write_text(
+                json.dumps(cache), encoding="utf-8"
+            )
+            from werewolf_eval.settlement_bundle import build_settlement_response
+            response = build_settlement_response(run_dir, "completed", "r_test")
+            self.assertTrue(response["available"])
+            # Served from cache — game_id matches the cached one (not recomputed).
+            self.assertEqual(response["bundle"]["game_id"], "g001")
 
 
 if __name__ == "__main__":

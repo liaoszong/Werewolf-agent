@@ -37,7 +37,7 @@
       },
       "p5": {
         "accurate_votes": 0,
-        "total_votes": 1,
+        "total_votes": 0,
         "vote_accuracy": 0.0
       },
       "p6": {
@@ -91,9 +91,9 @@
       ]
     },
     "team_metrics": {
-      "village_vote_cohesion": 0.75,
+      "village_vote_cohesion": 0.833333,
       "village_vote_cohesion_by_day": {
-        "round_1": 0.5,
+        "round_1": 0.666667,
         "round_2": 1.0
       },
       "werewolf_vote_coordination": 1.0,

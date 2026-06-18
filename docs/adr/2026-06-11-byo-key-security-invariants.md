@@ -54,8 +54,31 @@ Three invariant layers, strictest first:
 - **Implemented today (stricter than required):** the server-side `CredentialStore` is
   in-memory and process-lifetime only — never persisted, never serialized;
   `__repr__`/`__str__` are redacted so even a failing test cannot print a key. The Qt
-  client persists nothing; keys are re-entered (or re-synced) per session. If keychain
-  persistence is added later it must land under this layer's rules, not relax them.
+  client persists the user's key ONLY through an OS credential vault, never as
+  plaintext in QSettings, files, logs or HTTP responses.
+- **Windows (current safe-persistence backend):** the Qt client writes the raw key to
+  the Windows Credential Manager as `CRED_TYPE_GENERIC` /
+  `CRED_PERSIST_LOCAL_MACHINE` under the stable target
+  `WerewolfAgent/byokey/<provider>`. The raw key lives only in the
+  `CredentialBlob`; it never appears in `TargetName`, `UserName`, `Comment`, error
+  text, or `GetLastError` decodings, and transient byte buffers are best-effort
+  cleared after use.
+- **QSettings holds only non-secret state:** the per-provider `base_url`
+  (`byobase/<provider>`) and a provider-ID index (`credential/providers`) whose
+  presence is verified against the OS vault at startup (a stale index entry is
+  never advertised as a configured key). The raw key, any reversible encoding, the
+  plain Base64, the `Authorization` header and the `CredentialBlob` plaintext are
+  all forbidden from QSettings.
+- **Legacy plaintext migration:** a pre-TF-1 build may have left `byokey/<provider>`
+  plaintext entries in QSettings. The client migrates each such entry into the OS
+  vault ONCE at construction and removes the legacy key ONLY after the vault write
+  succeeds, so a vault failure never silently drops a user's key. New code never
+  creates a fresh `byokey/<provider>` plaintext entry.
+- **Other platforms (macOS / Linux):** no system credential vault is wired in this
+  slice, so the Qt client is **session-memory-only** there — it does NOT fall back to
+  plaintext QSettings persistence. Session-only remains until an equivalent system
+  credential vault (Keychain / Secret Service) is wired in; no third-party
+  dependency (e.g. QtKeychain) is introduced for this.
 
 ### Documented back-compat exception (scheduled for retirement)
 
@@ -84,6 +107,8 @@ and its retirement is specced in
   `::test_live_multi_provider_runs_with_per_seat_creds`.
 - Client is statically clean:
   `tests/test_qt_observer_static_contract.py::test_client_sources_do_not_contain_secret_markers`.
+- Client persists keys only via the OS vault and migrates legacy plaintext:
+  `tests/test_qt_observer_static_contract.py` (TF-1 vault + migration contract).
 - Review packet redacts credentials:
   `tests/test_build_review_packet.py::test_packet_redacts_credentials_from_diff`.
 
@@ -93,8 +118,11 @@ and its retirement is specced in
   (Python provider layer / `provider_registry`); adding a provider never touches the
   client's security surface.
 - Keys never cross a machine boundary: Qt → loopback server → vendor API, all local.
-- The cost is per-session re-entry of keys (no persistence yet) and a server restart
-  losing credentials — accepted until a keychain slice is justified.
+- On Windows the user's key survives an app restart (it lives in the Windows
+  Credential Manager), so re-entry is no longer required there. A server restart
+  still loses the synchronized key in the Python process, but the Qt client re-syncs
+  from its vault on the next save/sync. On macOS / Linux the Qt client remains
+  session-only (no plaintext fallback) until a system credential vault is wired in.
 - Any new artifact, endpoint, or log line is born under layer 1: the burden of proof is
   on the new surface to show it cannot carry a secret (extend the secret-marker scans
   when in doubt).

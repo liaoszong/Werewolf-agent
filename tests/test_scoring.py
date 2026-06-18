@@ -32,7 +32,7 @@ class DeterministicScorerTests(unittest.TestCase):
         self.score_log = score_game(self.game)
         self.metrics = summarize_metrics(self.game, self.score_log)
         self.d2_score_log = score_game(self.game, decision_log=self.decision_log)
-        self.d2_metrics = summarize_metrics(self.game, self.d2_score_log)
+        self.d2_metrics = summarize_metrics(self.game, self.d2_score_log, decision_log=self.decision_log)
         self.semantic_label_log = load_semantic_label_log(
             ROOT / "docs/gold-game/s5-semantic-label-output.example.json",
             self.decision_log,
@@ -42,7 +42,7 @@ class DeterministicScorerTests(unittest.TestCase):
             decision_log=self.decision_log,
             semantic_label_log=self.semantic_label_log,
         )
-        self.s5_metrics = summarize_metrics(self.game, self.s5_score_log)
+        self.s5_metrics = summarize_metrics(self.game, self.s5_score_log, decision_log=self.decision_log)
 
     def test_score_log_matches_s2_expected_records(self) -> None:
         actual = score_log_to_dict(self.d2_score_log)
@@ -544,8 +544,8 @@ class ScoreLogBucketTests(unittest.TestCase):
             {
                 "rules_version": "unknown",
                 "prompt_version": "unknown",
-                "scoring_version": "scoring_v1",
-                "comparison_key": "unknown__unknown__scoring_v1",
+                "scoring_version": "scoring_v2",
+                "comparison_key": "unknown__unknown__scoring_v2",
             },
         )
 
@@ -558,6 +558,121 @@ class ScoreLogBucketTests(unittest.TestCase):
         }
         d = score_log_to_dict(self.score_log, evaluation_bucket=bucket)
         self.assertEqual(d["evaluation_bucket"], bucket)
+
+
+class DefaultRandomVoteFilteringTests(unittest.TestCase):
+    """scoring_v2: when a Decision Log is supplied, votes whose matched
+    decision has decision_type in {default, random} are excluded from
+    vote_accuracy_by_player and team_metrics (village_vote_cohesion /
+    werewolf_vote_coordination). Without a Decision Log the historical
+    unfiltered behavior is preserved."""
+
+    def setUp(self) -> None:
+        self.game = load_game_log(ROOT / "docs/gold-game/g001-game-log.json")
+        self.decision_log = load_decision_log(ROOT / "docs/gold-game/g001-decision-log.json", self.game)
+
+    # -- no decision log: historical behavior preserved --
+
+    def test_no_decision_log_keeps_default_vote_in_metrics(self) -> None:
+        # g001 e020 is p5's default vote (decision_type=default). Without a
+        # Decision Log the scorer cannot know this, so total_votes stays 1.
+        metrics = summarize_metrics(self.game, score_game(self.game))
+        p5 = metrics.process_metrics.vote_accuracy_by_player["p5"]
+        self.assertEqual(p5["total_votes"], 1)
+        self.assertEqual(p5["vote_accuracy"], 0.0)
+
+    # -- with decision log: default/random votes excluded --
+
+    def test_with_decision_log_excludes_default_vote(self) -> None:
+        # g001 e020/p5→p3 matched g001_d008 (decision_type=default) → excluded.
+        metrics = summarize_metrics(
+            self.game, score_game(self.game), decision_log=self.decision_log
+        )
+        p5 = metrics.process_metrics.vote_accuracy_by_player["p5"]
+        self.assertEqual(p5["accurate_votes"], 0)
+        self.assertEqual(p5["total_votes"], 0)
+        self.assertEqual(p5["vote_accuracy"], 0.0)
+
+    def test_inference_based_votes_still_counted(self) -> None:
+        # g001_e019/p4→p1 (d007 inference_based) and g001_e035/p6→p1 (d010
+        # inference_based) must remain in metrics.
+        metrics = summarize_metrics(
+            self.game, score_game(self.game), decision_log=self.decision_log
+        )
+        p4 = metrics.process_metrics.vote_accuracy_by_player["p4"]
+        self.assertEqual(p4["total_votes"], 2)
+        self.assertEqual(p4["accurate_votes"], 2)
+        self.assertEqual(p4["vote_accuracy"], 1.0)
+        p6 = metrics.process_metrics.vote_accuracy_by_player["p6"]
+        self.assertEqual(p6["total_votes"], 2)
+        self.assertEqual(p6["accurate_votes"], 1)
+        self.assertEqual(p6["vote_accuracy"], 0.5)
+
+    def test_werewolf_coordination_unchanged(self) -> None:
+        # Wolves (p1, p2) have no default/random decisions; coordination
+        # metrics must be identical with or without the Decision Log.
+        metrics_no_dl = summarize_metrics(self.game, score_game(self.game))
+        metrics_with_dl = summarize_metrics(
+            self.game, score_game(self.game), decision_log=self.decision_log
+        )
+        tm_no = metrics_no_dl.process_metrics.team_metrics
+        tm_dl = metrics_with_dl.process_metrics.team_metrics
+        self.assertEqual(tm_no["werewolf_vote_coordination"], tm_dl["werewolf_vote_coordination"])
+        self.assertEqual(tm_no["werewolf_vote_coordination_by_day"], tm_dl["werewolf_vote_coordination_by_day"])
+
+    def test_village_cohesion_reflects_filtered_votes(self) -> None:
+        # round_1 village voters: p3(seer)→p1, p4(witch)→p1, p5(villager)→p3
+        # (default, excluded), p6(villager)→p3. After excluding p5: 3 village
+        # votes, max target(p1)=2 → cohesion=2/3≈0.666667.
+        # round_2 village voters: p4→p1, p6→p1 → cohesion=1.0.
+        # Overall = (0.666667 + 1.0) / 2 = 0.833333.
+        metrics = summarize_metrics(
+            self.game, score_game(self.game), decision_log=self.decision_log
+        )
+        tm = metrics.process_metrics.team_metrics
+        self.assertAlmostEqual(tm["village_vote_cohesion_by_day"]["round_1"], 0.666667, places=5)
+        self.assertAlmostEqual(tm["village_vote_cohesion"], 0.833333, places=5)
+
+    def test_random_decision_type_also_excluded(self) -> None:
+        # Verify that "random" decision_type is also excluded by constructing a
+        # minimal synthetic game + decision log.
+        players = [
+            Player(player_id="p1", role="werewolf", team="werewolf"),
+            Player(player_id="p2", role="seer", team="villager"),
+            Player(player_id="p3", role="villager", team="villager"),
+            Player(player_id="p4", role="witch", team="villager"),
+        ]
+        game = GameLog(
+            game_id="random_test",
+            source_label="synthetic",
+            players=players,
+            events=[
+                Event(event_id="e1", sequence=1, round=1, phase="day",
+                      type="player_vote", actor="p3", target="p1",
+                      visibility="public", data={}),
+            ],
+            result=GameResult(winner="villager", end_round=1,
+                              survivors=["p1", "p2", "p3", "p4"],
+                              end_condition="all_werewolves_eliminated"),
+        )
+        raw = {
+            "decision_log_id": "dl_random_test",
+            "game_id": "random_test",
+            "source_label": "[deterministic mock agent output]",
+            "decisions": [{
+                "decision_id": "rd001", "actor": "p3",
+                "decision_scope": "single", "consensus_id": None,
+                "phase": "day", "action": "player_vote", "target": "p1",
+                "visible_info_refs": [], "reason_summary": "random pick",
+                "decision_type": "random", "confidence": 0.1,
+                "strategy_tag": "random_vote",
+            }],
+        }
+        decision_log = parse_decision_log(raw, game)
+        metrics = summarize_metrics(game, score_game(game), decision_log=decision_log)
+        p3 = metrics.process_metrics.vote_accuracy_by_player["p3"]
+        self.assertEqual(p3["total_votes"], 0)
+        self.assertEqual(p3["vote_accuracy"], 0.0)
 
 
 class ScoreIdPrefixRaceTests(unittest.TestCase):
