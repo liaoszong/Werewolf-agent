@@ -7,6 +7,7 @@
 #include <QNetworkRequest>
 #include <QUrl>
 #include <QVarLengthArray>
+#include <cstring>
 
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -102,7 +103,7 @@ bool CredentialStore::writePersistentCredential(const QString &provider, const Q
 {
     const std::wstring target = credentialTarget(provider).toStdWString();
 
-    const QByteArray blobBytes = rawKey.toUtf8();
+    QByteArray blobBytes = rawKey.toUtf8();
     // Copy into a writable buffer so we can zero it after the call.
     QVarLengthArray<unsigned char, 256> blob(blobBytes.size());
     if (!blob.isEmpty())
@@ -110,7 +111,7 @@ bool CredentialStore::writePersistentCredential(const QString &provider, const Q
 
     // Clear the UTF-8 QByteArray copy as soon as we no longer need it.
     if (!blobBytes.isEmpty())
-        std::memset(const_cast<char *>(blobBytes.constData()), 0,
+        std::memset(blobBytes.data(), 0,
                     static_cast<size_t>(blobBytes.size()));
 
     CREDENTIALW cred;
@@ -262,19 +263,23 @@ bool CredentialStore::saveCredential(const QString &provider, const QString &raw
     if (rawText.trimmed().isEmpty())
         return false;
 
+#ifdef Q_OS_WIN
     // Persist to the OS vault FIRST. Only on success do we update the in-memory
     // cache and the provider-ID index, so a vault failure leaves no half-state.
     if (!writePersistentCredential(provider, rawText))
         return false;
+#endif
 
     m_credentials.insert(provider, rawText);
 
+#ifdef Q_OS_WIN
     // Reconcile the non-secret provider-ID index.
     QStringList idx = providerIndex();
     if (!idx.contains(provider)) {
         idx.append(provider);
         setProviderIndex(idx);
     }
+#endif
 
     // A blank base_url clears any stored custom endpoint (the server then falls
     // back to the provider's registry default). Non-blank values are trimmed.

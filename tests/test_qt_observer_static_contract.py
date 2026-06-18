@@ -965,6 +965,48 @@ class QtObserverCredentialPanelTests(unittest.TestCase):
             "CMakeLists.txt must link Advapi32 to appqt_observer on Windows",
         )
 
+    def test_tf1_credential_store_hotfix_contract(self) -> None:
+        """TF-1 post-commit hotfix: <cstring>, no const_cast, Q_OS_WIN branching
+        in saveCredential, non-Windows session-memory-only (no provider index
+        persist, no vault write outside the guard)."""
+        cpp_text = (QT / "src/CredentialStore.cpp").read_text(encoding="utf-8")
+
+        # (a) <cstring> included for std::memcpy / std::memset
+        self.assertIn(
+            "#include <cstring>", cpp_text,
+            "CredentialStore.cpp must #include <cstring> for std::memcpy/memset",
+        )
+
+        # (b) No const_cast<char *> — QByteArray::data() on non-const QByteArray
+        self.assertNotIn(
+            "const_cast<char *>", cpp_text,
+            "CredentialStore.cpp must not const_cast a const QByteArray",
+        )
+
+        # (c) saveCredential uses #ifdef Q_OS_WIN platform branching
+        save_pos = cpp_text.find("bool CredentialStore::saveCredential")
+        self.assertNotEqual(save_pos, -1, "saveCredential definition not found")
+        next_fn = cpp_text.find("\nvoid CredentialStore::", save_pos + 1)
+        save_body = cpp_text[save_pos:next_fn if next_fn != -1 else len(cpp_text)]
+        self.assertIn(
+            "#ifdef Q_OS_WIN", save_body,
+            "saveCredential must use #ifdef Q_OS_WIN for platform branching",
+        )
+
+        # (d) writePersistentCredential must be inside a #ifdef Q_OS_WIN guard
+        self.assertTrue(
+            any("writePersistentCredential" in m.group(1)
+                for m in re.finditer(r"#ifdef Q_OS_WIN\s+(.*?)#endif", save_body, re.DOTALL)),
+            "writePersistentCredential must be inside #ifdef Q_OS_WIN in saveCredential",
+        )
+
+        # (e) provider index update must be inside a #ifdef Q_OS_WIN guard
+        self.assertTrue(
+            any("setProviderIndex" in m.group(1)
+                for m in re.finditer(r"#ifdef Q_OS_WIN\s+(.*?)#endif", save_body, re.DOTALL)),
+            "setProviderIndex must be inside #ifdef Q_OS_WIN in saveCredential",
+        )
+
     def test_qml_does_not_reference_raw_key_accessors(self) -> None:
         # (d) Forbidden-leak guard: QML must never call getRawKey or rawCredential.
         # These are private C++ details that must never reach the QML layer.
