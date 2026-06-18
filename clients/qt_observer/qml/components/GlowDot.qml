@@ -4,7 +4,7 @@ import QtQuick
 Item {
     id: root
 
-    property color color: "#34D399"
+    property color color: Theme.color.success
     property bool pulse: false
     property int diameter: 8
 

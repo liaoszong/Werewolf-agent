@@ -383,7 +383,7 @@ Item {
                 layer.enabled: true
                 layer.effect: MultiEffect {
                     shadowEnabled: true
-                    shadowColor: Qt.rgba(40 / 255, 30 / 255, 20 / 255, 0.4)
+                    shadowColor: Theme.parchment.hoverShadow
                     shadowBlur: cardHover.hovered ? 1.2 : 0.4
                     shadowVerticalOffset: cardHover.hovered ? 16 : 4
                     Behavior on shadowBlur { NumberAnimation { duration: 200 } }
@@ -398,7 +398,7 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     anchors.verticalCenterOffset: parent.height * 0.31
                     text: root.roleName(cardWrapper.modelData)
-                    color: "#3a2a16"
+                    color: Theme.parchment.cardTitleInk
                     font.family: Theme.fontFamilies.serif
                     font.contextFontMerging: true
                     font.pixelSize: Theme.warmSize.titleMd   // bigger

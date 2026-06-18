@@ -477,7 +477,7 @@ Item {
                 radius: parent.radius - 1
                 color: "transparent"
                 border.width: 1
-                border.color: Qt.rgba(1, 248 / 255, 235 / 255, 0.32)
+                border.color: Theme.withAlpha(Theme.parchment.highlightLine, 0.32)
             }
 
             Row {
@@ -572,7 +572,7 @@ Item {
                                 anchors.leftMargin: 12
                                 anchors.rightMargin: 12
                                 height: 1
-                                color: Qt.rgba(1, 248 / 255, 234 / 255, 0.36)
+                                color: Theme.withAlpha(Theme.parchment.highlightLine, 0.36)
                             }
                         }
                         contentItem: Text {
@@ -645,7 +645,7 @@ Item {
             width: root.detailOpen ? Math.min(820, parent.width - detailPanel.width - Theme.space.lg)
                                    : Math.min(1040, parent.width)
             radius: 18
-            color: Qt.rgba(248 / 255, 238 / 255, 220 / 255, 0.34)
+            color: Theme.withAlpha(Theme.parchment.panelWash, 0.34)
             border.width: 1
             border.color: Theme.withAlpha(Theme.parchment.goldLine, 0.46)
             x: root.detailOpen ? 0 : (parent.width - width) / 2
@@ -658,7 +658,7 @@ Item {
                 radius: parent.radius - 1
                 color: "transparent"
                 border.width: 1
-                border.color: Qt.rgba(1, 248 / 255, 234 / 255, 0.58)
+                border.color: Theme.withAlpha(Theme.parchment.highlightLine, 0.58)
             }
 
             Rectangle {
@@ -668,7 +668,7 @@ Item {
                 anchors.leftMargin: parent.radius
                 anchors.rightMargin: parent.radius
                 height: 1
-                color: Qt.rgba(1, 250 / 255, 240 / 255, 0.62)
+                color: Theme.withAlpha(Theme.parchment.highlightPale, 0.62)
             }
             Rectangle {
                 anchors.left: parent.left
@@ -677,7 +677,7 @@ Item {
                 anchors.topMargin: parent.radius
                 anchors.bottomMargin: parent.radius
                 width: 1
-                color: Qt.rgba(1, 250 / 255, 240 / 255, 0.50)
+                color: Theme.withAlpha(Theme.parchment.highlightPale, 0.50)
             }
 
             Grid {
@@ -746,7 +746,7 @@ Item {
         anchors.bottomMargin: -8
         height: bottomBar.height
         radius: bottomBar.radius
-        color: Qt.rgba(48 / 255, 32 / 255, 18 / 255, 0.18)
+        color: Theme.withAlpha(Theme.parchment.sealShadowBase, 0.18)
         visible: bottomBar.visible
         z: bottomBar.z - 1
     }
@@ -780,7 +780,7 @@ Item {
             radius: parent.radius - 1
             color: "transparent"
             border.width: 1
-            border.color: Qt.rgba(1, 248 / 255, 234 / 255, 0.42)
+            border.color: Theme.withAlpha(Theme.parchment.highlightLine, 0.42)
         }
 
         Row {
@@ -805,7 +805,7 @@ Item {
                     radius: 14
                     color: Theme.withAlpha(Theme.parchment.parchment, 0.42)
                     border.width: 1
-                    border.color: Qt.rgba(1, 246 / 255, 220 / 255, 0.38)
+                    border.color: Theme.withAlpha(Theme.parchment.highlightGold, 0.38)
                 }
                 Text {
                     anchors.centerIn: parent
@@ -868,27 +868,27 @@ Item {
                 anchors.rightMargin: -2
                 anchors.bottomMargin: -5
                 radius: 14
-                color: root.launchEnabled ? Qt.rgba(48 / 255, 32 / 255, 18 / 255, 0.20) : "transparent"
+                color: root.launchEnabled ? Theme.parchment.sealShadow : "transparent"
             }
             Rectangle {
                 id: beginFace
                 anchors.fill: parent
                 radius: 14
                 border.width: 1
-                border.color: Qt.rgba(129 / 255, 73 / 255, 49 / 255, 0.62)
+                border.color: Theme.parchment.sealBorder
                 scale: beginTap.pressed ? 0.97 : 1.0
                 Behavior on scale { NumberAnimation { duration: Theme.anim.press; easing.type: Easing.OutQuad } }
                 gradient: Gradient {
                     GradientStop {
                         position: 0.0
                         color: root.launchEnabled
-                               ? (beginHover.hovered ? "#c6785f" : "#c8735b")
+                               ? (beginHover.hovered ? Theme.parchment.sealTopHover : Theme.parchment.sealTop)
                                : Theme.warm.primaryDisabled
                     }
                     GradientStop {
                         position: 1.0
                         color: root.launchEnabled
-                               ? (beginHover.hovered ? "#ae5f48" : "#b7654c")
+                               ? (beginHover.hovered ? Theme.parchment.sealBottomHover : Theme.parchment.sealBottom)
                                : Theme.warm.primaryDisabled
                     }
                 }
@@ -899,7 +899,7 @@ Item {
                     anchors.leftMargin: 18
                     anchors.rightMargin: 18
                     height: 1
-                    color: Qt.rgba(1, 246 / 255, 228 / 255, root.launchEnabled ? 0.26 : 0.14)
+                    color: Theme.withAlpha(Theme.parchment.highlightLine, root.launchEnabled ? 0.26 : 0.14)
                 }
                 Rectangle {
                     anchors.left: parent.left
@@ -908,7 +908,7 @@ Item {
                     anchors.leftMargin: 18
                     anchors.rightMargin: 18
                     height: 1
-                    color: Qt.rgba(91 / 255, 45 / 255, 30 / 255, root.launchEnabled ? 0.26 : 0.12)
+                    color: Theme.withAlpha(Theme.parchment.sealBottomShade, root.launchEnabled ? 0.26 : 0.12)
                 }
                 Row {
                     anchors.centerIn: parent

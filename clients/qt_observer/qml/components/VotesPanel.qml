@@ -75,7 +75,7 @@ HudCard {
                     Text {
                         anchors.centerIn: parent
                         text: modelData.count
-                        color: isLeader ? "#ffffff" : Theme.parchment.inkSoft
+                        color: isLeader ? Theme.warm.textOnPrimary : Theme.parchment.inkSoft
                         font.family: Theme.fontFamilies.sans; font.contextFontMerging: true
                         font.pixelSize: Theme.size.caption; font.weight: Theme.weight.bold
                     }

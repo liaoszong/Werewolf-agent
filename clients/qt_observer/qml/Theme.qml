@@ -8,6 +8,12 @@ QtObject {
     id: theme
 
     // ---------------------------------------------------------------- Color
+    // Palette routing:
+    // - color: legacy dark chrome and semantic role/status accents.
+    // - warm: light parchment application chrome.
+    // - parchment: board-game HUD material colors.
+    // - report: settlement report canvas.
+    // - provider: small-area provider identity accents.
     readonly property QtObject color: QtObject {
         // Backgrounds — matte charcoal / zinc, neutral (no blue or purple cast)
         readonly property color bgBase: "#09090B"   // zinc-950
@@ -43,6 +49,8 @@ QtObject {
         readonly property color seer: "#FBBF24"     // prophetic gold
         readonly property color witch: "#A855F7"    // arcane violet
         readonly property color villager: "#60A5FA" // calm blue
+        readonly property color guard: "#4a8c6f"    // forest green
+        readonly property color hunter: "#b5683a"   // leather ochre
         readonly property color unknown: "#71717A"  // hidden / zinc
 
         // Teams
@@ -145,6 +153,29 @@ QtObject {
         readonly property color terracotta: "#cc785c"
         readonly property color terracottaDeep: "#b2543a"
         readonly property color terracottaWash: "#f0d6c6"    // current-event row tint
+        readonly property color sealTop: "#c8735b"            // matte action seal gradient
+        readonly property color sealTopHover: "#c6785f"
+        readonly property color sealBottom: "#b7654c"
+        readonly property color sealBottomHover: "#ae5f48"
+        readonly property color sealBorder: Qt.rgba(129 / 255, 73 / 255, 49 / 255, 0.62)
+        readonly property color sealShadowBase: Qt.rgba(48 / 255, 32 / 255, 18 / 255, 1.0)
+        readonly property color sealShadow: Qt.rgba(48 / 255, 32 / 255, 18 / 255, 0.20)
+        readonly property color sealBottomShade: Qt.rgba(91 / 255, 45 / 255, 30 / 255, 1.0)
+        readonly property color highlightLine: Qt.rgba(1, 248 / 255, 234 / 255, 1.0)
+        readonly property color highlightCream: Qt.rgba(1, 246 / 255, 230 / 255, 1.0)
+        readonly property color highlightHoney: Qt.rgba(1, 241 / 255, 216 / 255, 1.0)
+        readonly property color highlightPale: Qt.rgba(1, 250 / 255, 240 / 255, 1.0)
+        readonly property color highlightWarm: Qt.rgba(1, 244 / 255, 216 / 255, 1.0)
+        readonly property color highlightGold: Qt.rgba(1, 246 / 255, 220 / 255, 1.0)
+        readonly property color innerShadow: "#3a2c1a"
+        readonly property color hoverShadow: Qt.rgba(40 / 255, 30 / 255, 20 / 255, 0.4)
+        readonly property color panelWash: Qt.rgba(248 / 255, 238 / 255, 220 / 255, 1.0)
+        readonly property color shadowBrown: Qt.rgba(107 / 255, 67 / 255, 40 / 255, 1.0)
+        readonly property color cardTitleInk: "#3a2a16"
+        readonly property color deadWash: "#4a3a28"
+        readonly property color sliderTrack: Qt.rgba(145 / 255, 122 / 255, 88 / 255, 0.28)
+        readonly property color sliderHandle: "#c79752"
+        readonly property color sliderHandleHover: "#d3a35e"
         // Seat status accents (small-area).
         readonly property color alive: "#6f8f5a"             // muted sage "ALIVE"
         readonly property color eliminated: "#a85b48"        // muted "ELIMINATED"
@@ -159,6 +190,17 @@ QtObject {
         readonly property color inkPrimary: ink
         readonly property color inkSecondary: inkSoft
         readonly property color deepHeader: bandNavy
+    }
+
+    readonly property QtObject provider: QtObject {
+        readonly property color openai: "#41a47a"
+        readonly property color anthropic: "#b98a58"
+        readonly property color deepseek: "#6d8ec8"
+        readonly property color qwen: warm.primaryActive
+        readonly property color moonshot: "#7d6ab3"
+        readonly property color zhipu: warm.accentTeal
+        readonly property color minimax: "#c98256"
+        readonly property color fallback: warm.primary
     }
 
     // Day / night phase surfaces (extracted from the home-scene illustrations).
@@ -295,11 +337,24 @@ QtObject {
         case "villager":
             return theme.color.villager;
         case "guard":
-            return "#4a8c6f";
+            return theme.color.guard;
         case "hunter":
-            return "#b5683a";
+            return theme.color.hunter;
         default:
             return theme.color.unknown;
+        }
+    }
+
+    function providerAccent(id) {
+        switch (id) {
+        case "openai": return theme.provider.openai;
+        case "anthropic": return theme.provider.anthropic;
+        case "deepseek": return theme.provider.deepseek;
+        case "qwen": return theme.provider.qwen;
+        case "moonshot": return theme.provider.moonshot;
+        case "zhipu": return theme.provider.zhipu;
+        case "minimax": return theme.provider.minimax;
+        default: return theme.provider.fallback;
         }
     }
 

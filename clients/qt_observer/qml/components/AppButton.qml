@@ -49,7 +49,7 @@ Item {
             return Theme.warm.body;  // ghost
         }
         if (variant === "primary") return Theme.color.primaryText;
-        if (variant === "danger") return "#FFFFFF";
+        if (variant === "danger") return Theme.color.primary;
         if (variant === "secondary") return Theme.color.text;
         return Theme.color.textSecondary;
     }

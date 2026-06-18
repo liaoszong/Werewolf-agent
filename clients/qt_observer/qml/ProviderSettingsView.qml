@@ -260,16 +260,7 @@ Item {
     }
 
     function providerAccent(id) {
-        switch (id) {
-        case "openai": return "#41a47a"
-        case "anthropic": return "#b98a58"
-        case "deepseek": return "#6d8ec8"
-        case "qwen": return "#a9583e"
-        case "moonshot": return "#7d6ab3"
-        case "zhipu": return "#5db8a6"
-        case "minimax": return "#c98256"
-        default: return Theme.warm.primary
-        }
+        return Theme.providerAccent(id)
     }
 
     function providerIcon(id) {

@@ -673,9 +673,9 @@ Item {
         anchors.fill: parent
         gradient: Gradient {
             orientation: Gradient.Vertical
-            GradientStop { position: 0.00; color: Qt.rgba(1.0, 246 / 255, 230 / 255, 0.24) }
-            GradientStop { position: 0.58; color: Qt.rgba(1.0, 241 / 255, 216 / 255, 0.08) }
-            GradientStop { position: 1.00; color: Qt.rgba(107 / 255, 67 / 255, 40 / 255, 0.18) }
+            GradientStop { position: 0.00; color: Theme.withAlpha(Theme.parchment.highlightCream, 0.24) }
+            GradientStop { position: 0.58; color: Theme.withAlpha(Theme.parchment.highlightHoney, 0.08) }
+            GradientStop { position: 1.00; color: Theme.withAlpha(Theme.parchment.shadowBrown, 0.18) }
         }
     }
 

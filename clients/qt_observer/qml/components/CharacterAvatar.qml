@@ -80,7 +80,7 @@ Item {
         Text {
             id: outText; anchors.centerIn: parent
             text: I18n.t("出局", "OUT")
-            color: "#ffffff"
+            color: Theme.warm.textOnPrimary
             font.family: Theme.fontFamilies.sans; font.contextFontMerging: true
             font.pixelSize: Theme.size.micro; font.weight: Theme.weight.bold
         }

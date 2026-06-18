@@ -94,7 +94,7 @@ Item {
         Rectangle {
             visible: !root.alive
             anchors.fill: parent; radius: width / 2
-            color: Theme.withAlpha("#4a3a28", 0.5)
+            color: Theme.withAlpha(Theme.parchment.deadWash, 0.5)
         }
         Item {
             visible: !root.alive
@@ -146,11 +146,11 @@ Item {
         width: 22; height: 22; radius: 11
         x: medallion.x + medallion.width - 20; y: medallion.y - 2
         color: Theme.parchment.terracotta
-        border.width: 1.5; border.color: Theme.withAlpha("#ffffff", 0.85)
+        border.width: 1.5; border.color: Theme.withAlpha(Theme.warm.textOnPrimary, 0.85)
         Text {
             anchors.centerIn: parent
             text: root.voteCount
-            color: "#ffffff"
+            color: Theme.warm.textOnPrimary
             font.family: Theme.fontFamilies.sans; font.contextFontMerging: true
             font.pixelSize: Theme.size.micro; font.weight: Theme.weight.bold
         }
@@ -182,7 +182,7 @@ Item {
             id: ribbonText
             anchors.centerIn: parent
             text: I18n.t("发言中", "SPEAKING")
-            color: "#ffffff"
+            color: Theme.warm.textOnPrimary
             font.family: Theme.fontFamilies.sans; font.contextFontMerging: true
             font.pixelSize: Theme.size.micro; font.weight: Theme.weight.bold; font.letterSpacing: 1
         }
