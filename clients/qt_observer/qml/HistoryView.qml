@@ -26,9 +26,10 @@ Item {
     property string searchText: ""
     property string executionFilter: "all"       // all | fake | live | local | unknown
     property string resultFilter: "all"          // all | good | wolf | unknown
-    property string timeFilter: "all"            // all | recent | older (placeholder until API exposes dates)
+    property string timeFilter: "all"            // all | recent | older
     property string selectedRunId: ""
     readonly property int maxSupportedPlayers: 6
+    readonly property double recentWindowMs: 7 * 24 * 60 * 60 * 1000
 
     readonly property var filteredRuns: _filteredRuns()
     readonly property var selectedRun: _findRun(selectedRunId)
@@ -429,6 +430,24 @@ Item {
             return false
         if (root.resultFilter !== "all" && _resultKey(run) !== root.resultFilter)
             return false
+        if (!root._matchTimeFilter(run))
+            return false
+        return true
+    }
+
+    function _matchTimeFilter(run) {
+        if (root.timeFilter === "all")
+            return true
+
+        var ms = _extractRunTimestamp(run)
+        if (isNaN(ms))
+            return root.timeFilter === "older"
+
+        var cutoff = Date.now() - root.recentWindowMs
+        if (root.timeFilter === "recent")
+            return ms >= cutoff
+        if (root.timeFilter === "older")
+            return ms < cutoff
         return true
     }
 
@@ -1032,8 +1051,8 @@ Item {
                         compact: true
                         model: [
                             I18n.t("全部时间", "All time"),
-                            I18n.t("最近创建", "Recent"),
-                            I18n.t("较早档案", "Older")
+                            I18n.t("最近 7 天", "Last 7 days"),
+                            I18n.t("更早/未知", "Older / unknown")
                         ]
                         onActivated: function(index) {
                             root.timeFilter = ["all", "recent", "older"][index]

@@ -48,7 +48,7 @@ The observer protocol is the hard boundary: any client (Qt today, Web later) con
 
 ### Prerequisites
 
-- **Python 3.10+** — no third-party packages needed.
+- **Python 3.12+** — no third-party packages needed.
 - **Qt 6.8+ and CMake 3.16+** — only for building the desktop client.
 
 ### One-click launch (Windows)

@@ -840,28 +840,56 @@ class QtObserverCredentialPanelTests(unittest.TestCase):
                     f"rawCredential must not be Q_INVOKABLE in code (line: {line.strip()!r})"
                 )
 
-    def test_credential_store_uses_qsettings_and_carries_dev_only_marker(self) -> None:
-        # (c) QSettings is the storage backend; a dev-only marker must appear in
-        # the header or the implementation (the spec Storage invariant requires it).
-        # QSettings is declared in the header (the .cpp uses it via m_settings).
+    def test_credential_store_keeps_raw_keys_memory_only_and_purges_legacy_qsettings(self) -> None:
+        # (c) Raw keys must be session-memory-only. QSettings remains allowed for
+        # non-secret base_url values, and startup must purge legacy byokey entries
+        # without reading or migrating their raw values.
         header_text = (QT / "src/CredentialStore.h").read_text(encoding="utf-8")
         cpp_text = (QT / "src/CredentialStore.cpp").read_text(encoding="utf-8")
         self.assertIn(
-            "QSettings", header_text,
-            "CredentialStore.h must declare QSettings (the storage backend)"
+            "QHash", header_text,
+            "CredentialStore.h must declare in-memory credential storage"
         )
-        # The .cpp must actually use the QSettings member (m_settings).
         self.assertIn(
-            "m_settings", cpp_text,
-            "CredentialStore.cpp must use m_settings (QSettings member)"
+            "m_credentials", header_text + cpp_text,
+            "CredentialStore must use the in-memory credential map"
         )
-        has_dev_only = (
-            re.search(r"dev.only", header_text, re.IGNORECASE) is not None
-            or re.search(r"dev.only", cpp_text, re.IGNORECASE) is not None
+        self.assertIn(
+            "QSettings", header_text,
+            "CredentialStore.h must still declare QSettings for non-secret base_url storage"
         )
-        self.assertTrue(
-            has_dev_only,
-            "CredentialStore.h or .cpp must carry a 'dev-only' marker (Storage invariant)"
+        self.assertRegex(
+            cpp_text,
+            r"m_settings\s*\.\s*setValue\s*\([^;]*byobase/",
+            "CredentialStore may persist non-secret base_url via QSettings",
+        )
+        self.assertRegex(
+            cpp_text,
+            r"m_settings\s*\.\s*value\s*\([^;]*byobase/",
+            "CredentialStore may read non-secret base_url via QSettings",
+        )
+        self.assertIsNone(
+            re.search(r"m_settings\s*\.\s*setValue\s*\([^;]*byokey/", cpp_text, re.DOTALL),
+            "CredentialStore must not write raw API keys to QSettings",
+        )
+        self.assertIsNone(
+            re.search(r"m_settings\s*\.\s*value\s*\([^;]*byokey/", cpp_text, re.DOTALL),
+            "CredentialStore must not read raw API keys from QSettings",
+        )
+        self.assertRegex(
+            cpp_text,
+            r"legacyKeyPrefix\s*=\s*QStringLiteral\(\"byokey/\"\)",
+            "CredentialStore must identify legacy byokey QSettings entries",
+        )
+        self.assertRegex(
+            cpp_text,
+            r"m_settings\s*\.\s*allKeys\(\)",
+            "CredentialStore must scan QSettings keys for legacy byokey entries",
+        )
+        self.assertRegex(
+            cpp_text,
+            r"m_settings\s*\.\s*remove\s*\(\s*key\s*\)",
+            "CredentialStore must purge legacy byokey entries without reading their values",
         )
 
     def test_qml_does_not_reference_raw_key_accessors(self) -> None:

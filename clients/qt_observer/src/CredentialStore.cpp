@@ -13,6 +13,12 @@ CredentialStore::CredentialStore(QObject *parent)
     , m_baseUrl(QStringLiteral("http://127.0.0.1:8765"))
     , m_network(new QNetworkAccessManager(this))
 {
+    const QString legacyKeyPrefix = QStringLiteral("byokey/");
+    const QStringList keys = m_settings.allKeys();
+    for (const QString &key : keys) {
+        if (key.startsWith(legacyKeyPrefix))
+            m_settings.remove(key);
+    }
 }
 
 void CredentialStore::setBaseUrl(const QString &baseUrl)
@@ -26,11 +32,11 @@ void CredentialStore::setBaseUrl(const QString &baseUrl)
 
 QString CredentialStore::rawCredential(const QString &provider) const
 {
-    return m_settings.value(QStringLiteral("byokey/") + provider).toString();
+    return m_credentials.value(provider);
 }
 
-// base_url is NOT a secret — stored alongside the key under a separate prefix and
-// readable by QML (the masking rules apply only to the key).
+// base_url is NOT a secret — persisted under a separate prefix and readable by
+// QML (the masking rules apply only to the key).
 QString CredentialStore::baseUrlFor(const QString &provider) const
 {
     return m_settings.value(QStringLiteral("byobase/") + provider).toString();
@@ -38,18 +44,13 @@ QString CredentialStore::baseUrlFor(const QString &provider) const
 
 QStringList CredentialStore::configuredProviders() const
 {
-    // QSettings::allKeys() is const (unlike beginGroup); filter the key entries and
-    // keep only providers with a non-empty saved key.
     QStringList providers;
-    const QString prefix = QStringLiteral("byokey/");
-    const QStringList keys = m_settings.allKeys();
-    for (const QString &k : keys) {
-        if (!k.startsWith(prefix))
-            continue;
-        const QString provider = k.mid(prefix.length());
-        if (!provider.isEmpty() && !m_settings.value(k).toString().isEmpty())
+    const QStringList keys = m_credentials.keys();
+    for (const QString &provider : keys) {
+        if (!provider.isEmpty() && !m_credentials.value(provider).isEmpty())
             providers.append(provider);
     }
+    providers.sort();
     return providers;
 }
 
@@ -85,7 +86,7 @@ void CredentialStore::saveCredential(const QString &provider, const QString &raw
 {
     if (rawText.trimmed().isEmpty())
         return;
-    m_settings.setValue(QStringLiteral("byokey/") + provider, rawText);
+    m_credentials.insert(provider, rawText);
     // A blank base_url clears any stored custom endpoint (the server then falls
     // back to the provider's registry default). Non-blank values are trimmed.
     const QString trimmedBase = baseUrl.trimmed();
@@ -98,6 +99,7 @@ void CredentialStore::saveCredential(const QString &provider, const QString &raw
 
 void CredentialStore::clearCredential(const QString &provider)
 {
+    m_credentials.remove(provider);
     m_settings.remove(QStringLiteral("byokey/") + provider);
     m_settings.remove(QStringLiteral("byobase/") + provider);
     emit credentialChanged(provider);
