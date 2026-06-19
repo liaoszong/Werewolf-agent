@@ -14,6 +14,10 @@ Item {
 
     // Day/night phase for the backdrop (screenshot matrix toggles this).
     property string phase: "day"
+    property string selectedActiveRunId: ""
+    readonly property var activeRuns: _activeRuns()
+    readonly property var selectedActiveRun: _findRun(selectedActiveRunId)
+    readonly property var primaryActiveRun: activeRuns.length > 0 ? activeRuns[0] : ({})
 
     // Bilingual role name overlaid on each card's blank banner (re-evaluates on
     // language switch because I18n.t reads I18n.lang).
@@ -29,7 +33,117 @@ Item {
         return ""
     }
 
-    Component.onCompleted: ObserverClient.checkHealth()
+    Component.onCompleted: {
+        ObserverClient.checkHealth()
+        ObserverClient.refreshRuns()
+        _ensureSelectedActiveRun()
+    }
+
+    Timer {
+        id: homeRunsRefreshTimer
+        interval: 3000
+        repeat: true
+        running: true
+        onTriggered: {
+            ObserverClient.refreshRuns()
+            if (root.selectedActiveRunId !== "")
+                ObserverClient.fetchRunEvents(root.selectedActiveRunId)
+        }
+    }
+
+    Connections {
+        target: ObserverClient
+        function onRunItemsChanged() {
+            root._ensureSelectedActiveRun()
+        }
+    }
+
+    onSelectedActiveRunIdChanged: {
+        ObserverClient.fetchRunEvents(selectedActiveRunId)
+    }
+
+    function _activeRuns() {
+        var runs = ObserverClient.runItems || []
+        var out = []
+        for (var i = 0; i < runs.length; ++i) {
+            var st = (runs[i].status || "").toLowerCase()
+            if (st === "running" || st === "queued")
+                out.push(runs[i])
+        }
+        out.sort(function(a, b) {
+            var as = (a.status || "").toLowerCase()
+            var bs = (b.status || "").toLowerCase()
+            if (as !== bs) {
+                if (as === "running") return -1
+                if (bs === "running") return 1
+            }
+            var am = Number(a.filesystem_mtime || 0)
+            var bm = Number(b.filesystem_mtime || 0)
+            if (bm !== am) return bm - am
+            return ("" + (b.run_id || "")).localeCompare("" + (a.run_id || ""))
+        })
+        return out
+    }
+
+    function _findRun(runId) {
+        if (!runId)
+            return ({})
+        var runs = ObserverClient.runItems || []
+        for (var i = 0; i < runs.length; ++i) {
+            if (runs[i].run_id === runId)
+                return runs[i]
+        }
+        return ({})
+    }
+
+    function _ensureSelectedActiveRun() {
+        var runs = _activeRuns()
+        var keep = false
+        for (var i = 0; i < runs.length; ++i) {
+            if (runs[i].run_id === selectedActiveRunId) {
+                keep = true
+                break
+            }
+        }
+        if (!keep)
+            selectedActiveRunId = runs.length > 0 ? runs[0].run_id : ""
+        else if (selectedActiveRunId !== "")
+            ObserverClient.fetchRunEvents(selectedActiveRunId)
+    }
+
+    function _statusLabel(st) {
+        st = (st || "").toLowerCase()
+        if (st === "running") return I18n.t("进行中", "Running")
+        if (st === "queued") return I18n.t("排队中", "Queued")
+        return I18n.t("未知", "Unknown")
+    }
+
+    function _shortRunId(id) {
+        id = "" + (id || "")
+        return id.length > 18 ? id.slice(0, 12) + "..." + id.slice(id.length - 5) : id
+    }
+
+    function _eventText(ev) {
+        if (!ev)
+            return "—"
+        var data = ev.data || {}
+        return data.summary || ev.summary || ev.kind || ev.type || ev.event_id || "—"
+    }
+
+    function _recentPreviewEvents() {
+        var events = ObserverClient.previewEventItems || []
+        var out = []
+        for (var i = events.length - 1; i >= 0 && out.length < 3; --i)
+            out.push(events[i])
+        return out
+    }
+
+    function _continueRun(run) {
+        if (!run || !run.run_id)
+            return
+        ObserverClient.openRun(run.run_id, false)
+        root.StackView.view.parent.navigateCockpit()
+    }
 
     // Backdrop fills ONLY the content region (right of the NavRail) so the
     // illustration's cream margin lands under the hero text, not behind the rail.
@@ -135,16 +249,30 @@ Item {
 
         Column {
             id: heroActions
-            width: Math.max(startNewMatchButton.implicitWidth, historyButton.implicitWidth)
+            width: Math.max(startNewMatchButton.implicitWidth,
+                            historyButton.implicitWidth,
+                            continueActiveRunButton.implicitWidth)
             spacing: Theme.space.sm
             topPadding: Theme.space.lg
+            AppButton {
+                id: continueActiveRunButton
+                objectName: "continueActiveRunButton"
+                onLight: true
+                width: parent.width
+                visible: root.activeRuns.length > 0
+                text: I18n.t("继续观察", "Continue Observing")
+                variant: "primary"
+                onClicked: root._continueRun(root.selectedActiveRunId !== "" ? root.selectedActiveRun : root.primaryActiveRun)
+            }
             AppButton {
                 id: startNewMatchButton
                 objectName: "startNewMatchButton"
                 onLight: true
                 width: parent.width
-                text: I18n.t("进入今夜对局", "Enter Tonight's Match")
-                variant: "primary"
+                text: root.activeRuns.length > 0
+                      ? I18n.t("开始新对局", "Start New Match")
+                      : I18n.t("开始新对局", "Start New Match")
+                variant: root.activeRuns.length > 0 ? "secondary" : "primary"
                 onClicked: root.StackView.view.parent.navigateSetup()
             }
             AppButton {
@@ -217,9 +345,10 @@ Item {
         }
     }
 
-    // ------------------------------------ Right floating panels (placeholder)
-    // Semi-transparent parchment over the scene (no blur — Phase 1 rule). Static
-    // structure for now; live "今夜对局 / 实时事件" data wired in a later phase.
+    // ------------------------------------ Right floating panels
+    // Semi-transparent parchment over the scene (no blur — Phase 1 rule). The
+    // panels are an active-runs hub: REST summaries select a run, and the event
+    // preview follows that one run without merging multiple streams.
     Column {
         id: rightPanels
         anchors.right: parent.right
@@ -229,14 +358,13 @@ Item {
         width: 264
         spacing: Theme.space.lg
 
-        // 今夜对局
         Rectangle {
             width: parent.width
             radius: Theme.radius.lg
             color: Theme.withAlpha(Theme.warm.canvas, 0.82)
             border.width: 1
             border.color: Theme.withAlpha(Theme.warm.ink, 0.08)
-            implicitHeight: tonightBody.implicitHeight + Theme.space.lg * 2
+            implicitHeight: Math.max(tonightBody.implicitHeight + Theme.space.lg * 2, 160)
 
             Column {
                 id: tonightBody
@@ -255,7 +383,8 @@ Item {
                     font.weight: Theme.weight.semibold
                 }
                 Text {
-                    text: I18n.t("暂未开始 · 开始一局后在此查看", "Not started — begin a match to see it here")
+                    visible: root.activeRuns.length === 0
+                    text: I18n.t("暂无进行中对局", "No active runs")
                     color: Theme.warm.muted
                     font.family: Theme.fontFamilies.sans
                     font.contextFontMerging: true
@@ -265,10 +394,121 @@ Item {
                     lineHeightMode: Text.ProportionalHeight
                     lineHeight: 1.45
                 }
+
+                Rectangle {
+                    visible: root.activeRuns.length > 0
+                    width: parent.width
+                    radius: Theme.radius.md
+                    color: Theme.withAlpha(Theme.parchment.parchmentSoft, 0.78)
+                    border.width: 1
+                    border.color: Theme.withAlpha(Theme.parchment.goldLine, 0.42)
+                    implicitHeight: primaryRunBody.implicitHeight + Theme.space.md * 2
+
+                    Column {
+                        id: primaryRunBody
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.top: parent.top
+                        anchors.margins: Theme.space.md
+                        spacing: Theme.space.xs
+
+                        Row {
+                            width: parent.width
+                            spacing: Theme.space.xs
+                            StatusBadge {
+                                onLight: true
+                                status: root.primaryActiveRun.status || "queued"
+                            }
+                            Text {
+                                width: parent.width - 92
+                                text: root._shortRunId(root.primaryActiveRun.run_id)
+                                color: Theme.warm.ink
+                                font.family: Theme.fontFamilies.mono
+                                font.pixelSize: Theme.size.caption
+                                elide: Text.ElideRight
+                            }
+                        }
+
+                        Text {
+                            width: parent.width
+                            text: root._statusLabel(root.primaryActiveRun.status)
+                                  + I18n.t(" · 事件 ", " · events ")
+                                  + (root.primaryActiveRun.event_count || 0)
+                            color: Theme.warm.muted
+                            font.family: Theme.fontFamilies.sans
+                            font.contextFontMerging: true
+                            font.pixelSize: Theme.size.caption
+                            elide: Text.ElideRight
+                        }
+
+                        AppButton {
+                            onLight: true
+                            width: parent.width
+                            height: 34
+                            text: I18n.t("继续观察", "Continue")
+                            variant: "primary"
+                            onClicked: root._continueRun(root.primaryActiveRun)
+                        }
+                    }
+                }
+
+                Column {
+                    visible: root.activeRuns.length > 1
+                    width: parent.width
+                    spacing: Theme.space.xs
+
+                    Repeater {
+                        model: root.activeRuns.slice(0, 5)
+                        delegate: Rectangle {
+                            required property var modelData
+                            width: parent.width
+                            height: 34
+                            radius: Theme.radius.sm
+                            color: modelData.run_id === root.selectedActiveRunId
+                                   ? Theme.withAlpha(Theme.warm.primary, 0.14)
+                                   : Theme.withAlpha(Theme.warm.canvas, 0.46)
+                            border.width: 1
+                            border.color: modelData.run_id === root.selectedActiveRunId
+                                          ? Theme.withAlpha(Theme.warm.primary, 0.42)
+                                          : Theme.withAlpha(Theme.warm.ink, 0.08)
+
+                            Row {
+                                anchors.fill: parent
+                                anchors.leftMargin: Theme.space.sm
+                                anchors.rightMargin: Theme.space.sm
+                                spacing: Theme.space.xs
+
+                                Rectangle {
+                                    width: 7; height: 7; radius: 4
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    color: Theme.statusColor(modelData.status || "queued")
+                                }
+                                Text {
+                                    width: parent.width - 88
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: root._shortRunId(modelData.run_id)
+                                    color: Theme.warm.bodyStrong
+                                    font.family: Theme.fontFamilies.mono
+                                    font.pixelSize: Theme.size.micro
+                                    elide: Text.ElideRight
+                                }
+                                Text {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: root._statusLabel(modelData.status)
+                                    color: Theme.warm.muted
+                                    font.family: Theme.fontFamilies.sans
+                                    font.contextFontMerging: true
+                                    font.pixelSize: Theme.size.micro
+                                }
+                            }
+                            HoverHandler { cursorShape: Qt.PointingHandCursor }
+                            TapHandler { onTapped: root.selectedActiveRunId = modelData.run_id }
+                        }
+                    }
+                }
             }
         }
 
-        // 实时事件
         Rectangle {
             width: parent.width
             radius: Theme.radius.lg
@@ -293,22 +533,36 @@ Item {
                     font.pixelSize: Theme.warmSize.titleMd
                     font.weight: Theme.weight.semibold
                 }
+                Text {
+                    width: parent.width
+                    text: root.selectedActiveRunId === ""
+                          ? I18n.t("选择一局进行中的对局后显示事件。", "Select an active run to preview events.")
+                          : root._shortRunId(root.selectedActiveRunId)
+                    color: Theme.warm.muted
+                    font.family: Theme.fontFamilies.mono
+                    font.pixelSize: Theme.size.micro
+                    elide: Text.ElideRight
+                }
                 Repeater {
-                    model: 3
+                    model: root._recentPreviewEvents().length > 0 ? root._recentPreviewEvents() : [null, null, null]
                     delegate: Row {
+                        required property var modelData
                         width: eventsBody.width
                         spacing: Theme.space.sm
                         Rectangle {
                             width: 6; height: 6; radius: 3
                             anchors.verticalCenter: parent.verticalCenter
-                            color: Theme.withAlpha(Theme.warm.ink, 0.18)
+                            color: modelData ? Theme.withAlpha(Theme.warm.primary, 0.72)
+                                             : Theme.withAlpha(Theme.warm.ink, 0.18)
                         }
                         Text {
-                            text: "—"
+                            width: parent.width - 16
+                            text: modelData ? root._eventText(modelData) : "—"
                             color: Theme.warm.mutedSoft
                             font.family: Theme.fontFamilies.sans
                             font.contextFontMerging: true
                             font.pixelSize: Theme.size.caption
+                            elide: Text.ElideRight
                         }
                     }
                 }

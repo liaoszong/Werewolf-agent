@@ -21,6 +21,7 @@ Item {
     property string dataSourceText: ""
     property string perspectiveText: ""
     property bool live: false
+    property bool interruptVisible: false
     // Cursor-gated phase axis + current micro-action (from EventPresentationQueue).
     // Drive the top-band timeline; presentational only (passed in, never read backend).
     property var phaseTimeline: []
@@ -30,6 +31,7 @@ Item {
     property Component auditSlot: null
     property Component playbackSlot: null
     signal backRequested()
+    signal interruptRequested()
 
     // 椭圆落位 = 背景图(table-day.png)自身比例，对齐画里的 6 个空座位。
     property real cx: 0.435
@@ -206,7 +208,7 @@ Item {
                     border.width: 1; border.color: Theme.withAlpha(Theme.parchment.goldLine, 0.6)
                     Text {
                         id: backText; anchors.centerIn: parent
-                        text: I18n.t("← 返回", "← Back")
+                        text: I18n.t("← 返回首页", "← Home")
                         color: Theme.parchment.goldText
                         font.family: Theme.fontFamilies.sans; font.contextFontMerging: true; font.pixelSize: Theme.size.caption
                     }
@@ -259,6 +261,26 @@ Item {
                         font.family: Theme.fontFamilies.sans; font.contextFontMerging: true
                         font.pixelSize: Theme.size.micro; font.letterSpacing: 1.5
                     }
+                }
+                Rectangle {
+                    visible: root.interruptVisible
+                    width: parent.width
+                    height: visible ? 30 : 0
+                    radius: Theme.radius.sm
+                    color: interruptHover.hovered ? Theme.withAlpha(Theme.color.failed, 0.16) : "transparent"
+                    border.width: 1
+                    border.color: Theme.withAlpha(Theme.color.failed, 0.58)
+                    Text {
+                        anchors.centerIn: parent
+                        text: I18n.t("中断对局", "Interrupt Match")
+                        color: Theme.color.failed
+                        font.family: Theme.fontFamilies.sans
+                        font.contextFontMerging: true
+                        font.pixelSize: Theme.size.caption
+                        font.weight: Theme.weight.semibold
+                    }
+                    HoverHandler { id: interruptHover; cursorShape: Qt.PointingHandCursor }
+                    TapHandler { onTapped: root.interruptRequested() }
                 }
                 Loader { width: parent.width; sourceComponent: root.auditSlot }
             }

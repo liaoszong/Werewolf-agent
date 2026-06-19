@@ -778,6 +778,13 @@ class QtObserverSettlementViewTests(unittest.TestCase):
         self.assertIn("/interrupt", cpp)
         self.assertIn("_interrupt_active_runs", launcher)
         self.assertIn("/interrupt", launcher)
+        self.assertIn('"source": "launcher_shutdown"', launcher)
+        self.assertIn('"reason": "launcher_shutdown"', launcher)
+        self.assertRegex(
+            launcher,
+            r"if server is not None:\s*\n\s*_interrupt_active_runs\(\)",
+        )
+        self.assertIn("外部观察者服务器仍在运行，未自动中断", launcher)
 
 
 class QtObserverCredentialPanelTests(unittest.TestCase):

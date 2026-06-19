@@ -1888,6 +1888,10 @@ class LiveRunStatusReasonTests(TestCase):
         h = self._handler()
         self.assertEqual(h._get_status("rr_stale", run_dir), "interrupted")
         self.assertEqual(read_run_status(run_dir), "interrupted")
+        payload = json.loads((run_dir / "status.json").read_text(encoding="utf-8"))
+        self.assertEqual(payload["interrupted_source"], "server_restart_stale")
+        self.assertEqual(payload["status_reason"], "server_restart_stale")
+        self.assertIn("interrupted_at", payload)
 
     def test_interrupt_wins_over_launcher_return(self) -> None:
         from werewolf_eval.observer_protocol import read_run_status
@@ -1897,13 +1901,18 @@ class LiveRunStatusReasonTests(TestCase):
         h = self._handler()
 
         def _interrupt_then_finish(rid: str, rd: Path) -> int:
-            code, payload = h._run_manager().interrupt_run(rid, rd)
+            code, payload = h._run_manager().interrupt_run(
+                rid, rd, source="user", reason="user_interrupted"
+            )
             self.assertEqual((code, payload), (200, {"interrupted": rid}))
             return 0
 
         h._execute_run("rr_interrupt", run_dir, _interrupt_then_finish)
         self.assertEqual(h._get_status("rr_interrupt", run_dir), "interrupted")
         self.assertEqual(read_run_status(run_dir), "interrupted")
+        payload = json.loads((run_dir / "status.json").read_text(encoding="utf-8"))
+        self.assertEqual(payload["interrupted_source"], "user")
+        self.assertEqual(payload["status_reason"], "user_interrupted")
 
 
 # ---------------------------------------------------------------------------

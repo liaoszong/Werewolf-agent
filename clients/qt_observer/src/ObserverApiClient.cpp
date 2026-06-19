@@ -167,6 +167,7 @@ void ObserverApiClient::setCurrentPerspective(const QString &perspective)
 
 QVariantList ObserverApiClient::runItems() const { return m_runItems; }
 QVariantList ObserverApiClient::eventItems() const { return m_eventItems; }
+QVariantList ObserverApiClient::previewEventItems() const { return m_previewEventItems; }
 QVariantList ObserverApiClient::auditItems() const { return m_auditItems; }
 QString ObserverApiClient::lastError() const { return m_lastError; }
 
@@ -502,6 +503,41 @@ void ObserverApiClient::openRun(const QString &runId, bool forReport)
             rebuildSeenStreamEventIds();
             emit eventItemsChanged();
         });
+    });
+}
+
+void ObserverApiClient::fetchRunEvents(const QString &runId)
+{
+    m_pendingPreviewRunId = runId;
+    if (runId.isEmpty()) {
+        if (!m_previewEventItems.isEmpty()) {
+            m_previewEventItems.clear();
+            emit previewEventItemsChanged();
+        }
+        return;
+    }
+
+    QNetworkReply *reply = get(
+        QStringLiteral("/api/runs/") + runId + QStringLiteral("/events?perspective=god"));
+    connect(reply, &QNetworkReply::finished, this, [this, runId, reply]() {
+        reply->deleteLater();
+        if (runId != m_pendingPreviewRunId)
+            return;
+        if (reply->error() != QNetworkReply::NoError) {
+            setError(reply->errorString());
+            return;
+        }
+        QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+        if (!doc.isObject()) {
+            setError(QStringLiteral("Invalid preview events response"));
+            return;
+        }
+        QJsonArray events = doc.object().value(QStringLiteral("events")).toArray();
+        QVariantList items;
+        for (const QJsonValue &v : events)
+            items.append(v.toObject().toVariantMap());
+        m_previewEventItems = items;
+        emit previewEventItemsChanged();
     });
 }
 

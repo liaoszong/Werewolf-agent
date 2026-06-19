@@ -22,6 +22,7 @@ class ObserverApiClient : public QObject {
     Q_PROPERTY(QString currentPerspective READ currentPerspective WRITE setCurrentPerspective NOTIFY currentPerspectiveChanged)
     Q_PROPERTY(QVariantList runItems READ runItems NOTIFY runItemsChanged)
     Q_PROPERTY(QVariantList eventItems READ eventItems NOTIFY eventItemsChanged)
+    Q_PROPERTY(QVariantList previewEventItems READ previewEventItems NOTIFY previewEventItemsChanged)
     Q_PROPERTY(QVariantList auditItems READ auditItems NOTIFY auditItemsChanged)
     Q_PROPERTY(QString lastError READ lastError NOTIFY lastErrorChanged)
     // G2c projection properties
@@ -75,6 +76,7 @@ public:
 
     QVariantList runItems() const;
     QVariantList eventItems() const;
+    QVariantList previewEventItems() const;
     QVariantList auditItems() const;
     QString lastError() const;
     // G2c projection accessors
@@ -110,6 +112,7 @@ public slots:
     // forReport=true (history "查看战报") makes the settlement overlay skip the freeze
     // ceremony and open straight to the report; default false = live freeze ceremony.
     Q_INVOKABLE void openRun(const QString &runId, bool forReport = false);
+    Q_INVOKABLE void fetchRunEvents(const QString &runId);
     Q_INVOKABLE void deleteRun(const QString &runId);
     Q_INVOKABLE void interruptRun(const QString &runId);
     Q_INVOKABLE void connectStream();
@@ -151,6 +154,7 @@ signals:
     void currentPerspectiveChanged();
     void runItemsChanged();
     void eventItemsChanged();
+    void previewEventItemsChanged();
     void auditItemsChanged();
     void lastErrorChanged();
     // G2c projection signals
@@ -211,6 +215,7 @@ private:
     QString m_currentPerspective;
     QVariantList m_runItems;
     QVariantList m_eventItems;
+    QVariantList m_previewEventItems;
     QVariantList m_auditItems;
     QString m_lastError;
     // G2c projection state
@@ -242,6 +247,7 @@ private:
     QString m_currentExecutionMode;
     QString m_initialRunId;
     QString m_pendingOpenRunId;   // last openRun target; stale async replies are dropped
+    QString m_pendingPreviewRunId;
 
     QNetworkAccessManager *m_network;
     QNetworkReply *m_streamReply;

@@ -57,7 +57,7 @@ The observer protocol is the hard boundary: any client (Qt today, Web later) con
 python launch-theater.py
 ```
 
-Starts the local observer server (if needed), builds/launches the Qt client, and lands on the home view — start a match from there. Closing the launcher/client marks any still `queued` or `running` local runs as `interrupted` before shutdown so History can archive and delete them without fabricating a settlement report. Edit the `QT_BIN` / `MINGW_BIN` / `CMAKE` constants at the top of `launch-theater.py` to match your Qt installation.
+Starts the local observer server (if needed), builds/launches the Qt client, and lands on the home view — start a match from there. When this launcher owns the local server process, closing the launcher/client first marks still `queued` or `running` local runs as `interrupted` before shutdown so History can archive and delete them without fabricating a settlement report. If the launcher reuses an already-running external observer server, it leaves that server and its active runs alone. Edit the `QT_BIN` / `MINGW_BIN` / `CMAKE` constants at the top of `launch-theater.py` to match your Qt installation.
 
 ### Manual launch
 

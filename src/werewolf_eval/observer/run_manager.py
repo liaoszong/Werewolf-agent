@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import shutil
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 from werewolf_eval.evaluation_versions import read_manifest_bucket
@@ -195,8 +196,38 @@ def _run_delete_result(run_dir: Path, run_id: str, status: str) -> tuple[int, di
     return (200, {"deleted": run_id})
 
 
+def _utc_now_iso() -> str:
+    return (
+        datetime.now(timezone.utc)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
+
+
+def _interrupt_metadata(source: str, reason: str | None = None) -> dict[str, object]:
+    safe_source = source if source in {
+        "user",
+        "launcher_shutdown",
+        "server_restart_stale",
+    } else "user"
+    status_reason = reason or safe_source
+    return {
+        "interrupted_at": _utc_now_iso(),
+        "interrupted_source": safe_source,
+        "status_reason": status_reason,
+        # Back-compat for existing UI/tests that already read "reason".
+        "reason": status_reason,
+    }
+
+
 def _run_interrupt_result(
-    run_dir: Path, run_id: str, status: str
+    run_dir: Path,
+    run_id: str,
+    status: str,
+    *,
+    source: str = "user",
+    reason: str | None = None,
 ) -> tuple[int, dict[str, object]]:
     """Mark an active run interrupted without deleting local artifacts.
 
@@ -211,7 +242,7 @@ def _run_interrupt_result(
     if status not in ("running", "queued"):
         return (409, {"error": "run_not_active"})
     write_run_status(run_dir, "interrupted")
-    _write_status_metadata(run_dir, {"reason": "user_interrupted"})
+    _write_status_metadata(run_dir, _interrupt_metadata(source, reason))
     return (200, {"interrupted": run_id})
 
 
@@ -353,7 +384,13 @@ class RunManager:
             # The server owns run threads. If it restarted and no in-memory entry
             # exists, that run can no longer complete; archive it as interrupted
             # instead of leaving an undeletable zombie.
-            _run_interrupt_result(run_dir, run_id, durable)
+            _run_interrupt_result(
+                run_dir,
+                run_id,
+                durable,
+                source="server_restart_stale",
+                reason="server_restart_stale",
+            )
             return "interrupted"
         return durable
 
@@ -436,10 +473,19 @@ class RunManager:
                 state.run_errors.pop(run_id, None)
         return code, payload
 
-    def interrupt_run(self, run_id: str, run_dir: Path) -> tuple[int, dict[str, object]]:
+    def interrupt_run(
+        self,
+        run_id: str,
+        run_dir: Path,
+        *,
+        source: str = "user",
+        reason: str | None = None,
+    ) -> tuple[int, dict[str, object]]:
         """POST /api/runs/{run_id}/interrupt flow: active-only terminal mark."""
         status_now = self.get_status(run_id, run_dir)
-        code, payload = _run_interrupt_result(run_dir, run_id, status_now)
+        code, payload = _run_interrupt_result(
+            run_dir, run_id, status_now, source=source, reason=reason
+        )
         if code == 200:
             state = self._state
             with state.lock:

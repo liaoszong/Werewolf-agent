@@ -178,18 +178,24 @@ def list_run_dirs(runs_dir: Path) -> list[Path]:
     return items
 
 
-def _read_status(run_dir: Path) -> str:
-    """Read the run status from the status file, falling back to 'unknown'."""
+def _read_status_payload(run_dir: Path) -> dict[str, object]:
+    """Read the durable status payload, falling back to an empty dict."""
     status_path = run_dir / _STATUS_FILE
     if status_path.exists():
         try:
             data = json.loads(status_path.read_text(encoding="utf-8"))
             if isinstance(data, dict):
-                status = data.get("status")
-                if isinstance(status, str) and status in RUN_STATUS_VALUES:
-                    return status
+                return data
         except (json.JSONDecodeError, OSError):
             pass
+    return {}
+
+
+def _read_status(run_dir: Path) -> str:
+    """Read the run status from the status file, falling back to 'unknown'."""
+    status = _read_status_payload(run_dir).get("status")
+    if isinstance(status, str) and status in RUN_STATUS_VALUES:
+        return status
     return "unknown"
 
 
@@ -322,20 +328,48 @@ def build_run_summary(
     """Build a run summary dictionary exposing relative paths only."""
     run_id = run_dir.name
     current_status = status if status is not None else _read_status(run_dir)
+    status_payload = _read_status_payload(run_dir)
     event_count = _count_events(run_dir)
     snapshot_files = _list_snapshot_files(run_dir)
     snapshot_count = len(snapshot_files)
     snapshot_names = [f.name for f in snapshot_files]
     failure_audit_path = run_dir / "failure-audit.json"
     has_failure_audit = failure_audit_path.exists()
-    return {
+    try:
+        filesystem_mtime = run_dir.stat().st_mtime
+    except OSError:
+        filesystem_mtime = 0.0
+    game_log_path = run_dir / "game-log.json"
+    report_available = current_status == "completed" and game_log_path.exists()
+    report_unavailable_reason = None
+    if not report_available:
+        report_unavailable_reason = (
+            "not_completed" if current_status != "completed" else "no_game_log"
+        )
+    summary: dict[str, object] = {
         "run_id": run_id,
         "status": current_status,
+        "is_active": current_status in ("queued", "running"),
+        "report_available": report_available,
+        "report_unavailable_reason": report_unavailable_reason,
+        "filesystem_mtime": filesystem_mtime,
         "event_count": event_count,
         "snapshot_count": snapshot_count,
         "snapshot_names": snapshot_names,
         "has_failure_audit": has_failure_audit,
     }
+    for key in (
+        "interrupted_at",
+        "interrupted_source",
+        "status_reason",
+        "reason",
+        "evaluation_bucket",
+    ):
+        if key in status_payload:
+            summary[key] = status_payload[key]
+    if "status_reason" not in summary and isinstance(summary.get("reason"), str):
+        summary["status_reason"] = summary["reason"]
+    return summary
 
 
 def build_run_detail(

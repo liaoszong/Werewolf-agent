@@ -132,6 +132,19 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
             raise ObserverProtocolError("Request body must be a JSON object")
         return data
 
+    def _read_optional_json_body(self) -> dict[str, object]:
+        content_length = int(self.headers.get("Content-Length", 0))
+        if content_length == 0:
+            return {}
+        raw = self.rfile.read(content_length)
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise ObserverProtocolError(f"Invalid JSON: {exc}") from exc
+        if not isinstance(data, dict):
+            raise ObserverProtocolError("Request body must be a JSON object")
+        return data
+
     def _get_state(self) -> ObserverServerState:
         return self.server.state  # type: ignore[attr-defined]
 
@@ -510,7 +523,15 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
     def _route_runs_interrupt(self, params: dict[str, str]) -> None:
         run_id = params["run_id"]
         run_dir = self._run_dir(run_id)          # validate_run_id -> raises on illegal id
-        code, payload = self._run_manager().interrupt_run(run_id, run_dir)
+        body = self._read_optional_json_body()
+        source = body.get("source")
+        reason = body.get("reason") or body.get("status_reason")
+        code, payload = self._run_manager().interrupt_run(
+            run_id,
+            run_dir,
+            source=source if isinstance(source, str) else "user",
+            reason=reason if isinstance(reason, str) else None,
+        )
         if code == 200:
             self._send_json(200, payload)
         else:

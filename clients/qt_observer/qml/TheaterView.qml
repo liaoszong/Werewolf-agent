@@ -11,6 +11,8 @@ Item {
     id: theaterRoot
     objectName: "theaterView"
     state: eventQueue.layoutPhase
+    readonly property bool _activeRun:
+        ObserverClient.currentStatus === "running" || ObserverClient.currentStatus === "queued"
 
     Component.onCompleted: {
         if (ObserverClient.currentRunId !== "") {
@@ -70,11 +72,13 @@ Item {
         perspectiveSlot: livePerspective
         eventLogSlot: liveEventLog
         playbackSlot: livePlayback
+        interruptVisible: theaterRoot._activeRun
         // 审计在底部全宽 EvidenceConsole（下），左区不再放，故 auditSlot 不注入。
         onBackRequested: {
             ObserverClient.disconnectStream()
             theaterRoot.StackView.view.parent.returnFromCockpit()
         }
+        onInterruptRequested: interruptConfirmDialog.open()
     }
 
     // 视角切换（左上,单实例,P1-C：只写 currentPerspective,绝不写 ring.perspective）。
@@ -143,6 +147,97 @@ Item {
                     nav.returnFromCockpit()
                 else
                     nav.navigateHome()
+            }
+        }
+    }
+
+    ConfirmDialog {
+        id: interruptConfirmDialog
+        objectName: "interruptRunConfirmDialog"
+        title: I18n.t("中断对局", "Interrupt match")
+        message: I18n.t("中断后不会生成战报，但可在历史中删除。确定中断当前对局吗？",
+                        "Interrupted runs do not generate a report, but can be deleted from History. Interrupt this match?")
+        confirmText: I18n.t("中断对局", "Interrupt")
+        onConfirmed: ObserverClient.interruptRun(ObserverClient.currentRunId)
+    }
+
+    Rectangle {
+        id: interruptedOverlay
+        anchors.fill: parent
+        visible: ObserverClient.currentStatus === "interrupted"
+        z: 80
+        color: Theme.withAlpha(Theme.parchment.darkPanel, 0.86)
+
+        Rectangle {
+            width: Math.min(460, parent.width - Theme.space.xxl * 2)
+            implicitHeight: interruptedBody.implicitHeight + Theme.space.xxl * 2
+            anchors.centerIn: parent
+            radius: Theme.radius.lg
+            color: Theme.withAlpha(Theme.parchment.parchmentSoft, 0.96)
+            border.width: 1
+            border.color: Theme.withAlpha(Theme.parchment.goldLine, 0.64)
+
+            Image {
+                anchors.fill: parent
+                anchors.margins: 1
+                source: Illustrations.texParchment
+                fillMode: Image.Tile
+                opacity: 0.14
+            }
+
+            Column {
+                id: interruptedBody
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.margins: Theme.space.xxl
+                spacing: Theme.space.md
+
+                Text {
+                    width: parent.width
+                    text: I18n.t("已中断", "Interrupted")
+                    color: Theme.parchment.ink
+                    font.family: Theme.fontFamilies.serif
+                    font.contextFontMerging: true
+                    font.pixelSize: Theme.warmSize.titleLg
+                    font.weight: Theme.weight.semibold
+                    horizontalAlignment: Text.AlignHCenter
+                }
+                Text {
+                    width: parent.width
+                    text: I18n.t("这局不会生成战报。你可以返回首页继续观察其他对局，或到历史中删除此记录。",
+                                 "This run will not generate a report. Return home to observe another run, or delete it from History.")
+                    color: Theme.parchment.inkSoft
+                    font.family: Theme.fontFamilies.sans
+                    font.contextFontMerging: true
+                    font.pixelSize: Theme.size.caption
+                    wrapMode: Text.WordWrap
+                    horizontalAlignment: Text.AlignHCenter
+                    lineHeightMode: Text.ProportionalHeight
+                    lineHeight: 1.45
+                }
+                Row {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    spacing: Theme.space.sm
+                    AppButton {
+                        onLight: true
+                        text: I18n.t("返回首页", "Home")
+                        variant: "primary"
+                        onClicked: {
+                            ObserverClient.disconnectStream()
+                            theaterRoot.StackView.view.parent.navigateHome()
+                        }
+                    }
+                    AppButton {
+                        onLight: true
+                        text: I18n.t("查看历史", "History")
+                        variant: "secondary"
+                        onClicked: {
+                            ObserverClient.disconnectStream()
+                            theaterRoot.StackView.view.parent.navigateHistory()
+                        }
+                    }
+                }
             }
         }
     }

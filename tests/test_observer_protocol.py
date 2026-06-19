@@ -149,6 +149,45 @@ class ObserverRunSummaryTests(TestCase):
             self.assertIn("snap_001.json", summary["snapshot_names"])
             self.assertIn("snap_002.json", summary["snapshot_names"])
 
+    def test_build_run_summary_separates_status_from_report_availability(self) -> None:
+        with TemporaryDirectory() as tmp:
+            run_dir = Path(tmp) / "run_completed_no_report"
+            run_dir.mkdir()
+            write_run_status(run_dir, "completed")
+
+            summary = build_run_summary(run_dir)
+            self.assertEqual(summary["status"], "completed")
+            self.assertFalse(summary["is_active"])
+            self.assertFalse(summary["report_available"])
+            self.assertEqual(summary["report_unavailable_reason"], "no_game_log")
+
+            (run_dir / "game-log.json").write_text("{}", encoding="utf-8")
+            summary_with_report = build_run_summary(run_dir)
+            self.assertEqual(summary_with_report["status"], "completed")
+            self.assertTrue(summary_with_report["report_available"])
+            self.assertIsNone(summary_with_report["report_unavailable_reason"])
+
+    def test_build_run_summary_exposes_interrupted_metadata(self) -> None:
+        with TemporaryDirectory() as tmp:
+            run_dir = Path(tmp) / "run_interrupted"
+            run_dir.mkdir()
+            (run_dir / "status.json").write_text(
+                json.dumps(
+                    {
+                        "status": "interrupted",
+                        "interrupted_at": "2026-06-19T00:00:00Z",
+                        "interrupted_source": "launcher_shutdown",
+                        "status_reason": "launcher_shutdown",
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            summary = build_run_summary(run_dir)
+            self.assertEqual(summary["status"], "interrupted")
+            self.assertEqual(summary["interrupted_source"], "launcher_shutdown")
+            self.assertEqual(summary["status_reason"], "launcher_shutdown")
+
     def test_build_artifact_registry_reports_allowed_artifacts_only(self) -> None:
         with TemporaryDirectory() as tmp:
             run_dir = Path(tmp) / "run_01"

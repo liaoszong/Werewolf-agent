@@ -69,6 +69,7 @@ Item {
     readonly property int completedCount: _countStatus("completed")
     readonly property int runningCount: _countStatus("running")
     readonly property int interruptedCount: _countStatus("interrupted")
+    readonly property int failedCount: _countStatus("failed")
     readonly property int unknownCount: _countStatus("unknown")
 
     function _shortRunId(run) {
@@ -267,6 +268,8 @@ Item {
             return "running"
         if (st === "interrupted")
             return "interrupted"
+        if (st === "failed")
+            return "failed"
         return "unknown"
     }
 
@@ -293,12 +296,28 @@ Item {
             return Theme.warm.primary
         if (st === "interrupted")
             return Theme.warm.warning
+        if (st === "failed")
+            return Theme.color.failed
         return Theme.parchment.mutedInk
     }
 
     function _canDelete(run) {
         var st = run && run.status ? ("" + run.status).toLowerCase() : ""
         return st !== "running" && st !== "queued"
+    }
+
+    function _canViewReport(run) {
+        if (!run)
+            return false
+        return (run.status || "").toLowerCase() === "completed"
+               && run.report_available === true
+    }
+
+    function _openActionLabel(run) {
+        var st = run && run.status ? ("" + run.status).toLowerCase() : ""
+        if (st === "running" || st === "queued")
+            return I18n.t("继续观察", "Continue")
+        return I18n.t("打开", "Open")
     }
 
     function _executionKey(run) {
@@ -400,9 +419,13 @@ Item {
         var events = run.event_count !== undefined ? run.event_count : 0
         var snaps = run.snapshot_count !== undefined ? run.snapshot_count : 0
         var st = (run.status || "").toLowerCase()
-        if (st === "completed")
+        if (st === "completed") {
+            var reportText = run.report_available === true
+                             ? I18n.t("战报可用", "report ready")
+                             : I18n.t("战报不可用", "report unavailable")
             return I18n.t("已归档 ", "Archived ") + events + I18n.t(" 条事件 · ", " events · ")
-                   + snaps + I18n.t(" 份快照", " snapshots")
+                   + snaps + I18n.t(" 份快照 · ", " snapshots · ") + reportText
+        }
         if (st === "running" || st === "queued")
             return I18n.t("正在记录事件流", "Recording the event stream")
         if (st === "interrupted")
@@ -985,6 +1008,7 @@ Item {
                             { key: "completed", label: I18n.t("已完成", "Completed"), count: root.completedCount },
                             { key: "running", label: I18n.t("进行中", "Running"), count: root.runningCount },
                             { key: "interrupted", label: I18n.t("中断", "Interrupted"), count: root.interruptedCount },
+                            { key: "failed", label: I18n.t("失败", "Failed"), count: root.failedCount },
                             { key: "unknown", label: root._unknownLabel(), count: root.unknownCount }
                         ]
                         delegate: Rectangle {
@@ -1560,10 +1584,12 @@ Item {
                                 id: reportButton
                                 objectName: "openSettlementButton"
                                 onLight: true
-                                width: visible ? 92 : 0
+                                width: visible ? (enabled ? 92 : 104) : 0
                                 height: 34
                                 visible: (modelData.status || "") === "completed"
-                                text: I18n.t("查看战报", "View report")
+                                enabled: root._canViewReport(modelData)
+                                text: enabled ? I18n.t("查看战报", "View report")
+                                              : I18n.t("战报不可用", "No report")
                                 variant: "secondary"
                                 onClicked: root._openRun(modelData, true)
                             }
@@ -1572,9 +1598,12 @@ Item {
                                 id: openButton
                                 objectName: "openReplayButton"
                                 onLight: true
-                                width: 66
+                                width: {
+                                    var key = root._statusKey(modelData.status)
+                                    return key === "running" || key === "queued" ? 92 : 66
+                                }
                                 height: 34
-                                text: I18n.t("打开", "Open")
+                                text: root._openActionLabel(modelData)
                                 variant: "primary"
                                 onClicked: root._openRun(modelData, false)
                             }
@@ -1977,7 +2006,7 @@ Item {
                 AppButton {
                     onLight: true
                     width: (parent.width - Theme.space.sm * 2) / 3
-                    text: I18n.t("打开", "Open")
+                    text: root._openActionLabel(root.selectedRun)
                     variant: "primary"
                     onClicked: root._openRun(root.selectedRun, false)
                 }
@@ -1985,9 +2014,11 @@ Item {
                 AppButton {
                     onLight: true
                     width: (parent.width - Theme.space.sm * 2) / 3
-                    text: I18n.t("查看战报", "View report")
+                    text: root._canViewReport(root.selectedRun)
+                          ? I18n.t("查看战报", "View report")
+                          : I18n.t("战报不可用", "No report")
                     variant: "secondary"
-                    enabled: root.hasSelectedRun && (root.selectedRun.status || "") === "completed"
+                    enabled: root.hasSelectedRun && root._canViewReport(root.selectedRun)
                     onClicked: root._openRun(root.selectedRun, true)
                 }
 

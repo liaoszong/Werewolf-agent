@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 602
+- Entries: 606
 
 ```text
 ./
@@ -154,6 +154,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       │   ├── ObserverSseParser.cpp
 │       │   └── ObserverSseParser.h
 │       ├── tests/
+│       │   ├── tst_observer_api_client.cpp
 │       │   └── tst_observer_sse_parser.cpp
 │       ├── CMakeLists.txt
 │       ├── main.cpp
@@ -278,7 +279,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   │   ├── 2026-06-12--l4-guard-witch-coord-arm-plan.md
 │   │   │   ├── 2026-06-12--p3a-replay-data-pipeline-c12-06-a45-7-plan.md
 │   │   │   ├── 2026-06-12-ablation-guardrails-plan.md
-│   │   │   └── 2026-06-13--audit-nongated-remainder-plan.md
+│   │   │   ├── 2026-06-13--audit-nongated-remainder-plan.md
+│   │   │   └── 2026-06-19--active-runs-navigation-lifecycle-plan.md
 │   │   └── reviews/
 │   │       ├── 2026-06-01--g1c-project-healthcheck-final.md
 │   │       ├── 2026-06-01--g1c-project-healthcheck.md
@@ -310,7 +312,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   ├── 01-risks-bugs.md
 │   │   ├── 02-slimming-candidates.md
 │   │   ├── 03-architecture-optimization.md
-│   │   └── 2026-06-12-system-view-audit.md
+│   │   ├── 2026-06-12-system-view-audit.md
+│   │   └── UI代码审查报告.md
 │   ├── prs/
 │   │   ├── 2026-05-30--phase2-next-step-research.md
 │   │   └── 2026-05-30--s5-semantic-label-research.md
@@ -665,7 +668,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── test_validate_clis.py
 │   ├── test_visibility_parity.py
 │   ├── test_visibility_two_side_sentinel.py
-│   └── test_witch_potion_one_shot_sentinel.py
+│   ├── test_witch_potion_one_shot_sentinel.py
+│   └── windows_gate.py
 ├── tools/
 │   ├── backfill_seer_claim_metrics.py
 │   ├── generate_golden_prompts.py

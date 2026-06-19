@@ -115,7 +115,11 @@ def _interrupt_active_runs() -> None:
     print(f"[*] 标记 {len(active)} 个未结束对局为中断。")
     for run_id in active:
         try:
-            _post(f"/api/runs/{run_id}/interrupt", {}, timeout=3)
+            _post(
+                f"/api/runs/{run_id}/interrupt",
+                {"source": "launcher_shutdown", "reason": "launcher_shutdown"},
+                timeout=3,
+            )
             print(f"    - 已中断：{run_id}")
         except Exception as exc:  # noqa: BLE001
             print(f"    - 中断失败 {run_id}：{exc}")
@@ -183,10 +187,12 @@ def main() -> None:
         print("[*] 打开客户端（主页/历史，不自动建对局）……（关闭客户端窗口即可退出本启动器）")
         subprocess.run([EXE, "--observer-base-url", BASE], env=qt_env)
     finally:
-        _interrupt_active_runs()
         if server is not None:
+            _interrupt_active_runs()
             print("[*] 关闭本启动器启动的服务器。")
             server.terminate()
+        else:
+            print("[*] 客户端已关闭；外部观察者服务器仍在运行，未自动中断其中的对局。")
 
 
 if __name__ == "__main__":
