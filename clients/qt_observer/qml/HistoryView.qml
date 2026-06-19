@@ -10,7 +10,15 @@ Item {
     id: root
     objectName: "historyView"
 
-    Component.onCompleted: ObserverClient.refreshRuns()
+    Component.onCompleted: firstFrameRefreshTimer.restart()
+
+    // When this view is embedded in AppShell's StackView, AppShell draws the
+    // warm full-bleed backdrop from a PERSISTENT layer (pageBackdropLayer) so the
+    // background Image is not recreated on every push/pop. In that mode the page
+    // must NOT paint its own full-screen gradient / archive art / veils, or they
+    // would cover the persistent backdrop and re-flash per visit. Standalone /
+    // preview usage keeps the default true so the page still has a background.
+    property bool embeddedBackdrop: true
 
     property bool selecting: false
     property var _selected: ({})
@@ -25,6 +33,23 @@ Item {
     readonly property int _batchConcurrency: 4
     readonly property int _batchErrorPreviewLimit: 3
     readonly property int _batchCompleted: _batchTotal - _batchQueue.length - _batchInFlight
+
+    Timer {
+        id: firstFrameRefreshTimer
+        interval: 80
+        repeat: false
+        onTriggered: {
+            if (ObserverClient.runItems.length > 0)
+                return
+            var shell = root.StackView.view ? root.StackView.view.parent : null
+            if (shell && shell._historyRunsPrewarmed)
+                return
+            if (shell && shell.requestHistoryRunsRefresh)
+                shell.requestHistoryRunsRefresh("history-first-frame", 1500)
+            else
+                ObserverClient.refreshRuns()
+        }
+    }
 
     property string activeFilter: "all"          // all | completed | running | interrupted | unknown
     property string searchText: ""
@@ -648,6 +673,7 @@ Item {
 
     Rectangle {
         anchors.fill: parent
+        visible: root.embeddedBackdrop
         gradient: Gradient {
             orientation: Gradient.Vertical
             GradientStop { position: 0.00; color: Theme.phase.day.bg }
@@ -659,6 +685,7 @@ Item {
     Image {
         id: historyArchiveArt
         anchors.fill: parent
+        visible: root.embeddedBackdrop
         source: Illustrations.historyArchive
         fillMode: Image.PreserveAspectCrop
         horizontalAlignment: Image.AlignHCenter
@@ -673,11 +700,13 @@ Item {
 
     Rectangle {
         anchors.fill: parent
+        visible: root.embeddedBackdrop
         color: Theme.withAlpha(Theme.warm.canvas, 0.26)
     }
 
     Rectangle {
         anchors.fill: parent
+        visible: root.embeddedBackdrop
         gradient: Gradient {
             orientation: Gradient.Vertical
             GradientStop { position: 0.00; color: Theme.withAlpha(Theme.parchment.highlightCream, 0.24) }

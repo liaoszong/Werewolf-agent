@@ -8,6 +8,14 @@ Item {
     id: root
     objectName: "matchSetupView"
 
+    // When this view is embedded in AppShell's StackView, AppShell draws the
+    // warm full-bleed backdrop from a PERSISTENT layer (pageBackdropLayer) so the
+    // background Image is not recreated on every push/pop. In that mode the page
+    // must NOT paint its own full-screen gradient / setup-room art / veil, or they
+    // would cover the persistent backdrop and re-flash per visit. Standalone /
+    // preview usage keeps the default true so the page still has a background.
+    property bool embeddedBackdrop: true
+
     property string selectedSeatId: ""
     property var editedProfile: ({})
     property int profileRevision: 0
@@ -400,6 +408,7 @@ Item {
 
     Rectangle {
         anchors.fill: parent
+        visible: root.embeddedBackdrop
         gradient: Gradient {
             GradientStop { position: 0.0; color: Theme.phase.day.bg }
             GradientStop { position: 1.0; color: Theme.warm.canvas }
@@ -409,6 +418,7 @@ Item {
     Image {
         id: setupRoomArt
         anchors.fill: parent
+        visible: root.embeddedBackdrop
         source: Illustrations.setupRoom
         fillMode: Image.PreserveAspectCrop
         asynchronous: true
@@ -421,6 +431,7 @@ Item {
 
     Rectangle {
         anchors.fill: parent
+        visible: root.embeddedBackdrop
         // Warm cream veil, not white — lets the arch window / flora / daylight
         // of setup-room.png breathe through while still lifting legibility.
         color: Theme.withAlpha(Theme.phase.day.bg, 0.06)

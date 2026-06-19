@@ -13,10 +13,26 @@ Item {
     // from any page via the global gear, so it remembers where it was opened from).
     property string _providerReturnView: "home"
     property string _cockpitReturnView: "home"
+    property bool _historyRunsPrewarmRequested: false
+    property bool _historyRunsPrewarmed: false
+    property bool _historyRunsRefreshPending: false
+    property double _lastHistoryRefreshMs: 0
+
+    // Which persistent page backdrop is currently active. The backdrop Images live
+    // in `pageBackdropLayer` below, OUTSIDE the StackView, so they are created once
+    // and never torn down by push/pop. Navigation sets this BEFORE pushing the page,
+    // so by the time the page content appears the backdrop is already on screen —
+    // no Loading -> Ready fallback flash on repeated visits.
+    //   "home"    -> no page backdrop (HomeView draws its own scene)
+    //   "setup"   -> setup-room art + warm veil
+    //   "history" -> history-archive art + archive veil
+    property string _activeBackdrop: "home"
 
     onCurrentViewChanged: {
-        if (currentView === "home")
+        if (currentView === "home") {
             warmAssetPreloader.schedule()
+            _scheduleHomeHistoryPrewarm()
+        }
     }
 
     // CLI --open-run: auto-open a run straight into the theater (mirrors Preflight's
@@ -41,9 +57,137 @@ Item {
         }
     }
 
+    Timer {
+        id: historyRunsPrewarmTimer
+        interval: 80
+        repeat: false
+        onTriggered: {
+            if (root.currentView !== "home" || ObserverClient.initialRunId !== "")
+                return
+            if (root._historyRunsPrewarmRequested || root._historyRunsPrewarmed)
+                return
+            root._historyRunsPrewarmRequested = true
+            root.requestHistoryRunsRefresh("home-idle", 5000)
+        }
+    }
+
+    Timer {
+        id: historyRunsRefreshTimeout
+        interval: 5000
+        repeat: false
+        onTriggered: root._historyRunsRefreshPending = false
+    }
+
+    Connections {
+        target: ObserverClient
+        function onRunItemsChanged() {
+            root._historyRunsRefreshPending = false
+            root._historyRunsPrewarmed = true
+            historyRunsRefreshTimeout.stop()
+        }
+    }
+
     // Ambient night backdrop behind everything
     AppBackground {
         anchors.fill: parent
+    }
+
+    // Persistent page backdrops for the warm full-bleed pages (setup / history).
+    // These Image objects are created ONCE here and never recreated by StackView
+    // push/pop, so repeated Home -> Setup -> Home -> Setup never re-runs the
+    // Loading -> Ready Image state machine (the root cause of the per-visit
+    // background flash). Only one is visible at a time, gated by `_activeBackdrop`.
+    // Each Image is asynchronous + cached, matching the per-page originals, and
+    // its opacity is driven by `_activeBackdrop`, NOT by Image.status — so once the
+    // image has decoded (first cold visit) it stays put on every later visit.
+    Item {
+        id: pageBackdropLayer
+        anchors.fill: parent
+        visible: root._activeBackdrop === "setup" || root._activeBackdrop === "history"
+        z: 0
+
+        // --- Setup backdrop (gradient + setup-room art + warm cream veil) -------
+        Item {
+            id: setupBackdrop
+            anchors.fill: parent
+            visible: root._activeBackdrop === "setup"
+            opacity: root._activeBackdrop === "setup" ? 1 : 0
+
+            Rectangle {
+                anchors.fill: parent
+                gradient: Gradient {
+                    GradientStop { position: 0.0; color: Theme.phase.day.bg }
+                    GradientStop { position: 1.0; color: Theme.warm.canvas }
+                }
+            }
+
+            Image {
+                id: setupBackdropArt
+                anchors.fill: parent
+                source: Illustrations.setupRoom
+                fillMode: Image.PreserveAspectCrop
+                asynchronous: true
+                cache: true
+                sourceSize.width: 1672
+                sourceSize.height: 941
+                opacity: status === Image.Ready ? 1 : 0
+                Behavior on opacity { NumberAnimation { duration: Theme.anim.press; easing.type: Easing.OutCubic } }
+            }
+
+            Rectangle {
+                anchors.fill: parent
+                // Warm cream veil mirroring MatchSetupView's embedded backdrop.
+                color: Theme.withAlpha(Theme.phase.day.bg, 0.06)
+            }
+        }
+
+        // --- History backdrop (gradient + history-archive art + archive veils) --
+        Item {
+            id: historyBackdrop
+            anchors.fill: parent
+            visible: root._activeBackdrop === "history"
+            opacity: root._activeBackdrop === "history" ? 1 : 0
+
+            Rectangle {
+                anchors.fill: parent
+                gradient: Gradient {
+                    orientation: Gradient.Vertical
+                    GradientStop { position: 0.00; color: Theme.phase.day.bg }
+                    GradientStop { position: 0.48; color: Theme.warm.canvas }
+                    GradientStop { position: 1.00; color: Theme.parchment.parchmentStrong }
+                }
+            }
+
+            Image {
+                id: historyBackdropArt
+                anchors.fill: parent
+                source: Illustrations.historyArchive
+                fillMode: Image.PreserveAspectCrop
+                horizontalAlignment: Image.AlignHCenter
+                verticalAlignment: Image.AlignVCenter
+                asynchronous: true
+                cache: true
+                sourceSize.width: 1672
+                sourceSize.height: 941
+                opacity: status === Image.Ready ? 1 : 0
+                Behavior on opacity { NumberAnimation { duration: Theme.anim.press; easing.type: Easing.OutCubic } }
+            }
+
+            Rectangle {
+                anchors.fill: parent
+                color: Theme.withAlpha(Theme.warm.canvas, 0.26)
+            }
+
+            Rectangle {
+                anchors.fill: parent
+                gradient: Gradient {
+                    orientation: Gradient.Vertical
+                    GradientStop { position: 0.00; color: Theme.withAlpha(Theme.parchment.highlightCream, 0.24) }
+                    GradientStop { position: 0.58; color: Theme.withAlpha(Theme.parchment.highlightHoney, 0.08) }
+                    GradientStop { position: 1.00; color: Theme.withAlpha(Theme.parchment.shadowBrown, 0.18) }
+                }
+            }
+        }
     }
 
     // Slim persistent brand bar (wordmark + global connection status)
@@ -264,8 +408,10 @@ Item {
         function schedule() {
             if (ObserverClient.initialRunId !== "")
                 return
-            if (loadedCount >= assets.length)
+            if (loadedCount >= assets.length) {
+                root._scheduleHomeHistoryPrewarm()
                 return
+            }
             if (started)
                 warmStepTimer.start()
             else
@@ -294,8 +440,10 @@ Item {
                     return
                 }
                 warmAssetPreloader.loadedCount++
-                if (warmAssetPreloader.loadedCount >= warmAssetPreloader.assets.length)
+                if (warmAssetPreloader.loadedCount >= warmAssetPreloader.assets.length) {
                     stop()
+                    root._scheduleHomeHistoryPrewarm()
+                }
             }
         }
 
@@ -319,15 +467,45 @@ Item {
     }
 
     Component { id: homeComponent; HomeView { objectName: "homeView" } }
-    Component { id: setupComponent; MatchSetupView { objectName: "matchSetupView" } }
+    Component { id: setupComponent; MatchSetupView { objectName: "matchSetupView"; embeddedBackdrop: false } }
     Component { id: preflightComponent; PreflightView { objectName: "preflightView" } }
     Component { id: cockpitComponent; TheaterView { objectName: "theaterView" } }
-    Component { id: historyComponent; HistoryView { objectName: "historyView" } }
+    Component { id: historyComponent; HistoryView { objectName: "historyView"; embeddedBackdrop: false } }
     Component { id: providerSettingsComponent; ProviderSettingsView { objectName: "providerSettingsView" } }
     Component { id: designPreviewComponent; DesignPreviewView { objectName: "designPreviewView" } }
 
     function _finishNav(view) {
         currentView = view
+        if (view === "setup")
+            _activeBackdrop = "setup"
+        else if (view === "history")
+            _activeBackdrop = "history"
+        else
+            _activeBackdrop = "home"
+    }
+
+    function _scheduleHomeHistoryPrewarm() {
+        if (currentView !== "home" || ObserverClient.initialRunId !== "")
+            return
+        if (_historyRunsPrewarmRequested || _historyRunsPrewarmed)
+            return
+        if (warmAssetPreloader.loadedCount < warmAssetPreloader.assets.length)
+            return
+        historyRunsPrewarmTimer.restart()
+    }
+
+    function requestHistoryRunsRefresh(reason, minIntervalMs) {
+        var now = Date.now()
+        var interval = minIntervalMs === undefined ? 0 : minIntervalMs
+        if (_historyRunsRefreshPending)
+            return false
+        if (_lastHistoryRefreshMs > 0 && now - _lastHistoryRefreshMs < interval)
+            return false
+        _historyRunsRefreshPending = true
+        _lastHistoryRefreshMs = now
+        historyRunsRefreshTimeout.restart()
+        ObserverClient.refreshRuns()
+        return true
     }
 
     function _popToHome() {
@@ -342,6 +520,12 @@ Item {
     function _showPrimary(component, view) {
         if (currentView === view)
             return
+        // Set the persistent backdrop BEFORE the new page is pushed so the backdrop
+        // is already on screen when the page content appears (no per-visit flash).
+        if (view === "setup")
+            _activeBackdrop = "setup"
+        else if (view === "history")
+            _activeBackdrop = "history"
         if (currentView !== "home" || stackView.depth > 1) {
             while (stackView.depth > 1)
                 stackView.pop(StackView.Immediate)
