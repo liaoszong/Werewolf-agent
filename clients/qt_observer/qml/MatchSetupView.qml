@@ -407,14 +407,16 @@ Item {
     }
 
     Image {
+        id: setupRoomArt
         anchors.fill: parent
         source: Illustrations.setupRoom
         fillMode: Image.PreserveAspectCrop
-        asynchronous: false
+        asynchronous: true
         cache: true
-        sourceSize.width: Math.max(1, Math.ceil(width * 2))
-        sourceSize.height: Math.max(1, Math.ceil(height * 2))
-        visible: status === Image.Ready
+        sourceSize.width: 1672
+        sourceSize.height: 941
+        opacity: status === Image.Ready ? 1 : 0
+        Behavior on opacity { NumberAnimation { duration: Theme.anim.press; easing.type: Easing.OutCubic } }
     }
 
     Rectangle {

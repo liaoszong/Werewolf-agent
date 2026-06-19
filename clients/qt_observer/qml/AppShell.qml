@@ -14,6 +14,11 @@ Item {
     property string _providerReturnView: "home"
     property string _cockpitReturnView: "home"
 
+    onCurrentViewChanged: {
+        if (currentView === "home")
+            warmAssetPreloader.schedule()
+    }
+
     // CLI --open-run: auto-open a run straight into the theater (mirrors Preflight's
     // poll-then-navigate so currentRunId is set before the cockpit loads).
     Component.onCompleted: {
@@ -21,6 +26,7 @@ Item {
             ObserverClient.openRun(ObserverClient.initialRunId)
             autoOpenPoller.start()
         }
+        Qt.callLater(warmAssetPreloader.schedule)
     }
     Timer {
         id: autoOpenPoller
@@ -228,6 +234,88 @@ Item {
         popExit: Transition {}
         replaceEnter: Transition {}
         replaceExit: Transition {}
+    }
+
+    Item {
+        id: warmAssetPreloader
+        // Invisible asynchronous warmup for first home -> setup/history jumps.
+        // Sources are assigned one by one after the home frame has settled, so
+        // navigation clicks do not pay a synchronous decode cost.
+        width: 1
+        height: 1
+        x: -10000
+        y: -10000
+        opacity: 0
+        visible: true
+
+        property int loadedCount: 0
+        property bool started: false
+        readonly property var assets: [
+            { "source": Illustrations.historyArchive, "width": 1672, "height": 941 },
+            { "source": Illustrations.setupRoom, "width": 1672, "height": 941 },
+            { "source": Illustrations.tarot("werewolf"), "width": 304, "height": 456 },
+            { "source": Illustrations.tarot("seer"), "width": 304, "height": 456 },
+            { "source": Illustrations.tarot("witch"), "width": 304, "height": 456 },
+            { "source": Illustrations.tarot("villager"), "width": 304, "height": 456 },
+            { "source": Illustrations.tarot("guard"), "width": 304, "height": 456 },
+            { "source": Illustrations.tarot("hunter"), "width": 304, "height": 456 }
+        ]
+
+        function schedule() {
+            if (ObserverClient.initialRunId !== "")
+                return
+            if (loadedCount >= assets.length)
+                return
+            if (started)
+                warmStepTimer.start()
+            else
+                warmStartTimer.restart()
+        }
+
+        Timer {
+            id: warmStartTimer
+            interval: 320
+            repeat: false
+            onTriggered: {
+                if (root.currentView !== "home")
+                    return
+                warmAssetPreloader.started = true
+                warmStepTimer.start()
+            }
+        }
+
+        Timer {
+            id: warmStepTimer
+            interval: 120
+            repeat: true
+            onTriggered: {
+                if (root.currentView !== "home") {
+                    stop()
+                    return
+                }
+                warmAssetPreloader.loadedCount++
+                if (warmAssetPreloader.loadedCount >= warmAssetPreloader.assets.length)
+                    stop()
+            }
+        }
+
+        Repeater {
+            model: warmAssetPreloader.assets
+            delegate: Image {
+                required property int index
+                required property var modelData
+                width: 1
+                height: 1
+                source: index < warmAssetPreloader.loadedCount ? modelData.source : ""
+                asynchronous: true
+                cache: true
+                sourceSize.width: modelData.width
+                sourceSize.height: modelData.height
+                fillMode: Image.PreserveAspectFit
+                opacity: 0
+                visible: true
+            }
+        }
     }
 
     Component { id: homeComponent; HomeView { objectName: "homeView" } }

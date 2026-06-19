@@ -63,11 +63,12 @@ Item {
             anchors.fill: parent
             source: Illustrations.tarot(root.roleKey)
             fillMode: Image.PreserveAspectFit
-            asynchronous: false
+            asynchronous: true
             cache: true
-            sourceSize.width: Math.max(1, Math.ceil(width * 2))
-            sourceSize.height: Math.max(1, Math.ceil(height * 2))
-            visible: status === Image.Ready
+            sourceSize.width: 304
+            sourceSize.height: 456
+            opacity: status === Image.Ready ? 1 : 0
+            Behavior on opacity { NumberAnimation { duration: Theme.anim.press; easing.type: Easing.OutCubic } }
             layer.enabled: true
             layer.effect: MultiEffect {
                 shadowEnabled: true
@@ -83,10 +84,11 @@ Item {
         // 2) Fallback when tarot art is not loaded (never blank).
         Rectangle {
             anchors.fill: parent
-            visible: cardArt.status !== Image.Ready
+            opacity: cardArt.status === Image.Ready ? 0 : 1
             radius: root._cardRadius
             border.width: 1
             border.color: Theme.withAlpha(Theme.parchment.goldLineSoft, 0.46)
+            Behavior on opacity { NumberAnimation { duration: Theme.anim.press; easing.type: Easing.OutCubic } }
             layer.enabled: true
             layer.effect: MultiEffect {
                 shadowEnabled: true

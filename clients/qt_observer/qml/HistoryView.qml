@@ -648,20 +648,27 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        color: Theme.warm.canvas
+        gradient: Gradient {
+            orientation: Gradient.Vertical
+            GradientStop { position: 0.00; color: Theme.phase.day.bg }
+            GradientStop { position: 0.48; color: Theme.warm.canvas }
+            GradientStop { position: 1.00; color: Theme.parchment.parchmentStrong }
+        }
     }
 
     Image {
+        id: historyArchiveArt
         anchors.fill: parent
         source: Illustrations.historyArchive
         fillMode: Image.PreserveAspectCrop
         horizontalAlignment: Image.AlignHCenter
         verticalAlignment: Image.AlignVCenter
-        asynchronous: false
+        asynchronous: true
         cache: true
-        sourceSize.width: Math.max(1, Math.ceil(width * 2))
-        sourceSize.height: Math.max(1, Math.ceil(height * 2))
-        visible: status === Image.Ready
+        sourceSize.width: 1672
+        sourceSize.height: 941
+        opacity: status === Image.Ready ? 1 : 0
+        Behavior on opacity { NumberAnimation { duration: Theme.anim.press; easing.type: Easing.OutCubic } }
     }
 
     Rectangle {
