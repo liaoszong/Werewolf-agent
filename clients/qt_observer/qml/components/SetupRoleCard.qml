@@ -63,7 +63,7 @@ Item {
             anchors.fill: parent
             source: Illustrations.tarot(root.roleKey)
             fillMode: Image.PreserveAspectFit
-            asynchronous: true
+            asynchronous: false
             cache: true
             sourceSize.width: Math.max(1, Math.ceil(width * 2))
             sourceSize.height: Math.max(1, Math.ceil(height * 2))
@@ -85,11 +85,40 @@ Item {
             anchors.fill: parent
             visible: cardArt.status !== Image.Ready
             radius: root._cardRadius
-            color: Theme.warm.surfaceCard
+            border.width: 1
+            border.color: Theme.withAlpha(Theme.parchment.goldLineSoft, 0.46)
+            layer.enabled: true
+            layer.effect: MultiEffect {
+                shadowEnabled: true
+                shadowColor: Theme.withAlpha(Theme.parchment.sealShadowBase, root.selected ? 0.56 : 0.44)
+                shadowBlur: root.selected ? 0.98 : (hoverHandler.hovered ? 0.92 : 0.84)
+                shadowHorizontalOffset: root.selected ? 7 : 6
+                shadowVerticalOffset: root.selected ? 16 : (hoverHandler.hovered ? 15 : 13)
+            }
+            gradient: Gradient {
+                GradientStop { position: 0.0; color: Theme.withAlpha(Theme.parchment.woodShadow, 0.82) }
+                GradientStop { position: 0.58; color: Theme.withAlpha(Theme.parchment.shadowBrown, 0.70) }
+                GradientStop { position: 1.0; color: Theme.withAlpha(Theme.parchment.parchmentStrong, 0.86) }
+            }
+            Image {
+                anchors.fill: parent
+                anchors.margins: 2
+                source: Illustrations.texParchment
+                fillMode: Image.Tile
+                opacity: 0.12
+            }
+            Rectangle {
+                anchors.fill: parent
+                anchors.margins: 8
+                radius: Math.max(2, root._cardRadius - 6)
+                color: "transparent"
+                border.width: 1
+                border.color: Theme.withAlpha(Theme.parchment.highlightLine, 0.24)
+            }
             Text {
                 anchors.centerIn: parent
                 text: root.roleLabel
-                color: Theme.warm.muted
+                color: Theme.withAlpha(Theme.parchment.highlightCream, 0.78)
                 font.family: Theme.fontFamilies.cjkSerif
                 font.contextFontMerging: true
                 font.pixelSize: Theme.warmSize.titleMd

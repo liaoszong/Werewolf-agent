@@ -13,6 +13,8 @@ Item {
     property int profileRevision: 0
     property int _validatedRevision: -1
     property bool _initialLoadDone: false
+    property bool _showProfileEmptyState: false
+    property bool _setupBoardMotionReady: false
     property int _credRev: 0
     property string currentConfigId: ""
     property string configStatusMessage: ""
@@ -92,8 +94,11 @@ Item {
             ObserverClient.refreshProfileSchema()
         if (ObserverClient.profileItems.length > 0) {
             _initialLoadDone = true
+            _showProfileEmptyState = false
             _loadProfileItem(ObserverClient.profileItems[0])
         } else {
+            _showProfileEmptyState = false
+            profileEmptyStateTimer.restart()
             ObserverClient.refreshProfiles()
         }
         ObserverClient.refreshCapabilities()
@@ -115,6 +120,13 @@ Item {
     Connections {
         target: ObserverClient
         function onProfileItemsChanged() {
+            if (ObserverClient.profileItems.length === 0) {
+                root._showProfileEmptyState = false
+                profileEmptyStateTimer.restart()
+                return
+            }
+            root._showProfileEmptyState = false
+            profileEmptyStateTimer.stop()
             if (root.currentConfigId) {
                 root._selectProfileItemByConfigId(root.currentConfigId)
                 return
@@ -183,6 +195,21 @@ Item {
         interval: 3200
         repeat: false
         onTriggered: root.configStatusMessage = ""
+    }
+
+    Timer {
+        id: profileEmptyStateTimer
+        interval: 450
+        repeat: false
+        onTriggered: root._showProfileEmptyState = ObserverClient.profileItems.length === 0
+    }
+
+    Timer {
+        id: setupBoardMotionTimer
+        interval: 1
+        repeat: false
+        running: true
+        onTriggered: root._setupBoardMotionReady = true
     }
 
     function _scheduleAutoReady() {
@@ -383,7 +410,7 @@ Item {
         anchors.fill: parent
         source: Illustrations.setupRoom
         fillMode: Image.PreserveAspectCrop
-        asynchronous: true
+        asynchronous: false
         cache: true
         sourceSize.width: Math.max(1, Math.ceil(width * 2))
         sourceSize.height: Math.max(1, Math.ceil(height * 2))
@@ -614,13 +641,6 @@ Item {
         }
     }
 
-    EmptyState {
-        anchors.centerIn: parent
-        visible: ObserverClient.profileItems.length === 0
-        title: I18n.t("没有可用对局配置", "No match configs")
-        subtitle: I18n.t("本地服务器暂未返回可编辑配置。", "The local server has not returned an editable config.")
-    }
-
     Item {
         id: stage
         anchors.top: pageHeader.bottom
@@ -631,7 +651,6 @@ Item {
         anchors.leftMargin: Theme.space.xxl
         anchors.rightMargin: Theme.space.xxl
         anchors.bottomMargin: Theme.space.lg
-        visible: ObserverClient.profileItems.length > 0
 
         Rectangle {
             id: boardPaper
@@ -649,8 +668,14 @@ Item {
             border.width: 1
             border.color: Theme.withAlpha(Theme.parchment.goldLine, 0.46)
             x: root.detailOpen ? 0 : (parent.width - width) / 2
-            Behavior on x { NumberAnimation { duration: Theme.motion.slow; easing.type: Easing.OutCubic } }
-            Behavior on width { NumberAnimation { duration: Theme.motion.slow; easing.type: Easing.OutCubic } }
+            Behavior on x {
+                enabled: root._setupBoardMotionReady
+                NumberAnimation { duration: Theme.motion.slow; easing.type: Easing.OutCubic }
+            }
+            Behavior on width {
+                enabled: root._setupBoardMotionReady
+                NumberAnimation { duration: Theme.motion.slow; easing.type: Easing.OutCubic }
+            }
 
             Rectangle {
                 anchors.fill: parent
@@ -710,6 +735,13 @@ Item {
             }
         }
 
+        EmptyState {
+            anchors.centerIn: boardPaper
+            visible: root._showProfileEmptyState && ObserverClient.profileItems.length === 0
+            title: I18n.t("没有可用对局配置", "No match configs")
+            subtitle: I18n.t("本地服务器暂未返回可编辑配置。", "The local server has not returned an editable config.")
+        }
+
         SeatEditorPanel {
             id: detailPanel
             objectName: "setupDetailPanel"
@@ -764,7 +796,6 @@ Item {
         color: Theme.withAlpha(Theme.parchment.parchmentSoft, 0.90)
         border.width: 1
         border.color: Theme.withAlpha(Theme.parchment.goldLine, 0.56)
-        visible: ObserverClient.profileItems.length > 0
 
         Image {
             anchors.fill: parent
