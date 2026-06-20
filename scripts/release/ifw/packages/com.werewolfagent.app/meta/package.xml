@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Package>
+    <DisplayName>Werewolf-agent</DisplayName>
+    <Description>AI-vs-AI Werewolf live experiment platform</Description>
+    <Version>${IFW_VERSION}</Version>
+    <ReleaseDate>${RELEASE_DATE}</ReleaseDate>
+    <Name>com.werewolfagent.app</Name>
+    <Script>installscript.qs</Script>
+    <Licenses>
+        <License name="License Agreement" file="license.txt" />
+    </Licenses>
+    <Default>true</Default>
+    <Essential>true</Essential>
+    <ForcedInstallation>true</ForcedInstallation>
+</Package>

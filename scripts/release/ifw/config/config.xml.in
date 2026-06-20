@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Installer>
+    <Name>Werewolf-agent</Name>
+    <Version>${IFW_VERSION}</Version>
+    <Title>Werewolf-agent</Title>
+    <Publisher>Werewolf-agent</Publisher>
+    <StartMenuDir>Werewolf-agent</StartMenuDir>
+    <TargetDir>@ApplicationsDir@/Werewolf-agent</TargetDir>
+    <MaintenanceToolName>maintenancetool</MaintenanceToolName>
+    <AllowNonAsciiCharacters>true</AllowNonAsciiCharacters>
+    <RepositorySettingsPageVisible>false</RepositorySettingsPageVisible>
+    <RemoteRepositories>
+        <Repository>
+            <Url>${REPOSITORY_URL}</Url>
+            <Enabled>1</Enabled>
+        </Repository>
+    </RemoteRepositories>
+</Installer>
