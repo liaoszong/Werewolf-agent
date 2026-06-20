@@ -154,6 +154,37 @@ def spawn_client(
     ], env=env)
 
 
+def _consume_update_request(path: Path, host_session_id: str) -> dict | None:
+    """Validate and consume update-request.json. Returns request dict or None."""
+    if not path.exists():
+        return None
+    try:
+        req = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        path.unlink(missing_ok=True)
+        return None
+
+    # Validate TTL (5 minutes)
+    from datetime import datetime, timezone, timedelta
+    try:
+        created = datetime.fromisoformat(req.get("created_at", "").rstrip("Z"))
+        if datetime.now(timezone.utc) - created.replace(tzinfo=timezone.utc) > timedelta(minutes=5):
+            path.unlink(missing_ok=True)
+            return None
+    except (ValueError, TypeError):
+        path.unlink(missing_ok=True)
+        return None
+
+    # Validate required fields
+    if (req.get("host_session_id") != host_session_id
+            or req.get("schema_version") != 1
+            or req.get("action") != "launch_maintenance_tool"):
+        path.unlink(missing_ok=True)
+        return None
+
+    return req
+
+
 def release_host_main() -> int:
     """CLI entry for Werewolf-agent.exe."""
     import argparse
@@ -201,14 +232,6 @@ def release_host_main() -> int:
         client_ret = client_proc.wait()
 
         # --- Shutdown logic ---
-        # Check for update request
-        update_request = None
-        if update_request_path.exists():
-            try:
-                update_request = json.loads(update_request_path.read_text(encoding="utf-8"))
-            except (json.JSONDecodeError, OSError):
-                update_request_path.unlink(missing_ok=True)
-
         # Check for active runs
         has_active = False
         try:
@@ -230,9 +253,8 @@ def release_host_main() -> int:
             return 0
 
         # Consume update request
-        if (update_request
-                and update_request.get("host_session_id") == host_session_id
-                and update_request.get("action") == "launch_maintenance_tool"):
+        update_request = _consume_update_request(update_request_path, host_session_id)
+        if update_request is not None:
             update_request_path.unlink(missing_ok=True)
             _launch_maintenance_tool(dist_root, server_proc)
 
