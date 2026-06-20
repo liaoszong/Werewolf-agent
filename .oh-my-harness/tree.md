@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 491
+- Entries: 493
 
 ```text
 ./
@@ -215,14 +215,13 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   ├── s5-label-contract.md
 │   │   └── s5-label-prompts.md
 │   ├── specs/
-│   │   ├── agent-workflow.md
 │   │   ├── board-rule-rulings.md
 │   │   ├── review-guidelines.md
-│   │   ├── review-packet-gate.md
 │   │   └── text-injection-channels.md
 │   ├── superpowers/
 │   │   ├── plans/
-│   │   │   └── 2026-06-19--active-runs-navigation-lifecycle-plan.md
+│   │   │   ├── 2026-06-19--active-runs-navigation-lifecycle-plan.md
+│   │   │   └── 2026-06-20-r0-implementation-plan.md
 │   │   └── specs/
 │   │       ├── 2026-06-04-g2d-2-qt-setup-ui-design.md
 │   │       ├── 2026-06-04-g2d-prompt-configuration-design.md
@@ -247,14 +246,12 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │       ├── 2026-06-11-sys-b4-claim-ledger-vote-scaffold-design.md
 │   │       ├── 2026-06-12-l4-guard-witch-coord-arm-design.md
 │   │       ├── 2026-06-13-livecockpit-godseye-redesign-phase2-design.md
-│   │       └── 2026-06-13-werewolf-game-client-redesign-design.md
+│   │       ├── 2026-06-13-werewolf-game-client-redesign-design.md
+│   │       └── 2026-06-20-r0-windows-distribution-baseline.md
 │   ├── CHECKPOINT_TEMPLATE.md
 │   ├── EVALUATION_RUBRIC.md
-│   ├── GOLD_DEMO.md
-│   ├── HEALTH_CHECK_2026-06-08.md
 │   ├── PRODUCT_ONE_PAGER.md
 │   ├── PROJECT_MAP.md
-│   ├── RISK_ASSESSMENT_2026-06-06.md
 │   ├── SPIKES.md
 │   └── TASKS.md
 ├── scripts/
@@ -304,6 +301,10 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       │   ├── security.py
 │       │   ├── sse.py
 │       │   └── state.py
+│       ├── release_host/
+│       │   ├── __init__.py
+│       │   ├── __main__.py
+│       │   └── lifecycle.py
 │       ├── __init__.py
 │       ├── artifacts.py
 │       ├── attribute_game.py
@@ -342,6 +343,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       ├── provider_agent.py
 │       ├── provider_contract.py
 │       ├── provider_registry.py
+│       ├── release_metadata.py
 │       ├── render_demo.py
 │       ├── render_provider_replay.py
 │       ├── role_visibility.py
@@ -560,5 +562,6 @@ Use this file for navigation only. Verify implementation details by reading sour
 ├── pyproject.toml
 ├── README.md
 ├── README.zh-CN.md
-└── requirements-dev.txt
+├── requirements-dev.txt
+└── VERSION
 ```
