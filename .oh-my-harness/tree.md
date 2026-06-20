@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 501
+- Entries: 511
 
 ```text
 ./
@@ -263,11 +263,26 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   ├── run_deepseek_live_smoke.py
 │   │   └── validate_brief.py
 │   ├── release/
+│   │   ├── ifw/
+│   │   │   ├── config/
+│   │   │   │   └── config.xml.in
+│   │   │   └── packages/
+│   │   │       └── com.werewolfagent.app/
+│   │   │           └── meta/
+│   │   │               ├── installscript.qs
+│   │   │               ├── license.txt
+│   │   │               └── package.xml
+│   │   ├── assemble-package.sh
 │   │   ├── build-bootstrapper-frozen.sh
+│   │   ├── build-installer.sh
 │   │   ├── build-qt-release.sh
+│   │   ├── build-repo.sh
 │   │   ├── build-server-frozen.sh
+│   │   ├── distribution-manifest.json.in
 │   │   ├── observer-server.spec
+│   │   ├── publish-to-github-pages.sh
 │   │   ├── setup-release-venv.sh
+│   │   ├── smoke-test.sh
 │   │   └── werewolf-agent.spec
 │   └── research/
 │       └── evaluate_semantic_labels.py
