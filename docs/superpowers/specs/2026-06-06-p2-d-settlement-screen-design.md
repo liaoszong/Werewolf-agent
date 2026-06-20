@@ -356,7 +356,7 @@ tests/test_settlement_bundle.py                      (new: builder 纯单元 + �
 tests/test_settlement_response.py                    (new: 离线路由分支 — completed gate/no-game-log/缺坏 decision-log/缓存)
 tests/test_qt_observer_static_contract.py            (新文件/objectName/契约)
 docs/superpowers/specs/2026-06-06-p2-d-settlement-screen-design.md
-docs/harness/plans/2026-06-06--p2-d-settlement-screen-plan.md
+historical harness plan 2026-06-06--p2-d-settlement-screen-plan.md
 ```
 
 ---
@@ -451,5 +451,6 @@ docs/harness/plans/2026-06-06--p2-d-settlement-screen-plan.md
 ## 16. Next steps
 
 1. **Spec self-review**(placeholder / 一致性 / scope / 歧义已扫,见 §14/§15)→ 提交 user review。
-2. user approve → 调 **writing-plans** 出实现计划 `docs/harness/plans/2026-06-06--p2-d-settlement-screen-plan.md`(严格 TDD:后端 `build_settlement_bundle` 纯单测先行 + 降级路径;Qt 组件逐个建 + 静态契约同步 + 视觉门四场景)。
+2. user approve → 调 **writing-plans** 出实现计划 `historical harness plan 2026-06-06--p2-d-settlement-screen-plan.md`(严格 TDD:后端 `build_settlement_bundle` 纯单测先行 + 降级路径;Qt 组件逐个建 + 静态契约同步 + 视觉门四场景)。
 3. 同步 `docs/PROJECT_MAP.md` P2-D 行状态(轮廓 → 进行中)与 `docs/TASKS.md`。
+

@@ -2,7 +2,7 @@
 
 > Status: **DESIGN — pending user review** · Date: 2026-06-09 · Author: brainstorming session (liaoszong + Claude + GPT cross-review)
 > Supersedes the hardcoded action-resolution path in `emergent_engine.py`; does **not** supersede the engine's output contracts, visibility projection, or runtime spine.
-> Companion context: `docs/PROJECT_MAP.md` (phases), `docs/RISK_ASSESSMENT_2026-06-06.md` (R-01..38, closed), `docs/HEALTH_CHECK_2026-06-08.md` (B-5/B-2/D-4/E-5 confirm the coupling this spec resolves).
+> Companion context: `docs/PROJECT_MAP.md` (phases + SYS-A2 / SYS-C3 system view), `docs/superpowers/specs/2026-06-09-p2a-invariant-safety-net-design.md` (runtime verification guardrails).
 
 ---
 

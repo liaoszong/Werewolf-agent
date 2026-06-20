@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 606
+- Entries: 491
 
 ```text
 ./
@@ -12,14 +12,6 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       ├── committing-in-shared-worktrees/
 │       │   └── SKILL.md
 │       ├── guarding-prompt-bytes/
-│       │   └── SKILL.md
-│       ├── harness/
-│       │   ├── agents/
-│       │   │   └── openai.yaml
-│       │   ├── refs/
-│       │   │   ├── local-review.md
-│       │   │   ├── visual-display.md
-│       │   │   └── writing-plan.md
 │       │   └── SKILL.md
 │       ├── receiving-code-review/
 │       │   └── SKILL.md
@@ -55,13 +47,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   └── tree.mjs
 │   └── hooks.json
 ├── .github/
-│   ├── PULL_REQUEST_TEMPLATE/
-│   │   ├── implementation.md
-│   │   └── research.md
-│   ├── workflows/
-│   │   └── tests.yml
-│   ├── codex-review-comment.md
-│   └── writing-plan.md
+│   └── workflows/
+│       └── tests.yml
 ├── clients/
 │   └── qt_observer/
 │       ├── assets/
@@ -219,101 +206,6 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   ├── s5-score-log.json
 │   │   ├── s5-semantic-label-eval-set.json
 │   │   └── s5-semantic-label-output.example.json
-│   ├── harness/
-│   │   ├── designs/
-│   │   │   ├── 2026-06-03--live-ai-werewolf-experiment-platform-charter.md
-│   │   │   └── 2026-06-03--live-ai-werewolf-experiment-platform-charter.zh.md
-│   │   ├── plans/
-│   │   │   ├── 2026-05-29--e1-game-log-parser-validation-plan.md
-│   │   │   ├── 2026-05-29--phase1-closure-phase2-boundary-alignment-plan.md
-│   │   │   ├── 2026-05-29--s0-gold-game-seed-plan.md
-│   │   │   ├── 2026-05-29--s1-game-log-schema-validation-plan.md
-│   │   │   ├── 2026-05-29--s2-deterministic-scorer-validation-plan.md
-│   │   │   ├── 2026-05-29--s3-rule-attribution-validation-plan.md
-│   │   │   ├── 2026-05-29--s6-leaderboard-ui-demo-validation-plan.md
-│   │   │   ├── 2026-05-30--d1-decision-log-runtime-skeleton-plan.md
-│   │   │   ├── 2026-05-30--d2-decision-log-scoring-integration-plan.md
-│   │   │   ├── 2026-05-30--e2-deterministic-scorer-plan.md
-│   │   │   ├── 2026-05-30--e3-rule-attribution-engine-plan.md
-│   │   │   ├── 2026-05-30--e4-runtime-demo-html-plan.md
-│   │   │   ├── 2026-05-30--roadmap-alignment-plan.md
-│   │   │   ├── 2026-05-30--s4-consensus-log-runtime-input-plan.md
-│   │   │   ├── 2026-05-30--s4x-context-budget-hardening-plan.md
-│   │   │   ├── 2026-05-30--s5-semantic-label-research-plan.md
-│   │   │   ├── 2026-05-31--g1-scripted-game-runner-plan.md
-│   │   │   ├── 2026-05-31--g1b-engine-mock-agent-contract-plan.md
-│   │   │   ├── 2026-05-31--g1c-wolf-consensus-failure-recovery-plan.md
-│   │   │   ├── 2026-05-31--review-packet-gate-v1-plan.md
-│   │   │   ├── 2026-05-31--s5-semantic-label-scoring-integration-plan.md
-│   │   │   ├── 2026-06-01--pre-g1d-evaluation-trust-hardening-plan.md
-│   │   │   ├── 2026-06-02--g1d-fake-provider-contract-harness-plan.md
-│   │   │   ├── 2026-06-02--g1e-deepseek-provider-smoke-plan.md
-│   │   │   ├── 2026-06-02--g1f-deepseek-consensus-smoke-plan.md
-│   │   │   ├── 2026-06-02--g1g-provider-replay-html-plan.md
-│   │   │   ├── 2026-06-02--g1h-decision-round-scoring-disambiguation-plan.md
-│   │   │   ├── 2026-06-03--g1h-contract-closeout-route-docs-alignment-plan.md
-│   │   │   ├── 2026-06-03--g1h-live-runtime-event-spine-plan.md
-│   │   │   ├── 2026-06-03--g2a-local-observer-server-protocol-control-plane-plan.md
-│   │   │   ├── 2026-06-03--g2b-qt-observer-cockpit-mvp-plan.md
-│   │   │   ├── 2026-06-03--g2c-god-role-view-visibility-trust-plan.md
-│   │   │   ├── 2026-06-04--g2d-2-qt-setup-ui-plan.md
-│   │   │   ├── 2026-06-04--g2d-prompt-configuration-mvp-plan.md
-│   │   │   ├── 2026-06-05--g3-1-live-deepseek-execution-plan.md
-│   │   │   ├── 2026-06-05--g3-2-qt-live-toggle-plan.md
-│   │   │   ├── 2026-06-06--p2-c-1-theater-view-plan.md
-│   │   │   ├── 2026-06-06--p2-d-settlement-screen-plan.md
-│   │   │   ├── 2026-06-08--full-health-check.md
-│   │   │   ├── 2026-06-08--p2b-byo-key-rework-plan.md
-│   │   │   ├── 2026-06-11--b2-engine-visibility-single-source-plan.md
-│   │   │   ├── 2026-06-11--b3-scoring-split-plan.md
-│   │   │   ├── 2026-06-11--b4-observer-visibility-layering-plan.md
-│   │   │   ├── 2026-06-11--foundation-artifacts-pyproject-plan.md
-│   │   │   ├── 2026-06-11--l4-guard-arm-plan.md
-│   │   │   ├── 2026-06-11--observer-server-split-plan.md
-│   │   │   ├── 2026-06-11--provider-launcher-mechanical-refactor-plan.md
-│   │   │   ├── 2026-06-11--sys-a2-role-single-source-plan.md
-│   │   │   ├── 2026-06-11--sys-b1-prompt-renderer-registry-plan.md
-│   │   │   ├── 2026-06-12--audit-closeout-rules-invariants-docs-smoke-plan.md
-│   │   │   ├── 2026-06-12--b2-engine-failure-classification-plan.md
-│   │   │   ├── 2026-06-12--c12-score-id-race-plan.md
-│   │   │   ├── 2026-06-12--l4-guard-witch-coord-arm-plan.md
-│   │   │   ├── 2026-06-12--p3a-replay-data-pipeline-c12-06-a45-7-plan.md
-│   │   │   ├── 2026-06-12-ablation-guardrails-plan.md
-│   │   │   ├── 2026-06-13--audit-nongated-remainder-plan.md
-│   │   │   └── 2026-06-19--active-runs-navigation-lifecycle-plan.md
-│   │   └── reviews/
-│   │       ├── 2026-06-01--g1c-project-healthcheck-final.md
-│   │       ├── 2026-06-01--g1c-project-healthcheck.md
-│   │       ├── 2026-06-01--project-wide-healthcheck-v2.md
-│   │       ├── 2026-06-09-action-runtime-audit-charter.md
-│   │       ├── 2026-06-09-action-runtime-audit-REPORT.md
-│   │       ├── 2026-06-10-live-game-sameness-and-prompt-leak-investigation.md
-│   │       ├── 2026-06-10-live-quality-diagnosis.md
-│   │       ├── 2026-06-11-b1-context-repair-VERDICT.md
-│   │       ├── 2026-06-11-b1-prompt-v2-metrics.json
-│   │       ├── 2026-06-11-b4-prompt-v3-metrics.json
-│   │       ├── 2026-06-11-b4-scaffold-VERDICT.md
-│   │       ├── 2026-06-11-baseline-prompt-v1-metrics.json
-│   │       ├── 2026-06-11-l4-baseline-backfill.json
-│   │       ├── 2026-06-11-l4-guard-prompt-v3-metrics.json
-│   │       ├── 2026-06-11-l4-guard-VERDICT.md
-│   │       ├── 2026-06-12-l4-guard-witch-coord-prompt-v4-metrics.json
-│   │       └── 2026-06-12-l4-guard-witch-coord-VERDICT.md
-│   ├── health-check/
-│   │   ├── _baseline/
-│   │   │   ├── baseline.py
-│   │   │   ├── bigfiles.txt
-│   │   │   ├── coverage.txt
-│   │   │   ├── doc-refs.txt
-│   │   │   ├── entrypoint-wiring.txt
-│   │   │   ├── import-refs.txt
-│   │   │   ├── preflight-dirty.txt
-│   │   │   └── vulture.txt
-│   │   ├── 01-risks-bugs.md
-│   │   ├── 02-slimming-candidates.md
-│   │   ├── 03-architecture-optimization.md
-│   │   ├── 2026-06-12-system-view-audit.md
-│   │   └── UI代码审查报告.md
 │   ├── prs/
 │   │   ├── 2026-05-30--phase2-next-step-research.md
 │   │   └── 2026-05-30--s5-semantic-label-research.md
@@ -330,23 +222,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   └── text-injection-channels.md
 │   ├── superpowers/
 │   │   ├── plans/
-│   │   │   ├── 2026-06-07-emergent-role-projection-snapshots.md
-│   │   │   ├── 2026-06-07-p2-b-1-byo-key-credential-relay.md
-│   │   │   ├── 2026-06-08-byo-key-provider-presets.md
-│   │   │   ├── 2026-06-09-action-runtime-allowed-actions-swap.md
-│   │   │   ├── 2026-06-09-action-runtime-hunter-v1.1.md
-│   │   │   ├── 2026-06-09-action-runtime-resolver-deletion.md
-│   │   │   ├── 2026-06-09-agent-action-runtime.md
-│   │   │   ├── 2026-06-10-ablation-metrics-harness.md
-│   │   │   ├── 2026-06-10-game-variety.md
-│   │   │   ├── 2026-06-10-history-run-management.md
-│   │   │   ├── 2026-06-10-p2a-invariant-safety-net.md
-│   │   │   ├── 2026-06-10-prompt-versioning.md
-│   │   │   ├── 2026-06-10-role-shuffle.md
-│   │   │   ├── 2026-06-11-sys-b1-context-repair.md
-│   │   │   ├── 2026-06-11-sys-b4-claim-ledger-vote-scaffold.md
-│   │   │   ├── 2026-06-13-game-client-redesign-phase1.md
-│   │   │   └── 2026-06-13-livecockpit-godseye-redesign-phase2.md
+│   │   │   └── 2026-06-19--active-runs-navigation-lifecycle-plan.md
 │   │   └── specs/
 │   │       ├── 2026-06-04-g2d-2-qt-setup-ui-design.md
 │   │       ├── 2026-06-04-g2d-prompt-configuration-design.md
@@ -379,7 +255,6 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── PRODUCT_ONE_PAGER.md
 │   ├── PROJECT_MAP.md
 │   ├── RISK_ASSESSMENT_2026-06-06.md
-│   ├── ROADMAP.md
 │   ├── SPIKES.md
 │   └── TASKS.md
 ├── scripts/

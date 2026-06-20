@@ -1,6 +1,6 @@
 # Layer 4 守卫臂(l4_guard)设计 — 6p 保护型结构替换实验
 
-> 2026-06-11。承接 SYS-B4 verdict(`docs/harness/reviews/2026-06-11-b4-scaffold-VERDICT.md`):
+> 2026-06-11。承接 SYS-B4 verdict(`historical harness review 2026-06-11-b4-scaffold-VERDICT.md`):
 > prompt 层已到边际,瓶颈转移为「信息到得太晚 + 预言家存活结构」(预言家 40 局死 33:夜刀 15 + 被票 20)。
 > 用户裁决:Layer 4 第一臂 = 守卫角色;轮数上限(cap=4)留作第二批,视本臂结果再定;不做板子规模扩张。
 > 用户终审口径:ACCEPTED_WITH_SPEC_REQUIREMENTS(8 条硬边界,已全部钉入本 spec)。
@@ -166,7 +166,7 @@ I1-I7 + I4b 照常全跑;coverage 门(`scaffold_coverage<0.5` 剔局)沿用。
 - golden:v1 14 样本 + v3 现有样本字节不动(CI 守卫);新增 guard 板样本入锁。
 - 全量回归:`PYTHONPATH=src python -m unittest discover`(基准 1107 OK)。
 - live 验收:45 局,n_valid 口径同 b4(live 率 + coverage 门),快照
-  `docs/harness/reviews/2026-06-XX-l4-guard-metrics.json` + verdict 文档。
+  `historical harness review 2026-06-XX-l4-guard-metrics.json` + verdict 文档。
 
 ## 10. Out of scope(硬边界,用户原文)
 
@@ -197,6 +197,7 @@ I1-I7 + I4b 照常全跑;coverage 门(`scaffold_coverage<0.5` 剔局)沿用。
 
 ## 12. 流程
 
-spec(本文)→ plan(`docs/harness/plans/2026-06-XX--l4-guard-arm-plan.md`,独立审)→
-worktree 隔离 subagent 执行 → review → 45 局 live(`running-live-games` skill)→ verdict 归档。
+spec(本文)→ plan(历史计划)→
+本地执行与验证 → 45 局 live(`running-live-games` skill)→ verdict 归档。
 消融对照直接复用三臂快照与度量台(b4 verdict 处置条款)。
+

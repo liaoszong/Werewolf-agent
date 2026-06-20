@@ -1,7 +1,7 @@
 # G3-1 Live DeepSeek Execution — Design Spec
 
 **Status:** draft (for spec review)
-**Route:** Phase 3 / G3 experiment route — first slice (`docs/ROADMAP.md` §G3 "Replay + live dual mode"). Depends on G1h event spine + G2a/G2c/G2d observer contracts.
+**Route:** Phase 3 / G3 experiment route — first slice (`docs/PROJECT_MAP.md` §G3 "Replay + live dual mode"). Depends on G1h event spine + G2a/G2c/G2d observer contracts.
 **Date:** 2026-06-05
 
 ---
@@ -115,10 +115,10 @@ tests/test_profile_config.py
 scripts/dev/run_deepseek_live_smoke.py         (new, gated, not in default suite)
 tests/test_deepseek_live_smoke.py              (new, skipUnless wrapper)
 docs/superpowers/specs/2026-06-05-g3-1-live-deepseek-execution-design.md
-docs/harness/plans/2026-06-05--g3-1-...-plan.md
+historical harness plan 2026-06-05--g3-1-...-plan.md
 ```
 
-**Forbidden scope:** no edits to `deepseek_provider.py` / `provider_agent.py` / `provider_contract.py` / `game_engine.py` / the consensus runner internals (reuse verbatim); no Qt client changes; no `docs/ROADMAP.md` / `docs/TASKS.md` / `docs/adr/**` edits without a bound plan; no new third-party deps; no secrets in any committed file/fixture.
+**Forbidden scope:** no edits to `deepseek_provider.py` / `provider_agent.py` / `provider_contract.py` / `game_engine.py` / the consensus runner internals (reuse verbatim); no Qt client changes; no `docs/PROJECT_MAP.md` / `docs/TASKS.md` / `docs/adr/**` edits without a bound plan; no new third-party deps; no secrets in any committed file/fixture.
 
 ---
 
@@ -144,7 +144,7 @@ docs/harness/plans/2026-06-05--g3-1-...-plan.md
 - It validates **request/response integration only**: the launcher returns exit 0, spine + bundle exist, and `provider-trace.json` shows ≥1 real response with `source_label="[DeepSeek API output]"`. It does **NOT** assert `live_api=used` — that marker is written by the server `_profile_launcher` wrapper, which a launcher-direct smoke bypasses. It **must not** assert exact model text.
 - It **must not** print the API key, the `Authorization` header, or the full raw request.
 
-Cost-bounded by `max_requests=32`. Run once before merge; record the text-free result in the review packet.
+Cost-bounded by `max_requests=32`. Run once before merge; record the text-free result in the validation summary.
 
 ---
 
@@ -155,7 +155,7 @@ Cost-bounded by `max_requests=32`. Run once before merge; record the text-free r
 - **T3** — `deepseek_launcher.py`: `build_deepseek_launcher` (default `max_requests=32`, server-override-only) delegating to the consensus runner; launcher artifact tests (fake transport/provider factory) + a budget-exhaustion test (faked provider raising the budget error → exit nonzero → run status `failed`/`budget_exhausted`).
 - **T4** — `profile_config.py`: parameterize `build_resolved_profile_artifact(execution_mode/live_api)`; the live `_profile_launcher` wrapper stamps `execution_mode=live`/`live_api=used` and the artifact records the resolved real per-seat model. (Prompt-manifest model stays `"unknown"` — runner-owned; named follow-up.) Artifact-marker tests.
 - **T5** — `run_observer_server.py`: `--allow-live-api` / `--api-key-env`; build + inject the live launcher from env. Subprocess gate tests (`DOES_NOT_EXIST_XXXX`).
-- **T6** — Secret-scan + artifact-contract regression tests; review packet.
+- **T6** — Secret-scan + artifact-contract regression tests; validation summary.
 - **T7** — `scripts/dev/run_deepseek_live_smoke.py` (primary) + `tests/test_deepseek_live_smoke.py` (`skipUnless(RUN_DEEPSEEK_LIVE_SMOKE=1)` only — key read **inside** the body); enforces the §7 boundaries (no real net by default; structure-only asserts via provider-trace `source_label`; no key/Authorization/raw-request printed). Run once before merge; record the text-free result in the packet.
 
 ---
@@ -176,3 +176,4 @@ Cost-bounded by `max_requests=32`. Run once before merge; record the text-free r
 - **`max_requests=32`** default; server-side override only (option/env/CLI), never per-request; budget reached → **fail closed `budget_exhausted`**. Re-tune to 48/64 later only on smoke evidence.
 - **Smoke harness:** `scripts/dev/run_deepseek_live_smoke.py` (primary) + a default-skip `skipUnless` `unittest` wrapper; **never** a default acceptance gate; boundaries per §7.
 - **Canonical error codes** (§4 gate order): `live_api_disabled` / `missing_api_key` (403), `unsupported_live_provider` / `mixed_models` (400) request-time; `budget_exhausted` / `provider_failure` run-time.
+

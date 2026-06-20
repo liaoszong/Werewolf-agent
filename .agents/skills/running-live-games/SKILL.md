@@ -36,4 +36,5 @@ NO_PROXY='*' PYTHONPATH=src python -m werewolf_eval.ablation compare <armA_dir> 
 
 ## 基线对照
 
-prompt_v1 45 局基线快照:`docs/harness/reviews/2026-06-11-baseline-prompt-v1-metrics.json`(n_valid=45,狼胜 ~0.778)。原始 .runs 不在仓库,compare 只需把快照复制为 `<dir>/_metrics.json`。
+prompt_v1 45 局基线快照:`historical harness review 2026-06-11-baseline-prompt-v1-metrics.json`(n_valid=45,狼胜 ~0.778)。原始 .runs 不在仓库,compare 只需把快照复制为 `<dir>/_metrics.json`。
+

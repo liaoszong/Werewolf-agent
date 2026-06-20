@@ -2,7 +2,7 @@
 
 > Status: **DESIGN — review-applied, PLAN-READY** · Date: 2026-06-09 (review 2026-06-10) · Author: brainstorming session (liaoszong + Claude)
 > **2026-06-10 independent review applied** (read-only fact-check vs `main==dceac69`, cross-checked against the ②a plan). Fixed: BLOCKING-1 I5 key → `(request_id, phase)`; BLOCKING-2 B4 → silent no-op (user ruling); M-1 `event_visible_in_projection` returns `(bool, reason)` tuple; M-2 I4a is in-memory-only; M-3 B1 anchor = `_provider_action`+3 sites (not `_resolve_*`); M-4 B4 adds day-vote commit site; LOW: I3 per-`(actor, capability)`, I4b in-memory `role_source`. Load-bearing I4b dual-implementation anti-circularity **verified genuine**. Line refs ≥`:545` shift under ②a — re-locate at wiring time (see review's post-②a list).
-> Companion context: `docs/superpowers/specs/2026-06-09-agent-action-runtime-architecture-design.md` (the runtime this net protects), `docs/harness/reviews/2026-06-09-action-runtime-audit-REPORT.md` (proves the gap), `docs/PROJECT_MAP.md` (P2-A is the current engine core).
+> Companion context: `docs/superpowers/specs/2026-06-09-agent-action-runtime-architecture-design.md` (the runtime this net protects), `historical harness review 2026-06-09-action-runtime-audit-REPORT.md` (proves the gap), `docs/PROJECT_MAP.md` (P2-A is the current engine core).
 > Does **not** modify: `CapabilityLedger`, `EffectQueue`/`TriggerSystem`, `DecisionWindow`, `NightPlan`, or any enhancement-layer code. This spec builds the **net those four rewrites land on**; it does not build them.
 
 ---
@@ -284,3 +284,4 @@ New package `src/werewolf_eval/invariants/` (sibling to `action_runtime/` — th
 - **Q3 — RESOLVED ✓ (rename + 1-line fake-runner add).** Per-call `observation_source_event_ids` persist in **`provider-turns.json` → `turns[]`** (live runner `:160`), recorded for all call types (`:508/717/794/896`). Spec artifact name corrected (was `provider-trace.json`). Plan adds one `_write_json` to `run_emergent_fake_runtime.py` so persisted fake runs are disk-checkable. *(No longer blocking.)*
 - **Q4 — guards' home.** `invariants/guards.py` imported by the engine, or co-located in `action_runtime/`? *(Lean: `invariants/`, single visibility-oracle source shared with the offline checker.)*
 - **Q5 — RESOLVED ✓ (user ruling 2026-06-10): duplicate candidate = SILENT no-op (no audit).** Duplicate **committed event** = hard fail. The earlier "no-op+audit" draft was rejected: the candidate-skip is reachable in a legal game (hunter co-victim path, `emergent_engine.py:998`), so any audit write would break byte parity + the ②a differential gate. Now truly matches §7 and current engine behavior.
+

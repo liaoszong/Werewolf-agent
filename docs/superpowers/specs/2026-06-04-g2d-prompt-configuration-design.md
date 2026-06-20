@@ -29,13 +29,13 @@ This mirrors the established platform pattern: G2a added a protocol/control-plan
 **Known misalignment.** The canonical route docs still point at G2c as the *next* candidate, even though G2c is fully implemented and merged (git: `8b81fe6`…`2a3f08a`, plus follow-on `d765955`). This staleness is pre-existing: the G2c plan deliberately listed route docs under "Do Not Modify," so the post-merge route update was never made. Evidence at time of writing:
 
 - `README.md` (zh): "G2b … 已完成，下一候选开发点是 **G2c** God View / Role View."
-- `docs/ROADMAP.md` → *Current Priority*: "… are now `completed`. The next implementation candidate is **G2c** God View / Role View."
+- `docs/PROJECT_MAP.md` → *Current Priority*: "… are now `completed`. The next implementation candidate is **G2c** God View / Role View."
 - `docs/TASKS.md`: lists through G2b then Backlog; G2c is not marked completed and G2d is not surfaced as active.
 
 **Resolution (binds the implementation plan).**
 
 1. **This committed spec is the authoritative route source for the G2d-1 slice.** The implementation plan must open with a note citing `docs/superpowers/specs/2026-06-04-g2d-prompt-configuration-design.md` as the route override authorizing G2d-1 work, so the plan does not contradict the stale docs.
-2. **The plan's first task is a minimal, self-contained Route Alignment task** that updates exactly three route docs to reflect reality — `README.md`, `docs/ROADMAP.md`, `docs/TASKS.md` — to mark **G2c `completed`** and **G2d the active candidate**. This is the *only* route-doc change in scope; wording stays minimal (status flip + next-candidate line), no roadmap restructuring.
+2. **The plan's first task is a minimal, self-contained Route Alignment task** that updates exactly three route docs to reflect reality — `README.md`, `docs/PROJECT_MAP.md`, `docs/TASKS.md` — to mark **G2c `completed`** and **G2d the active candidate**. This is the *only* route-doc change in scope; wording stays minimal (status flip + next-candidate line), no roadmap restructuring.
 3. All other route/product docs (`docs/PRODUCT_ONE_PAGER.md`, `docs/adr/**`, charter/designs) remain **out of scope** and unchanged.
 
 These three route-doc paths are added to a clearly-marked *route-alignment* portion of the allowlist (§11) and are exempt from the otherwise-strict "no route-doc changes" boundary in §10, which continues to apply to every other doc.
@@ -245,7 +245,7 @@ The G2c projection endpoints continue to work against the run's events/snapshots
 - No Qt/Web UI, no setup wizard (→ G2d-2).
 - No live provider calls, API keys, credentials, or secret handling.
 - No changes to `game_engine.py`, `run_g1h_fake_runtime.py`, `provider_agent.py`, scoring, attribution, validators unrelated to the observer protocol.
-- Route docs: **only** the minimal G2c-completed / G2d-active alignment in `README.md`, `docs/ROADMAP.md`, `docs/TASKS.md` per §2A. **No** changes to `docs/PRODUCT_ONE_PAGER.md`, `docs/adr/**`, or the charter/designs.
+- Route docs: **only** the minimal G2c-completed / G2d-active alignment in `README.md`, `docs/PROJECT_MAP.md`, `docs/TASKS.md` per §2A. **No** changes to `docs/PRODUCT_ONE_PAGER.md`, `docs/adr/**`, or the charter/designs.
 - No client-driven server-side profile **writes** (save is a pure helper / file-drop).
 - No new third-party dependencies; Python standard library only.
 
@@ -260,12 +260,12 @@ tests/test_profile_config.py                  (new)
 tests/test_observer_protocol.py               (launch-payload + ALLOWED_ARTIFACTS tests)
 tests/test_observer_server.py                 (profile endpoint + launch tests)
 docs/superpowers/specs/2026-06-04-g2d-prompt-configuration-design.md  (this spec)
-.logs/review/latest/review-packet.md           (review packet only; git-tracked)
+.logs/review/latest/validation-summary.md           (validation summary only; git-tracked)
 .oh-my-harness/tree.md                         (refresh via tree hook only)
 
 # route alignment (§2A — minimal status flip only)
 README.md                                      (G2c completed, G2d active)
-docs/ROADMAP.md                                (G2c completed, G2d active)
+docs/PROJECT_MAP.md                                (G2c completed, G2d active)
 docs/TASKS.md                                  (G2c completed, G2d active)
 ```
 
@@ -280,9 +280,10 @@ docs/TASKS.md                                  (G2c completed, G2d active)
 - A7. No live providers, no new dependencies, no changes to the game engine / fake runtime / out-of-scope docs (route-doc changes limited to the §2A alignment).
 - A8. Pure-module tests pass; server tests pass in a normal environment or are documented with the exact environmental limitation.
 - A9. `parse_profile_launch_request` enforces exactly one launch source (rejects `profile`+`profile_name`, `profile`/`profile_name`+`template`, neither, and unexpected keys).
-- A10. Route docs (`README.md`, `docs/ROADMAP.md`, `docs/TASKS.md`) mark G2c `completed` and G2d the active candidate; no other route/product docs change.
+- A10. Route docs (`README.md`, `docs/PROJECT_MAP.md`, `docs/TASKS.md`) mark G2c `completed` and G2d the active candidate; no other route/product docs change.
 
 ## 13. Future (out of scope, noted for continuity)
 
 - **G2d-2:** Qt setup wizard consuming `/api/profiles` + `POST /api/runs {profile}`, provider/model/prompt/strategy pickers, save/import UI.
 - **G3+:** experiment profiles (batches of profiles), live provider execution behind authenticated, secret-safe adapters.
+

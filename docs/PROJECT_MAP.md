@@ -4,7 +4,7 @@
 >
 > - 规划深度原则:**锁上不锁下**。阶段 + 模块**全部锁定**(很少改,改动即大决策);**工作任务只细化当前模块**;子任务由实现者自动拆(superpowers / spec / writing-plans)。远期模块只画轮廓。
 > - 命名:`P<阶段>-<模块>-<工作任务>`,例如 `P2-A-1`。旧 `G*` 编号的映射见文末「Reconcile」表。
-> - 与其他文档的关系:`ROADMAP.md` 保留工程依赖图与历史记录;`TASKS.md` 跟踪**当前工作任务**的状态与产物;本文件是它们之上的产品框架。三者冲突时,产品阶段以本文件为准。
+> - 与其他文档的关系:`TASKS.md` 是压缩任务索引(任务名/状态/产物),不承载路线判断;本文件是唯一阶段权威。产品阶段冲突一律以本文件为准。
 > - 除产品阶段外,文末另有「**系统视图(System View)**」:按工程子系统(SYS-xx 编号)组织的正式系统清单,用于讨论各系统的优化/改进/重构。阶段视图回答"做到哪了",系统视图回答"楼是怎么搭的"。
 
 ---
@@ -20,7 +20,7 @@
 | 阶段 | 名称 | 状态 | 一句话 |
 |---|---|---|---|
 | **P1** | 数据与事件地基 | ✅ 完成 | 后端原语:日志 schema/校验/评分/归因、引擎与 provider 契约、实时事件骨架、observer 协议+server。 |
-| **P2** | 观战式 AI-vs-AI 对局客户端 | 🚧 **当前** | 让对局真能自演化并好看地观战:**引擎 → 配置 → 观战 UI → 结算**。 |
+| **P2** | 观战式 AI-vs-AI 对局客户端 | ✅ 完成 | 对局可自演化、可配置、可实时观战,并能进入结算与历史回看。 |
 | **P3** | 评测 · 复盘 · 排行榜 | ⏳ 未开始(仅轮廓) | 结算画面深化为评测/复盘;历史对战回看;每角色 AI 胜率动态榜。 |
 
 ---
@@ -38,19 +38,18 @@
 
 ---
 
-## P2 · 观战式 AI-vs-AI 对局客户端 🚧(当前阶段)
+## P2 · 观战式 AI-vs-AI 对局客户端 ✅(已完成)
 
-> 这是当前阶段。目标:把写死的剧本换成**真正自演化的对局**,并让玩家能**配置 → 观战 → 看结算**。
-> 已有的 Qt 座舱(G2b/c/d)、实时执行开关(G3-1/2/3)是本阶段已建好的**外壳/管线**,P2-B/P2-C 在其上长出真正的可玩与观感。
+> 本阶段已把写死剧本替换为**真正自演化的对局**,并形成完整的**配置 → 观战 → 结算 → 历史管理**闭环。
 
 ### 模块
 
 | 模块 | 交付物(轮廓) | 状态 |
 |---|---|---|
-| **P2-A 涌现式游戏引擎** | 全角色 AI 驱动的真实对局:刀/查/救毒/发言/投票/胜负/动态回合。离线 fake 默认可测,真实 DeepSeek 走 G3 开关。 | ✅ 完成(P2-A-1/A-2;后续引擎演进走系统视图 SYS-A2 action runtime 线) |
-| P2-B 开局配置 | 每角色选哪个 AI、改 agent prompt/参数(在已有 server-side profile 之上做到真正可玩)。**架构转向(grill 2026-06-05 定):BYO-key — 用户自带 key,见下「P2-B 架构方向」。** | 🚧 主体完成(BYO-key 凭证中继、供应商中心、9 家预设、调度沙盘、per-seat 配置已落地);剩 B5 收尾(per-seat token/成本汇总、退役 deepseek-only env 兜底) |
-| P2-C 实时观战上帝视角 UI | 玩家环+真角色、阶段/回合、发言流、投票箭头、夜晚揭示;娱乐导向,而非数据仪表盘。 | ✅ 完成(剧场视图 + 证据控制台 + AI 推理轨迹,2026-06-06 合并) |
-| P2-D 结算画面 | 对局结束的结算视图。**注意:这就是 P3 评测/复盘的入口**,数据结构需"评测就绪"以免 P3 返工。 | ✅ 完成(结算战报 + 历史回看/管理;逐人复盘归属 P3-A) |
+| **P2-A 涌现式游戏引擎** | 全角色 AI 驱动的真实对局:刀/查/救毒/发言/投票/胜负/动态回合。离线 fake 默认可测,真实 DeepSeek 可走 live 开关。 | ✅ 完成(P2-A-1/A-2;后续引擎演进走系统视图 SYS-A2 action runtime 线) |
+| P2-B 开局配置 | BYO-key、本地凭证存储与中继、供应商中心、多供应商预设、per-seat provider/prompt/参数配置、调度沙盘、配置保存/导入/导出。 | ✅ 完成 |
+| P2-C 实时观战上帝视角 UI | 实时上帝视角剧场、事件跟随、SSE/live 状态、玩家环/发言/投票/夜晚揭示、证据控制台、AI 推理轨迹、导航生命周期。 | ✅ 完成 |
+| P2-D 结算画面 | 结算战报、剧场内结算覆盖层、历史回看/管理、中断局归档和删除语义。逐人深度复盘仍归 P3-A。 | ✅ 完成 |
 
 ### P2-A 工作任务(当前模块,细化到工作任务粒度)
 
@@ -63,7 +62,7 @@
 
 **P2-A-2 验收口径(grill 2026-06-05 锁定):**
 - **硬门槛①(visibility 不喂漏):** live prompt 只能由该 seat 的 `public_event_ids ∪ private_event_ids` 渲染(引擎侧文本化,provider 只收已过滤的 `observation_text`,绝不碰全局事件存)。机检:渲染来源 event_ids ⊆ obs 可见集;非狼视角 prompt 不含狼队私有/队友身份/他人私有结果。**喂漏=阻断性 bug。**
-- **硬门槛②(真的是 live,非 fallback 糊过):** `max_requests_per_game=64`、`live_success_rate ≥ 0.80`、`live_success_actions ≥ 12`(2026-06-05 两局真实数据校准:6 人局 1-2 轮分胜负、~14-22 回合,原 20 误杀合法早终局)、`budget_exhausted` 一律 hard fail;兜底可救场不可过关,须按 `provider_result_kind`(live_success / invalid_then_fallback / timeout_then_fallback / error_then_fallback / budget_exhausted)统计并在 review packet 暴露。更短早终局 → `--allow-short-game` + packet 解释。
+- **硬门槛②(真的是 live,非 fallback 糊过):** `max_requests_per_game=64`、`live_success_rate ≥ 0.80`、`live_success_actions ≥ 12`(2026-06-05 两局真实数据校准:6 人局 1-2 轮分胜负、~14-22 回合,原 20 误杀合法早终局)、`budget_exhausted` 一律 hard fail;兜底可救场不可过关,须按 `provider_result_kind`(live_success / invalid_then_fallback / timeout_then_fallback / error_then_fallback / budget_exhausted)统计并在验收摘要中暴露。更短早终局 → `--allow-short-game` + artifact 解释。
 - **硬门槛③(诚实链,复用 G3-3):** `source_label=="[DeepSeek API output]"`、manifest 记真实 model、`token_usage>0`(fake 恒 0)。
 - **软门槛(嘴漏=内容警告):** 模型幻觉自称拥有不可见系统事实 → 记 content warning,不阻断(除非破坏 action 契约/崩);狼人伪装/诈身份是正常玩法。
 - **运行(spec-review 2026-06-05 supersede grill Q4):** **user-run / agent-offline-review** —— 用户本地用 dev key 跑 gated live smoke,agent 不接触 key,只对 raw artifacts 离线机检;`fake-deterministic` 仍是无条件默认。
@@ -75,7 +74,7 @@
 > 从 dev/server 自带凭证,转向**用户自带本地凭证**作为可玩配置。Qt 客户端可收集/本地保存/选择用户自己的 API key,并按供应商下拉选模型(自动拉取);但 **provider 网络调用仍只由本地 Python observer/server 执行,客户端绝不直连各家供应商**。这保住"Python owns engine/provider,Qt 只是配置+观战客户端"地基——G3-1/2 的活是进化不是推倒。`fake-deterministic` 仍是无 key 默认。
 
 **修订后的三层安全不变量(取代旧"客户端完全不碰 key"):**
-- **Hard invariants:** key 不写死进源码;不提交/打日志/导出进 review packet、prompt manifest、runtime events、客户端崩溃日志;fake-deterministic 模式永不需要 key。
+- **Hard invariants:** key 不写死进源码;不提交/打日志/导出进共享产物、prompt manifest、runtime events、客户端崩溃日志;fake-deterministic 模式永不需要 key。
 - **Architecture invariant:** Qt 可收集并本地保存用户自有 key;provider 网络调用只由本地 Python server/provider 执行;Qt 不直连各家 API。
 - **Storage invariant:** 优先 OS keychain / 凭证库;若有本地回退存储,须明确标 dev-only 或尽量加密;UI 只显示打码 key。
 
@@ -144,7 +143,7 @@
 | G2a | P1-D observer 协议+server | ✅ |
 | G2b / G2c / G2d(+G2d-2) | P2 客户端外壳(座舱 / 视角 / 配置入口)→ 喂给 P2-B、P2-C | ✅(管线) |
 | G3-1 / G3-2 / G3-3 | P2 实时执行通道(live/fake 开关、HUD、manifest 诚实)→ 喂给 P2-A 真实路径 | ✅(管线) |
-| (新) 涌现式引擎 | **P2-A-1**(原临时名 "G4-1") | 🚧 当前 |
+| (新) 涌现式引擎 | **P2-A-1**(原临时名 "G4-1") | ✅ |
 | 旧 "Phase 4 / G4 评测平台"、L1 真实排行榜 | **P3**(拆为 P3-A/B/C),重构 | ⏳ 已 supersede |
 
 ---

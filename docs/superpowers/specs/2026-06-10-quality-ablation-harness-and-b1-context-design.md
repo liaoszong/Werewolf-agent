@@ -1,7 +1,7 @@
 # 设计:质量消融度量台 + SYS-B1 Layer-1 上下文修复
 
 > **类型**:design spec(待用户 review → 再写 implementation plan)
-> **来源**:`docs/harness/reviews/2026-06-10-live-quality-diagnosis.md`(已 commit `75d8363`)。
+> **来源**:`historical harness review 2026-06-10-live-quality-diagnosis.md`(已 commit `75d8363`)。
 > **范围由用户锁定(2026-06-10)**:首份 spec = **可复现消融度量台** + **SYS-B1 Layer-1 上下文修复**(作为第一个干预臂)。**不含** SYS-B4 脚手架、女巫 ②b ledger、候选/座位随机化、板子平衡。
 > **目标不是直接平衡胜率**,而是:① 建成可复现实验 harness;② 用最高置信的上下文修复作首个干预臂;③ 验证指标链是否改善。
 
@@ -152,3 +152,4 @@ metrics.aggregate(run_dirs) ◀─────┘  (纯函数, 只读 artifacts,
 - **arm 切换 = `prompt_version` flag(机制)+ PROMPT_VERSION/ledger(记账)合用,v1/v2 渲染器运行时共存**(§2.1 + §3.4)。
 - **§3.2 声称区首版砍掉**(降级方案 c),列 follow-up。
 ```
+

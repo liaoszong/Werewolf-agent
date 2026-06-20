@@ -1,6 +1,6 @@
 # 奶穿协调臂(l4_guard_witch_coord)设计 — prompt_v4 女巫保护协调实验
 
-> 2026-06-12。承接 L4 守卫臂 verdict(`docs/harness/reviews/2026-06-11-l4-guard-VERDICT.md`):
+> 2026-06-12。承接 L4 守卫臂 verdict(`historical harness review 2026-06-11-l4-guard-VERDICT.md`):
 > 守卫臂 ACCEPTABLE PROGRESS(主判据 5/5 过,狼胜 87.5→68.2 首次低于 baseline,强通过 65% 差 3.2pp);
 > 瓶颈转移为**奶穿 12 次 = 最大保护内耗**(女巫解药使用率 100%,夜1机械必救,频繁与守卫同守同救)。
 > 用户裁决:下一臂 = 女巫保护协调,**标准规则不动**(同守同救仍死——改规则会把实验从
@@ -104,7 +104,7 @@ PYTHONPATH=src python -m werewolf_eval.ablation run l4_guard_witch_coord --promp
 ```
 
 - 预算参考:l4_guard 实跑 1225 请求 / ~108K completion tokens / 50.2 分钟(deepseek 串行)。
-- 45 局产物全跑 check_run(I1-I8c 0 违例硬门)→ 快照 + verdict 归档 `docs/harness/reviews/`。
+- 45 局产物全跑 check_run(I1-I8c 0 违例硬门)→ 快照 + verdict 归档为历史评测证据。
 
 ## 8. 判据(用户裁决口径,全部机算)
 
@@ -144,7 +144,7 @@ PYTHONPATH=src python -m werewolf_eval.ablation run l4_guard_witch_coord --promp
 - 全量回归:`PYTHONPATH=src python -m unittest discover`(当前基线 931c3ae@1187 OK;
   跨会话计数不可比,以执行时主树同 commit 实测为准)。
 - live 验收:45 局,n_valid 口径同 l4_guard(live 率 + coverage 门),快照
-  `docs/harness/reviews/2026-06-XX-l4-guard-witch-coord-prompt-v4-metrics.json` + verdict 文档。
+  `historical harness review 2026-06-XX-l4-guard-witch-coord-prompt-v4-metrics.json` + verdict 文档。
 
 ## 10. Out of scope(硬边界,用户裁决)
 
@@ -175,6 +175,7 @@ PYTHONPATH=src python -m werewolf_eval.ablation run l4_guard_witch_coord --promp
 
 ## 12. 流程
 
-spec(本文)→ plan(`docs/harness/plans/2026-06-12--l4-guard-witch-coord-arm-plan.md`,独立审)→
-worktree 隔离执行 → review → 45 局 live(用户触发)→ verdict 归档。
+spec(本文)→ plan(历史计划)→
+本地执行与验证 → 45 局 live(用户触发)→ verdict 归档。
 对照数据直接复用 `2026-06-11-l4-guard-prompt-v3-metrics.json`(座位级配对,无需回算 b4)。
+

@@ -108,10 +108,10 @@ PYTHONPATH=src python -m unittest discover -s tests -p "test_*.py"
 | Phase | Scope | Status |
 |-------|-------|--------|
 | **P1 — Data & event foundation** | Log schemas/validation/scoring/attribution, engine & provider contracts, runtime event spine, observer protocol + server | ✅ Done |
-| **P2 — Watchable AI-vs-AI client** | Emergent engine, BYO-key multi-provider setup, live theater UI, settlement report | 🚧 Current (core delivered; final polish in flight) |
+| **P2 — Watchable AI-vs-AI client** | Emergent engine, BYO-key multi-provider setup, live theater UI, settlement report | ✅ Done |
 | **P3 — Evaluation · Replay analysis · Leaderboard** | Settlement deepened into per-player review; per-role AI win-rate leaderboard | ⏳ Planned |
 
-[`docs/PROJECT_MAP.md`](docs/PROJECT_MAP.md) is the authoritative product map (phases + system view). Ongoing research (prompt ablation, game balance) is tracked in `docs/harness/`.
+[`docs/PROJECT_MAP.md`](docs/PROJECT_MAP.md) is the authoritative product map (phases + system view).
 
 ## Documentation
 
@@ -119,8 +119,10 @@ PYTHONPATH=src python -m unittest discover -s tests -p "test_*.py"
 |-----|------|
 | [PROJECT_MAP](docs/PROJECT_MAP.md) | **Authority** — product phases, module status, system view (SYS-xx) |
 | [PRODUCT_ONE_PAGER](docs/PRODUCT_ONE_PAGER.md) | Product definition: users, inputs, outputs, value |
-| [ROADMAP](docs/ROADMAP.md) | Engineering dependency graph + route history |
-| [TASKS](docs/TASKS.md) | Task-level status ledger |
+| [TASKS](docs/TASKS.md) | Compressed task index |
+| [DESIGN](DESIGN.md) | UI / QML visual direction |
+| [Specs](docs/superpowers/specs/) | Design specs for substantial slices |
+| [Plans](docs/superpowers/plans/) | Current implementation plans |
 | [ADRs](docs/adr/) | Architecture decisions (observer protocol, action runtime orchestrator) |
 | [Qt client README](clients/qt_observer/README.md) | Building, running, and testing the theater client |
 | [EVALUATION_RUBRIC](docs/EVALUATION_RUBRIC.md) | Scoring system reference (P3) |

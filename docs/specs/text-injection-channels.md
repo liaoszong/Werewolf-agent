@@ -5,8 +5,8 @@
 > "injection channels" carry information into the model's prompt that did NOT pass
 > through `observation_source_event_ids` / the I4b oracle. This spec is the
 > authoritative registry of every such channel, the input each may consume, its
-> visibility level, and whether it must carry source ids. Closed out from
-> `docs/health-check/2026-06-12-system-view-audit.md` item **C3-2 (merged A45-5)**.
+> visibility level, and whether it must carry source ids. Closed out from the
+> 2026-06-12 system-view audit item **C3-2 (merged A45-5)**.
 >
 > **System view.** SYS-B1 (Agent Memory / Context Engineering) × SYS-A4 (Information
 > Visibility, I4b oracle) × SYS-C3 (quality defenses). The structural root cause and
@@ -133,7 +133,7 @@ observation:
 
 ## References
 
-- Audit: `docs/health-check/2026-06-12-system-view-audit.md` §C3-2 (合并 A45-5).
+- Audit: 2026-06-12 system-view audit §C3-2 (合并 A45-5).
 - Negative scan: `tests/test_c3_negative_scan.py`.
 - Drift sentinel: `tests/test_injection_registry_sentinel.py`.
 - Visibility oracle: `src/werewolf_eval/invariants/` (I4b), `role_visibility.py`.

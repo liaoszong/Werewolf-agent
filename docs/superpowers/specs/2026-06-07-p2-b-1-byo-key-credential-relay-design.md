@@ -37,7 +37,7 @@
   **本切片在此结构上演进,不新发明端点/顶层 schema。**
 - **provider/model allowlist:** `profile_config.ALLOWED_PROVIDERS = {fake_deterministic, deepseek}`,模型为静态
   frozenset(`deepseek-chat`/`deepseek-reasoner`)。本切片**不动**(动态/多供应商是后续切片)。
-- **既有安全地基(#51):** DeepSeek transport 异常链断开(不泄 key)、review-packet `redact_secrets()`、`.runs/`
+- **既有安全地基(#51):** DeepSeek transport 异常链断开(不泄 key)、validation-summary `redact_secrets()`、`.runs/`
   gitignored。本切片**复用并扩展**这套脱敏到凭证库 + 端点 + 错误响应。
 
 ---
@@ -147,7 +147,7 @@ launch(mode=live) → POST /api/runs(profile + mode;**body 内无 key**)
 ## 5. 安全不变量(本切片的核心)
 
 - **Hard:** key 不入源码、不打日志(端点 body + launcher + 错误路径)、不进 resolved-profile / prompt-manifest /
-  provider-trace / events / status / capabilities / review-packet;fake 永不需 key。
+  provider-trace / events / status / capabilities / validation-summary;fake 永不需 key。
 - **Architecture:** Qt 不直连 DeepSeek;只 POST 本地 loopback `/api/credentials`;provider 调用只在 server。
 - **Storage:** QSettings **dev-only**(明确标注);UI 只显示打码 key;不向 QML 暴露 raw 已存 key。
 - **端点硬化:** loopback only、仅 JSON、限 body 大小、无宽 CORS、清除只走 DELETE。
@@ -217,3 +217,4 @@ launch(mode=live) → POST /api/runs(profile + mode;**body 内无 key**)
 capability 拆「server 能力 / provider 凭证状态」、launch 用内存 key(env 兜底,启动即 COPY)、Qt CredentialStore
 (QSettings dev-only,不向 QML 暴露 raw key)+ MatchSetupView 内联面板 + arming UX 门槛、全离线 secret 扫描(含错误
 响应)。动态模型 / 多供应商 / keychain 留后续切片。
+

@@ -1,7 +1,7 @@
 # 对局多样性设计(子集 1/2):per-seat persona + 温度策略(2026-06-10)
 
 **状态**:DESIGN(用户已审 r1,r2 修订:组 4 重写 + 组 1 措辞收紧 + 温度可观测性)
-**动机来源**:`docs/harness/reviews/2026-06-10-live-game-sameness-and-prompt-leak-investigation.md`。
+**动机来源**:`historical harness review 2026-06-10-live-game-sameness-and-prompt-leak-investigation.md`。
 **范围裁决**:用户定 = 本 spec **只做真·无冲突子集 ② per-seat persona + ③ 温度**。① 角色洗牌经查证落不进无冲突子集(§1.1),另立 spec、排并行 prompt-versioning 线合并后。
 
 ---
@@ -133,3 +133,4 @@ prompt = role_strategy if not personality else (
 - per-seat persona 在 Qt 客户端的编辑入口(UI 跟进)。
 - per-seat persona 的 role-agnostic 语义机器校验(暂文档 + 评审把关)。
 - live 路径 `seed=0` 写死(查证副产物,与本设计无关,记录备查)。
+

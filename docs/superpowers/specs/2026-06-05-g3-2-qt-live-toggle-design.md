@@ -1,7 +1,7 @@
 # G3-2 Qt Live/Fake Toggle — Design Spec
 
 **Status:** draft (for spec review)
-**Route:** Phase 3 / G3 experiment route — second slice (`docs/ROADMAP.md` §G3 "Replay + live dual mode"). Consumes G3-1 (server live execution) + G2b/G2c/G2d Qt cockpit.
+**Route:** Phase 3 / G3 experiment route — second slice (`docs/PROJECT_MAP.md` §G3 "Replay + live dual mode"). Consumes G3-1 (server live execution) + G2b/G2c/G2d Qt cockpit.
 **Date:** 2026-06-05
 
 ---
@@ -134,7 +134,7 @@ Implement the FSM as a string `state` property on `ModeControl` with exactly the
 - **No direct Qt artifact file reads** — no `QFile`/`QDir`/`file://`/`resolved-profile.json` path in the client; execution truth only via server API JSON.
 - **No new artifact-read endpoint** — reuse run-detail `execution_mode`.
 - No profile save; no real DeepSeek smoke; no `prompt-manifest.json` model fix; no `max_requests` tuning; no cost/metering readout; no per-seat live models; no template live launch; no Web client.
-- No changes to G3-1 server gate logic / provider / consensus runner / game engine; no `docs/ROADMAP.md`/`docs/TASKS.md`/`docs/adr/**` edits.
+- No changes to G3-1 server gate logic / provider / consensus runner / game engine; no `docs/PROJECT_MAP.md`/`docs/TASKS.md`/`docs/adr/**` edits.
 
 **Allowlist (planned):**
 ```
@@ -154,7 +154,7 @@ clients/qt_observer/tests/tst_observer_api_client_mode.cpp  (new, optional QtTes
 clients/qt_observer/tests/CMakeLists.txt                    (if QtTest added)
 tests/test_qt_observer_static_contract.py
 docs/superpowers/specs/2026-06-05-g3-2-qt-live-toggle-design.md
-docs/harness/plans/2026-06-05--g3-2-qt-live-toggle-plan.md
+historical harness plan 2026-06-05--g3-2-qt-live-toggle-plan.md
 ```
 
 ---
@@ -187,7 +187,7 @@ docs/harness/plans/2026-06-05--g3-2-qt-live-toggle-plan.md
 - **T4** — `ObserverApiClient`: `mode` param on `launchFromProfile`; `refreshCapabilities` + properties + `currentExecutionMode`; `unreachable` fallback. Static-contract + optional QtTest.
 - **T5** — `ModeControl.qml` (segmented + two-click arming FSM) replacing `setupExecutionBanner`; `DataSourceChip.qml`; `MatchSetupView`/`AppShell` wiring; CMake + static-contract updates.
 - **T6** — README + secret/boundary regression: reaffirm no-key-UI / no-file-reads, document the live toggle; full static-contract green.
-- **T7** — Validate (offline suite + Qt build/ctest on F:) + review packet + PR.
+- **T7** — Validate (offline suite + Qt build/ctest on F:) + validation summary + PR.
 
 ---
 
@@ -207,4 +207,5 @@ docs/harness/plans/2026-06-05--g3-2-qt-live-toggle-plan.md
 - Thread the real model into runtime-spine `prompt-manifest.json` (today `"unknown"`).
 - Run the gated real-DeepSeek smoke once; record the text-free result.
 - Re-tune `max_requests=32` → 48/64 only on smoke evidence.
-- (Housekeeping) sync `docs/ROADMAP.md` + `docs/TASKS.md` (stale; omit G2d-2/G3-1).
+- (Housekeeping) sync `docs/PROJECT_MAP.md` + `docs/TASKS.md` (stale; omit G2d-2/G3-1).
+

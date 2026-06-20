@@ -61,10 +61,10 @@ Werewolf-agent 是一个 **client-agnostic live AI Werewolf experiment platform*
 | 阶段 | 内容 | 状态 |
 |------|------|------|
 | P1 数据与事件地基 | 日志 schema/校验/评分/归因、引擎与 provider 契约、实时事件骨架、observer 协议 + server | ✅ 完成 |
-| P2 观战式 AI-vs-AI 对局客户端 | 涌现式引擎、BYO-key 配置、剧场观战、结算战报 | 🚧 当前（核心已交付，收尾中） |
+| P2 观战式 AI-vs-AI 对局客户端 | 涌现式引擎、BYO-key 配置、剧场观战、结算战报 | ✅ 完成 |
 | P3 评测 · 复盘 · 排行榜 | 结算深化为评测/复盘、历史聚合、每角色 AI 胜率榜 | ⏳ 规划 |
 
-项目从 Phase 1 deterministic MVP（单局人工 gold sample → 确定性评分 → 规则归因 → UI demo）出发，经由 provider-backed gameplay foundation（旧 G-track），pivot 到 client-agnostic live experiment platform。旧 G/E/S 编号到 P 阶段的映射见 `docs/PROJECT_MAP.md` 的「Reconcile」表；工程依赖图与历史见 `docs/ROADMAP.md`。
+项目从 Phase 1 deterministic MVP（单局人工 gold sample → 确定性评分 → 规则归因 → UI demo）出发，经由 provider-backed gameplay foundation（旧 G-track），pivot 到 client-agnostic live experiment platform。旧 G/E/S 编号到 P 阶段的映射见 `docs/PROJECT_MAP.md` 的「Reconcile」表。
 
 ## 数据标注规范
 

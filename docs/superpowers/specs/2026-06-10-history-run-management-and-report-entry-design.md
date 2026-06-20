@@ -80,4 +80,5 @@ The five locked rules:
 3. Rapidly alternating report/open across two runs never fast-forwards the wrong queue (rule 4).
 4. Full suite green; no engine/runtime/artifact bytes change (this is server-routing + client-only).
 
-**Validation report (root policy, AGENTS.md「Validation」):** every change PR reports `git diff --stat`, `git diff --name-only`, allowlist check against this spec, forbidden-scope check (no unintended `src/**` beyond `observer_server.py`/`observer_protocol.py`, no `docs/ROADMAP.md`/`docs/TASKS.md`/`docs/adr/**`/historical plans/gold-game/`.github/**`), and the relevant tests.
+**Validation report (root policy, AGENTS.md「Validation」):** every change PR reports `git diff --stat`, `git diff --name-only`, allowlist check against this spec, forbidden-scope check (no unintended `src/**` beyond `observer_server.py`/`observer_protocol.py`, no `docs/PROJECT_MAP.md`/`docs/TASKS.md`/`docs/adr/**`/historical plans/gold-game/`.github/**`), and the relevant tests.
+

@@ -199,7 +199,7 @@ faction.unknown  #8e8b82   (隐藏 → "Hidden")
 - ⚠️ 大改 QML 会撞 `tests/test_qt_observer_static_contract.py` 等静态契约测试（钉了文案/结构）；**每个 plan 必须含同步更新这些契约测试**。
 - 保持中 / EN 双语对等。
 - 每阶段改完走 **Qt 构建 + 截图验证**（skill `verifying-qt-observer-ui`）。
-- 共享 main 检出，提交走 skill `committing-in-shared-worktrees`；实现工作在隔离 worktree。
+- 单人本地执行；提交前按根 `AGENTS.md` 的本地验证纪律自检。
 - 本次不触碰 runtime/scoring/provider/模型可见 prompt/日志契约。
 - **QML 数据绑定语义不变**：不改现有路由、API 字段、状态机、SSE 订阅、profile schema、运行日志结构。**页面可重排，数据绑定语义保持不变**。
 

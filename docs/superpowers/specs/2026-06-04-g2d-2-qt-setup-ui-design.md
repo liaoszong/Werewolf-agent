@@ -185,8 +185,8 @@ tests/test_observer_protocol.py
 tests/test_observer_server.py
 tests/test_qt_observer_static_contract.py
 docs/superpowers/specs/2026-06-04-g2d-2-qt-setup-ui-design.md
-docs/harness/plans/2026-06-04--g2d-2-qt-setup-ui-plan.md
-.logs/review/latest/review-packet.md
+historical harness plan 2026-06-04--g2d-2-qt-setup-ui-plan.md
+.logs/review/latest/validation-summary.md
 .oh-my-harness/tree.md
 ```
 
@@ -218,3 +218,4 @@ This slice keeps the **master-detail + explicit-Validate** design and pulls in t
 4. **Live debounced validation** instead of an explicit Validate button — gated on enhancing the validate endpoint to **collect-all** errors (G2d-1 ships single-error mode) for per-field highlighting.
 
 *(Pulled into this slice from the design review: the global "Deterministic Mock" execution banner — cheap, high-value, ethos-aligned.)*
+

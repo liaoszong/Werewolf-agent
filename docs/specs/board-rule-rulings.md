@@ -2,8 +2,8 @@
 
 > Authoritative text for rule gaps the engine resolved by default but never had a
 > written ruling or pin test. Each ruling names the cause, the code single source,
-> and the pin test. Closed out from `docs/health-check/2026-06-12-system-view-audit.md`
-> items **A-2** and **A-3** (user-adjudicated 2026-06-12).
+> and the pin test. Closed out from the 2026-06-12 system-view audit items
+> **A-2** and **A-3** (user-adjudicated 2026-06-12).
 >
 > Scope: these are RULINGS on existing roles (hunter, witch). They add NO role and
 > change NO undecided board rule (奶穿 / 连守 / death-announcement order stay as-is).

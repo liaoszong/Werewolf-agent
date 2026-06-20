@@ -138,7 +138,7 @@ z 序:按 sin θᵢ 升序绘制(后排先画,前排压上)
 - 不触碰 runtime/scoring/provider/模型可见 prompt/日志契约/observer 后端字段。
 - 中 / EN 双语对等,中文默认;塔罗/头像画面中文已烤入或无字。
 - 每阶段:Qt 构建 0 error + 截图复核(skill `verifying-qt-observer-ui`)。
-- 共享 main 检出,提交走 skill `committing-in-shared-worktrees`,实现在隔离 worktree。
+- 单人本地执行;提交前按根 `AGENTS.md` 的本地验证纪律自检。
 - 增量 `Theme`(暖色令牌已于 Phase 1 落地),共享组件 `onLight` 开关,避免暗色页回归。
 
 ## 11. 验收口径

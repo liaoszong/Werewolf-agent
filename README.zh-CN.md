@@ -108,10 +108,10 @@ PYTHONPATH=src python -m unittest discover -s tests -p "test_*.py"
 | 阶段 | 范围 | 状态 |
 |------|------|------|
 | **P1 — 数据与事件地基** | 日志 schema/校验/评分/归因、引擎与 provider 契约、实时事件骨架、observer 协议 + server | ✅ 完成 |
-| **P2 — 观战式 AI-vs-AI 对局客户端** | 涌现引擎、BYO-key 多供应商配置、实时剧场 UI、结算战报 | 🚧 当前(核心已交付,收尾打磨中) |
+| **P2 — 观战式 AI-vs-AI 对局客户端** | 涌现引擎、BYO-key 多供应商配置、实时剧场 UI、结算战报 | ✅ 完成 |
 | **P3 — 评测 · 复盘 · 排行榜** | 结算深化为逐人复盘;每角色 AI 胜率排行榜 | ⏳ 计划中 |
 
-[`docs/PROJECT_MAP.md`](docs/PROJECT_MAP.md) 是权威产品地图(阶段视图 + 系统视图)。进行中的研究(prompt 消融、对局平衡)在 `docs/harness/` 下跟踪。
+[`docs/PROJECT_MAP.md`](docs/PROJECT_MAP.md) 是权威产品地图(阶段视图 + 系统视图)。
 
 ## 文档索引
 
@@ -119,8 +119,10 @@ PYTHONPATH=src python -m unittest discover -s tests -p "test_*.py"
 |------|------|
 | [PROJECT_MAP](docs/PROJECT_MAP.md) | **权威** — 产品阶段、模块状态、系统视图(SYS-xx) |
 | [PRODUCT_ONE_PAGER](docs/PRODUCT_ONE_PAGER.md) | 产品定义:用户、输入、输出、价值 |
-| [ROADMAP](docs/ROADMAP.md) | 工程依赖图 + 路线历史 |
-| [TASKS](docs/TASKS.md) | 任务级状态台账 |
+| [TASKS](docs/TASKS.md) | 压缩任务索引 |
+| [DESIGN](DESIGN.md) | UI / QML 视觉方向 |
+| [Specs](docs/superpowers/specs/) | 重要切片的设计规格 |
+| [Plans](docs/superpowers/plans/) | 当前实现计划 |
 | [ADRs](docs/adr/) | 架构决策(observer 协议、action runtime 编排器) |
 | [Qt 客户端 README](clients/qt_observer/README.md) | 剧场客户端的构建、运行与测试 |
 | [EVALUATION_RUBRIC](docs/EVALUATION_RUBRIC.md) | 评分体系参考(P3) |

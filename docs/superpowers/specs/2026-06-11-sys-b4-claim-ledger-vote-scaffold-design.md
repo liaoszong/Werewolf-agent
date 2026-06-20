@@ -1,7 +1,7 @@
 # 设计:SYS-B4 Claim Ledger + Vote Scaffold
 
 > **类型**:design spec(待用户 review → 再写 implementation plan)
-> **来源**:b1 消融实验 verdict(`docs/harness/reviews/2026-06-11-b1-context-repair-VERDICT.md`,merge `ae09d12`)+ 用户裁决(2026-06-11):合并 b1、冻结 v2、不跑 v2-lite、直开 B4。
+> **来源**:b1 消融实验 verdict(`historical harness review 2026-06-11-b1-context-repair-VERDICT.md`,merge `ae09d12`)+ 用户裁决(2026-06-11):合并 b1、冻结 v2、不跑 v2-lite、直开 B4。
 > **B4 第一版定性(用户裁决)**:**input-side scaffold**,不是 output protocol 改造。
 
 ---
@@ -135,3 +135,4 @@ ProviderRequest.observation_text(投票/发言请求,输入侧)──→ provide
 8. scribe fixture 单测(固定发言文本 → 期望 claim 集,含对跳/反驳/不确定标注用例)。
 9. `scaffold_coverage` 进明细行;有效局门槛 = live≥0.7 且 coverage≥0.5;`n_invalid_scaffold` 单列(阈值可调,单列不可取消)。
 10. provider 层 additive 改动的字节安全:v1/v2 golden 守卫绿 + `git diff --exit-code` v1/v2 golden 目录。
+

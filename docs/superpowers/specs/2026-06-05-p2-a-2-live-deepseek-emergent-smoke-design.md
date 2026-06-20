@@ -102,7 +102,7 @@ fake provider 忽略这三个字段(只按 `(actor,phase,round)` 取脚本)→ P
 - **`observation_text` 空 = hard failure**(涌现 live 局每个 live `ProviderRequest` 必须带非空 `observation_text`;不得回退 `json.dumps(observation)`)。
 
 **硬门槛②(真的是 live):**
-- `live_success_rate = live_success_actions / live_requested_actions ≥ 0.80`;`budget_exhausted=false`;`provider_turns` 全量统计出现在 review packet。
+- `live_success_rate = live_success_actions / live_requested_actions ≥ 0.80`;`budget_exhausted=false`;`provider_turns` 全量统计出现在 validation summary。
 - **终局优先:** 通过的首选条件是**真实终局**。deterministic cap **只在 smoke config 里预声明**(不得在看到坏 run 后才选),且仍须满足 `live_success_rate≥0.80` 加上(`live_success_actions≥20` **或** 一份有据的"早终局/短局"解释)。
 - 绝对下限 `live_success_actions≥12`(防小样本骗过)。**校准说明(2026-06-05 两局真实数据):** 6 人局 1-2 轮分胜负、产生 ~14-22 provider 回合,故下限定在"最短合法全局(~14)之下、~6 次骗局之上",并与 `rate≥0.80` 在最短局上自洽(原定 20 会误杀合法早终局,已下调)。早终局致更低调用数 → `--allow-short-game` + review 解释。
 
@@ -110,7 +110,7 @@ fake provider 忽略这三个字段(只按 `(actor,phase,round)` 取脚本)→ P
 
 **软门槛(嘴漏):** 模型幻觉自称不可见系统事实 → 记 content warning,不阻断(除非破坏 action 契约/崩);狼人伪装/诈身份属正常玩法。
 
-**Secret scan(PASS 前置):** 冒烟脚本须扫**全部产物**(game/decision/consensus/failure 日志、events.jsonl、snapshots、prompt-manifest、provider-trace、review packet)无 secret marker(`Authorization`/`Bearer `/`api_key`/`DEEPSEEK_API_KEY`/`sk-`)才判 PASS——只扫源码不够,live 最易把 header/env/prompt 泄进 artifact。
+**Secret scan(PASS 前置):** 冒烟脚本须扫**全部产物**(game/decision/consensus/failure 日志、events.jsonl、snapshots、prompt-manifest、provider-trace、validation summary)无 secret marker(`Authorization`/`Bearer `/`api_key`/`DEEPSEEK_API_KEY`/`sk-`)才判 PASS——只扫源码不够,live 最易把 header/env/prompt 泄进 artifact。
 
 ---
 
@@ -129,7 +129,7 @@ fake provider 忽略这三个字段(只按 `(actor,phase,round)` 取脚本)→ P
 
 ## 8. Definition of Done
 1. §7 全部离线单元绿;P2-A-1/g1b/g1d 零回归。
-2. **用户**本地跑通一局真实 DeepSeek 涌现 live;**agent 离线机检** raw artifacts,§6 三条硬门槛 + 全产物 secret scan 全 PASS;review packet 摊开 provider_turns 统计 + 逐回合 token_usage>0 证据 + 软门槛 content warnings(若有)。
+2. **用户**本地跑通一局真实 DeepSeek 涌现 live;**agent 离线机检** raw artifacts,§6 三条硬门槛 + 全产物 secret scan 全 PASS;validation summary 摊开 provider_turns 统计 + 逐回合 token_usage>0 证据 + 软门槛 content warnings(若有)。
 3. 记录这次的 `live_requested_actions` / `live_success_rate` / 结局,更新 PROJECT_MAP P2-A-2 状态。
 
 ## 8b. Live smoke evidence (user-run 2026-06-05, agent offline-reviewed)
@@ -151,3 +151,4 @@ fake provider 忽略这三个字段(只按 `(actor,phase,round)` 取脚本)→ P
 - ProviderRequest 新字段进 provider-trace 可能撞既有精确断言 → TDD first 暴露并更新。
 - 真实 live 输入 token 随公共历史 + 发言滚动增长(成本主因)→ 紧凑渲染 + per-request token 上限 + `max_requests=64` 控顶。
 - 双闸语义(§4 已写死):`EmergentBudget.max_requests`(局级 provider 回合)与 `DeepSeekProvider.max_requests`(对外 HTTP 尝试,含 retry)区分;`max_requests_per_game=64` 指 HTTP 尝试、`max_retries_per_action∈{0,1}`。两者对齐由 writing-plans 钉死,避免 40 回合+retry 误碰 64 或口径混淆。
+

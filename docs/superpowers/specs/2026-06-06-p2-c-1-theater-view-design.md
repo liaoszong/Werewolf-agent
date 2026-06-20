@@ -312,7 +312,7 @@ clients/qt_observer/README.md                       (非目标更新)
 tests/test_observer_visibility.py                   (富化 + 视角安全断言)
 tests/test_qt_observer_static_contract.py           (新文件/objectName/re-home/CMake)
 docs/superpowers/specs/2026-06-06-p2-c-1-theater-view-design.md
-docs/harness/plans/2026-06-06--p2-c-1-theater-view-plan.md
+historical harness plan 2026-06-06--p2-c-1-theater-view-plan.md
 ```
 
 ---
@@ -406,5 +406,6 @@ docs/harness/plans/2026-06-06--p2-c-1-theater-view-plan.md
 ## 18. Next steps
 
 1. **Spec self-review**(本节已并入 §16/§17:placeholder/一致性/scope/歧义已扫)→ 提交 user review。
-2. user approve → 调 **writing-plans** 出实现计划 `docs/harness/plans/2026-06-06--p2-c-1-theater-view-plan.md`(严格 TDD:后端富化先行 + 视角安全测试;Qt 组件逐个建 + 静态契约同步 + 视觉门)。
+2. user approve → 调 **writing-plans** 出实现计划 `historical harness plan 2026-06-06--p2-c-1-theater-view-plan.md`(严格 TDD:后端富化先行 + 视角安全测试;Qt 组件逐个建 + 静态契约同步 + 视觉门)。
 3. 删除 `docs/superpowers/specs/2026-06-05-p2-c-1-theater-view-NOTES.md`(已被本 spec supersede)。
+
