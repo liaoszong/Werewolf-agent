@@ -251,7 +251,16 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
     # -- GET endpoints -------------------------------------------------------
 
     def _route_health(self, params: dict[str, str]) -> None:
-        self._send_json(200, {"status": "ok", "service": "werewolf-observer"})
+        state = self._get_state()
+        payload: dict[str, object] = {
+            "status": "ok",
+            "service": "werewolf-observer",
+            "instance_id": state.instance_id,
+            "owner_token": state.owner_token,
+            "release_version": state.release_version,
+            "protocol_version": state.protocol_version,
+        }
+        self._send_json(200, payload)
 
     def _route_capabilities(self, params: dict[str, str]) -> None:
         # G3-2 read-only live posture — no writes, no provider call, no

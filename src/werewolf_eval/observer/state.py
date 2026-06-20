@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 from threading import Lock
 from typing import Callable
 
 from werewolf_eval.credential_store import CredentialStore
+from werewolf_eval.release_metadata import read_version
 
 RunLauncher = Callable[[str, Path], int]
 
@@ -36,3 +38,10 @@ class ObserverServerState:
     # tests can pass a fake (no network); built with the server live limits in
     # create_observer_server.
     multi_provider_launcher_factory: Callable[..., RunLauncher] | None = None
+    # R0 release metadata — populated from CLI args or sensible defaults.
+    # instance_id is generated once per server start; owner_token comes from
+    # --release-owner-token; release_version defaults to the VERSION file.
+    instance_id: str = field(default_factory=lambda: uuid.uuid4().hex)
+    owner_token: str = ""
+    release_version: str = field(default_factory=read_version)
+    protocol_version: int = 1

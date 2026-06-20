@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from werewolf_eval.observer.release_manifest import write_release_manifest
 from werewolf_eval.observer.run_manager import (
     _check_live_capability,
     _check_live_profile_shape,
@@ -103,6 +104,17 @@ def execute_profile_launch(
     else:
         base = state.launcher
     run_dir.mkdir(parents=True)
+
+    # Write release-manifest.json synchronously (R0). Must succeed or the run
+    # must not proceed -- a missing manifest means release provenance is lost.
+    try:
+        write_release_manifest(
+            run_dir=run_dir,
+            release_version=state.release_version,
+            observer_protocol_version=state.protocol_version,
+        )
+    except OSError as exc:
+        return ("error", 500, "release_manifest_failed", f"release-manifest write failed: {exc}")
 
     # Write the resolved-profile (which carries execution_mode) SYNCHRONOUSLY here,
     # before the async run starts and before the 202 returns. The artifact is built

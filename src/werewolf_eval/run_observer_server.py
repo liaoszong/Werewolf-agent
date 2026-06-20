@@ -1,10 +1,18 @@
-"""CLI entry point for the local observer server (G2a; G3-1 live opt-in)."""
+"""CLI entry point for the local observer server (G2a; G3-1 live opt-in).
+
+R0: extended with --runtime-state-file, --release-owner-token,
+--release-version, --profiles-dir, --configs-dir for release host integration
+and atomic server-state.json durable writing.
+"""
 
 from __future__ import annotations
 
 import argparse
+import json as _json
 import os
 import sys
+import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Mapping
 
@@ -39,6 +47,17 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--deepseek-model", default="deepseek-v4-flash")
     parser.add_argument("--version", action="version",
                         version=f"observer-server {read_version()}")
+    # R0: release host integration
+    parser.add_argument("--runtime-state-file", default=None,
+                        help="Path to server-state.json for release host (None = don't write)")
+    parser.add_argument("--release-owner-token", default=None,
+                        help="Owner token from release host")
+    parser.add_argument("--release-version", default=None,
+                        help="Release version (overrides VERSION file)")
+    parser.add_argument("--profiles-dir", default=None,
+                        help="Explicit profiles directory")
+    parser.add_argument("--configs-dir", default=None,
+                        help="Explicit configs directory")
     return parser
 
 
@@ -83,6 +102,8 @@ def main() -> int:
         # A fresh server seeds a baseline default profile so the setup page is
         # never an empty 'no profiles' state on first run.
         seed_default_profile=True,
+        profiles_dir=Path(args.profiles_dir) if args.profiles_dir else None,
+        configs_dir=Path(args.configs_dir) if args.configs_dir else None,
     )
     host, port = server.server_address[:2]
     print("observer_server=started")
@@ -94,6 +115,26 @@ def main() -> int:
         print("live_api=disabled")
     else:
         print("live_api=enabled")
+
+    # Write server-state.json if release host requested it (R0).
+    runtime_state_file = getattr(args, "runtime_state_file", None)
+    if runtime_state_file:
+        state = {
+            "schema_version": 1,
+            "instance_id": uuid.uuid4().hex,
+            "pid": os.getpid(),
+            "port": port,
+            "owner_token": getattr(args, "release_owner_token", "") or "",
+            "release_version": getattr(args, "release_version", None) or read_version(),
+            "observer_protocol_version": 1,
+            "data_root": str(Path(args.runs_dir).parent) if args.runs_dir else "",
+            "started_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        }
+        sp = Path(runtime_state_file)
+        tmp = sp.with_suffix(".tmp")
+        tmp.write_text(_json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+        tmp.replace(sp)
+        print(f"runtime_state_file={runtime_state_file}")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
