@@ -16,6 +16,7 @@ mkdir -p "$META_DIR" "$DATA_DIR"
 
 # Copy payload
 cp -r "$RELEASE_DIR/Werewolf-agent/Werewolf-agent.exe" "$DATA_DIR/"
+cp "$RELEASE_DIR/Werewolf-agent/VERSION" "$DATA_DIR/"
 cp -r "$RELEASE_DIR/Werewolf-agent/_internal" "$DATA_DIR/"
 cp -r "$RELEASE_DIR/app" "$DATA_DIR/"
 cp -r "$RELEASE_DIR/runtime/observer-server" "$DATA_DIR/runtime"
