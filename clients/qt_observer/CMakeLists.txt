@@ -1,6 +1,11 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(qt_observer VERSION 0.1 LANGUAGES CXX)
+# Read release version from repo-root VERSION (single source).
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/../../VERSION" RELEASE_VERSION)
+string(STRIP "${RELEASE_VERSION}" RELEASE_VERSION)
+message(STATUS "Release version: ${RELEASE_VERSION}")
+
+project(qt_observer VERSION ${RELEASE_VERSION} LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Mapping
 
 from werewolf_eval.deepseek_launcher import DEFAULT_MAX_LIVE_REQUESTS
+from werewolf_eval.release_metadata import read_version
 from werewolf_eval.observer_server import create_observer_server
 from werewolf_eval.run_emergent_fake_runtime import default_emergent_fake_launcher
 
@@ -36,6 +37,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--deepseek-base-url", default="https://api.deepseek.com")
     # Default aligns with the P2-A-2 emergent live-smoke calibration; overridable.
     parser.add_argument("--deepseek-model", default="deepseek-v4-flash")
+    parser.add_argument("--version", action="version",
+                        version=f"observer-server {read_version()}")
     return parser
 
 
