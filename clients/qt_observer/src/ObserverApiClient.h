@@ -60,6 +60,11 @@ class ObserverApiClient : public QObject {
     Q_PROPERTY(QString currentExecutionMode READ currentExecutionMode NOTIFY currentExecutionModeChanged)
     // Startup convenience: a run id to auto-open into the cockpit (CLI --open-run).
     Q_PROPERTY(QString initialRunId READ initialRunId CONSTANT)
+    // R0 release-client properties (CLI args, forwarded to QML for About & Update UI)
+    Q_PROPERTY(QString releaseVersion READ releaseVersion NOTIFY releaseVersionChanged)
+    Q_PROPERTY(QString releaseChannel READ releaseChannel NOTIFY releaseChannelChanged)
+    Q_PROPERTY(QString hostSessionId READ hostSessionId NOTIFY hostSessionIdChanged)
+    Q_PROPERTY(QString updateRequestPath READ updateRequestPath NOTIFY updateRequestPathChanged)
 
 public:
     explicit ObserverApiClient(QObject *parent = nullptr);
@@ -104,6 +109,18 @@ public:
     QString currentExecutionMode() const;
     QString initialRunId() const;
     void setInitialRunId(const QString &id);
+
+    // R0 release-client accessors
+    QString releaseVersion() const;
+    QString releaseChannel() const;   // hard-coded "stable" for now
+    QString hostSessionId() const;
+    QString updateRequestPath() const;
+    Q_INVOKABLE bool hasActiveRun() const;
+    Q_INVOKABLE bool writeUpdateRequest(const QVariantMap &request);
+
+    void setReleaseVersion(const QString &v);
+    void setHostSessionId(const QString &s);
+    void setUpdateRequestPath(const QString &p);
 
 public slots:
     Q_INVOKABLE void checkHealth();
@@ -186,6 +203,11 @@ signals:
     void providerModelsFailed(const QString &provider, const QString &reason); // reason is key-free
     void deleteRunFinished(const QString &runId, bool ok, const QString &error);
     void interruptRunFinished(const QString &runId, bool ok, const QString &error);
+    // R0 release-client signals
+    void releaseVersionChanged();
+    void releaseChannelChanged();
+    void hostSessionIdChanged();
+    void updateRequestPathChanged();
 
 private slots:
     void onStreamReadyRead();
@@ -248,6 +270,11 @@ private:
     QString m_initialRunId;
     QString m_pendingOpenRunId;   // last openRun target; stale async replies are dropped
     QString m_pendingPreviewRunId;
+    // R0 release-client state
+    QString m_releaseVersion;
+    QString m_releaseChannel = QStringLiteral("stable");
+    QString m_hostSessionId;
+    QString m_updateRequestPath;
 
     QNetworkAccessManager *m_network;
     QNetworkReply *m_streamReply;

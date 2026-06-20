@@ -1853,7 +1853,7 @@ Item {
             Item {
                 id: previewSectionContent
                 anchors.fill: parent
-                visible: root.selectedSection !== "ai"
+                visible: root.selectedSection !== "ai" && root.selectedSection !== "about"
 
                 Rectangle {
                     anchors.fill: parent
@@ -2140,6 +2140,134 @@ Item {
                                 font.pixelSize: Theme.size.caption
                                 wrapMode: Text.WordWrap
                                 verticalAlignment: Text.AlignVCenter
+                            }
+                        }
+                    }
+                }
+            }
+
+            // R0: About & Update section
+            Item {
+                id: aboutContent
+                anchors.fill: parent
+                visible: root.selectedSection === "about"
+
+                Rectangle {
+                    anchors.fill: parent
+                    radius: Theme.radius.xl
+                    color: Theme.withAlpha(Theme.parchment.parchmentSoft, 0.92)
+                    border.width: 1
+                    border.color: Theme.withAlpha(Theme.parchment.goldLine, 0.48)
+
+                    Rectangle {
+                        anchors.fill: parent
+                        anchors.topMargin: 9
+                        anchors.leftMargin: 6
+                        anchors.rightMargin: -6
+                        anchors.bottomMargin: -10
+                        radius: parent.radius
+                        color: Theme.withAlpha(Theme.parchment.woodShadow, 0.42)
+                        z: -1
+                    }
+
+                    Image {
+                        anchors.fill: parent
+                        anchors.margins: 2
+                        source: Illustrations.texParchment
+                        fillMode: Image.Tile
+                        opacity: 0.17
+                    }
+
+                    Column {
+                        anchors.fill: parent
+                        anchors.margins: Theme.space.xxl
+                        spacing: Theme.space.lg
+
+                        SectionHeader {
+                            title: I18n.t("关于与更新", "About & Updates")
+                        }
+
+                        AppCard {
+                            width: parent.width
+                            implicitHeight: aboutCardContent.implicitHeight + Theme.space.lg * 2
+
+                            Column {
+                                id: aboutCardContent
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.top: parent.top
+                                anchors.margins: Theme.space.lg
+                                spacing: 12
+
+                                Row {
+                                    spacing: 8
+                                    Text {
+                                        text: "Werewolf-agent"
+                                        font.family: Theme.fontFamilies.serif
+                                        font.pixelSize: 18
+                                        color: Theme.warm.ink
+                                    }
+                                }
+
+                                Row {
+                                    spacing: 8
+                                    Text {
+                                        text: I18n.t("版本", "Version") + ": " + ObserverClient.releaseVersion
+                                        color: Theme.warm.body
+                                        font.family: Theme.fontFamilies.sans
+                                        font.pixelSize: Theme.size.caption
+                                    }
+                                }
+
+                                Row {
+                                    spacing: 8
+                                    Text {
+                                        text: I18n.t("通道", "Channel") + ": " + I18n.t("Stable", "Stable")
+                                        color: Theme.warm.body
+                                        font.family: Theme.fontFamilies.sans
+                                        font.pixelSize: Theme.size.caption
+                                    }
+                                }
+
+                                Text {
+                                    text: I18n.t("通过系统更新工具检查可用更新", "Check for available updates using the system update tool")
+                                    color: Theme.warm.muted
+                                    font.pixelSize: 12
+                                    font.family: Theme.fontFamilies.sans
+                                    wrapMode: Text.WordWrap
+                                }
+
+                                AppButton {
+                                    text: ObserverClient.hasActiveRun()
+                                        ? I18n.t("当前有进行中的对局，请等待对局结束后再检查更新", "A match is in progress. Please wait for it to finish before checking for updates.")
+                                        : I18n.t("检查更新", "Check for Updates")
+                                    enabled: !ObserverClient.hasActiveRun()
+                                    onLight: true
+                                    onClicked: {
+                                        if (ObserverClient.updateRequestPath) {
+                                            var req = {
+                                                schema_version: 1,
+                                                request_id: Date.now().toString(36) + Math.random().toString(36).slice(2),
+                                                host_session_id: ObserverClient.hostSessionId,
+                                                client_pid: 0,
+                                                created_at: new Date().toISOString(),
+                                                release_version: ObserverClient.releaseVersion,
+                                                action: "launch_maintenance_tool"
+                                            }
+                                            ObserverClient.writeUpdateRequest(req)
+                                        }
+                                        aboutUpdateStatus.text = I18n.t("正在退出并打开更新工具…", "Exiting and opening update tool…")
+                                        Qt.quit()
+                                    }
+                                }
+
+                                Text {
+                                    id: aboutUpdateStatus
+                                    color: Theme.warm.muted
+                                    font.pixelSize: Theme.size.caption
+                                    font.family: Theme.fontFamilies.sans
+                                    visible: text !== ""
+                                }
                             }
                         }
                     }

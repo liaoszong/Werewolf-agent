@@ -44,6 +44,29 @@ Item {
         }
         Qt.callLater(warmAssetPreloader.schedule)
     }
+
+    // R0: close-with-active-run warning
+    Connections {
+        target: root.Window.window
+        function onClosing(close) {
+            if (ObserverClient.hasActiveRun()) {
+                close.accepted = false
+                closeWarningDialog.title = I18n.t("确认关闭", "Confirm Close")
+                closeWarningDialog.message = I18n.t(
+                    "当前有进行中的对局。关闭窗口后，对局将继续在本地后台运行。\n重新打开 Werewolf-agent 可继续观察。",
+                    "A match is in progress. Closing the window will not stop it — it continues running locally.\nReopen Werewolf-agent to continue observing."
+                )
+                closeWarningDialog.confirmText = I18n.t("关闭", "Close")
+                closeWarningDialog.open()
+            }
+        }
+    }
+
+    ConfirmDialog {
+        id: closeWarningDialog
+        objectName: "closeWarningDialog"
+        onConfirmed: Qt.quit()
+    }
     Timer {
         id: autoOpenPoller
         interval: 150

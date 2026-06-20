@@ -201,6 +201,62 @@ QString ObserverApiClient::currentExecutionMode() const { return m_currentExecut
 QString ObserverApiClient::initialRunId() const { return m_initialRunId; }
 void ObserverApiClient::setInitialRunId(const QString &id) { m_initialRunId = id; }
 
+// R0 release-client getters/setters
+QString ObserverApiClient::releaseVersion() const { return m_releaseVersion; }
+QString ObserverApiClient::releaseChannel() const { return m_releaseChannel; }
+QString ObserverApiClient::hostSessionId() const { return m_hostSessionId; }
+QString ObserverApiClient::updateRequestPath() const { return m_updateRequestPath; }
+
+void ObserverApiClient::setReleaseVersion(const QString &v)
+{
+    if (m_releaseVersion != v) {
+        m_releaseVersion = v;
+        emit releaseVersionChanged();
+    }
+}
+
+void ObserverApiClient::setHostSessionId(const QString &s)
+{
+    if (m_hostSessionId != s) {
+        m_hostSessionId = s;
+        emit hostSessionIdChanged();
+    }
+}
+
+void ObserverApiClient::setUpdateRequestPath(const QString &p)
+{
+    if (m_updateRequestPath != p) {
+        m_updateRequestPath = p;
+        emit updateRequestPathChanged();
+    }
+}
+
+bool ObserverApiClient::hasActiveRun() const
+{
+    for (const QVariant &r : m_runItems) {
+        const QVariantMap run = r.toMap();
+        const QString status = run.value(QStringLiteral("status")).toString();
+        if (status == QStringLiteral("queued") || status == QStringLiteral("running"))
+            return true;
+    }
+    return false;
+}
+
+bool ObserverApiClient::writeUpdateRequest(const QVariantMap &request)
+{
+    const QString path = m_updateRequestPath;
+    if (path.isEmpty()) return false;
+    const QJsonDocument doc(QJsonObject::fromVariantMap(request));
+    QFile file(path + QStringLiteral(".tmp"));
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate))
+        return false;
+    file.write(doc.toJson(QJsonDocument::Compact));
+    file.close();
+    // Atomic rename
+    QFile::remove(path);
+    return QFile::rename(path + QStringLiteral(".tmp"), path);
+}
+
 QNetworkReply *ObserverApiClient::get(const QString &path)
 {
     QNetworkRequest req(QUrl(m_baseUrl + path));

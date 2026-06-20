@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 493
+- Entries: 495
 
 ```text
 ./
@@ -296,6 +296,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       │   ├── factory.py
 │       │   ├── handler.py
 │       │   ├── launch.py
+│       │   ├── release_manifest.py
 │       │   ├── routes.py
 │       │   ├── run_manager.py
 │       │   ├── security.py
@@ -304,6 +305,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       ├── release_host/
 │       │   ├── __init__.py
 │       │   ├── __main__.py
+│       │   ├── control.py
 │       │   └── lifecycle.py
 │       ├── __init__.py
 │       ├── artifacts.py

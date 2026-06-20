@@ -2,6 +2,7 @@
 #include <QQmlApplicationEngine>
 #include <QQmlEngine>
 #include <QQuickStyle>
+#include <QTextStream>
 #include "ObserverApiClient.h"
 #include "CredentialStore.h"
 
@@ -23,6 +24,35 @@ static QString openRunFromArgs(const QStringList &args)
     return QString();
 }
 
+static QString releaseVersionFromArgs(const QStringList &args)
+{
+    const int index = args.indexOf("--release-version");
+    if (index >= 0 && index + 1 < args.size())
+        return args.at(index + 1);
+    return QString();
+}
+
+static QString hostSessionFromArgs(const QStringList &args)
+{
+    const int index = args.indexOf("--release-host-session");
+    if (index >= 0 && index + 1 < args.size())
+        return args.at(index + 1);
+    return QString();
+}
+
+static QString updateRequestPathFromArgs(const QStringList &args)
+{
+    const int index = args.indexOf("--update-request-path");
+    if (index >= 0 && index + 1 < args.size())
+        return args.at(index + 1);
+    return QString();
+}
+
+static bool versionFlagFromArgs(const QStringList &args)
+{
+    return args.contains("--version");
+}
+
 int main(int argc, char *argv[])
 {
     QGuiApplication app(argc, argv);
@@ -34,6 +64,17 @@ int main(int argc, char *argv[])
     ObserverApiClient observerClient;
     observerClient.setBaseUrl(observerBaseUrlFromArgs(app.arguments()));
     observerClient.setInitialRunId(openRunFromArgs(app.arguments()));
+    observerClient.setReleaseVersion(releaseVersionFromArgs(app.arguments()));
+    observerClient.setHostSessionId(hostSessionFromArgs(app.arguments()));
+    observerClient.setUpdateRequestPath(updateRequestPathFromArgs(app.arguments()));
+
+    if (versionFlagFromArgs(app.arguments())) {
+        QString ver = releaseVersionFromArgs(app.arguments());
+        if (ver.isEmpty()) ver = QStringLiteral("0.2.0");
+        QTextStream(stdout) << "Werewolf-agent " << ver << "\n";
+        return 0;
+    }
+
     qmlRegisterSingletonInstance("qt_observer", 1, 0, "ObserverClient", &observerClient);
 
     CredentialStore credentialStore;
