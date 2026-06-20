@@ -1,6 +1,6 @@
 # R0: Windows Distribution Baseline — Design Spec
 
-**Status:** Design approved, pending owner review
+**Status:** Design approved · Spec reviewed · Plan written
 **Date:** 2026-06-20
 **Scope:** P2 完成 → P3 开始前的发行版基础设施
 
