@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import socket
 import threading
+from datetime import datetime, timezone
 from pathlib import Path
 
 from werewolf_eval.release_host.lifecycle import _atomic_write_json, _generate_token
@@ -21,7 +22,7 @@ def _write_host_control(data_root: Path, host_session_id: str, control_port: int
         "control_port": control_port,
         "control_token": control_token,
         "release_version": release_version,
-        "started_at": __import__("datetime").datetime.utcnow().isoformat() + "Z",
+        "started_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
     })
     return path
 
