@@ -117,6 +117,7 @@ public:
     QString updateRequestPath() const;
     Q_INVOKABLE bool hasActiveRun() const;
     Q_INVOKABLE bool writeUpdateRequest(const QVariantMap &request);
+    Q_INVOKABLE QString generateUuid() const;
 
     void setReleaseVersion(const QString &v);
     void setHostSessionId(const QString &s);

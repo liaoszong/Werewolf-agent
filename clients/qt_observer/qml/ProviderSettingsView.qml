@@ -2247,17 +2247,20 @@ Item {
                                         if (ObserverClient.updateRequestPath) {
                                             var req = {
                                                 schema_version: 1,
-                                                request_id: Date.now().toString(36) + Math.random().toString(36).slice(2),
+                                                request_id: ObserverClient.generateUuid(),
                                                 host_session_id: ObserverClient.hostSessionId,
                                                 client_pid: 0,
                                                 created_at: new Date().toISOString(),
                                                 release_version: ObserverClient.releaseVersion,
                                                 action: "launch_maintenance_tool"
                                             }
-                                            ObserverClient.writeUpdateRequest(req)
+                                            if (ObserverClient.writeUpdateRequest(req)) {
+                                                aboutUpdateStatus.text = I18n.t("正在退出并打开更新工具…", "Exiting and opening update tool…")
+                                                Qt.quit()
+                                            } else {
+                                                aboutUpdateStatus.text = I18n.t("无法启动更新工具，请查看日志", "Cannot start update tool. Please check the logs.")
+                                            }
                                         }
-                                        aboutUpdateStatus.text = I18n.t("正在退出并打开更新工具…", "Exiting and opening update tool…")
-                                        Qt.quit()
                                     }
                                 }
 

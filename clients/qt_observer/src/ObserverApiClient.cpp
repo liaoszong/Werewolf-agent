@@ -6,6 +6,7 @@
 #include <QJsonObject>
 #include <QDateTime>
 #include <QFile>
+#include <QUuid>
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QSaveFile>
@@ -240,6 +241,11 @@ bool ObserverApiClient::hasActiveRun() const
             return true;
     }
     return false;
+}
+
+QString ObserverApiClient::generateUuid() const
+{
+    return QUuid::createUuid().toString(QUuid::WithoutBraces);
 }
 
 bool ObserverApiClient::writeUpdateRequest(const QVariantMap &request)
