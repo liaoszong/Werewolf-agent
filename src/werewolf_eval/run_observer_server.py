@@ -11,13 +11,12 @@ import argparse
 import json as _json
 import os
 import sys
-import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Mapping
 
 from werewolf_eval.deepseek_launcher import DEFAULT_MAX_LIVE_REQUESTS
-from werewolf_eval.release_metadata import read_version
+from werewolf_eval.release_metadata import read_release_metadata, read_version
 from werewolf_eval.observer_server import create_observer_server
 from werewolf_eval.run_emergent_fake_runtime import default_emergent_fake_launcher
 
@@ -105,6 +104,12 @@ def main() -> int:
         profiles_dir=Path(args.profiles_dir) if args.profiles_dir else None,
         configs_dir=Path(args.configs_dir) if args.configs_dir else None,
     )
+    # Finding 1: propagate CLI overrides to server state so /health reflects them.
+    if args.release_owner_token:
+        server.state.owner_token = args.release_owner_token
+    if args.release_version:
+        server.state.release_version = args.release_version
+
     host, port = server.server_address[:2]
     print("observer_server=started")
     print(f"host={host}")
@@ -121,11 +126,11 @@ def main() -> int:
     if runtime_state_file:
         state = {
             "schema_version": 1,
-            "instance_id": uuid.uuid4().hex,
+            "instance_id": server.state.instance_id,
             "pid": os.getpid(),
             "port": port,
             "owner_token": getattr(args, "release_owner_token", "") or "",
-            "release_version": getattr(args, "release_version", None) or read_version(),
+            "release_version": getattr(args, "release_version", None) or read_release_metadata()["release_version"],
             "observer_protocol_version": 1,
             "data_root": str(Path(args.runs_dir).parent) if args.runs_dir else "",
             "started_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
