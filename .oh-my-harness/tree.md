@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 495
+- Entries: 501
 
 ```text
 ./
@@ -262,6 +262,13 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   ├── build_review_packet.py
 │   │   ├── run_deepseek_live_smoke.py
 │   │   └── validate_brief.py
+│   ├── release/
+│   │   ├── build-bootstrapper-frozen.sh
+│   │   ├── build-qt-release.sh
+│   │   ├── build-server-frozen.sh
+│   │   ├── observer-server.spec
+│   │   ├── setup-release-venv.sh
+│   │   └── werewolf-agent.spec
 │   └── research/
 │       └── evaluate_semantic_labels.py
 ├── src/

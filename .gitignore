@@ -46,4 +46,7 @@ clients/qt_observer/build/
 # Claude Code agent worktree scratch (embedded git repos)
 .claude/worktrees/
 
+# Release virtualenv (isolated from dev — never committed)
+.venv-release/
+
 .worktrees/

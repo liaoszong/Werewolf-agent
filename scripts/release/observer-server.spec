@@ -1,0 +1,77 @@
+# -*- mode: python ; coding: utf-8 -*-
+
+a = Analysis(
+    ['../../src/werewolf_eval/run_observer_server.py'],
+    pathex=[],
+    binaries=[],
+    datas=[
+        ('../../VERSION', '.'),
+    ],
+    hiddenimports=[
+        'werewolf_eval.observer_server',
+        'werewolf_eval.observer.handler',
+        'werewolf_eval.observer.state',
+        'werewolf_eval.observer.factory',
+        'werewolf_eval.observer.run_manager',
+        'werewolf_eval.observer.launch',
+        'werewolf_eval.observer.sse',
+        'werewolf_eval.observer.routes',
+        'werewolf_eval.observer.credentials_api',
+        'werewolf_eval.observer.security',
+        'werewolf_eval.observer.release_manifest',
+        'werewolf_eval.observer_protocol',
+        'werewolf_eval.profile_config',
+        'werewolf_eval.user_config_library',
+        'werewolf_eval.action_runtime',
+        'werewolf_eval.action_runtime.ruleset',
+        'werewolf_eval.emergent_engine',
+        'werewolf_eval.provider_agent',
+        'werewolf_eval.provider_registry',
+        'werewolf_eval.evaluation_versions',
+        'werewolf_eval.deepseek_launcher',
+        'werewolf_eval.run_emergent_fake_runtime',
+        'werewolf_eval.run_g1h_fake_runtime',
+        'werewolf_eval.credential_store',
+        'werewolf_eval.invariants',
+        'werewolf_eval.release_metadata',
+    ],
+    hookspath=[],
+    hooksconfig={},
+    runtime_hooks=[],
+    excludes=['tkinter', 'matplotlib', 'numpy', 'pandas', 'tests', 'test'],
+    win_no_prefer_redirects=False,
+    win_private_assemblies=False,
+    cipher=None,
+    noarchive=False,
+)
+
+pyz = PYZ(a.pure, a.zipped_data)
+
+exe = EXE(
+    pyz,
+    a.scripts,
+    [],
+    exclude_binaries=True,
+    name='observer-server',
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=True,
+    console=True,
+    disable_windowed_traceback=False,
+    argv_emulation=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
+)
+
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    strip=False,
+    upx=True,
+    upx_exclude=[],
+    name='observer-server',
+)
