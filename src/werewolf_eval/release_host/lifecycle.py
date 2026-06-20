@@ -165,69 +165,84 @@ def release_host_main() -> int:
     dist_root = Path(sys.executable).parent if getattr(sys, 'frozen', False) else Path(__file__).resolve().parent.parent.parent.parent
     data_root = ensure_data_dirs()
 
+    from werewolf_eval.release_host.control import ControlServer, send_open_client_request
+
+    # Check for existing instance
+    hc_path = data_root / "runtime-state" / "host-control.json"
+    if hc_path.exists():
+        result = send_open_client_request(hc_path)
+        if result in ("foregrounded", "client_started"):
+            print(f"Existing instance found — {result}")
+            return 0
+        # Stale host-control — clean up and become primary
+        hc_path.unlink(missing_ok=True)
+
+    host_session_id = uuid.uuid4().hex
+
     print(f"Werewolf-agent {read_version()} starting")
     print(f"Data: {data_root}")
 
-    try:
-        server_proc, port, owner_token, host_session_id = find_or_start_server(data_root, dist_root)
-    except RuntimeError as exc:
-        print(f"FATAL: {exc}", file=sys.stderr)
-        return 1
-
-    client_exe = dist_root / "app" / "appqt_observer.exe"
-    update_request_path = data_root / "runtime-state" / "update-request.json"
-
-    client_proc = spawn_client(
-        client_exe, port, host_session_id,
-        read_version(), update_request_path,
-    )
-
-    # Wait for client to exit
-    client_ret = client_proc.wait()
-
-    # --- Shutdown logic ---
-    # Check for update request
-    update_request = None
-    if update_request_path.exists():
+    with ControlServer(data_root, host_session_id, read_version()):
         try:
-            update_request = json.loads(update_request_path.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
-            update_request_path.unlink(missing_ok=True)
+            server_proc, port, owner_token, _ = find_or_start_server(data_root, dist_root)
+        except RuntimeError as exc:
+            print(f"FATAL: {exc}", file=sys.stderr)
+            return 1
 
-    # Check for active runs
-    has_active = False
-    try:
-        import urllib.request
-        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
-        resp = opener.open(f"http://127.0.0.1:{port}/api/runs", timeout=3)
-        runs_data = json.loads(resp.read().decode("utf-8"))
-        has_active = any(
-            r.get("status") in ("queued", "running")
-            for r in runs_data.get("runs", [])
+        client_exe = dist_root / "app" / "appqt_observer.exe"
+        update_request_path = data_root / "runtime-state" / "update-request.json"
+
+        client_proc = spawn_client(
+            client_exe, port, host_session_id,
+            read_version(), update_request_path,
         )
-    except Exception:
-        pass
 
-    if has_active:
-        print("Active runs exist — keeping server alive. Reopen app to continue watching.")
-        # Idle cleanup loop (30s grace after all runs finish)
-        _idle_cleanup_loop(port, data_root, dist_root, host_session_id)
-        return 0
+        # Wait for client to exit
+        client_ret = client_proc.wait()
 
-    # Consume update request
-    if (update_request
-            and update_request.get("host_session_id") == host_session_id
-            and update_request.get("action") == "launch_maintenance_tool"):
-        update_request_path.unlink(missing_ok=True)
-        _launch_maintenance_tool(dist_root, server_proc)
+        # --- Shutdown logic ---
+        # Check for update request
+        update_request = None
+        if update_request_path.exists():
+            try:
+                update_request = json.loads(update_request_path.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                update_request_path.unlink(missing_ok=True)
 
-    if server_proc is not None:
-        server_proc.terminate()
+        # Check for active runs
+        has_active = False
         try:
-            server_proc.wait(timeout=10)
-        except subprocess.TimeoutExpired:
-            server_proc.kill()
-    return 0
+            import urllib.request
+            opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+            resp = opener.open(f"http://127.0.0.1:{port}/api/runs", timeout=3)
+            runs_data = json.loads(resp.read().decode("utf-8"))
+            has_active = any(
+                r.get("status") in ("queued", "running")
+                for r in runs_data.get("runs", [])
+            )
+        except Exception:
+            pass
+
+        if has_active:
+            print("Active runs exist — keeping server alive. Reopen app to continue watching.")
+            # Idle cleanup loop (30s grace after all runs finish)
+            _idle_cleanup_loop(port, data_root, dist_root, host_session_id)
+            return 0
+
+        # Consume update request
+        if (update_request
+                and update_request.get("host_session_id") == host_session_id
+                and update_request.get("action") == "launch_maintenance_tool"):
+            update_request_path.unlink(missing_ok=True)
+            _launch_maintenance_tool(dist_root, server_proc)
+
+        if server_proc is not None:
+            server_proc.terminate()
+            try:
+                server_proc.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                server_proc.kill()
+        return 0
 
 
 def _idle_cleanup_loop(port: int, data_root: Path, dist_root: Path, host_session_id: str) -> None:
