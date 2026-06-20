@@ -10,6 +10,9 @@ project(qt_observer VERSION ${RELEASE_VERSION} LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Release build flags: optimize for speed, disable asserts.
+set(CMAKE_CXX_FLAGS_RELEASE "-O2 -DNDEBUG" CACHE STRING "" FORCE)
+
 find_package(Qt6 REQUIRED COMPONENTS Quick QuickControls2 Network Test)
 
 qt_standard_project_setup(REQUIRES 6.8)
