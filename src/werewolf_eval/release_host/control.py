@@ -55,8 +55,8 @@ def control_server_thread(
     sock: socket.socket,
     host_session_id: str,
     control_token: str,
-    data_root: Path,
     stop_event: threading.Event,
+    cs: ControlServer,
 ) -> None:
     sock.settimeout(1.0)
     while not stop_event.is_set():
@@ -73,15 +73,9 @@ def control_server_thread(
                 conn.close()
                 continue
             resp = _handle_request(data, host_session_id, control_token)
-            # If foreground requested, set pending_reopen on host-control
+            # If foreground requested, signal reopen to idle cleanup loop
             if resp.get("ok") and resp.get("action") == "foregrounded":
-                try:
-                    hc_path = data_root / "runtime-state" / "host-control.json"
-                    hc = json.loads(hc_path.read_text(encoding="utf-8"))
-                    hc["pending_reopen"] = True
-                    _atomic_write_json(hc_path, hc)
-                except Exception:
-                    pass
+                cs._set_pending_reopen()
             conn.sendall((json.dumps(resp) + "\n").encode("utf-8"))
         except Exception:
             pass
@@ -103,6 +97,8 @@ class ControlServer:
         self._sock: socket.socket | None = None
         self._thread: threading.Thread | None = None
         self._stop = threading.Event()
+        self._reopen_lock = threading.Lock()
+        self._pending_reopen = False
         self._port: int = 0
         self._hc_path: Path | None = None
 
@@ -113,6 +109,17 @@ class ControlServer:
     @property
     def token(self) -> str:
         return self._token
+
+    def check_and_clear_pending_reopen(self) -> bool:
+        """Atomically check and clear the reopen flag. Returns True if reopen was requested."""
+        with self._reopen_lock:
+            result = self._pending_reopen
+            self._pending_reopen = False
+        return result
+
+    def _set_pending_reopen(self) -> None:
+        with self._reopen_lock:
+            self._pending_reopen = True
 
     def start(self) -> None:
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -127,7 +134,7 @@ class ControlServer:
 
         self._thread = threading.Thread(
             target=control_server_thread,
-            args=(self._sock, self._session_id, self._token, self._data_root, self._stop),
+            args=(self._sock, self._session_id, self._token, self._stop, self),
             daemon=True,
         )
         self._thread.start()

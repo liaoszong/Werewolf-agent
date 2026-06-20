@@ -198,22 +198,25 @@ def release_host_main() -> int:
 
     from werewolf_eval.release_host.control import ControlServer, send_open_client_request
 
-    # Check for existing instance
-    hc_path = data_root / "runtime-state" / "host-control.json"
-    if hc_path.exists():
-        result = send_open_client_request(hc_path)
-        if result in ("foregrounded", "client_started"):
-            print(f"Existing instance found — {result}")
-            return 0
-        # Stale host-control — clean up and become primary
-        hc_path.unlink(missing_ok=True)
+    # Windows named mutex for single-instance enforcement (R0 M-1)
+    if not _acquire_host_mutex():
+        # Did not acquire mutex — another instance may exist
+        # Fall through to file-guided IPC check
+        hc_path = data_root / "runtime-state" / "host-control.json"
+        if hc_path.exists():
+            result = send_open_client_request(hc_path)
+            if result in ("foregrounded", "client_started"):
+                print(f"Existing instance found — {result}")
+                return 0
+            # Stale host-control — clean up and become primary
+            hc_path.unlink(missing_ok=True)
 
     host_session_id = uuid.uuid4().hex
 
     print(f"Werewolf-agent {read_version()} starting")
     print(f"Data: {data_root}")
 
-    with ControlServer(data_root, host_session_id, read_version()):
+    with ControlServer(data_root, host_session_id, read_version()) as cs:
         try:
             server_proc, port, owner_token, _ = find_or_start_server(data_root, dist_root)
         except RuntimeError as exc:
@@ -249,7 +252,7 @@ def release_host_main() -> int:
         if has_active:
             print("Active runs exist — keeping server alive. Reopen app to continue watching.")
             # Idle cleanup loop (30s grace after all runs finish)
-            _idle_cleanup_loop(port, data_root, dist_root, host_session_id)
+            _idle_cleanup_loop(port, data_root, dist_root, host_session_id, cs)
             return 0
 
         # Consume update request
@@ -267,7 +270,7 @@ def release_host_main() -> int:
         return 0
 
 
-def _idle_cleanup_loop(port: int, data_root: Path, dist_root: Path, host_session_id: str) -> None:
+def _idle_cleanup_loop(port: int, data_root: Path, dist_root: Path, host_session_id: str, cs: ControlServer) -> None:
     """Wait until all runs finish, then grace period, then stop server."""
     import urllib.request
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
@@ -288,10 +291,8 @@ def _idle_cleanup_loop(port: int, data_root: Path, dist_root: Path, host_session
         if all_terminal_at is None:
             all_terminal_at = time.monotonic()
 
-        # Check for client reopen IPC
-        hc = _read_host_control(data_root)
-        if hc and hc.get("pending_reopen"):
-            _clear_pending_reopen(data_root)
+        # Check for reopen signal from control server (in-memory, no JSON race)
+        if cs.check_and_clear_pending_reopen():
             client_exe = dist_root / "app" / "appqt_observer.exe"
             update_path = data_root / "runtime-state" / "update-request.json"
             client_proc = spawn_client(client_exe, port, host_session_id, read_version(), update_path)
@@ -301,27 +302,6 @@ def _idle_cleanup_loop(port: int, data_root: Path, dist_root: Path, host_session
 
         if time.monotonic() - all_terminal_at > grace_seconds:
             break
-
-
-def _read_host_control(data_root: Path) -> dict | None:
-    path = data_root / "runtime-state" / "host-control.json"
-    if not path.exists():
-        return None
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
-        return None
-
-
-def _clear_pending_reopen(data_root: Path) -> None:
-    path = data_root / "runtime-state" / "host-control.json"
-    if path.exists():
-        try:
-            hc = json.loads(path.read_text(encoding="utf-8"))
-            hc.pop("pending_reopen", None)
-            _atomic_write_json(path, hc)
-        except Exception:
-            pass
 
 
 def _launch_maintenance_tool(dist_root: Path, server_proc: subprocess.Popen | None) -> None:
@@ -334,3 +314,20 @@ def _launch_maintenance_tool(dist_root: Path, server_proc: subprocess.Popen | No
             server_proc.kill()
     if mt.exists():
         subprocess.Popen([str(mt)], creationflags=subprocess.DETACHED_PROCESS if os.name == "nt" else 0)
+
+
+def _acquire_host_mutex() -> bool:
+    """Try to acquire the per-user Windows named mutex. Returns True if acquired (first instance)."""
+    import ctypes
+    mutex_name = f"Global\\WerewolfAgentHost-{os.environ.get('USERNAME', 'default')}"
+    kernel32 = ctypes.windll.kernel32
+    handle = kernel32.CreateMutexW(None, False, mutex_name)
+    if handle == 0:
+        return False  # Failed to create — fall back to file-guided approach
+    last_error = kernel32.GetLastError()
+    if last_error == 183:  # ERROR_ALREADY_EXISTS
+        kernel32.CloseHandle(handle)
+        return False  # Another instance holds the mutex
+    import atexit
+    atexit.register(kernel32.CloseHandle, handle)
+    return True
