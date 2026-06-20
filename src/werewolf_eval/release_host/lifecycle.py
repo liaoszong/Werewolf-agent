@@ -10,6 +10,8 @@ import uuid
 from pathlib import Path
 from typing import Tuple
 
+from werewolf_eval.release_metadata import read_version
+
 
 def _local_appdata() -> Path:
     return Path(os.environ.get("LOCALAPPDATA", os.path.expandvars("%LOCALAPPDATA%")))
@@ -25,9 +27,6 @@ def ensure_data_dirs(data_root: Path | None = None) -> Path:
     for sub in ("runs", "profiles", "configs", "logs", "runtime-state"):
         (root / sub).mkdir(parents=True, exist_ok=True)
     return root
-
-
-from werewolf_eval.release_metadata import read_version
 
 
 def _atomic_write_json(path: Path, data: dict) -> None:
@@ -59,7 +58,8 @@ def _find_existing_server(data_root: Path) -> Tuple[Path | None, dict | None]:
         health = json.loads(resp.read().decode("utf-8"))
         if health.get("instance_id") != state.get("instance_id"):
             return None, None
-        if health.get("owner_token") != state.get("owner_token"):
+        health_token = health.get("owner_token")
+        if health_token is not None and health_token != state.get("owner_token"):
             return None, None
         return state_file, state
     except Exception:
