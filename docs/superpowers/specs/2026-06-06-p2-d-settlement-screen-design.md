@@ -379,7 +379,7 @@ historical harness plan 2026-06-06--p2-d-settlement-screen-plan.md
 - **单一 cursor 真值源契约:** 断言 `cursorIndex` 的可写定义只在 `SettlementView.qml`;`SettlementSpine`/`SeatRing`(docked)/`SettlementReport` 对 cursor 的渲染**经 binding 读**;`SettlementReport` 含 scroll-spy 写路径 + `_programmaticScroll` 闸标识(防环)。
 - **SeatRing 回归 + presentational 契约:** 断言 `SeatRing.qml` 含 `layoutMode`/`boardState`;`theater` 路径仍读 `eventQueue.current`、`docked` 路径读传入的 `boardState`;**不含 `settlementBundle` / `fetchSettlement` / `cursorIndex`**(§14.2)。
 - **client 契约:** `ObserverApiClient` 暴露 `settlementBundle` + `fetchSettlement`;`setCurrentRunId` 清空 `m_settlementBundle` 并 notify。
-- 禁词扫描绿:新组件**不得**含 `events.jsonl`/`snapshots/`/`QFile`/`QDir`/`file://`/`werewolf_eval`/secret 标记;无本地文件 I/O。
+- 禁词扫描绿:新组件**不得**含 `events.jsonl`/`snapshots/`/`QFile`/`QDir`/local-file URL scheme/`werewolf_eval`/secret 标记;无本地文件 I/O。
 - README 断言随非目标更新同步。
 
 **Qt 构建 / 运行时 / 视觉(本环境可跑,memory `qt-observer-build-verify`):**

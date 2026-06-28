@@ -64,7 +64,7 @@ class ObserverApiClient : public QObject {
     Q_PROPERTY(QString releaseVersion READ releaseVersion NOTIFY releaseVersionChanged)
     Q_PROPERTY(QString releaseChannel READ releaseChannel NOTIFY releaseChannelChanged)
     Q_PROPERTY(QString hostSessionId READ hostSessionId NOTIFY hostSessionIdChanged)
-    Q_PROPERTY(QString updateRequestPath READ updateRequestPath NOTIFY updateRequestPathChanged)
+    Q_PROPERTY(QVariantMap updateStatus READ updateStatus NOTIFY updateStatusChanged)
 
 public:
     explicit ObserverApiClient(QObject *parent = nullptr);
@@ -114,14 +114,14 @@ public:
     QString releaseVersion() const;
     QString releaseChannel() const;   // hard-coded "stable" for now
     QString hostSessionId() const;
-    QString updateRequestPath() const;
+    QVariantMap updateStatus() const;
     Q_INVOKABLE bool hasActiveRun() const;
-    Q_INVOKABLE bool writeUpdateRequest(const QVariantMap &request);
-    Q_INVOKABLE QString generateUuid() const;
 
     void setReleaseVersion(const QString &v);
     void setHostSessionId(const QString &s);
-    void setUpdateRequestPath(const QString &p);
+    void setUpdateSessionId(const QString &s);
+    void setUpdateSessionToken(const QString &s);
+    void setUpdateControlPort(int port);
 
 public slots:
     Q_INVOKABLE void checkHealth();
@@ -163,6 +163,10 @@ public slots:
     // Drop a provider's cached (validated) model list — call when its credential
     // changes so a re-entered, not-yet-validated key no longer reads as validated.
     Q_INVOKABLE void invalidateProviderModels(const QString &provider);
+    Q_INVOKABLE void checkForUpdate();
+    Q_INVOKABLE void getUpdateStatus();
+    Q_INVOKABLE void downloadUpdate();
+    Q_INVOKABLE void applyDownloadedUpdate();
 
 signals:
     void baseUrlChanged();
@@ -208,7 +212,7 @@ signals:
     void releaseVersionChanged();
     void releaseChannelChanged();
     void hostSessionIdChanged();
-    void updateRequestPathChanged();
+    void updateStatusChanged();
 
 private slots:
     void onStreamReadyRead();
@@ -218,6 +222,9 @@ private slots:
 private:
     QNetworkReply *get(const QString &path);
     QNetworkReply *post(const QString &path, const QByteArray &body);
+    QNetworkReply *postUpdateAction(const QString &action);
+    void handleUpdateReply(QNetworkReply *reply, const QString &fallbackPhase);
+    void setUpdateStatus(const QVariantMap &status);
     void setError(const QString &msg);
     void setConfigActionError(const QString &msg);
     QString localPathFromFileUrl(const QString &fileUrl) const;
@@ -275,7 +282,10 @@ private:
     QString m_releaseVersion;
     QString m_releaseChannel = QStringLiteral("stable");
     QString m_hostSessionId;
-    QString m_updateRequestPath;
+    QString m_updateSessionId;
+    QString m_updateSessionToken;
+    int m_updateControlPort = 0;
+    QVariantMap m_updateStatus;
 
     QNetworkAccessManager *m_network;
     QNetworkReply *m_streamReply;

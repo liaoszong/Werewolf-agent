@@ -3,8 +3,9 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 VENV_DIR="$REPO_ROOT/.venv-release"
-OUTPUT_DIR="${OUTPUT_DIR:-$REPO_ROOT/.tmp/release/runtime}"
-SPEC_FILE="$REPO_ROOT/scripts/release/observer-server.spec"
+OUTPUT_DIR="${OUTPUT_DIR:-$REPO_ROOT/.tmp/release}"
+WORK_DIR="${WORK_DIR:-$REPO_ROOT/.tmp/pyinstaller-build}"
+SPEC_FILE="$REPO_ROOT/scripts/release/werewolf-agent.spec"
 PYINSTALLER_EXE="${PYINSTALLER_EXE:-$VENV_DIR/Scripts/pyinstaller.exe}"
 
 to_windows_path() {
@@ -19,15 +20,12 @@ to_windows_path() {
     fi
 }
 
-echo "=== Building frozen observer server ==="
+echo "=== Building Werewolf-agent bootstrapper ==="
 cd "$REPO_ROOT"
-"$PYINSTALLER_EXE" \
+"$PYINSTALLER_EXE" -y \
     --distpath "$(to_windows_path "$OUTPUT_DIR")" \
-    --workpath "$(to_windows_path "$REPO_ROOT/.tmp/pyi-server-build")" \
+    --workpath "$(to_windows_path "$WORK_DIR")" \
     "$(to_windows_path "$SPEC_FILE")"
 
-# Copy VERSION alongside the executable (PyInstaller COLLECT puts data files in _internal/)
-cp "$REPO_ROOT/VERSION" "$OUTPUT_DIR/observer-server/VERSION"
-
-echo "=== Frozen server at $OUTPUT_DIR/observer-server/ ==="
-ls -la "$OUTPUT_DIR/observer-server/"
+cp "$REPO_ROOT/VERSION" "$OUTPUT_DIR/Werewolf-agent/VERSION"
+echo "=== Bootstrapper at $OUTPUT_DIR/Werewolf-agent/ ==="

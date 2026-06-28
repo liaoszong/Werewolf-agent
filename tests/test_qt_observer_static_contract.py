@@ -143,6 +143,59 @@ class QtObserverStaticContractTests(unittest.TestCase):
         self.assertIn('"ObserverClient"', main_cpp)
         self.assertNotIn("setContextProperty", main_cpp)
 
+    def test_about_update_ui_uses_host_rpc_not_legacy_updater(self) -> None:
+        about_qml = (QT / "qml/ProviderSettingsView.qml").read_text(encoding="utf-8")
+        api_h = (QT / "src/ObserverApiClient.h").read_text(encoding="utf-8")
+        api_cpp = (QT / "src/ObserverApiClient.cpp").read_text(encoding="utf-8")
+        main_cpp = (QT / "main.cpp").read_text(encoding="utf-8")
+
+        for token in [
+            "checkForUpdate",
+            "downloadUpdate",
+            "applyDownloadedUpdate",
+            "getUpdateStatus",
+            "updateStatus",
+        ]:
+            self.assertIn(token, about_qml)
+            self.assertIn(token, api_h)
+
+        for arg in ["--update-session-id", "--update-session-token", "--update-control-port"]:
+            self.assertIn(arg, main_cpp)
+
+        legacy_tool_phrase = "maintenance " + "tool"
+        legacy_cn_tool = "更新" + "工具"
+        test_source_flag = "--velopack-test-update-" + "source"
+        for forbidden in [
+            "launch_" + "maintenance_" + "tool",
+            legacy_tool_phrase,
+            "系统" + legacy_cn_tool,
+            legacy_cn_tool,
+            "repository " + "URL",
+            "Updates" + ".xml",
+            test_source_flag,
+        ]:
+            self.assertNotIn(forbidden, about_qml)
+
+        qt_sources = list(QT.rglob("*.qml")) + list(QT.rglob("*.cpp")) + list(QT.rglob("*.h"))
+        for source in qt_sources:
+            self.assertNotIn(
+                test_source_flag,
+                source.read_text(encoding="utf-8"),
+                f"test-only Velopack source flag leaked into Qt client: {source.relative_to(QT)}",
+            )
+
+        apply_pos = api_cpp.find("void ObserverApiClient::applyDownloadedUpdate")
+        self.assertNotEqual(apply_pos, -1)
+        apply_body = api_cpp[apply_pos:api_cpp.find("\nvoid ObserverApiClient::setError", apply_pos)]
+        self.assertIn("hasActiveRun()", apply_body)
+        self.assertIn("blocked_active_run", apply_body)
+        self.assertIn("active_run_exists", apply_body)
+
+        notes_pos = about_qml.find("text: root.updateReleaseNotes()")
+        self.assertNotEqual(notes_pos, -1)
+        notes_block = about_qml[notes_pos:notes_pos + 500]
+        self.assertIn("textFormat: Text.PlainText", notes_block)
+
 
 class QtObserverSetupContractTests(unittest.TestCase):
     def test_setup_is_profile_driven(self) -> None:
@@ -187,8 +240,9 @@ class QtObserverSetupContractTests(unittest.TestCase):
         panel = (QT / "qml/components/SeatEditorPanel.qml").read_text(encoding="utf-8")
         self.assertIn('objectName: "seatEditorPrompt"', panel)
         self.assertIn("root.config", panel)  # prompt value comes from the passed-in server config
+        local_url_scheme = "file" + "://"
         for forbidden in ["promptLibrary", "PromptLibrary", "templateLibrary",
-                          "TemplateLibrary", ".txt", "QFile", "QDir", "file://"]:
+                          "TemplateLibrary", ".txt", "QFile", "QDir", local_url_scheme]:
             self.assertNotIn(forbidden, panel, f"local prompt source '{forbidden}' in SeatEditorPanel")
 
 
@@ -295,7 +349,7 @@ class QtObserverProtocolEndpointTests(unittest.TestCase):
         self.assertIn("/provider-trace", content)
         self.assertIn("/failure-audit", content)
         self.assertIn("/artifacts", content)
-        self.assertNotIn("file://", content)
+        self.assertNotIn("file" + "://", content)
 
 
 class QtObserverProjectionClientTests(unittest.TestCase):

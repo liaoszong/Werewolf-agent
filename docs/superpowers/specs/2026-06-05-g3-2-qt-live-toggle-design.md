@@ -25,7 +25,7 @@ Bring G3-1's server-side live capability onto the **Qt cockpit user path**: let 
 - **The launch path already surfaces gate errors.** `launchFromProfile`'s 4xx branch parses `{code,message}` and calls `setError(message)` + `emit launchFailed()` (`:475-495`); it advances **only** on HTTP 202 + a `run_id`. The QML navigates from `onLaunchSucceeded`, never optimistically.
 - **The honesty cue is a hard-coded amber banner.** `MatchSetupView.qml` `setupExecutionBanner` (`:101`) is warning-amber and reads "Deterministic Mock — no real API calls". Semantically wrong (fake is the *safe* default, not a caution) and unconditional.
 - **Server live posture is unobservable via API.** G3-1 prints `live_api=enabled/enabled_no_key/disabled` to startup stdout only. The two pure helpers `_check_live_capability(state, mode)` (`observer_server.py`) and the run-status reason already exist; there is **no** capability endpoint yet.
-- **Client boundary contracts already enforced** (`tests/test_qt_observer_static_contract.py`): no `werewolf_eval`/`QProcess`/`events.jsonl`/`snapshots/` references; **no `file://`/`QFile`/`QDir`**; **secret-scan** over all `.cpp/.h/.qml` for `Authorization:`, `Bearer `, `DEEPSEEK_API_KEY=`, `sk-`, **`api_key`**, `api-key`. README must state "no local artifact file reads".
+- **Client boundary contracts already enforced** (`tests/test_qt_observer_static_contract.py`): no `werewolf_eval`/`QProcess`/`events.jsonl`/`snapshots/` references; **no local-file URL scheme/`QFile`/`QDir`**; **secret-scan** over all `.cpp/.h/.qml` for `Authorization:`, `Bearer `, `DEEPSEEK_API_KEY=`, `sk-`, **`api_key`**, `api-key`. README must state "no local artifact file reads".
 
 ---
 
@@ -69,7 +69,7 @@ This prevents the dangerous lie where the user picks live, the server fails the 
 **Locked**
 - **Capability endpoint, not optimistic-403.** `GET /api/runtime/capabilities` is read-only: **no file writes, no provider call, never returns the key / env var name / Authorization / base-url secret, does not change the fake default.** It mirrors `_check_live_capability`, so `reason_code` ∈ {`live_api_disabled`, `missing_api_key`} is **identical** to the launch-time 403 code.
 - **`default_mode` is always `"fake"`.** Live being *available* never changes the default selection.
-- **HUD truth is API-mediated.** `execution_mode` arrives as a run-detail JSON field (server reads its own `resolved-profile.json`); the Qt client performs **no** file I/O and never references `resolved-profile.json`, `QFile`, `QDir`, or `file://`.
+- **HUD truth is API-mediated.** `execution_mode` arrives as a run-detail JSON field (server reads its own `resolved-profile.json`); the Qt client performs **no** file I/O and never references `resolved-profile.json`, `QFile`, `QDir`, or local-file URL scheme.
 - **Reason codes are rendered data-driven.** The client displays the server's `reason_code`/`message` **verbatim**; it must **not** embed the literal code strings (e.g. `"missing_api_key"`) in `.cpp/.h/.qml` — both to avoid drift and because `api_key` is a forbidden secret-scan substring. The localized label (`UNAVAIL` / `禁用`) is client I18n; the `<reason_code>` and human `message` come from the server.
 - **Launch mode rule (hard):** `mode="live"` is sent **only** when the FSM is `live_confirmed`; `fake` and `live_armed` both launch `mode="fake"`. `mode` omitted ⇒ fake. Template launches stay fake. Only the profile launch can request live.
 
@@ -131,7 +131,7 @@ Implement the FSM as a string `state` property on `ModeControl` with exactly the
 
 **Explicitly NOT in scope (hard boundaries):**
 - **No API-key UI** — never an input, never displayed, never in client source.
-- **No direct Qt artifact file reads** — no `QFile`/`QDir`/`file://`/`resolved-profile.json` path in the client; execution truth only via server API JSON.
+- **No direct Qt artifact file reads** — no `QFile`/`QDir`/local-file URL scheme/`resolved-profile.json` path in the client; execution truth only via server API JSON.
 - **No new artifact-read endpoint** — reuse run-detail `execution_mode`.
 - No profile save; no real DeepSeek smoke; no `prompt-manifest.json` model fix; no `max_requests` tuning; no cost/metering readout; no per-seat live models; no template live launch; no Web client.
 - No changes to G3-1 server gate logic / provider / consensus runner / game engine; no `docs/PROJECT_MAP.md`/`docs/TASKS.md`/`docs/adr/**` edits.
@@ -163,7 +163,7 @@ historical harness plan 2026-06-05--g3-2-qt-live-toggle-plan.md
 
 - The capabilities endpoint exposes **only** posture: `enabled`, `available`, a canonical `reason_code`, and a key-free `message`. It must **never** include the key, the env var name, an `Authorization` header, or a base-url secret.
 - The Qt client never holds, requests, or renders a key; `reason_code`/`message` are server-supplied and shown verbatim (no client-side code literals).
-- `tests/test_qt_observer_static_contract.py` stays the enforcement: no `file://`/`QFile`/`QDir`; secret-scan (`Authorization:`/`Bearer `/`DEEPSEEK_API_KEY=`/`sk-`/`api_key`/`api-key`) over all client sources must stay clean.
+- `tests/test_qt_observer_static_contract.py` stays the enforcement: no local-file URL scheme/`QFile`/`QDir`; secret-scan (`Authorization:`/`Bearer `/`DEEPSEEK_API_KEY=`/`sk-`/`api_key`/`api-key`) over all client sources must stay clean.
 
 ---
 

@@ -19,7 +19,7 @@ This completes the G2d milestone end-to-end (G2d-1 = backend; G2d-2 = UI). It is
 | # | Decision | Choice | Rationale |
 |---|----------|--------|-----------|
 | D1 | Editor depth | **Full per-seat** — provider/model/strategy/prompt | Exercises the whole `g2d.profile.v1` schema the backend already validates. |
-| D2 | Save/import | **Defer save** — load → edit → validate → launch | The Qt client is forbidden local file I/O (contract test bans `QFile`/`QDir`/`file://`), and G2d-1 deliberately exposes no server write endpoint. "Import" = picking an existing server-side profile. Save lands in a later slice that adds a server write endpoint. |
+| D2 | Save/import | **Defer save** — load -> edit -> validate -> launch | The Qt client is forbidden local file I/O (contract test bans `QFile`/`QDir`/local-file URL scheme), and G2d-1 deliberately exposes no server write endpoint. "Import" = picking an existing server-side profile. Save lands in a later slice that adds a server write endpoint. |
 | D3 | Layout | **Master-detail** — seat grid (left) + editor panel (right) | The split `MatchSetupView.qml` already anticipates; fits the wizard page + bottom action bar. |
 | D4 | Dropdown allowlists | **Read-only `GET /api/profiles/schema`** | The UI must not hardcode provider/model/strategy lists (drift + violates the "don't bake backend truth into QML" contract philosophy). One read-only endpoint = single source of truth. No write surface. |
 
@@ -29,7 +29,7 @@ This completes the G2d milestone end-to-end (G2d-1 = backend; G2d-2 = UI). It is
 - `clients/qt_observer/src/ObserverApiClient.h/.cpp` — singleton with `get(path)`/`post(path, body)` helpers, `startDefaultMatch()` (POST `/api/runs`), `refreshProjection()` (latest-wins serial guard, a model for new fetches), Q_PROPERTY/NOTIFY pattern.
 - `clients/qt_observer/CMakeLists.txt` — `qt_add_qml_module(... QML_FILES ...)` lists views/components; `Theme`/`I18n` are `QT_QML_SINGLETON_TYPE`.
 - Design system (`Theme.qml`, `I18n.qml`): tokens `Theme.color/space/radius/font/size/weight`, layout `Theme.layout.pageMargin=40`/`contentMax=1040`/`actionBarHeight=72`; components `AppButton` (primary/secondary/ghost/danger), `AppCard`, `SectionHeader`, `EmptyState`, `RoleCard` (faction tints/stripe, omitted for `unknown`). `I18n.t(zh, en)` — **English is always the 2nd arg** (keeps contract-test substrings in files). Default language zh.
-- `tests/test_qt_observer_static_contract.py` — required QML files + objectNames (MatchSetupView → `matchSetupView`, `setupRoleCards`, `setupContinueButton`), forbidden-pattern scan (`events.jsonl`, `snapshots/`, `QFile`, `QDir`, `file://`), `test_setup_contains_default_six_player_roles` (asserts p1–p6 + role names in MatchSetupView), and `QtObserverReadmeTests` asserting `clients/qt_observer/README.md` contains `"no full prompt/profile editor"`.
+- `tests/test_qt_observer_static_contract.py` — required QML files + objectNames (MatchSetupView -> `matchSetupView`, `setupRoleCards`, `setupContinueButton`), forbidden-pattern scan (`events.jsonl`, `snapshots/`, `QFile`, `QDir`, local-file URL scheme), `test_setup_contains_default_six_player_roles` (asserts p1-p6 + role names in MatchSetupView), and `QtObserverReadmeTests` asserting `clients/qt_observer/README.md` contains `"no full prompt/profile editor"`.
 - G2d-1 backend (merged): `profile_config.py` constants (`ALLOWED_PROVIDERS`, `ALLOWED_MODELS`, `ALLOWED_STRATEGIES`, `DEFAULT_6P_SEAT_ROLES`, `ROLE_TEAMS`, `PROMPT_MAX_LEN`), endpoints `GET /api/profiles`, `GET /api/profiles/{name}`, `POST /api/profiles/validate`, `POST /api/runs {profile|profile_name}`.
 
 **Build feasibility:** Qt 6.10 mingw toolchain on `F:` with a configured `.tmp/qt-observer-build`; build, static-contract test, `ctest`, `qmllint`, and **visual** verification (`grabToImage` → PNG → Read) all run in this environment. No environment blocker (contrast G2d-1 server tests).
@@ -155,7 +155,7 @@ The Qt-side gates — build, static-contract, ctest, qmllint, visual — are **r
   - assert it does **not** hardcode provider/model lists (options come from `profileSchema`);
   - replace `test_setup_contains_default_six_player_roles` so seats/roles are driven by profile/schema, not a static `roles` array;
   - update `QtObserverReadmeTests` ("no full prompt/profile editor" assertion removed / replaced);
-  - keep forbidden-pattern scan green (`QFile`/`QDir`/`file://`/`events.jsonl`/`snapshots/`).
+  - keep forbidden-pattern scan green (`QFile`/`QDir`/local-file URL scheme/`events.jsonl`/`snapshots/`).
 - **ctest** (`.tmp/qt-observer-build`) — SSE parser test stays green.
 - **qmllint** — only `Error:` lines matter.
 - **Visual:** temp `Timer` in AppShell navigating to MatchSetup with a profile loaded + a seat selected → `grabToImage` → PNG under `.tmp/` → Read the image to confirm master-detail layout, dropdowns, prompt area, action bar. Remove the harness after.

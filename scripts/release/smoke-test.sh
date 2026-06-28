@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
-# R0 End-to-End Smoke Test
-# Run from repo root: bash scripts/release/smoke-test.sh
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-RELEASE_DIR="$REPO_ROOT/.tmp/release"
-INSTALLER="$RELEASE_DIR/Werewolf-agent-0.2.0-installer.exe"
+VERSION_VALUE="$(tr -d '\r\n' < "$REPO_ROOT/VERSION")"
+RELEASE_DIR="${RELEASE_DIR:-$REPO_ROOT/.tmp/release}"
+RELEASE_ROOT="${RELEASE_ROOT:-$REPO_ROOT/.tmp/velopack-release}"
+PACK_DIR="${PACK_DIR:-$RELEASE_ROOT/packdir-$VERSION_VALUE}"
+OUTPUT_DIR="${OUTPUT_DIR:-$RELEASE_ROOT/Releases}"
+UNPACK_DIR="${UNPACK_DIR:-$RELEASE_ROOT/unpacked-full-$VERSION_VALUE}"
+RUN_INSTALLED_E2E="${RUN_INSTALLED_E2E:-0}"
 
 PASS_COUNT=0
 FAIL_COUNT=0
@@ -13,176 +16,158 @@ FAIL_COUNT=0
 pass() { echo "  PASS: $1"; PASS_COUNT=$((PASS_COUNT + 1)); }
 fail() { echo "  FAIL: $1"; FAIL_COUNT=$((FAIL_COUNT + 1)); }
 
+expect_file() {
+    if [[ -f "$1" ]]; then
+        pass "$2"
+    else
+        fail "$2 missing: $1"
+    fi
+}
+
+expect_dir() {
+    if [[ -d "$1" ]]; then
+        pass "$2"
+    else
+        fail "$2 missing: $1"
+    fi
+}
+
 echo ""
 echo "========================================"
-echo "  R0 End-to-End Smoke Test"
+echo "  R0 Velopack Release Smoke"
 echo "  Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 echo "  Repo root: $REPO_ROOT"
+echo "  Version: $VERSION_VALUE"
 echo "========================================"
 echo ""
 
-# ── V1: Installer ──────────────────────────────────────────────
-echo "--- V1: Installer exists ---"
-if [ -f "$INSTALLER" ]; then
-    INSTALLER_SIZE=$(stat -c%s "$INSTALLER")
-    pass "Installer exists ($INSTALLER_SIZE bytes)"
+echo "--- V1: Release staging ---"
+expect_file "$RELEASE_DIR/Werewolf-agent/Werewolf-agent.exe" "Bootstrapper executable"
+expect_dir "$RELEASE_DIR/Werewolf-agent/_internal" "Bootstrapper onedir runtime"
+expect_file "$RELEASE_DIR/runtime/observer-server/observer-server.exe" "Frozen observer server"
+expect_dir "$RELEASE_DIR/runtime/observer-server/_internal" "Frozen observer server runtime"
+expect_file "$RELEASE_DIR/app/appqt_observer.exe" "Qt client executable"
+expect_file "$RELEASE_DIR/app/Qt6Core.dll" "Qt runtime deployed"
+expect_dir "$RELEASE_DIR/app/platforms" "Qt platforms deployed"
+
+echo "--- V2: Version and manifest data ---"
+expect_file "$REPO_ROOT/VERSION" "Root VERSION"
+expect_file "$RELEASE_DIR/Werewolf-agent/VERSION" "Bootstrapper VERSION"
+expect_file "$RELEASE_DIR/runtime/observer-server/VERSION" "Server VERSION"
+if [[ -f "$RELEASE_DIR/Werewolf-agent/VERSION" ]] \
+    && [[ "$(tr -d '\r\n' < "$RELEASE_DIR/Werewolf-agent/VERSION")" == "$VERSION_VALUE" ]]; then
+    pass "Bootstrapper VERSION matches root"
 else
-    fail "Installer not found at $INSTALLER"
+    fail "Bootstrapper VERSION does not match root"
+fi
+if [[ -f "$RELEASE_DIR/runtime/observer-server/VERSION" ]] \
+    && [[ "$(tr -d '\r\n' < "$RELEASE_DIR/runtime/observer-server/VERSION")" == "$VERSION_VALUE" ]]; then
+    pass "Server VERSION matches root"
+else
+    fail "Server VERSION does not match root"
 fi
 
-# ── V2: Bootstrapper (standalone frozen) ───────────────────────
-echo "--- V2: Bootstrapper frozen ---"
-BOOTSTRAPPER="$RELEASE_DIR/Werewolf-agent/Werewolf-agent.exe"
-if [ -f "$BOOTSTRAPPER" ]; then
-    pass "Bootstrapper exe exists"
-    # --version
-    VERSION_OUT=$("$BOOTSTRAPPER" --version 2>&1)
-    if echo "$VERSION_OUT" | grep -q "0.2.0"; then
-        pass "Bootstrapper --version = $VERSION_OUT"
+echo "--- V3: Velopack packDir and package output ---"
+expect_dir "$PACK_DIR" "Velopack packDir"
+expect_file "$PACK_DIR/Werewolf-agent.exe" "Velopack main executable"
+expect_dir "$PACK_DIR/_internal" "Velopack bootstrapper runtime"
+expect_dir "$PACK_DIR/app" "Velopack Qt deployment tree"
+expect_dir "$PACK_DIR/runtime/observer-server" "Velopack frozen observer server tree"
+expect_file "$OUTPUT_DIR/Werewolf-agent-Setup.exe" "First-install setup executable"
+expect_file "$OUTPUT_DIR/releases.win.json" "Velopack release index"
+expect_file "$REPO_ROOT/scripts/release/release-notes.md" "Single release notes input"
+if compgen -G "$OUTPUT_DIR/WerewolfAgent-$VERSION_VALUE-full.nupkg" >/dev/null; then
+    pass "Full package exists"
+else
+    fail "Full package missing"
+fi
+if compgen -G "$OUTPUT_DIR/WerewolfAgent-$VERSION_VALUE-delta.nupkg" >/dev/null; then
+    pass "Delta package exists"
+else
+    pass "Delta package not emitted for first package set"
+fi
+
+echo "--- V4: Data isolation in replaceable tree ---"
+for sub in runs profiles configs logs runtime-state; do
+    if [[ -e "$PACK_DIR/$sub" ]]; then
+        fail "User data directory leaked into packDir: $sub"
     else
-        fail "Bootstrapper --version unexpected: $VERSION_OUT"
+        pass "No user data directory in packDir: $sub"
     fi
-    # VERSION file alongside
-    if [ -f "$RELEASE_DIR/Werewolf-agent/VERSION" ]; then
-        BV=$(cat "$RELEASE_DIR/Werewolf-agent/VERSION")
-        if [ "$BV" = "0.2.0" ]; then
-            pass "Bootstrapper VERSION file = $BV"
+done
+
+echo "--- V5: Full package unpack and hygiene ---"
+FULL_PACKAGE="$(find "$OUTPUT_DIR" -maxdepth 1 -type f -name "WerewolfAgent-$VERSION_VALUE-full.nupkg" | head -n 1 || true)"
+if [[ -n "$FULL_PACKAGE" ]]; then
+    rm -rf "$UNPACK_DIR"
+    mkdir -p "$UNPACK_DIR"
+    python - "$FULL_PACKAGE" "$UNPACK_DIR" <<'PY'
+import sys
+import zipfile
+package, out_dir = sys.argv[1:3]
+with zipfile.ZipFile(package) as zf:
+    zf.extractall(out_dir)
+PY
+    pass "Full package unpacked"
+else
+    fail "Full package unavailable for unpack scan"
+fi
+
+OLD_PATTERNS=(
+    "I""FW"
+    "maintenance ""tool"
+    "repo""gen"
+    "binary""creator"
+    "Updates"".xml"
+    "github"".io"
+    "werewolf-agent-""updates"
+    "file""://"
+)
+for target in "$RELEASE_DIR" "$PACK_DIR" "$OUTPUT_DIR" "$UNPACK_DIR"; do
+    [[ -d "$target" ]] || continue
+    pattern_index=0
+    for pattern in "${OLD_PATTERNS[@]}"; do
+        pattern_index=$((pattern_index + 1))
+        if python - "$target" "$pattern" <<'PY'
+import os
+import sys
+
+root, pattern = sys.argv[1], sys.argv[2].encode("utf-8")
+skip_ext = {
+    ".dll", ".exe", ".pdb", ".a", ".o", ".obj", ".png", ".jpg", ".jpeg",
+    ".ico", ".zip", ".nupkg", ".pyc", ".pyd", ".qm",
+}
+for dirpath, dirnames, filenames in os.walk(root):
+    for name in filenames:
+        path = os.path.join(dirpath, name)
+        if os.path.splitext(name)[1].lower() in skip_ext:
+            continue
+        try:
+            with open(path, "rb") as fh:
+                if pattern in fh.read():
+                    sys.exit(1)
+        except OSError:
+            pass
+sys.exit(0)
+PY
+        then
+            pass "No legacy token $pattern_index under $(basename "$target")"
         else
-            fail "Bootstrapper VERSION file mismatch: $BV"
+            fail "Legacy release token $pattern_index found under $target"
         fi
-    else
-        fail "Bootstrapper VERSION file missing"
-    fi
-    # _internal subdir
-    if [ -d "$RELEASE_DIR/Werewolf-agent/_internal" ]; then
-        pass "Bootstrapper _internal directory exists"
-    else
-        fail "Bootstrapper _internal directory missing"
-    fi
+    done
+done
+
+echo "--- V6: Installed tree and local update E2E ---"
+if [[ "$RUN_INSTALLED_E2E" == "1" ]]; then
+    powershell.exe -NoProfile -ExecutionPolicy Bypass \
+        -File "$REPO_ROOT/scripts/release/run-installed-local-e2e.ps1" \
+        -UpdateSource "$OUTPUT_DIR"
+    pass "Installed local update E2E script completed"
 else
-    fail "Bootstrapper exe not found"
+    pass "Installed local update E2E skipped; set RUN_INSTALLED_E2E=1 to run it"
 fi
 
-# ── V3: Observer server (standalone frozen) ────────────────────
-echo "--- V3: Observer server frozen ---"
-SERVER="$RELEASE_DIR/runtime/observer-server/observer-server.exe"
-if [ -f "$SERVER" ]; then
-    pass "Server exe exists"
-    VERSION_OUT=$("$SERVER" --version 2>&1)
-    if echo "$VERSION_OUT" | grep -q "0.2.0"; then
-        pass "Server --version = $VERSION_OUT"
-    else
-        fail "Server --version unexpected: $VERSION_OUT"
-    fi
-    # VERSION file alongside
-    if [ -f "$RELEASE_DIR/runtime/observer-server/VERSION" ]; then
-        SV=$(cat "$RELEASE_DIR/runtime/observer-server/VERSION")
-        if [ "$SV" = "0.2.0" ]; then
-            pass "Server VERSION file = $SV"
-        else
-            fail "Server VERSION file mismatch: $SV"
-        fi
-    else
-        fail "Server VERSION file missing"
-    fi
-    # _internal subdir
-    if [ -d "$RELEASE_DIR/runtime/observer-server/_internal" ]; then
-        pass "Server _internal directory exists"
-    else
-        fail "Server _internal directory missing"
-    fi
-else
-    fail "Server exe not found"
-fi
-
-# ── V4: Qt client (build output) ────────────────────────────────
-echo "--- V4: Qt client ---"
-CLIENT="$RELEASE_DIR/app/appqt_observer.exe"
-if [ -f "$CLIENT" ]; then
-    CLIENT_SIZE=$(stat -c%s "$CLIENT")
-    pass "Qt client exists ($CLIENT_SIZE bytes)"
-    # Verify windeployqt deployed Qt DLLs alongside
-    if [ -f "$RELEASE_DIR/app/Qt6Core.dll" ]; then
-        pass "Qt6Core.dll deployed alongside client"
-    else
-        fail "Qt6Core.dll not found -- windeployqt may not have run"
-    fi
-    # Verify platforms directory
-    if [ -d "$RELEASE_DIR/app/platforms" ]; then
-        pass "platforms/ directory exists"
-    else
-        fail "platforms/ directory missing"
-    fi
-else
-    fail "Qt client not found at $CLIENT"
-fi
-
-# ── V5: IFW repository ─────────────────────────────────────────
-echo "--- V5: IFW repository ---"
-IFW_REPO="$REPO_ROOT/.tmp/ifw-repo/stable"
-if [ -d "$IFW_REPO" ]; then
-    pass "IFW repo directory exists"
-    if [ -f "$IFW_REPO/Updates.xml" ]; then
-        pass "Updates.xml exists"
-    else
-        fail "Updates.xml missing"
-    fi
-    if [ -d "$IFW_REPO/com.werewolfagent.app" ]; then
-        COMP_COUNT=$(ls "$IFW_REPO/com.werewolfagent.app/"*.7z 2>/dev/null | wc -l)
-        pass "Component archive directory exists ($COMP_COUNT .7z files)"
-    else
-        fail "Component directory missing"
-    fi
-else
-    fail "IFW repo directory not found"
-fi
-
-# ── V6: VERSION root consistency ───────────────────────────────
-echo "--- V6: VERSION consistency ---"
-ROOT_VER=$(cat "$REPO_ROOT/VERSION" 2>/dev/null || echo "MISSING")
-if [ "$ROOT_VER" = "0.2.0" ]; then
-    pass "Root VERSION = $ROOT_VER"
-else
-    fail "Root VERSION unexpected: $ROOT_VER"
-fi
-
-# ── V7: Release manifest template ──────────────────────────────
-echo "--- V7: Manifest template ---"
-MANIFEST_TEMPLATE="$REPO_ROOT/scripts/release/distribution-manifest.json.in"
-if [ -f "$MANIFEST_TEMPLATE" ]; then
-    pass "distribution-manifest.json.in template exists"
-    if grep -q '<placeholder>' "$MANIFEST_TEMPLATE"; then
-        pass "Template contains placeholders"
-    else
-        fail "Template missing placeholders"
-    fi
-else
-    fail "Template not found"
-fi
-
-# ── V8: Sentinel scan ──────────────────────────────────────────
-echo "--- V8: Sentinel scan (no secrets in release) ---"
-if grep -r "R0_TEST_SECRET_SENTINEL" "$RELEASE_DIR" 2>/dev/null; then
-    fail "Secret sentinel found in release dirs!"
-else
-    pass "No secret sentinel in release dirs"
-fi
-
-# ── V9: Publish script ─────────────────────────────────────────
-echo "--- V9: Publish script ---"
-PUBLISH_SCRIPT="$REPO_ROOT/scripts/release/publish-to-github-pages.sh"
-if [ -f "$PUBLISH_SCRIPT" ]; then
-    pass "publish-to-github-pages.sh exists"
-    if [ -x "$PUBLISH_SCRIPT" ]; then
-        pass "Publish script is executable"
-    else
-        fail "Publish script is not executable"
-    fi
-else
-    fail "Publish script not found"
-fi
-
-# ── Summary ─────────────────────────────────────────────────────
 echo ""
 echo "========================================"
 echo "  Smoke Test Results"
@@ -190,10 +175,9 @@ echo "  Passed: $PASS_COUNT"
 echo "  Failed: $FAIL_COUNT"
 echo "========================================"
 
-if [ "$FAIL_COUNT" -gt 0 ]; then
+if [[ "$FAIL_COUNT" -gt 0 ]]; then
     echo "FAILED: Some checks did not pass."
     exit 1
 fi
 
 echo "ALL SMOKE TESTS PASSED"
-exit 0

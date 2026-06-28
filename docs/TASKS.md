@@ -40,6 +40,7 @@
 | P2-B：开局配置 / BYO-key / per-seat provider setup | completed | `src/werewolf_eval/user_config_library.py`, `src/werewolf_eval/provider_registry.py`, `clients/qt_observer/qml/MatchSetupView.qml`, `clients/qt_observer/src/ObserverApiClient.cpp` |
 | P2-C：实时观战上帝视角 UI | completed | `clients/qt_observer/qml/TheaterView.qml`, `clients/qt_observer/qml/components/CockpitSurface.qml`, `clients/qt_observer/qml/components/RoleCard.qml`, `clients/qt_observer/qml/components/DataSourceChip.qml` |
 | P2-D：结算画面 / 历史回看管理 | completed | `src/werewolf_eval/settlement_bundle.py`, `clients/qt_observer/qml/SettlementView.qml`, `clients/qt_observer/qml/components/SettlementReport.qml`, `clients/qt_observer/qml/HistoryView.qml`, `tests/test_settlement_bundle.py` |
+| R0：Windows 桌面发行 / 客户端内更新 | completed | `scripts/release/build-velopack-release.sh`, `scripts/release/upload-github-release.sh`, `scripts/release/release-notes.md`, `scripts/release/smoke-test.sh`, `scripts/release/run-installed-local-e2e.ps1`, `src/werewolf_eval/release_host/update_control.py`, `src/werewolf_eval/release_host/velopack_runtime.py`, `clients/qt_observer/qml/ProviderSettingsView.qml` |
 
 ## P3 — planned
 

@@ -8,7 +8,7 @@ import sys
 import time
 import uuid
 from pathlib import Path
-from typing import Tuple
+from typing import Callable, Tuple
 
 from werewolf_eval.release_metadata import read_version
 
@@ -68,6 +68,13 @@ def _find_existing_server(data_root: Path) -> Tuple[Path | None, dict | None]:
         return None, None
 
 
+def _observer_server_exe(dist_root: Path) -> Path:
+    nested = dist_root / "runtime" / "observer-server" / "observer-server.exe"
+    if nested.exists():
+        return nested
+    return dist_root / "runtime" / "observer-server.exe"
+
+
 def find_or_start_server(
     data_root: Path, dist_root: Path
 ) -> Tuple[subprocess.Popen | None, int, str, str]:
@@ -81,7 +88,7 @@ def find_or_start_server(
         return None, state["port"], state["owner_token"], host_session_id
 
     # Start new server
-    server_exe = dist_root / "runtime" / "observer-server.exe"
+    server_exe = _observer_server_exe(dist_root)
     owner_token = _generate_token()
     state_path = data_root / "runtime-state" / "server-state.json"
 
@@ -135,7 +142,9 @@ def spawn_client(
     observer_port: int,
     host_session_id: str,
     release_version: str,
-    update_request_path: Path,
+    update_session_id: str,
+    update_session_token: str,
+    update_control_port: int,
 ) -> subprocess.Popen:
     """Launch Qt client. Returns the Popen handle."""
     env = dict(os.environ)
@@ -150,39 +159,38 @@ def spawn_client(
         "--observer-base-url", f"http://127.0.0.1:{observer_port}",
         "--release-version", release_version,
         "--release-host-session", host_session_id,
-        "--update-request-path", str(update_request_path),
+        "--update-session-id", update_session_id,
+        "--update-session-token", update_session_token,
+        "--update-control-port", str(update_control_port),
     ], env=env)
 
 
-def _consume_update_request(path: Path, host_session_id: str) -> dict | None:
-    """Validate and consume update-request.json. Returns request dict or None."""
-    if not path.exists():
-        return None
+def _has_active_runs(port: int) -> bool:
     try:
-        req = json.loads(path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
-        path.unlink(missing_ok=True)
-        return None
+        import urllib.request
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        resp = opener.open(f"http://127.0.0.1:{port}/api/runs", timeout=3)
+        runs_data = json.loads(resp.read().decode("utf-8"))
+        return any(
+            r.get("status") in ("queued", "running")
+            for r in runs_data.get("runs", [])
+        )
+    except Exception:
+        return False
 
-    # Validate TTL (5 minutes)
-    from datetime import datetime, timezone, timedelta
-    try:
-        created = datetime.fromisoformat(req.get("created_at", "").rstrip("Z"))
-        if datetime.now(timezone.utc) - created.replace(tzinfo=timezone.utc) > timedelta(minutes=5):
-            path.unlink(missing_ok=True)
-            return None
-    except (ValueError, TypeError):
-        path.unlink(missing_ok=True)
-        return None
 
-    # Validate required fields
-    if (req.get("host_session_id") != host_session_id
-            or req.get("schema_version") != 1
-            or req.get("action") != "launch_maintenance_tool"):
-        path.unlink(missing_ok=True)
-        return None
+def _stop_owned_server(server_proc: subprocess.Popen | None) -> None:
+    if server_proc is not None:
+        server_proc.terminate()
+        try:
+            server_proc.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            server_proc.kill()
 
-    return req
+
+def _test_update_source_allowed(environ: dict[str, str] | None = None) -> bool:
+    env = environ if environ is not None else os.environ
+    return env.get("WEREWOLF_ALLOW_VELOPACK_TEST_SOURCE") == "1"
 
 
 def release_host_main() -> int:
@@ -191,12 +199,23 @@ def release_host_main() -> int:
     parser = argparse.ArgumentParser(description="Werewolf-agent")
     parser.add_argument("--version", action="version",
                         version=f"Werewolf-agent {read_version()}")
+    parser.add_argument("--velopack-test-update-source", default=None, help=argparse.SUPPRESS)
     args = parser.parse_args()
+
+    if args.velopack_test_update_source and not _test_update_source_allowed():
+        print("FATAL: Velopack test update source is disabled in this build context", file=sys.stderr)
+        return 2
 
     dist_root = Path(sys.executable).parent if getattr(sys, 'frozen', False) else Path(__file__).resolve().parent.parent.parent.parent
     data_root = ensure_data_dirs()
 
     from werewolf_eval.release_host.control import ControlServer, send_open_client_request
+    from werewolf_eval.release_host.update_control import (
+        UpdateControlServer,
+        VelopackUpdateBackend,
+        create_update_source_factory,
+        new_update_session,
+    )
 
     # Windows named mutex for single-instance enforcement (R0 M-1)
     if not _acquire_host_mutex():
@@ -223,54 +242,66 @@ def release_host_main() -> int:
             print(f"FATAL: {exc}", file=sys.stderr)
             return 1
 
-        client_exe = dist_root / "app" / "appqt_observer.exe"
-        update_request_path = data_root / "runtime-state" / "update-request.json"
-
-        client_proc = spawn_client(
-            client_exe, port, host_session_id,
-            read_version(), update_request_path,
-        )
-
-        # Wait for client to exit
-        client_ret = client_proc.wait()
-
-        # --- Shutdown logic ---
-        # Check for active runs
-        has_active = False
+        update_session_id, update_session_token = new_update_session()
         try:
-            import urllib.request
-            opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
-            resp = opener.open(f"http://127.0.0.1:{port}/api/runs", timeout=3)
-            runs_data = json.loads(resp.read().decode("utf-8"))
-            has_active = any(
-                r.get("status") in ("queued", "running")
-                for r in runs_data.get("runs", [])
+            update_source_factory = create_update_source_factory(
+                test_update_source=args.velopack_test_update_source,
             )
-        except Exception:
-            pass
+            update_backend = VelopackUpdateBackend(update_source_factory)
+        except Exception as exc:
+            print(f"FATAL: invalid update source: {exc.__class__.__name__}", file=sys.stderr)
+            _stop_owned_server(server_proc)
+            return 1
+        with UpdateControlServer(
+            backend=update_backend,
+            active_run_checker=lambda: _has_active_runs(port),
+            session_id=update_session_id,
+            session_token=update_session_token,
+        ) as update_control:
+            client_exe = dist_root / "app" / "appqt_observer.exe"
 
-        if has_active:
-            print("Active runs exist — keeping server alive. Reopen app to continue watching.")
-            # Idle cleanup loop (30s grace after all runs finish)
-            _idle_cleanup_loop(port, data_root, dist_root, host_session_id, cs)
-            return 0
+            client_proc = spawn_client(
+                client_exe, port, host_session_id,
+                read_version(),
+                update_session_id, update_session_token, update_control.port,
+            )
 
-        # Consume update request
-        update_request = _consume_update_request(update_request_path, host_session_id)
-        if update_request is not None:
-            update_request_path.unlink(missing_ok=True)
-            _launch_maintenance_tool(dist_root, server_proc)
+            # Wait for client to exit
+            client_proc.wait()
 
-        if server_proc is not None:
-            server_proc.terminate()
-            try:
-                server_proc.wait(timeout=10)
-            except subprocess.TimeoutExpired:
-                server_proc.kill()
+            if update_control.apply_requested:
+                _stop_owned_server(server_proc)
+                return 0
+
+            # --- Shutdown logic ---
+            has_active = _has_active_runs(port)
+
+            if has_active:
+                print("Active runs exist — keeping server alive. Reopen app to continue watching.")
+                # Idle cleanup loop (30s grace after all runs finish)
+                _idle_cleanup_loop(
+                    port, data_root, dist_root, host_session_id, cs,
+                    update_session_id, update_session_token, update_control.port,
+                    lambda: update_control.apply_requested,
+                )
+                _stop_owned_server(server_proc)
+                return 0
+
+        _stop_owned_server(server_proc)
         return 0
 
 
-def _idle_cleanup_loop(port: int, data_root: Path, dist_root: Path, host_session_id: str, cs: ControlServer) -> None:
+def _idle_cleanup_loop(
+    port: int,
+    data_root: Path,
+    dist_root: Path,
+    host_session_id: str,
+    cs: ControlServer,
+    update_session_id: str,
+    update_session_token: str,
+    update_control_port: int,
+    apply_requested: Callable[[], bool],
+) -> None:
     """Wait until all runs finish, then grace period, then stop server."""
     import urllib.request
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
@@ -294,26 +325,18 @@ def _idle_cleanup_loop(port: int, data_root: Path, dist_root: Path, host_session
         # Check for reopen signal from control server (in-memory, no JSON race)
         if cs.check_and_clear_pending_reopen():
             client_exe = dist_root / "app" / "appqt_observer.exe"
-            update_path = data_root / "runtime-state" / "update-request.json"
-            client_proc = spawn_client(client_exe, port, host_session_id, read_version(), update_path)
+            client_proc = spawn_client(
+                client_exe, port, host_session_id, read_version(),
+                update_session_id, update_session_token, update_control_port,
+            )
             client_proc.wait()
+            if apply_requested():
+                break
             all_terminal_at = None
             continue
 
         if time.monotonic() - all_terminal_at > grace_seconds:
             break
-
-
-def _launch_maintenance_tool(dist_root: Path, server_proc: subprocess.Popen | None) -> None:
-    mt = dist_root / "maintenancetool.exe"
-    if server_proc is not None:
-        server_proc.terminate()
-        try:
-            server_proc.wait(timeout=10)
-        except subprocess.TimeoutExpired:
-            server_proc.kill()
-    if mt.exists():
-        subprocess.Popen([str(mt)], creationflags=subprocess.DETACHED_PROCESS if os.name == "nt" else 0)
 
 
 def _acquire_host_mutex() -> bool:

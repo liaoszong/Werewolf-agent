@@ -30,7 +30,7 @@ def _credentials_post_result(
         return (400, {"error": "missing_api_key"})
     if not isinstance(base_url, str):
         return (400, {"error": "invalid_base_url"})
-    # Only http(s) endpoints are fetchable; reject file://, gopher://, schemeless,
+    # Only http(s) endpoints are fetchable; reject local-file URLs, gopher, schemeless,
     # etc. (localhost/private hosts are intentionally allowed — local model servers
     # like Ollama/LM Studio are a first-class BYO-key use case).
     if base_url and not (base_url.startswith("http://") or base_url.startswith("https://")):

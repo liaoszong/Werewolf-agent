@@ -329,7 +329,7 @@ historical harness plan 2026-06-06--p2-c-1-theater-view-plan.md
 - 独立诚实链组件文件(`PerspectiveSwitcher.qml`/`AuditLinksPanel.qml`/`ViewBoundaryBadge.qml`/`ProjectionProofPanel.qml`)**自身 objectName 与注册不变**,仅被 `EvidenceConsole` 复用;`QtObserverCockpitContractTests` 里键于这些**组件文件**的断言(`PerspectiveSwitcher` 9 视角值、`AuditLinksPanel` 审计 chip)**保持绿不动**。
 - **EvidenceConsole re-home 强校验(Edit, user 2026-06-06):** 断言 `EvidenceConsole.qml` **自身文本**实例化 `ViewBoundaryBadge`/`ProjectionProofPanel`/`PerspectiveSwitcher`/`EventTimeline`/`AuditLinksPanel` 且含 `objectName:"providerFailureSummary"`。**不得**由保留的 `LiveCockpitView.qml` 顶替满足 re-home —— 断言键定在 `EvidenceConsole.qml` 文件上。
 - CMake 注册测试覆盖新文件。
-- 禁词扫描保持绿(新组件**不得**含 `events.jsonl`/`snapshots/`/`QFile`/`QDir`/`file://`/`werewolf_eval`/secret 标记);新组件无本地文件 I/O。
+- 禁词扫描保持绿(新组件**不得**含 `events.jsonl`/`snapshots/`/`QFile`/`QDir`/local-file URL scheme/`werewolf_eval`/secret 标记);新组件无本地文件 I/O。
 - `QtObserverProjectionClientTests`:加断言 client 暴露 `projectionEvents`,且 `setCurrentPerspective`/`setCurrentRunId` **清空 `m_projectionEvents` 并 notify**(stale 守卫,§5.7)。
 - **队列契约(Edit):** 断言 `EventPresentationQueue.qml` 含 `function reset`(Reset 协议)、含 `_present`(PresentationEvent 规范化)、**不含 `.sort(`**(append-order 消费,§6);断言 `SeatRing/SpeechTheater/PlaybackControls` 三文件**不含 `.payload`**(只读 PresentationEvent)。
 - README 断言随非目标更新同步。

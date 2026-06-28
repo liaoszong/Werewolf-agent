@@ -46,6 +46,12 @@ The observer protocol is the hard boundary: any client (Qt today, Web later) con
 
 ## Getting started
 
+### Windows desktop install
+
+For normal desktop use, download `Werewolf-agent-Setup.exe` from the main repository's GitHub Releases and run it once. The app installs to `%LOCALAPPDATA%\WerewolfAgent\current\`, while runs, profiles, configs, logs, credentials, and settings stay under `%LOCALAPPDATA%\Werewolf-agent\` or the Windows user stores.
+
+After installation, launch Werewolf-agent from the desktop or Start menu. Future stable updates are handled in the client under Settings -> About & Updates: check for updates, review the target version and release notes, then choose Download and Restart when no match is queued or running.
+
 ### Prerequisites
 
 - **Python 3.12+** — no third-party packages needed.

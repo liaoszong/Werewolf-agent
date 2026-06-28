@@ -19,6 +19,7 @@ Item {
     property bool statusIsError: false
     property bool fetching: false
     property int usagePeriodIndex: 0
+    property bool updateApplyAfterDownload: false
 
     readonly property int outerMargin: 26
     readonly property int pageGap: Theme.space.lg
@@ -410,6 +411,96 @@ Item {
         }
     }
 
+    function updateValue(key) {
+        var status = ObserverClient.updateStatus
+        if (!status)
+            return ""
+        var value = status[key]
+        return value === undefined || value === null ? "" : value
+    }
+
+    function updatePhase() {
+        return "" + root.updateValue("phase")
+    }
+
+    function updateTargetVersion() {
+        return "" + root.updateValue("target_version")
+    }
+
+    function updateReleaseNotes() {
+        return "" + root.updateValue("release_notes")
+    }
+
+    function updateProgress() {
+        var value = Number(root.updateValue("progress"))
+        if (isNaN(value))
+            return 0
+        return Math.max(0, Math.min(100, value))
+    }
+
+    function updateErrorText(code) {
+        switch (code) {
+        case "active_run_exists":
+            return I18n.t("当前有排队或运行中的对局，不能重启更新。", "A queued or running match is active. Restart update is blocked.")
+        case "update_control_unavailable":
+            return I18n.t("当前启动方式不支持客户端内更新。", "In-app updates are unavailable for this launch.")
+        case "forbidden":
+            return I18n.t("更新会话已失效，请重启客户端。", "The update session expired. Restart the client.")
+        case "check_failed":
+            return I18n.t("检查更新失败，请稍后重试。", "Update check failed. Try again later.")
+        case "download_failed":
+            return I18n.t("下载更新失败，请保持客户端打开后重试。", "Update download failed. Keep the client open and try again.")
+        case "apply_failed":
+            return I18n.t("应用更新失败，请重启客户端后重试。", "Applying the update failed. Restart the client and try again.")
+        case "no update has been checked":
+        case "RuntimeError":
+            return I18n.t("请先检查更新。", "Check for updates first.")
+        default:
+            return code ? I18n.t("更新失败:", "Update failed: ") + code : ""
+        }
+    }
+
+    function updateStatusText() {
+        var error = "" + root.updateValue("error")
+        if (error)
+            return root.updateErrorText(error)
+        var phase = root.updatePhase()
+        if (phase === "checking")
+            return I18n.t("正在检查更新…", "Checking for updates…")
+        if (phase === "current")
+            return I18n.t("当前已是最新版本。", "You are on the latest version.")
+        if (phase === "available")
+            return I18n.t("发现新版本", "Update available") + ": " + root.updateTargetVersion()
+        if (phase === "downloading")
+            return I18n.t("正在下载更新", "Downloading update") + " " + Math.round(root.updateProgress()) + "%"
+        if (phase === "downloaded")
+            return I18n.t("更新已下载，准备重启应用。", "Update downloaded. Ready to restart.")
+        if (phase === "applying")
+            return I18n.t("正在退出并应用更新…", "Exiting to apply update…")
+        if (phase === "blocked_active_run")
+            return root.updateErrorText("active_run_exists")
+        return ""
+    }
+
+    function updateBusy() {
+        var phase = root.updatePhase()
+        return phase === "checking" || phase === "downloading" || phase === "applying"
+    }
+
+    function requestDownloadAndRestartUpdate() {
+        if (ObserverClient.hasActiveRun()) {
+            root.updateApplyAfterDownload = false
+            ObserverClient.getUpdateStatus()
+            return
+        }
+        root.updateApplyAfterDownload = true
+        if (root.updatePhase() === "downloaded")
+            ObserverClient.applyDownloadedUpdate()
+        else
+            ObserverClient.downloadUpdate()
+        aboutUpdatePoller.restart()
+    }
+
     function loadProviderIntoForm() {
         keyField.clear()
         if (root.isPreviewProvider(root.selectedProvider))
@@ -468,6 +559,32 @@ Item {
                 root.statusText = root.reasonText(reason)
             }
         }
+        function onUpdateStatusChanged() {
+            var phase = root.updatePhase()
+            if (root.updateApplyAfterDownload && phase === "downloaded") {
+                if (ObserverClient.hasActiveRun()) {
+                    root.updateApplyAfterDownload = false
+                    return
+                }
+                ObserverClient.applyDownloadedUpdate()
+                return
+            }
+            if (phase === "applying") {
+                root.updateApplyAfterDownload = false
+                Qt.quit()
+                return
+            }
+            if (phase === "error" || phase === "blocked_active_run")
+                root.updateApplyAfterDownload = false
+        }
+    }
+
+    Timer {
+        id: aboutUpdatePoller
+        interval: 600
+        repeat: true
+        running: root.updateApplyAfterDownload || root.updatePhase() === "downloading"
+        onTriggered: ObserverClient.getUpdateStatus()
     }
 
     Rectangle {
@@ -2230,46 +2347,95 @@ Item {
                                 }
 
                                 Text {
-                                    text: I18n.t("通过系统更新工具检查可用更新", "Check for available updates using the system update tool")
+                                    text: I18n.t("在客户端内检查、下载并重启更新。", "Check, download, and restart to update in the client.")
                                     color: Theme.warm.muted
                                     font.pixelSize: 12
                                     font.family: Theme.fontFamilies.sans
                                     wrapMode: Text.WordWrap
                                 }
 
-                                AppButton {
-                                    text: ObserverClient.hasActiveRun()
-                                        ? I18n.t("当前有进行中的对局，请等待对局结束后再检查更新", "A match is in progress. Please wait for it to finish before checking for updates.")
-                                        : I18n.t("检查更新", "Check for Updates")
-                                    enabled: !ObserverClient.hasActiveRun()
-                                    onLight: true
-                                    onClicked: {
-                                        if (ObserverClient.updateRequestPath) {
-                                            var req = {
-                                                schema_version: 1,
-                                                request_id: ObserverClient.generateUuid(),
-                                                host_session_id: ObserverClient.hostSessionId,
-                                                client_pid: 0,
-                                                created_at: new Date().toISOString(),
-                                                release_version: ObserverClient.releaseVersion,
-                                                action: "launch_maintenance_tool"
-                                            }
-                                            if (ObserverClient.writeUpdateRequest(req)) {
-                                                aboutUpdateStatus.text = I18n.t("正在退出并打开更新工具…", "Exiting and opening update tool…")
-                                                Qt.quit()
-                                            } else {
-                                                aboutUpdateStatus.text = I18n.t("无法启动更新工具，请查看日志", "Cannot start update tool. Please check the logs.")
-                                            }
-                                        }
+                                Row {
+                                    spacing: Theme.space.sm
+                                    AppButton {
+                                        text: I18n.t("检查更新", "Check for Updates")
+                                        enabled: !root.updateBusy()
+                                        onLight: true
+                                        variant: "secondary"
+                                        onClicked: ObserverClient.checkForUpdate()
+                                    }
+
+                                    AppButton {
+                                        text: I18n.t("下载并重启更新", "Download and Restart")
+                                        enabled: !root.updateBusy()
+                                                 && root.updateTargetVersion() !== ""
+                                                 && (root.updatePhase() === "available" || root.updatePhase() === "downloaded")
+                                        onLight: true
+                                        onClicked: root.requestDownloadAndRestartUpdate()
                                     }
                                 }
 
                                 Text {
+                                    visible: ObserverClient.hasActiveRun()
+                                    text: I18n.t("当前有排队或运行中的对局；可检查更新，但不能重启应用更新。", "A queued or running match is active; you can check for updates, but restart update is blocked.")
+                                    color: Theme.warm.warning
+                                    font.pixelSize: Theme.size.caption
+                                    font.family: Theme.fontFamilies.sans
+                                    wrapMode: Text.WordWrap
+                                    width: parent.width
+                                }
+
+                                Text {
                                     id: aboutUpdateStatus
+                                    text: root.updateStatusText()
                                     color: Theme.warm.muted
                                     font.pixelSize: Theme.size.caption
                                     font.family: Theme.fontFamilies.sans
                                     visible: text !== ""
+                                    wrapMode: Text.WordWrap
+                                    width: parent.width
+                                }
+
+                                Rectangle {
+                                    width: parent.width
+                                    height: 8
+                                    radius: 4
+                                    color: Theme.withAlpha(Theme.warm.ink, 0.08)
+                                    visible: root.updatePhase() === "downloading"
+                                             || root.updatePhase() === "downloaded"
+                                             || root.updatePhase() === "applying"
+                                    Rectangle {
+                                        anchors.left: parent.left
+                                        anchors.top: parent.top
+                                        anchors.bottom: parent.bottom
+                                        width: parent.width * root.updateProgress() / 100
+                                        radius: parent.radius
+                                        color: Theme.warm.primary
+                                    }
+                                }
+
+                                Column {
+                                    width: parent.width
+                                    spacing: 6
+                                    visible: root.updateTargetVersion() !== ""
+                                             || root.updateReleaseNotes() !== ""
+                                    Text {
+                                        text: I18n.t("目标版本", "Target version") + ": " + root.updateTargetVersion()
+                                        color: Theme.warm.bodyStrong
+                                        font.pixelSize: Theme.size.caption
+                                        font.family: Theme.fontFamilies.sans
+                                        visible: root.updateTargetVersion() !== ""
+                                    }
+                                    Text {
+                                        text: root.updateReleaseNotes()
+                                        textFormat: Text.PlainText
+                                        color: Theme.warm.body
+                                        font.pixelSize: Theme.size.caption
+                                        font.family: Theme.fontFamilies.sans
+                                        wrapMode: Text.WordWrap
+                                        width: parent.width
+                                        maximumLineCount: 8
+                                        visible: root.updateReleaseNotes() !== ""
+                                    }
                                 }
                             }
                         }

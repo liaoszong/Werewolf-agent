@@ -6,7 +6,6 @@
 #include <QJsonObject>
 #include <QDateTime>
 #include <QFile>
-#include <QUuid>
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QSaveFile>
@@ -206,7 +205,7 @@ void ObserverApiClient::setInitialRunId(const QString &id) { m_initialRunId = id
 QString ObserverApiClient::releaseVersion() const { return m_releaseVersion; }
 QString ObserverApiClient::releaseChannel() const { return m_releaseChannel; }
 QString ObserverApiClient::hostSessionId() const { return m_hostSessionId; }
-QString ObserverApiClient::updateRequestPath() const { return m_updateRequestPath; }
+QVariantMap ObserverApiClient::updateStatus() const { return m_updateStatus; }
 
 void ObserverApiClient::setReleaseVersion(const QString &v)
 {
@@ -224,12 +223,19 @@ void ObserverApiClient::setHostSessionId(const QString &s)
     }
 }
 
-void ObserverApiClient::setUpdateRequestPath(const QString &p)
+void ObserverApiClient::setUpdateSessionId(const QString &s)
 {
-    if (m_updateRequestPath != p) {
-        m_updateRequestPath = p;
-        emit updateRequestPathChanged();
-    }
+    m_updateSessionId = s;
+}
+
+void ObserverApiClient::setUpdateSessionToken(const QString &s)
+{
+    m_updateSessionToken = s;
+}
+
+void ObserverApiClient::setUpdateControlPort(int port)
+{
+    m_updateControlPort = port;
 }
 
 bool ObserverApiClient::hasActiveRun() const
@@ -241,26 +247,6 @@ bool ObserverApiClient::hasActiveRun() const
             return true;
     }
     return false;
-}
-
-QString ObserverApiClient::generateUuid() const
-{
-    return QUuid::createUuid().toString(QUuid::WithoutBraces);
-}
-
-bool ObserverApiClient::writeUpdateRequest(const QVariantMap &request)
-{
-    const QString path = m_updateRequestPath;
-    if (path.isEmpty()) return false;
-    const QJsonDocument doc(QJsonObject::fromVariantMap(request));
-    QFile file(path + QStringLiteral(".tmp"));
-    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate))
-        return false;
-    file.write(doc.toJson(QJsonDocument::Compact));
-    file.close();
-    // Atomic rename
-    QFile::remove(path);
-    return QFile::rename(path + QStringLiteral(".tmp"), path);
 }
 
 QNetworkReply *ObserverApiClient::get(const QString &path)
@@ -276,6 +262,133 @@ QNetworkReply *ObserverApiClient::post(const QString &path, const QByteArray &bo
     req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
     req.setRawHeader("Accept", "application/json");
     return m_network->post(req, body);
+}
+
+QNetworkReply *ObserverApiClient::postUpdateAction(const QString &action)
+{
+    if (m_updateControlPort <= 0 || m_updateSessionId.isEmpty() || m_updateSessionToken.isEmpty()) {
+        QVariantMap status;
+        status[QStringLiteral("phase")] = QStringLiteral("unavailable");
+        status[QStringLiteral("error")] = QStringLiteral("update_control_unavailable");
+        setUpdateStatus(status);
+        return nullptr;
+    }
+    QNetworkRequest req(QUrl(QStringLiteral("http://127.0.0.1:%1/update/%2")
+        .arg(m_updateControlPort).arg(action)));
+    req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    req.setRawHeader("Accept", "application/json");
+    QJsonObject payload;
+    payload[QStringLiteral("schema_version")] = 1;
+    payload[QStringLiteral("session_id")] = m_updateSessionId;
+    payload[QStringLiteral("session_token")] = m_updateSessionToken;
+    payload[QStringLiteral("action")] = action;
+    return m_network->post(req, QJsonDocument(payload).toJson(QJsonDocument::Compact));
+}
+
+void ObserverApiClient::handleUpdateReply(QNetworkReply *reply, const QString &fallbackPhase)
+{
+    if (!reply)
+        return;
+    const QByteArray body = reply->readAll();
+    const QJsonDocument doc = QJsonDocument::fromJson(body);
+    QVariantMap status;
+    bool ok = false;
+    if (doc.isObject()) {
+        const QJsonObject obj = doc.object();
+        ok = obj.value(QStringLiteral("ok")).toBool(false);
+        status = obj.value(QStringLiteral("status")).toObject().toVariantMap();
+        if (!ok && status.value(QStringLiteral("error")).toString().isEmpty()) {
+            const QString code = obj.value(QStringLiteral("code")).toString();
+            if (!code.isEmpty())
+                status[QStringLiteral("error")] = code;
+        }
+    }
+    if (status.isEmpty()) {
+        status[QStringLiteral("phase")] = fallbackPhase;
+        status[QStringLiteral("error")] = reply->error() == QNetworkReply::NoError
+            ? QStringLiteral("invalid_update_response")
+            : reply->errorString();
+    }
+    setUpdateStatus(status);
+    if (reply->error() != QNetworkReply::NoError || !ok) {
+        const QString err = status.value(QStringLiteral("error")).toString();
+        setError(err.isEmpty() ? QStringLiteral("update_request_failed") : err);
+    }
+    reply->deleteLater();
+}
+
+void ObserverApiClient::setUpdateStatus(const QVariantMap &status)
+{
+    m_updateStatus = status;
+    emit updateStatusChanged();
+}
+
+void ObserverApiClient::checkForUpdate()
+{
+    QVariantMap status = m_updateStatus;
+    status[QStringLiteral("phase")] = QStringLiteral("checking");
+    status[QStringLiteral("error")] = QString();
+    setUpdateStatus(status);
+    QNetworkReply *reply = postUpdateAction(QStringLiteral("check_for_update"));
+    if (!reply)
+        return;
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        handleUpdateReply(reply, QStringLiteral("check_failed"));
+    });
+}
+
+void ObserverApiClient::getUpdateStatus()
+{
+    if (m_updateControlPort <= 0 || m_updateSessionId.isEmpty() || m_updateSessionToken.isEmpty()) {
+        QVariantMap status;
+        status[QStringLiteral("phase")] = QStringLiteral("unavailable");
+        status[QStringLiteral("error")] = QStringLiteral("update_control_unavailable");
+        setUpdateStatus(status);
+        return;
+    }
+    QUrl url(QStringLiteral("http://127.0.0.1:%1/update/status").arg(m_updateControlPort));
+    QUrlQuery query;
+    query.addQueryItem(QStringLiteral("session_id"), m_updateSessionId);
+    query.addQueryItem(QStringLiteral("session_token"), m_updateSessionToken);
+    url.setQuery(query);
+    QNetworkRequest req(url);
+    req.setRawHeader("Accept", "application/json");
+    QNetworkReply *reply = m_network->get(req);
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        handleUpdateReply(reply, QStringLiteral("status_failed"));
+    });
+}
+
+void ObserverApiClient::downloadUpdate()
+{
+    QVariantMap status = m_updateStatus;
+    status[QStringLiteral("phase")] = QStringLiteral("downloading");
+    status[QStringLiteral("progress")] = 0;
+    status[QStringLiteral("error")] = QString();
+    setUpdateStatus(status);
+    QNetworkReply *reply = postUpdateAction(QStringLiteral("download_update"));
+    if (!reply)
+        return;
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        handleUpdateReply(reply, QStringLiteral("download_failed"));
+    });
+}
+
+void ObserverApiClient::applyDownloadedUpdate()
+{
+    if (hasActiveRun()) {
+        QVariantMap status = m_updateStatus;
+        status[QStringLiteral("phase")] = QStringLiteral("blocked_active_run");
+        status[QStringLiteral("error")] = QStringLiteral("active_run_exists");
+        setUpdateStatus(status);
+        return;
+    }
+    QNetworkReply *reply = postUpdateAction(QStringLiteral("apply_downloaded_update"));
+    if (!reply)
+        return;
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        handleUpdateReply(reply, QStringLiteral("apply_failed"));
+    });
 }
 
 void ObserverApiClient::setError(const QString &msg)

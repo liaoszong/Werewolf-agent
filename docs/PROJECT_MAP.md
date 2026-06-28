@@ -50,6 +50,7 @@
 | P2-B 开局配置 | BYO-key、本地凭证存储与中继、供应商中心、多供应商预设、per-seat provider/prompt/参数配置、调度沙盘、配置保存/导入/导出。 | ✅ 完成 |
 | P2-C 实时观战上帝视角 UI | 实时上帝视角剧场、事件跟随、SSE/live 状态、玩家环/发言/投票/夜晚揭示、证据控制台、AI 推理轨迹、导航生命周期。 | ✅ 完成 |
 | P2-D 结算画面 | 结算战报、剧场内结算覆盖层、历史回看/管理、中断局归档和删除语义。逐人深度复盘仍归 P3-A。 | ✅ 完成 |
+| R0 Windows 桌面发行 | GitHub Releases 首次安装、Velopack 后台更新、Settings 内检查/下载/重启、active-run apply gate、用户数据隔离。 | ✅ 完成 |
 
 ### P2-A 工作任务(当前模块,细化到工作任务粒度)
 
@@ -128,6 +129,7 @@
 | **SYS-C1** | 评测 | Evaluation Harness;baseline vs ablation(消融) | scoring / attribution / score_records | ✅ P1 原语完整;P3 深化为复盘/排行榜 |
 | **SYS-C2** | 观战与回放 | Replay / Spectator System | observer server(REST/SSE)+ Qt 剧场/结算 | ✅ 主体完成;P3-A 逐人复盘待做 |
 | **SYS-C3** | 质量防线 | 三件套:Differential Testing(差分测试)· **Runtime Verification / Semantic Oracle**(不变量安全网)· Deterministic Simulation Testing(fake 脚本+固定种子,对标 FoundationDB DST) | 差分:②a 的 OLD-oracle gate;安全网:`docs/superpowers/specs/2026-06-09-p2a-invariant-safety-net-design.md`(PLAN-READY);DST:`emergent_fake_script.py` + seed 体系 | ✅ 三件套全部就位(2026-06-10):安全网已合并(`src/werewolf_eval/invariants/`,7 不变量 + B1 防泄漏×4站点 + B4 防双死×3站点 + 50-seed fuzz,字节中立);剩 engine-level fuzz、B2/B3 守卫跟 ledger/EffectQueue |
+| **SYS-C4** | 桌面发行与更新 | Desktop Distribution / In-App Update | `scripts/release/`, `src/werewolf_eval/release_host/`, `clients/qt_observer/qml/ProviderSettingsView.qml` | ✅ R0 完成:PyInstaller onedir bootstrapper、frozen observer server、Qt deployment tree、Velopack package、GitHub Releases source、host-owned update RPC、Settings 内更新 UI、安装态本地 E2E 与数据保留验证 |
 
 > **系统间的关键依赖**(讨论重构顺序时用):SYS-A2 的 ledger 是女巫迁移前提;SYS-C3 安全网是 A2 后续所有大刀(ledger/EffectQueue/NightPlan)的护栏,先网后刀;SYS-B1 的情景记忆依赖 SYS-A4 可见性检查(I4b)防泄漏;SYS-A1 的 NightPlan 与 SYS-A2 的 EffectQueue 都等真实角色需求触发,不预建。
 

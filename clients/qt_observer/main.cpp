@@ -40,12 +40,32 @@ static QString hostSessionFromArgs(const QStringList &args)
     return QString();
 }
 
-static QString updateRequestPathFromArgs(const QStringList &args)
+static QString updateSessionIdFromArgs(const QStringList &args)
 {
-    const int index = args.indexOf("--update-request-path");
+    const int index = args.indexOf("--update-session-id");
     if (index >= 0 && index + 1 < args.size())
         return args.at(index + 1);
     return QString();
+}
+
+static QString updateSessionTokenFromArgs(const QStringList &args)
+{
+    const int index = args.indexOf("--update-session-token");
+    if (index >= 0 && index + 1 < args.size())
+        return args.at(index + 1);
+    return QString();
+}
+
+static int updateControlPortFromArgs(const QStringList &args)
+{
+    const int index = args.indexOf("--update-control-port");
+    if (index >= 0 && index + 1 < args.size()) {
+        bool ok = false;
+        const int port = args.at(index + 1).toInt(&ok);
+        if (ok)
+            return port;
+    }
+    return 0;
 }
 
 static bool versionFlagFromArgs(const QStringList &args)
@@ -66,7 +86,9 @@ int main(int argc, char *argv[])
     observerClient.setInitialRunId(openRunFromArgs(app.arguments()));
     observerClient.setReleaseVersion(releaseVersionFromArgs(app.arguments()));
     observerClient.setHostSessionId(hostSessionFromArgs(app.arguments()));
-    observerClient.setUpdateRequestPath(updateRequestPathFromArgs(app.arguments()));
+    observerClient.setUpdateSessionId(updateSessionIdFromArgs(app.arguments()));
+    observerClient.setUpdateSessionToken(updateSessionTokenFromArgs(app.arguments()));
+    observerClient.setUpdateControlPort(updateControlPortFromArgs(app.arguments()));
 
     if (versionFlagFromArgs(app.arguments())) {
         QString ver = releaseVersionFromArgs(app.arguments());

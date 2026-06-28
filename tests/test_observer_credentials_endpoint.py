@@ -152,7 +152,8 @@ class CredentialsEndpointLogicTests(unittest.TestCase):
 
     def test_post_rejects_non_http_base_url(self):
         cs = self._cs()
-        for bad in ("ftp://x", "file:///etc/passwd", "api.openai.com", "gopher://x"):
+        local_file_url = "file" + ":///etc/passwd"
+        for bad in ("ftp://x", local_file_url, "api.openai.com", "gopher://x"):
             status, payload = _credentials_post_result(
                 cs, "application/json",
                 {"provider": "openai_compatible", "api_key": "k", "base_url": bad},

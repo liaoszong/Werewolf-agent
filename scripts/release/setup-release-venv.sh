@@ -9,7 +9,8 @@ python -m venv "$VENV_DIR"
 
 source "$VENV_DIR/Scripts/activate"
 pip install --upgrade pip
-pip install pyinstaller
+pip install pyinstaller velopack
 
 echo "=== Release venv ready at $VENV_DIR ==="
 echo "PyInstaller version: $(pyinstaller --version)"
+python -c "import velopack; print('Velopack Python package:', getattr(velopack, '__version__', 'installed'))"

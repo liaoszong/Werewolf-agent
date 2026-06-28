@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 511
+- Entries: 520
 
 ```text
 ./
@@ -274,15 +274,20 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   │               └── package.xml
 │   │   ├── assemble-package.sh
 │   │   ├── build-bootstrapper-frozen.sh
+│   │   ├── build-bootstrapper-release.sh
 │   │   ├── build-installer.sh
 │   │   ├── build-qt-release.sh
 │   │   ├── build-repo.sh
 │   │   ├── build-server-frozen.sh
+│   │   ├── build-velopack-release.sh
 │   │   ├── distribution-manifest.json.in
 │   │   ├── observer-server.spec
 │   │   ├── publish-to-github-pages.sh
+│   │   ├── release-notes.md
+│   │   ├── run-installed-local-e2e.ps1
 │   │   ├── setup-release-venv.sh
 │   │   ├── smoke-test.sh
+│   │   ├── upload-github-release.sh
 │   │   └── werewolf-agent.spec
 │   └── research/
 │       └── evaluate_semantic_labels.py
@@ -328,7 +333,9 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       │   ├── __init__.py
 │       │   ├── __main__.py
 │       │   ├── control.py
-│       │   └── lifecycle.py
+│       │   ├── lifecycle.py
+│       │   ├── update_control.py
+│       │   └── velopack_runtime.py
 │       ├── __init__.py
 │       ├── artifacts.py
 │       ├── attribute_game.py
@@ -544,6 +551,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── test_provider_contract.py
 │   ├── test_provider_registry.py
 │   ├── test_qt_observer_static_contract.py
+│   ├── test_release_host_lifecycle.py
+│   ├── test_release_update_control.py
 │   ├── test_render_demo.py
 │   ├── test_render_provider_replay.py
 │   ├── test_rng_draw_order.py
