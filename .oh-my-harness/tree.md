@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 520
+- Entries: 511
 
 ```text
 ./
@@ -209,8 +209,6 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── prs/
 │   │   ├── 2026-05-30--phase2-next-step-research.md
 │   │   └── 2026-05-30--s5-semantic-label-research.md
-│   ├── secrets/
-│   │   └── README.md
 │   ├── semantic-labeling/
 │   │   ├── s5-label-contract.md
 │   │   └── s5-label-prompts.md
@@ -247,7 +245,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │       ├── 2026-06-12-l4-guard-witch-coord-arm-design.md
 │   │       ├── 2026-06-13-livecockpit-godseye-redesign-phase2-design.md
 │   │       ├── 2026-06-13-werewolf-game-client-redesign-design.md
-│   │       └── 2026-06-20-r0-windows-distribution-baseline.md
+│   │       ├── 2026-06-20-r0-windows-distribution-baseline.md
+│   │       └── 2026-07-02-agent-roleplay-human-game-pivot-design.md
 │   ├── CHECKPOINT_TEMPLATE.md
 │   ├── EVALUATION_RUBRIC.md
 │   ├── PRODUCT_ONE_PAGER.md
@@ -263,26 +262,12 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   ├── run_deepseek_live_smoke.py
 │   │   └── validate_brief.py
 │   ├── release/
-│   │   ├── ifw/
-│   │   │   ├── config/
-│   │   │   │   └── config.xml.in
-│   │   │   └── packages/
-│   │   │       └── com.werewolfagent.app/
-│   │   │           └── meta/
-│   │   │               ├── installscript.qs
-│   │   │               ├── license.txt
-│   │   │               └── package.xml
-│   │   ├── assemble-package.sh
 │   │   ├── build-bootstrapper-frozen.sh
 │   │   ├── build-bootstrapper-release.sh
-│   │   ├── build-installer.sh
 │   │   ├── build-qt-release.sh
-│   │   ├── build-repo.sh
 │   │   ├── build-server-frozen.sh
 │   │   ├── build-velopack-release.sh
-│   │   ├── distribution-manifest.json.in
 │   │   ├── observer-server.spec
-│   │   ├── publish-to-github-pages.sh
 │   │   ├── release-notes.md
 │   │   ├── run-installed-local-e2e.ps1
 │   │   ├── setup-release-venv.sh
