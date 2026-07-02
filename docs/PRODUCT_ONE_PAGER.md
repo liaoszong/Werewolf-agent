@@ -4,17 +4,17 @@
 
 ## 产品定义
 
-Werewolf-agent 是一个 **client-agnostic live AI Werewolf experiment platform**。平台目标是让 AI 狼人杀对局可以被**实时运行、观察、配置、审计和复盘**。
+Werewolf-agent 是一个 **client-agnostic live Werewolf Agent Theater**。平台目标是让狼人杀 Agent 对局可以被**实时运行、参与、观察、配置、审计和复盘**。AI-vs-AI 是默认实验形态;真人作为角色加入实时局是 P3 后续一等能力。
 
 平台核心是一个 Python runtime game engine + agent/provider loop。每次对局产出结构化运行日志（Game Log / Decision Log / Consensus Log / Score Log）、`events.jsonl` 事件流、runtime snapshots、prompt manifest 和 provider lifecycle 记录。这些运行产物通过 client-agnostic observer protocol 对外暴露，由 Qt observer client（未来可扩展 Web client）消费。
 
-评测评分、复盘归因、Leaderboard 和跨模型对比是建立在同一套结构化运行日志之上的 **P3 downstream capabilities**，结算画面即评测/复盘的入口。
+Agent 角色体验、单局记忆、桌面发言和真人参与是当前 **P3 direction**。评测评分、复盘归因、Leaderboard 和跨模型对比是建立在同一套结构化运行日志之上的 **P4 downstream capabilities**，结算画面既是趣味性复盘入口,也是后续评测/复盘入口。
 
 ## 用户是谁
 
-**主要用户：** AI Agent 开发者、模型评测者、狼人杀 AI 研究者。他们需要通过配置 agent profile（prompt / model / temperature / strategy）来运行可控实验，实时观察 AI 对局行为，审计运行日志，并对比不同配置下的 Agent 表现。
+**主要用户：** AI Agent 开发者、模型评测者、狼人杀 AI 研究者。他们需要通过配置 agent profile、Agent Card、RolePolicy、provider/model/temperature 来运行可控实验，实时观察 AI 对局行为，审计运行日志，并对比不同配置下的 Agent 表现。
 
-**间接用户：** 非技术用户通过 Qt observer client 观看对局过程，通过 P3 阶段的 Leaderboard 和评分面板理解 Agent 能力差异。
+**直接玩家/观众：** 非技术用户可以通过 Qt observer client 观看对局过程;P3 后续会允许本地真人以受限角色座位参战。P4 阶段再通过 Leaderboard 和评分面板理解 Agent 能力差异。
 
 ## 输入是什么
 
@@ -37,13 +37,21 @@ Werewolf-agent 是一个 **client-agnostic live AI Werewolf experiment platform*
 6. 对局配置面：每座位 provider/model/prompt 选择、live/fake 双模、多供应商预设（DeepSeek / OpenAI / Anthropic / 9 家 OpenAI 兼容 / 自定义端点）
 7. 结算战报（settlement bundle + 剧场内战报覆盖层）与历史对局回看/管理
 
-**评测层（P3，建设中的下游能力）：**
+**Agent 角色体验层（P3，当前方向）：**
 
-- 结果评测指标 + 过程评测指标（确定性评分已在 P1 落地，作为 P3 的原语）
+- Agent asset ownership：SeatCharacterCard / RolePolicy / RuntimeAgentState / ProviderProfile 分层
+- 单局 scoped memory：Fact / Claim / Belief / Commitment / TeamPlan 等有真相层级的记录
+- AgentContextPacket：带 provenance、visibility guard、prompt block hash、预算裁剪的上下文编译
+- Structured SpeechAct / table-talk：最小回应、质询、对跳、转票接口
+- Human participant seat：先从本地单真人村民开始,复用 observer protocol 与 action contract
+
+**评测层（P4，下游能力）：**
+
+- 结果评测指标 + 过程评测指标（确定性评分已在 P1 落地，作为 P4 的原语）
 - 确定性规则归因（turn_points + top_attribution）
 - 单局评分卡 + 跨局聚合 + 消融实验台（prompt/脚手架对比）
-- 多模型、多版本、按角色区分的真实 Leaderboard
-- 评分规则定义见 `docs/EVALUATION_RUBRIC.md`（P3 reference）
+- 多模型、多版本、按角色、Agent Card、记忆策略区分的真实 Leaderboard
+- 评分规则定义见 `docs/EVALUATION_RUBRIC.md`（P4 reference）
 
 ## 核心价值
 
@@ -53,6 +61,7 @@ Werewolf-agent 是一个 **client-agnostic live AI Werewolf experiment platform*
 - 对局过程不是黑盒——`events.jsonl`、prompt manifest、provider trace 提供完整审计链；HUD 始终显示执行真相（LIVE_API vs SIMULATION）。
 - 严格信息隔离可被机检：每个座位的 prompt 只能由其可见事件渲染，运行时不变量在泄漏时立刻报错。
 - 同一 profile 可复现运行，不同配置可对比实验；prompt 字节锁保证 baseline 不被静默漂移。
+- 角色体验优先于排行榜:只有对局本身有记忆、有拉扯、有戏剧节点,评测和 Leaderboard 才有产品价值。
 - 评测和 Leaderboard 建立在真实运行数据之上，不是人工 gold sample。
 - Client-agnostic protocol 确保 observer client 不与 Python runtime 内部实现绑定。
 
@@ -62,7 +71,8 @@ Werewolf-agent 是一个 **client-agnostic live AI Werewolf experiment platform*
 |------|------|------|
 | P1 数据与事件地基 | 日志 schema/校验/评分/归因、引擎与 provider 契约、实时事件骨架、observer 协议 + server | ✅ 完成 |
 | P2 观战式 AI-vs-AI 对局客户端 | 涌现式引擎、BYO-key 配置、剧场观战、结算战报 | ✅ 完成 |
-| P3 评测 · 复盘 · 排行榜 | 结算深化为评测/复盘、历史聚合、每角色 AI 胜率榜 | ⏳ 规划 |
+| P3 Agent 角色体验 · 真人参与 | 角色卡、单局记忆、roleplay harness、桌面发言、真人座位 | 🚧 当前方向 |
+| P4 评测 · 复盘 · 排行榜 | 结算深化为复盘/归因、历史聚合、按模型/角色/Agent Card/记忆策略排行 | ⏳ 后移 |
 
 项目从 Phase 1 deterministic MVP（单局人工 gold sample → 确定性评分 → 规则归因 → UI demo）出发，经由 provider-backed gameplay foundation（旧 G-track），pivot 到 client-agnostic live experiment platform。旧 G/E/S 编号到 P 阶段的映射见 `docs/PROJECT_MAP.md` 的「Reconcile」表。
 

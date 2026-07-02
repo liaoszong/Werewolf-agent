@@ -103,9 +103,9 @@
 
 | 模块 | 交付物(轮廓) | 状态 |
 |---|---|---|
-| **P3-A Agent Card + Memory Spine** | 角色卡/座位卡 schema;局内情景记忆、私有笔记、怀疑图、承诺/矛盾记录;跨局可选 playbook;所有记忆注入带 source ids 与 visibility guard。 | 🚧 当前模块 |
-| **P3-B 博弈脚手架与桌面发言** | 白天讨论从"顺序发言+投票"升级为可回应、可追问、可对跳、可转票的 table-talk;狼人私密频道、发言-投票一致性、反思/计划器进入 ActionEnvelope 上游。 | ⏳ 下一模块 |
-| **P3-C 真人座位实时参与** | 任一 seat 可由真人扮演:只看该角色可见信息,用同一 action contract 发言/投票/夜间行动;支持超时、AI 接管、重连和观战/参战边界。 | ⏳ 后续模块 |
+| **P3-A Agent Runtime Contract + Memory Spine** | 先锁四层 ownership:SeatCharacterCard / RolePolicy / RuntimeAgentState / ProviderProfile;再建单局 scoped memory、私有笔记、怀疑图、承诺/矛盾记录。所有记忆注入带 provenance、真相层级、status 与 visibility guard。 | 🚧 当前模块 |
+| **P3-B 博弈脚手架与桌面发言** | 先建 P3-B0 Structured SpeechAct Contract,再把白天讨论从"顺序发言+投票"升级为可回应、可追问、可对跳、可转票的 table-talk;狼人私密频道、发言-投票一致性、轻量计划器进入 ActionEnvelope 上游。 | ⏳ 下一模块 |
+| **P3-C 真人座位实时参与** | 首版只做本地单真人村民 seat,完整支持村民观察/发言/回应/投票/遗言/超时/重连;后续再扩真人狼人、预言家、女巫、多真人。所有真人动作由 server action_window 控制。 | ⏳ 后续模块 |
 | **P3-D 趣味性复盘入口** | 结算先回答"这局哪里好看/哪里蠢/谁骗过了谁",再接评测指标;把 P4 的评测能力挂到玩家能理解的戏剧节点上。 | ⏳ 后续模块 |
 
 ### P3-A 工作任务(当前模块,细化到工作任务粒度)
@@ -113,9 +113,9 @@
 | 工作任务 | 描述 | 状态 |
 |---|---|---|
 | **P3-A-0 路线转向 spec** | 正式记录从"评测/排行榜优先"转向"Agent 角色体验 + 真人参与优先";把 SillyTavern 与 Claude Code/learn-claude-code 参考转译成 Werewolf-agent 架构。 | ✅ 文档中 |
-| **P3-A-1 Agent Card schema** | 定义可编辑 Agent Card / Seat Card:角色策略、人格、语气、风险偏好、社交倾向、常用开局、示例发言、记忆策略、可用工具/权限。不得把真实身份硬编码到 role-agnostic seat persona。 | ⏳ 待 plan |
-| **P3-A-2 Agent memory packet** | 在现有 observation_text 之上建立 `AgentContextPacket`:工作记忆、情景记忆、私有笔记、公开 claim/票史、狼队共享记忆、注入预算与 source ids。 | ⏳ 待 plan |
-| **P3-A-3 First playable roleplay arm** | 先做 6 人基础板的最小好玩闭环:不同 seat 有明显风格差异,预言家会记验人并推动议程,狼人会维护伪装和团队剧本,村民会追问/转票。 | ⏳ 待 plan |
+| **P3-A-1 Agent asset ownership/schema** | 定义 SeatCharacterCard(角色无关人格)、RolePolicy(按真实身份加载)、RuntimeAgentState(每局新建)、ProviderProfile(模型/温度/预算)四层。用户可打包成预设,但 runtime 内部必须拆开。 | ⏳ 待 plan |
+| **P3-A-2 Agent memory packet** | 在现有 observation_text 之上建立 `AgentContextPacket`:Fact/Claim/Belief/Commitment/TeamPlan/StaticPlaybook 分层,包含 source ids、audience_scope、confidence、status、supersedes、prompt block hash 与调用成本记录。 | ⏳ 待 plan |
+| **P3-A-3 First playable roleplay arm(shadow-safe)** | 先做 6 人基础板的最小 Agent 化闭环:卡片差异可见、记忆引用可追溯、belief 与 fact 不混淆、狼人共享计划不泄漏、旧 baseline 在 shadow mode 下保持可比、调用成本可审计。追问/转票/戏剧节点归 P3-B/P3-D。 | ⏳ 待 plan |
 
 ### P3 成功口径
 
@@ -123,6 +123,7 @@
 - **博弈优先:**狼人会围绕伪装目标协作,好人会围绕公开/私有信息形成推理链,不同角色行动不只是"合法 JSON"。
 - **真人可玩:**真人 seat 不需要上帝视角也能完整参与;AI 能回应真人发言,不是把真人当旁白。
 - **安全不退:**所有 Agent 记忆、摘要、RAG、playbook 注入都必须过 SYS-A4 可见性边界;不能把私有事实包装成"记忆"泄漏给不该知道的 seat。
+- **成本可控:**默认一名玩家一次行动最多一次玩家模型调用;确定性 harness 负责 context selection、source entitlement、claim ledger 和预算裁剪。反思/记忆更新首版不得扩成多轮 planner。
 
 ---
 
@@ -163,8 +164,8 @@
 | **SYS-B1** | 记忆与上下文构建 | **Agent Memory / Context Engineering**;分层:工作记忆 → 情景记忆(episodic)→ 语义记忆(semantic) | `render_observation_text` + `augment_witch_observation`(每轮 prompt 组装) | 🌱 现在 = 工作记忆层的最小实现(每轮由可见事件重建上下文)。情景/语义记忆 ⏳ 属增强层,接缝 AgentContextPacket 已留;**任何记忆注入必须带 source ids 过 I4b 可见性检查**(防隐形喂漏,已写进安全网 spec)。**prompt 版本化机制已落地**(prompt_v1 字节锁 + ledger + 三元组戳,spec 2026-06-10):baseline prompt 修订有合法出口 |
 | **SYS-B2** | 决策协议 | Action Protocol / Structured Output | `action_runtime/envelope.py`(ActionEnvelope)+ strict-JSON;tool-calling 仅作消融轴 | ✅ baseline 统一 strict-JSON 已锁定(评测公平性不变量) |
 | **SYS-B3** | 模型接入网关 | Model Gateway / LLM Provider Abstraction | provider registry + BYO-key + 9 家 OpenAI 兼容预设 | ✅ 主体完成;剩 B5 收尾(per-seat token/成本汇总、退役 deepseek-only env 兜底) |
-| **SYS-B4** | 增强脚手架 | **Agent Scaffolding / Agent Harness**(计划、反思、工具、hooks、狼频道、发言-投票一致性) | 现有接缝 = 渲染器 `requires_scaffold` 标志 + `scaffold_model`(scribe provider);未来接 `AgentContextPacket` / roleplay harness | 🚧 P3 核心方向。边界已锁:脚手架在 ActionEnvelope 上游,baseline 永远裁判;不得把中间推理混入 action JSON。 |
-| **SYS-B5** | 角色卡与剧本资产 | Character Card / Persona Card / Playbook Library | 现有 `profile_config` 的 role prompt + seat persona;未来新增 Agent Card schema 与本地资产库 | ⏳ P3-A 待建。对标 SillyTavern 的 Character Card/World Info,但必须游戏化:身份策略、说话风格、风险偏好、社交倾向、示例发言、记忆策略、工具权限分开建模。 |
+| **SYS-B4** | 增强脚手架 | **Agent Scaffolding / Agent Harness**(计划、反思、工具、hooks、狼频道、发言-投票一致性) | 现有接缝 = 渲染器 `requires_scaffold` 标志 + `scaffold_model`(scribe provider);未来接 `AgentContextPacket` / roleplay harness | 🚧 P3 核心方向。边界已锁:脚手架在 ActionEnvelope 上游,baseline 永远裁判;不得把中间推理混入 action JSON。默认一玩家行动一次模型调用,额外 team/scaffold 调用必须单独记账。 |
+| **SYS-B5** | 角色卡与剧本资产 | Character Card / Persona Card / Playbook Library | 现有 `profile_config` 的 role prompt + seat persona;未来新增四层资产模型与本地资产库 | ⏳ P3-A 待建。对标 SillyTavern 的 Character Card/World Info,但 runtime 必须拆成 SeatCharacterCard / RolePolicy / RuntimeAgentState / ProviderProfile;本局状态永不回写角色卡本体。 |
 
 ### C 组 · 平台与质量面(Platform & Quality)
 
@@ -174,7 +175,7 @@
 | **SYS-C2** | 观战与回放 | Replay / Spectator System | observer server(REST/SSE)+ Qt 剧场/结算 | ✅ 主体完成;P3-D 趣味性节点展示与 P4-A 逐人深度复盘待做 |
 | **SYS-C3** | 质量防线 | 三件套:Differential Testing(差分测试)· **Runtime Verification / Semantic Oracle**(不变量安全网)· Deterministic Simulation Testing(fake 脚本+固定种子,对标 FoundationDB DST) | 差分:②a 的 OLD-oracle gate;安全网:`docs/superpowers/specs/2026-06-09-p2a-invariant-safety-net-design.md`(PLAN-READY);DST:`emergent_fake_script.py` + seed 体系 | ✅ 三件套全部就位(2026-06-10):安全网已合并(`src/werewolf_eval/invariants/`,7 不变量 + B1 防泄漏×4站点 + B4 防双死×3站点 + 50-seed fuzz,字节中立);剩 engine-level fuzz、B2/B3 守卫跟 ledger/EffectQueue |
 | **SYS-C4** | 桌面发行与更新 | Desktop Distribution / In-App Update | `scripts/release/`, `src/werewolf_eval/release_host/`, `clients/qt_observer/qml/ProviderSettingsView.qml` | ✅ R0 完成:PyInstaller onedir bootstrapper、frozen observer server、Qt deployment tree、Velopack package、GitHub Releases source、host-owned update RPC、Settings 内更新 UI、安装态本地 E2E 与数据保留验证 |
-| **SYS-C5** | 真人参与通道 | Human-in-the-loop Game Client / Participant Seat Gateway | observer REST/SSE + Qt setup/theater;未来新增 human seat action endpoints/UI | ⏳ P3-C 待建。真人 seat 必须走同一信息可见性和 action contract;客户端不得读取本地 artifact 或 god snapshot 伪造参战视角。 |
+| **SYS-C5** | 真人参与通道 | Human-in-the-loop Game Client / Participant Seat Gateway | observer REST/SSE + Qt setup/theater;未来新增 human seat action endpoints/UI | ⏳ P3-C 待建。首版本地单真人村民;真人 seat 必须走 server-controlled `SeatController` / `action_window_id` / session token / idempotency key / reconnect cursor;客户端不得读取本地 artifact 或 god snapshot 伪造参战视角。 |
 
 > **系统间的关键依赖**(讨论重构顺序时用):SYS-A2 的 ledger 是女巫迁移前提;SYS-C3 安全网是 A2 后续所有大刀(ledger/EffectQueue/NightPlan)的护栏,先网后刀;P3-A 先建 SYS-B5 Agent Card 与 SYS-B1 AgentContextPacket,再让 SYS-B4 harness 消费它;SYS-B1 的情景/语义记忆依赖 SYS-A4 可见性检查(I4b)防泄漏;SYS-C5 真人参与必须复用 SYS-A4/SYS-B2/SYS-C2,不能绕过 observer 协议。
 

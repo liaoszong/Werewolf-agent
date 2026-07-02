@@ -1,6 +1,6 @@
 # EVALUATION_RUBRIC — Werewolf-agent
 
-> **P3 reference.** Scoring dimensions, formulas, role rubrics, and AI judge boundaries defined here are canonical for evaluation / replay / leaderboard work. Current product direction is `docs/PROJECT_MAP.md` and `docs/PRODUCT_ONE_PAGER.md`.
+> **P4 reference.** Scoring dimensions, formulas, role rubrics, and AI judge boundaries defined here are canonical for evaluation / replay / leaderboard work. Current product direction is `docs/PROJECT_MAP.md` and `docs/PRODUCT_ONE_PAGER.md`; P3 now focuses on Agent roleplay, game-scoped memory, table-talk, and planned human participation.
 
 评分体系唯一事实来源。本文档定义所有评分维度、计算公式、角色 Rubric、AI 裁判边界和 Leaderboard 结构。其他文档引用本文件，不复制评分规则。
 
@@ -550,14 +550,14 @@ Decision Log: visible_info_refs = ["event_12","event_15","event_18"], reason = "
 }
 ```
 
-### H.4 延后到 Phase 2+ 的 AI 用途
+### H.4 延后到 P4+ 的 AI 用途
 
 | 用途 | Phase | 原因 |
 |------|-------|------|
-| 跨局策略风格聚类 | Phase 3 | 需要多局数据 |
-| 发言说服力评分 | Phase 3 | 高度主观，需大量校准 |
-| 自动发现新型作弊模式 | Phase 3 | 需要对抗样本积累 |
-| 自然语言复盘报告 | Phase 3 或不做 | 产品形态待定 |
+| 跨局策略风格聚类 | P4+ | 需要多局数据 |
+| 发言说服力评分 | P4+ | 高度主观,需大量校准 |
+| 自动发现新型作弊模式 | P4+ | 需要对抗样本积累 |
+| 自然语言复盘报告 | P4+ | P3-D 只做趣味性节点入口;完整自然语言复盘归后续评测/复盘层 |
 
 ---
 

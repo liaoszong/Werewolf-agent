@@ -1,8 +1,8 @@
 # Werewolf-agent
 
-**A watchable, auditable AI-vs-AI Werewolf (Mafia) arena.**
+**A playable, watchable, auditable Werewolf Agent Theater.**
 
-Configure which AI model plays each seat, watch the match unfold live from a god's-eye theater view, then dive into the settlement battle report — every decision, speech, and vote backed by a fully auditable event log.
+Configure AI agent seats, watch the match unfold live from a god's-eye theater view, then dive into the settlement battle report — every decision, speech, and vote backed by a fully auditable event log. AI-vs-AI is the default experiment mode; human participation is a planned first-class mode.
 
 [简体中文](README.zh-CN.md) | English
 
@@ -10,9 +10,9 @@ Configure which AI model plays each seat, watch the match unfold live from a god
 
 ## What is this?
 
-Werewolf-agent is a **client-agnostic live AI Werewolf experiment platform**. A Python game engine drives a 6-player social-deduction match where every seat is played by an AI agent under strict information isolation — werewolves don't know the seer, the seer's checks stay private, and prompts are provably built only from events each seat is allowed to see.
+Werewolf-agent is a **client-agnostic live Werewolf Agent Theater**. A Python game engine drives a 6-player social-deduction match under strict information isolation — werewolves don't know the seer, the seer's checks stay private, and each seat's context is provably built only from events that seat is allowed to see.
 
-Matches can run fully offline (deterministic fake provider, the default) or live against real LLM APIs. Every run produces a structured, replayable event stream that powers spectating, settlement reports, history replay, and evaluation.
+Matches can run fully offline (deterministic fake provider, the default) or live against real LLM APIs. Today the default product path is AI-vs-AI; the roadmap now promotes richer role-playing agents and then human-controlled seats. Every run produces a structured, replayable event stream that powers spectating, settlement reports, history replay, and downstream evaluation.
 
 ## Highlights
 
@@ -20,13 +20,14 @@ Matches can run fully offline (deterministic fake provider, the default) or live
 - **Bring your own AI** — per-seat provider/model/prompt/temperature configuration. Built-in presets: DeepSeek, OpenAI, Anthropic, plus 9 OpenAI-compatible vendors (Zhipu GLM, Moonshot, Qwen, MiniMax, SiliconFlow, xAI, Gemini, ModelScope, OpenRouter) and fully custom endpoints. API keys stay on your machine; only the local Python server ever calls a provider.
 - **Qt theater client** — live god-view spectating (seat ring, speech theater, evidence console, playback controls), match setup sandbox, in-theater settlement overlay with a scrolling battle report, and a history view for replaying or managing past runs.
 - **Honest by construction** — event-sourced logs (`events.jsonl`, snapshots, prompt manifest, provider traces, failure audits), executed-truth HUD (`LIVE_API` vs `SIMULATION`), visibility projections (God / Public / per-Role), and runtime invariants that fail loudly on information leaks or rule violations.
-- **Evaluation-ready** — deterministic scoring, rule attribution, an ablation harness with per-arm metrics, byte-locked prompt versioning with a revision ledger, differential testing, and seeded deterministic simulation.
+- **Agent-first roadmap** — P3 now focuses on role cards, game-scoped memory, agent harnesses, table-talk, and planned human seats. Evaluation, replay analysis, and leaderboards move downstream to P4.
+- **Evaluation-ready foundation** — deterministic scoring, rule attribution, an ablation harness with per-arm metrics, byte-locked prompt versioning with a revision ledger, differential testing, and seeded deterministic simulation.
 - **Zero-dependency backend** — the entire Python backend uses only the standard library. No `pip install` required to run an offline match.
 
 ## Architecture
 
 ```text
-YAML run profile (per-seat AI / prompts / role shuffle)
+YAML run profile (seat controllers / AI profiles / prompts / role shuffle)
         │
         ▼
 Python game engine + agent/provider loop          src/werewolf_eval/
@@ -40,6 +41,7 @@ Local observer server (REST + SSE, client-agnostic protocol)
         ▼
 Qt 6 / QML theater client                         clients/qt_observer/
   · live spectating · match setup · settlement report · history replay
+  · human participant seats planned behind the same observer protocol
 ```
 
 The observer protocol is the hard boundary: any client (Qt today, Web later) consumes the same REST/SSE surface and never touches engine internals or provider secrets.
@@ -117,7 +119,8 @@ PYTHONPATH=src python -m unittest discover -s tests -p "test_*.py"
 |-------|-------|--------|
 | **P1 — Data & event foundation** | Log schemas/validation/scoring/attribution, engine & provider contracts, runtime event spine, observer protocol + server | ✅ Done |
 | **P2 — Watchable AI-vs-AI client** | Emergent engine, BYO-key multi-provider setup, live theater UI, settlement report | ✅ Done |
-| **P3 — Evaluation · Replay analysis · Leaderboard** | Settlement deepened into per-player review; per-role AI win-rate leaderboard | ⏳ Planned |
+| **P3 — Agent roleplay · Human participation** | Agent cards, game-scoped memory, roleplay harness, table-talk, first-class human seats | 🚧 Current direction |
+| **P4 — Evaluation · Replay analysis · Leaderboard** | Settlement deepened into replay analysis; rankings by model, role, Agent Card, memory strategy | ⏳ Downstream |
 
 [`docs/PROJECT_MAP.md`](docs/PROJECT_MAP.md) is the authoritative product map (phases + system view).
 
@@ -133,8 +136,8 @@ PYTHONPATH=src python -m unittest discover -s tests -p "test_*.py"
 | [Plans](docs/superpowers/plans/) | Current implementation plans |
 | [ADRs](docs/adr/) | Architecture decisions (observer protocol, action runtime orchestrator) |
 | [Qt client README](clients/qt_observer/README.md) | Building, running, and testing the theater client |
-| [EVALUATION_RUBRIC](docs/EVALUATION_RUBRIC.md) | Scoring system reference (P3) |
+| [EVALUATION_RUBRIC](docs/EVALUATION_RUBRIC.md) | Scoring system reference (P4) |
 
 ## Background
 
-The project originates from a multi-agent systems exercise: build an AI Werewolf agent team that plays a hidden-information game under strict information isolation, with a complete match engine, structured observability, and a spectator UI. It started from the *evaluation & replay* direction — deterministic scoring over structured logs — and grew into the live experiment platform described above: run first, observe everything, then evaluate on top of the same auditable data.
+The project originates from a multi-agent systems exercise: build an AI Werewolf agent team that plays a hidden-information game under strict information isolation, with a complete match engine, structured observability, and a spectator UI. It first grew through the *evaluation & replay* direction — deterministic scoring over structured logs — and now pivots toward richer agents: role cards, game-scoped memory, table-talk, team plans, and eventually human players sharing the same auditable game loop.

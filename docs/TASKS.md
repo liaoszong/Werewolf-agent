@@ -42,10 +42,20 @@
 | P2-D：结算画面 / 历史回看管理 | completed | `src/werewolf_eval/settlement_bundle.py`, `clients/qt_observer/qml/SettlementView.qml`, `clients/qt_observer/qml/components/SettlementReport.qml`, `clients/qt_observer/qml/HistoryView.qml`, `tests/test_settlement_bundle.py` |
 | R0：Windows 桌面发行 / 客户端内更新 | completed | `scripts/release/build-velopack-release.sh`, `scripts/release/upload-github-release.sh`, `scripts/release/release-notes.md`, `scripts/release/smoke-test.sh`, `scripts/release/run-installed-local-e2e.ps1`, `src/werewolf_eval/release_host/update_control.py`, `src/werewolf_eval/release_host/velopack_runtime.py`, `clients/qt_observer/qml/ProviderSettingsView.qml` |
 
-## P3 — planned
+## P3 — current direction
 
 | Task | Status | Outputs |
 |---|---|---|
-| P3-A：评测 · 复盘 | planned | — |
-| P3-B：历史对战 | planned | — |
-| P3-C：动态排行榜 | planned | — |
+| P3-A-0：Agent 角色体验与真人参与路线转向 | completed | `docs/PROJECT_MAP.md`, `docs/superpowers/specs/2026-07-02-agent-roleplay-human-game-pivot-design.md` |
+| P3-A：Agent Card + Memory Spine | planned | — |
+| P3-B：博弈脚手架与桌面发言 | planned | — |
+| P3-C：真人座位实时参与 | planned | — |
+| P3-D：趣味性复盘入口 | planned | — |
+
+## P4 — downstream
+
+| Task | Status | Outputs |
+|---|---|---|
+| P4-A：评测 · 复盘 | planned | `docs/EVALUATION_RUBRIC.md` |
+| P4-B：历史对战聚合 | planned | — |
+| P4-C：动态排行榜 | planned | — |
