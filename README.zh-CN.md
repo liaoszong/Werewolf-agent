@@ -48,7 +48,9 @@ observer 协议是硬边界:任何客户端(现在是 Qt,未来可以是 Web)消
 
 ### Windows 桌面安装
 
-普通桌面用户只需要从主仓库 GitHub Releases 下载 `Werewolf-agent-Setup.exe` 并运行一次。程序安装到 `%LOCALAPPDATA%\WerewolfAgent\current\`,对局、profiles、configs、logs、凭证和设置保留在 `%LOCALAPPDATA%\Werewolf-agent\` 或 Windows 用户存储中。
+普通桌面用户只需要从主仓库 GitHub Releases 下载 `Werewolf-agent-0.2.0-Setup.exe` 并运行一次。其他 release assets 是更新器使用的包和索引,体验者不需要手动选择。程序安装到 `%LOCALAPPDATA%\WerewolfAgent\current\`,对局、profiles、configs、logs、凭证和设置保留在 `%LOCALAPPDATA%\Werewolf-agent\` 或 Windows 用户存储中。
+
+首次公开 Windows 安装包暂未做代码签名。安装前 Windows 可能显示“未知发布者”或 SmartScreen 提示;这是 0.2.0 的已知限制。
 
 安装后可从桌面或开始菜单启动。后续稳定版更新在客户端 Settings -> 关于与更新 中完成:检查更新、查看目标版本和 release notes,在没有 queued/running 对局时点击“下载并重启更新”。
 

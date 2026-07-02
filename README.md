@@ -48,7 +48,9 @@ The observer protocol is the hard boundary: any client (Qt today, Web later) con
 
 ### Windows desktop install
 
-For normal desktop use, download `Werewolf-agent-Setup.exe` from the main repository's GitHub Releases and run it once. The app installs to `%LOCALAPPDATA%\WerewolfAgent\current\`, while runs, profiles, configs, logs, credentials, and settings stay under `%LOCALAPPDATA%\Werewolf-agent\` or the Windows user stores.
+For normal desktop use, download `Werewolf-agent-0.2.0-Setup.exe` from the main repository's GitHub Releases and run it once. Other release assets are updater packages and indexes; testers should not choose them manually. The app installs to `%LOCALAPPDATA%\WerewolfAgent\current\`, while runs, profiles, configs, logs, credentials, and settings stay under `%LOCALAPPDATA%\Werewolf-agent\` or the Windows user stores.
+
+The first public Windows installer is not code-signed yet. Windows may show an "Unknown publisher" or SmartScreen warning before installation; this is a known limitation of the 0.2.0 release.
 
 After installation, launch Werewolf-agent from the desktop or Start menu. Future stable updates are handled in the client under Settings -> About & Updates: check for updates, review the target version and release notes, then choose Download and Restart when no match is queued or running.
 

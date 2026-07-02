@@ -73,7 +73,12 @@ expect_file "$PACK_DIR/Werewolf-agent.exe" "Velopack main executable"
 expect_dir "$PACK_DIR/_internal" "Velopack bootstrapper runtime"
 expect_dir "$PACK_DIR/app" "Velopack Qt deployment tree"
 expect_dir "$PACK_DIR/runtime/observer-server" "Velopack frozen observer server tree"
-expect_file "$OUTPUT_DIR/Werewolf-agent-Setup.exe" "First-install setup executable"
+expect_file "$OUTPUT_DIR/Werewolf-agent-$VERSION_VALUE-Setup.exe" "Versioned first-install setup executable"
+if [[ -e "$OUTPUT_DIR/Werewolf-agent-Setup.exe" ]]; then
+    fail "Generic setup alias should not be present in release output"
+else
+    pass "Generic setup alias absent"
+fi
 expect_file "$OUTPUT_DIR/releases.win.json" "Velopack release index"
 expect_file "$REPO_ROOT/scripts/release/release-notes.md" "Single release notes input"
 if compgen -G "$OUTPUT_DIR/WerewolfAgent-$VERSION_VALUE-full.nupkg" >/dev/null; then

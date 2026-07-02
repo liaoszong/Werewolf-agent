@@ -62,12 +62,8 @@ SETUP_CANDIDATE="$(
 )"
 if [[ -n "$SETUP_CANDIDATE" ]]; then
     VERSIONED_SETUP_ALIAS="$OUTPUT_DIR/Werewolf-agent-$PACK_VERSION-Setup.exe"
-    GENERIC_SETUP_ALIAS="$OUTPUT_DIR/Werewolf-agent-Setup.exe"
     if [[ "$(realpath "$SETUP_CANDIDATE")" != "$(realpath -m "$VERSIONED_SETUP_ALIAS")" ]]; then
         cp "$SETUP_CANDIDATE" "$VERSIONED_SETUP_ALIAS"
-    fi
-    if [[ "$(realpath "$SETUP_CANDIDATE")" != "$(realpath -m "$GENERIC_SETUP_ALIAS")" ]]; then
-        cp "$SETUP_CANDIDATE" "$GENERIC_SETUP_ALIAS"
     fi
 fi
 

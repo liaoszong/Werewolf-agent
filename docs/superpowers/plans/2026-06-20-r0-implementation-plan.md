@@ -73,7 +73,7 @@ Important defaults:
 Outputs:
 
 ```text
-Werewolf-agent-Setup.exe
+Werewolf-agent-<version>-Setup.exe
 WerewolfAgent-<version>-full.nupkg
 WerewolfAgent-<version>-delta.nupkg
 releases.win.json
@@ -93,7 +93,8 @@ GITHUB_TOKEN=... PUBLISH=false bash scripts/release/upload-github-release.sh
 
 Behavior:
 
-- uploads Velopack output to the main repository GitHub Releases;
+- uploads the public first-install setup plus Velopack updater assets to the main repository GitHub Releases;
+- keeps the user-facing setup asset versioned, e.g. `Werewolf-agent-0.2.0-Setup.exe`;
 - uses stable releases only;
 - keeps the release unpublished unless `PUBLISH=true`;
 - applies the same `release-notes.md` as the GitHub Release body when `gh` is available.

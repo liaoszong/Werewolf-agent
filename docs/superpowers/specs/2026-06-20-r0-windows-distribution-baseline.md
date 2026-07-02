@@ -8,7 +8,7 @@
 
 ## Product Behavior
 
-1. A Windows user downloads one `Werewolf-agent-Setup.exe` from the main repository GitHub Releases page.
+1. A Windows user downloads one versioned setup executable such as `Werewolf-agent-0.2.0-Setup.exe` from the main repository GitHub Releases page.
 2. Setup installs the app under `%LOCALAPPDATA%\WerewolfAgent\current\`.
 3. The user launches Werewolf-agent from the desktop or Start menu.
 4. Later, Settings -> About & Updates checks for a new stable release.
@@ -208,7 +208,7 @@ Velopack output:
 
 ```text
 .tmp/velopack-release/Releases/
-  Werewolf-agent-Setup.exe
+  Werewolf-agent-<version>-Setup.exe
   WerewolfAgent-<version>-full.nupkg
   WerewolfAgent-<version>-delta.nupkg   # after a prior package exists
   releases.win.json
@@ -220,7 +220,7 @@ Velopack output:
 
 R0 acceptance requires:
 
-- clean Windows user environment without Python or Qt can install from `Werewolf-agent-Setup.exe`;
+- clean Windows user environment without Python or Qt can install from `Werewolf-agent-<version>-Setup.exe`;
 - installed app files are under `%LOCALAPPDATA%\WerewolfAgent\current\`;
 - user data remains under `%LOCALAPPDATA%\Werewolf-agent\`;
 - installed v0.2.0 can discover a test-only local v0.2.1 source, show target version and release notes, download, apply, and restart into v0.2.1;
