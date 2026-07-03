@@ -128,7 +128,7 @@
 
 | 工作任务 | 描述 | 状态 |
 |---|---|---|
-| **P3-C-0 Server action protocol spec** | 先定义真人动作的 observer/server 协议:action window 查询/提交、session token 生命周期、idempotency key、game revision、reconnect cursor、超时策略(skip/pass/ai_takeover)和可见性拒绝语义。P3-E-3 不得在客户端 spec 内临时发明这些端点。 | ⏳ 待 plan |
+| **P3-C-0 Server action protocol spec** | 先定义真人动作的 observer/server 协议:action window 查询/提交、session token 生命周期、idempotency key、game revision、reconnect cursor、超时策略(skip/pass/ai_takeover)和可见性拒绝语义。P3-E-3 不得在客户端 spec 内临时发明这些端点。 | ✅ 文档中 |
 
 ### P3-E 工作任务(客户端路线,细化到工作任务粒度)
 

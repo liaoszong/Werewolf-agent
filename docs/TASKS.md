@@ -50,7 +50,7 @@
 | P3-A：Agent Card + Memory Spine | planned | — |
 | P3-B：博弈脚手架与桌面发言 | planned | — |
 | P3-C：真人座位实时参与 | planned | — |
-| P3-C-0：真人 action protocol spec | planned | `docs/PROJECT_MAP.md`, future P3-C server action protocol spec |
+| P3-C-0：真人 action protocol spec | completed | `docs/PROJECT_MAP.md`, `docs/superpowers/specs/2026-07-03-p3-c-0-server-action-protocol-design.md` |
 | P3-D：趣味性复盘入口 | planned | — |
 | P3-E-0：跨平台客户端迁移路线 spec | completed | `docs/PROJECT_MAP.md`, `DESIGN.md`, `docs/superpowers/specs/2026-07-02-p3-e-client-platform-migration-design.md` |
 | P3-E-1：Flutter protocol spike | planned | future Flutter client protocol spike |
