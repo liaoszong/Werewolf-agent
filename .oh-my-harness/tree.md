@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 513
+- Entries: 515
 
 ```text
 ./
@@ -350,6 +350,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       ├── observer_server.py
 │       ├── observer_trust_index.py
 │       ├── observer_visibility.py
+│       ├── participant_protocol.py
 │       ├── profile_config.py
 │       ├── prompt_goldens.py
 │       ├── prompt_renderers.py
@@ -524,6 +525,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── test_observer_visibility.py
 │   ├── test_openai_provider.py
 │   ├── test_p2a2_live_path.py
+│   ├── test_participant_protocol.py
 │   ├── test_profile_config.py
 │   ├── test_prompt_renderers.py
 │   ├── test_prompt_v2_invariants.py
