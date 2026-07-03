@@ -82,6 +82,7 @@ from werewolf_eval.profile_config import (
     resolve_profile,
     validate_profile,
 )
+from werewolf_eval.run_emergent_fake_runtime import build_participant_emergent_fake_launcher
 from werewolf_eval.runtime_events import redact_secret_values
 from werewolf_eval.settlement_bundle import build_settlement_response
 from werewolf_eval.user_config_library import (
@@ -724,21 +725,33 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
             self._handle_profile_launch(body)
             return
         launch = parse_launch_request(body)
-        run_id = launch["run_id"]
+        run_id = str(launch["run_id"])
         run_dir = self._get_state().runs_dir / run_id
         if run_dir.exists():
             self._send_error_json(409, "conflict", f"Run already exists: {run_id}")
             return
         run_dir.mkdir(parents=True)
-        self._launch_run_async(run_id, run_dir, self._get_state().launcher)
+        launcher = self._get_state().launcher
+        response: dict[str, object] = {
+            "run_id": run_id,
+            "template": launch["template"],
+            "mode": launch["mode"],
+            "status": "queued",
+        }
+        participant = launch.get("participant")
+        if isinstance(participant, dict):
+            seat_id = str(participant["seat_id"])
+            state = self._get_state()
+            state.participant_controller.configure_human_seat(run_id, seat_id)
+            launcher = build_participant_emergent_fake_launcher(
+                state.participant_controller,
+                human_seat_id=seat_id,
+            )
+            response["participant"] = {"seat_id": seat_id}
+        self._launch_run_async(run_id, run_dir, launcher)
         self._send_json(
             202,
-            {
-                "run_id": run_id,
-                "template": launch["template"],
-                "mode": launch["mode"],
-                "status": "queued",
-            },
+            response,
         )
 
     def _route_profile_validate(self, params: dict[str, str]) -> None:

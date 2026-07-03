@@ -17,7 +17,9 @@ from __future__ import annotations
 
 import json
 import random
+from collections.abc import Iterable
 from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from werewolf_eval.game_engine import (
@@ -102,6 +104,11 @@ ERROR_FALLBACK = "error_then_fallback"
 # SYS-B4 scaffold turn kinds (never contribute to live_success_rate).
 SCAFFOLD_SUCCESS = "scaffold_success"
 SCAFFOLD_FALLBACK = "scaffold_fallback"
+HUMAN_ACTION = "human_action"
+HUMAN_TIMEOUT = "human_timeout"
+HUMAN_PARTICIPANT_SOURCE_LABEL = "[human participant]"
+PARTICIPANT_PASS_SPEECH = "（真人选择跳过发言）"
+PARTICIPANT_TIMEOUT_SPEECH = "（真人超时跳过发言）"
 
 
 def _fallback_kind_for(failure_kind: str) -> str:
@@ -219,6 +226,9 @@ class EmergentGameEngine:
         runtime_events: Any | None = None,
         prompt_version: str = "prompt_v1",
         scaffold_agent: Any | None = None,
+        participant_controller: Any | None = None,
+        human_seat_ids: Iterable[str] = (),
+        participant_action_timeout_seconds: float = 60.0,
     ) -> None:
         self._config = config
         self._players_by_id: dict[str, EnginePlayer] = {p.player_id: p for p in config.players}
@@ -238,6 +248,19 @@ class EmergentGameEngine:
         self._source_label = source_label or "[deterministic fake provider output]"
         self._budget = budget or EmergentBudget()
         self._runtime_events = runtime_events
+        self._participant_controller = participant_controller
+        self._human_seat_ids = frozenset(human_seat_ids)
+        self._participant_action_timeout_seconds = participant_action_timeout_seconds
+        if self._human_seat_ids and self._participant_controller is None:
+            raise ValueError("human_seat_ids requires participant_controller")
+        for seat_id in self._human_seat_ids:
+            player = self._players_by_id.get(seat_id)
+            if player is None:
+                raise ValueError(f"unknown human participant seat: {seat_id}")
+            if player.role != "villager":
+                raise ValueError(
+                    f"P3-C-1 first slice only supports human villager seats, got {seat_id}={player.role}"
+                )
 
         self._events: list[dict[str, Any]] = []
         self._decisions: list[dict[str, Any]] = []
@@ -300,6 +323,78 @@ class EmergentGameEngine:
     def _alive_in_seat_order(self, exclude: set[str] | None = None) -> list[str]:
         exclude = exclude or set()
         return [pid for pid in self._seat_order if pid in self._alive and pid not in exclude]
+
+    def _is_human_seat(self, player_id: str) -> bool:
+        return player_id in self._human_seat_ids
+
+    def _participant_deadline_at(self) -> str:
+        return (
+            datetime.now(UTC) + timedelta(seconds=self._participant_action_timeout_seconds)
+        ).isoformat().replace("+00:00", "Z")
+
+    def _participant_reconnect_cursor(self) -> str:
+        return f"event:{self._seq}"
+
+    def _participant_opened_at_event_id(self) -> str:
+        if self._events:
+            return str(self._events[-1]["event_id"])
+        return f"{self._game_id}_e000"
+
+    def _emit_participant_runtime_event(
+        self,
+        kind: str,
+        *,
+        window: Any,
+        payload: dict[str, object] | None = None,
+    ) -> None:
+        if self._runtime_events is None:
+            return
+        base_payload = {
+            "action_window_id": window.action_window_id,
+            "run_id": window.run_id,
+            "seat_id": window.seat_id,
+            "game_revision": window.game_revision,
+            "status": window.status,
+            "allowed_actions": list(window.allowed_actions),
+            "reconnect_cursor": window.reconnect_cursor,
+        }
+        if payload:
+            base_payload.update(payload)
+        self._runtime_events.emit(
+            kind,
+            round=window.round,
+            phase=window.phase,
+            actor=window.seat_id,
+            visibility="private",
+            payload=base_payload,
+        )
+
+    def _record_human_participant_turn(
+        self,
+        *,
+        actor: str,
+        rnd: int,
+        response_kind: str,
+        action_window_id: str,
+        kind: str = HUMAN_ACTION,
+        fallback_reason: str | None = None,
+    ) -> dict[str, Any]:
+        turn: dict[str, Any] = {
+            "request_id": f"{self._game_id}_r{rnd:02d}_{actor}_{action_window_id}",
+            "round": rnd,
+            "phase": "day",
+            "actor": actor,
+            "response_kind": response_kind,
+            "live_requested": False,
+            "kind": kind,
+            "fallback_reason": fallback_reason,
+            "source_label": HUMAN_PARTICIPANT_SOURCE_LABEL,
+            "model": "human",
+            "token_usage": None,
+            "observation_source_event_ids": [],
+        }
+        self._provider_turns.append(turn)
+        return turn
 
     def _public_refs(self) -> list[str]:
         return public_refs(self._events)
@@ -666,7 +761,10 @@ class EmergentGameEngine:
         tally: dict[str, int] = {}
         for voter in self._alive_in_seat_order():
             role = self._players_by_id[voter].role
-            target = self._run_single_turn(VoteResolver(), voter, role, "day_vote", "day", "day", rnd, refs=refs)
+            if self._is_human_seat(voter):
+                target = self._run_participant_vote(voter, role, rnd, refs=refs)
+            else:
+                target = self._run_single_turn(VoteResolver(), voter, role, "day_vote", "day", "day", rnd, refs=refs)
             if target is not None:
                 tally[target] = tally.get(target, 0) + 1
         if not tally:
@@ -676,6 +774,104 @@ class EmergentGameEngine:
         if len(leaders) == 1:
             return leaders[0]
         return leaders[self._rng.randrange(len(leaders))]
+
+    def _run_participant_vote(self, actor: str, role: str, rnd: int, refs=()) -> str | None:
+        window = self._participant_controller.open_action_window(
+            run_id=self._game_id,
+            seat_id=actor,
+            phase="day_vote",
+            round=rnd,
+            game_revision=self._seq,
+            opened_at_event_id=self._participant_opened_at_event_id(),
+            deadline_at=self._participant_deadline_at(),
+            allowed_actions=("vote",),
+            required=True,
+            default_on_timeout="ai_takeover",
+            reconnect_cursor=self._participant_reconnect_cursor(),
+            ai_takeover_allowed=True,
+        )
+        self._emit_participant_runtime_event("action_window_opened", window=window)
+        submission = self._participant_controller.wait_for_action(
+            window.action_window_id,
+            timeout=self._participant_action_timeout_seconds,
+        )
+        live_action = None
+        if submission is None:
+            turn = self._record_human_participant_turn(
+                actor=actor,
+                rnd=rnd,
+                response_kind="action",
+                action_window_id=window.action_window_id,
+                kind=HUMAN_TIMEOUT,
+                fallback_reason="participant vote timed out",
+            )
+            self._record_failure(rnd, "day", actor, "timeout", f"{actor} participant vote timed out")
+            self._emit_participant_runtime_event(
+                "action_window_timed_out",
+                window=window,
+                payload={"status": "timed_out"},
+            )
+        else:
+            payload = submission.payload if isinstance(submission.payload, dict) else {}
+            target = payload.get("target")
+            live_action = AgentAction(
+                actor=actor,
+                action="player_vote",
+                target=str(target),
+                phase="day",
+                round=rnd,
+                reason_summary="human participant vote",
+                decision_type="inference_based",
+                source_label=HUMAN_PARTICIPANT_SOURCE_LABEL,
+            )
+            turn = self._record_human_participant_turn(
+                actor=actor,
+                rnd=rnd,
+                response_kind="action",
+                action_window_id=window.action_window_id,
+            )
+            self._emit_participant_runtime_event(
+                "action_accepted",
+                window=window,
+                payload={"status": "accepted", "action_type": submission.action_type},
+            )
+
+        resolver = VoteResolver()
+        decision_window = self._decision_window(
+            rnd,
+            actor,
+            role,
+            "day_vote",
+            "day",
+            live_action,
+            refs,
+        )
+        adj = resolver.adjudicate(decision_window)
+        if adj.skip:
+            return None
+        if adj.failure is not None:
+            self._record_failure(rnd, "day", actor, adj.failure.kind, adj.failure.reason, adj.failure.target)
+        if adj.downgrade_reason is not None:
+            self._downgrade_turn(turn, adj.downgrade_reason)
+        target = adj.accepted_target if adj.rng_pick is None else self._draw(adj.rng_pick)
+        plan = resolver.render(decision_window, target, adj.decision_type)
+        d = plan.decision
+        self._decision(
+            d.actor,
+            d.scope,
+            d.phase,
+            d.action,
+            d.target,
+            d.dtype,
+            d.reason,
+            rnd=rnd,
+            request_id=turn.get("request_id"),
+            refs=list(d.refs) or None,
+            consensus_id=d.consensus_id,
+        )
+        e = plan.event
+        self._emit(e.phase, rnd, e.etype, e.actor, e.target, e.visibility, e.summary)
+        return target
 
     # ---- win condition -------------------------------------------------
 
@@ -885,6 +1081,10 @@ class EmergentGameEngine:
     # ---- day sub-phases ------------------------------------------------
 
     def _resolve_speech(self, player_id: str, rnd: int) -> None:
+        if self._is_human_seat(player_id):
+            self._resolve_participant_speech(player_id, rnd)
+            return
+
         self._budget.charge()  # may raise BudgetExhausted -> propagates to run()
         provider = self._agents[player_id].provider
         obs = self._build_obs(player_id, SPEECH_REQUEST_PHASE, rnd)
@@ -937,6 +1137,71 @@ class EmergentGameEngine:
             turn["token_usage"] = None
         else:
             turn["kind"] = LIVE_SUCCESS
+        self._emit("day", rnd, "player_speech", player_id, "none", "public", text)
+
+    def _resolve_participant_speech(self, player_id: str, rnd: int) -> None:
+        window = self._participant_controller.open_action_window(
+            run_id=self._game_id,
+            seat_id=player_id,
+            phase="day_speech",
+            round=rnd,
+            game_revision=self._seq,
+            opened_at_event_id=self._participant_opened_at_event_id(),
+            deadline_at=self._participant_deadline_at(),
+            allowed_actions=("speech", "pass"),
+            required=False,
+            default_on_timeout="pass",
+            reconnect_cursor=self._participant_reconnect_cursor(),
+        )
+        self._emit_participant_runtime_event("action_window_opened", window=window)
+        submission = self._participant_controller.wait_for_action(
+            window.action_window_id,
+            timeout=self._participant_action_timeout_seconds,
+        )
+        if submission is None:
+            text = PARTICIPANT_TIMEOUT_SPEECH
+            self._record_human_participant_turn(
+                actor=player_id,
+                rnd=rnd,
+                response_kind="speech",
+                action_window_id=window.action_window_id,
+                kind=HUMAN_TIMEOUT,
+                fallback_reason="participant speech timed out",
+            )
+            self._emit_participant_runtime_event(
+                "action_window_timed_out",
+                window=window,
+                payload={"status": "timed_out"},
+            )
+        elif submission.action_type == "pass":
+            text = PARTICIPANT_PASS_SPEECH
+            self._record_human_participant_turn(
+                actor=player_id,
+                rnd=rnd,
+                response_kind="speech",
+                action_window_id=window.action_window_id,
+            )
+            self._emit_participant_runtime_event(
+                "action_accepted",
+                window=window,
+                payload={"status": "accepted", "action_type": submission.action_type},
+            )
+        else:
+            payload = submission.payload if isinstance(submission.payload, dict) else {}
+            text = str(payload.get("text", "")).strip()[:SPEECH_MAX_CHARS]
+            if not text:
+                text = SPEECH_EMPTY_PLACEHOLDER
+            self._record_human_participant_turn(
+                actor=player_id,
+                rnd=rnd,
+                response_kind="speech",
+                action_window_id=window.action_window_id,
+            )
+            self._emit_participant_runtime_event(
+                "action_accepted",
+                window=window,
+                payload={"status": "accepted", "action_type": submission.action_type},
+            )
         self._emit("day", rnd, "player_speech", player_id, "none", "public", text)
 
     def _run_scribe(self, rnd: int) -> None:

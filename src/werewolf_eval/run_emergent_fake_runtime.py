@@ -70,6 +70,9 @@ def run_emergent_fake_runtime(
     seed: int = 0,
     max_requests: int = 80,
     max_day_rounds: int = 3,
+    participant_controller: object | None = None,
+    human_seat_id: str | None = None,
+    participant_action_timeout_seconds: float = 60.0,
 ) -> int:
     """Run one fake-deterministic emergent game writing the full observer spine.
 
@@ -89,6 +92,9 @@ def run_emergent_fake_runtime(
         source_label=FAKE_PROVIDER_SOURCE_LABEL,
         budget=EmergentBudget(max_requests=max_requests, max_day_rounds=max_day_rounds),
         runtime_events=writer,
+        participant_controller=participant_controller,
+        human_seat_ids={human_seat_id} if human_seat_id is not None else (),
+        participant_action_timeout_seconds=participant_action_timeout_seconds,
     )
     outcome = engine.run()
 
@@ -163,6 +169,40 @@ def run_emergent_fake_runtime(
 def default_emergent_fake_launcher(run_id: str, run_dir: Path) -> int:
     """`RunLauncher`-shaped entry the observer server wires as the fake default."""
     return run_emergent_fake_runtime(game_id=run_id, out_dir=Path(run_dir))
+
+
+def build_participant_emergent_fake_launcher(
+    participant_controller: object,
+    *,
+    human_seat_id: str,
+    script: str = "villager_win",
+    seed: int = 0,
+    max_requests: int = 80,
+    max_day_rounds: int = 3,
+    participant_action_timeout_seconds: float = 60.0,
+):
+    """Build a fake launcher that gives one villager seat to a participant.
+
+    P3-C-1 first slice keeps this template-only and in-memory. The controller is
+    injected from observer state so HTTP submissions and the engine thread share
+    one action-window store.
+    """
+
+    def _launcher(run_id: str, run_dir: Path) -> int:
+        participant_controller.configure_human_seat(run_id, human_seat_id)
+        return run_emergent_fake_runtime(
+            game_id=run_id,
+            out_dir=Path(run_dir),
+            script=script,
+            seed=seed,
+            max_requests=max_requests,
+            max_day_rounds=max_day_rounds,
+            participant_controller=participant_controller,
+            human_seat_id=human_seat_id,
+            participant_action_timeout_seconds=participant_action_timeout_seconds,
+        )
+
+    return _launcher
 
 
 def main(argv: list[str] | None = None) -> int:

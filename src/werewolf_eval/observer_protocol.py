@@ -384,13 +384,13 @@ def build_run_detail(
 def parse_launch_request(payload: dict[str, object]) -> dict[str, object]:
     """Validate and normalize a launch request payload.
 
-    Allowed keys: ``template``, ``run_id``, ``mode``.
+    Allowed keys: ``template``, ``run_id``, ``mode``, ``participant``.
     Unknown templates, unknown modes, unsafe run_ids, and extra keys are rejected.
     """
     if not isinstance(payload, dict):
         raise ObserverProtocolError("Launch request payload must be a JSON object")
 
-    allowed_keys = {"template", "run_id", "mode"}
+    allowed_keys = {"template", "run_id", "mode", "participant"}
     extra_keys = set(payload.keys()) - allowed_keys
     if extra_keys:
         raise ObserverProtocolError(
@@ -423,7 +423,24 @@ def parse_launch_request(payload: dict[str, object]) -> dict[str, object]:
         if not run_id.startswith(template):
             run_id = f"{template}_{uuid.uuid4().hex[:8]}"
 
-    return {"template": template, "run_id": run_id, "mode": mode}
+    launch: dict[str, object] = {"template": template, "run_id": run_id, "mode": mode}
+    participant = payload.get("participant")
+    if participant is not None:
+        if not isinstance(participant, dict):
+            raise ObserverProtocolError("participant must be a JSON object")
+        participant_allowed_keys = {"seat_id"}
+        participant_extra = set(participant.keys()) - participant_allowed_keys
+        if participant_extra:
+            raise ObserverProtocolError(
+                "Unexpected keys in participant launch request: "
+                f"{sorted(participant_extra)}.  Allowed: {sorted(participant_allowed_keys)}"
+            )
+        seat_id = participant.get("seat_id")
+        if seat_id not in {"p5", "p6"}:
+            raise ObserverProtocolError("participant.seat_id must be one of: p5, p6")
+        launch["participant"] = {"seat_id": seat_id}
+
+    return launch
 
 
 def parse_profile_launch_request(payload: dict[str, object]) -> dict[str, object]:

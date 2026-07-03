@@ -9,11 +9,8 @@ from threading import Lock
 from typing import Callable
 
 from werewolf_eval.credential_store import CredentialStore
-from werewolf_eval.participant_protocol import (
-    ActionIdempotencyTracker,
-    ActionWindow,
-    ParticipantSession,
-)
+from werewolf_eval.participant_controller import InMemoryParticipantActionController
+from werewolf_eval.participant_protocol import ParticipantSession
 from werewolf_eval.release_metadata import read_version
 
 RunLauncher = Callable[[str, Path], int]
@@ -50,11 +47,10 @@ class ObserverServerState:
     owner_token: str = ""
     release_version: str = field(default_factory=read_version)
     protocol_version: int = 1
-    # P3-C-0b local-only participant route skeleton. In-memory only; the real
-    # game-loop integration and durable action-window ownership land in P3-C-1.
+    # P3-C participant sessions remain local-dev and in-memory. Action windows
+    # are owned by the controller so route stubs and game-loop integration share
+    # the same validation/idempotency semantics.
     participant_sessions: dict[str, ParticipantSession] = field(default_factory=dict)
-    participant_action_windows: dict[str, ActionWindow] = field(default_factory=dict)
-    participant_idempotency: ActionIdempotencyTracker = field(
-        default_factory=ActionIdempotencyTracker
+    participant_controller: InMemoryParticipantActionController = field(
+        default_factory=InMemoryParticipantActionController
     )
-    participant_action_counter: int = 0

@@ -17,16 +17,12 @@ from werewolf_eval.observer.run_manager import _read_events_jsonl_safe
 from werewolf_eval.observer.state import ObserverServerState
 from werewolf_eval.observer_visibility import build_projection_envelope
 from werewolf_eval.participant_protocol import (
-    ACTION_SUBMIT_RESULT_SCHEMA_VERSION,
-    ActionWindow,
-    ParticipantActionSubmission,
     ParticipantProtocolError,
     ParticipantSession,
     build_participant_error_envelope,
     perspective_for_seat,
     validate_reconnect_cursor,
     validate_seat_id,
-    validate_submission_for_window,
 )
 
 PARTICIPANT_STATE_SCHEMA_VERSION = "p3c.participant_state.v1"
@@ -84,7 +80,18 @@ def issue_participant_session(
     )
     with state.lock:
         state.participant_sessions[token] = session
-        _ensure_stub_action_window_locked(state, run_id=run_id, seat_id=seat_id)
+    run_has_human_seat = state.participant_controller.run_has_human_seat(run_id)
+    if run_has_human_seat and not state.participant_controller.is_human_seat(run_id, seat_id):
+        with state.lock:
+            state.participant_sessions.pop(token, None)
+        raise ParticipantProtocolError(
+            "seat_not_controlled_by_session",
+            "This run does not assign that seat to a participant",
+            run_id=run_id,
+            seat_id=seat_id,
+        )
+    if not run_has_human_seat:
+        state.participant_controller.ensure_stub_action_window(run_id=run_id, seat_id=seat_id)
     return session
 
 
@@ -144,8 +151,10 @@ def build_participant_state_payload(
         perspective=perspective,
         events=events,
     )
-    with state.lock:
-        window = _open_window_for_session_locked(state, session)
+    window = state.participant_controller.open_window_for(
+        run_id=session.run_id,
+        seat_id=session.seat_id,
+    )
     reconnect_cursor = window.reconnect_cursor if window is not None else session.last_seen_cursor
     return {
         "schema_version": PARTICIPANT_STATE_SCHEMA_VERSION,
@@ -167,7 +176,7 @@ def submit_participant_action(
     request_payload: Mapping[str, object],
     run_status: str,
 ) -> dict[str, object]:
-    """Validate and accept a skeleton participant action submission."""
+    """Validate and accept a participant action submission."""
     if run_status != "running":
         raise ParticipantProtocolError(
             "run_not_accepting_actions",
@@ -176,74 +185,11 @@ def submit_participant_action(
             seat_id=session.seat_id,
             reconnect_cursor=session.last_seen_cursor,
         )
-    submission = ParticipantActionSubmission(
-        action_window_id=request_payload.get("action_window_id"),
-        game_revision=request_payload.get("game_revision"),
-        idempotency_key=request_payload.get("idempotency_key"),
-        action_type=request_payload.get("action_type"),
-        payload=request_payload.get("payload"),
-        client_observed_event_id=(
-            request_payload.get("client_observed_event_id")
-            if isinstance(request_payload.get("client_observed_event_id"), str)
-            else None
-        ),
-        client_sent_at=(
-            request_payload.get("client_sent_at")
-            if isinstance(request_payload.get("client_sent_at"), str)
-            else None
-        ),
+    return state.participant_controller.submit_action(
+        run_id=run_id,
+        seat_id=session.seat_id,
+        payload=request_payload,
     )
-
-    with state.lock:
-        duplicate = state.participant_idempotency.duplicate_for(submission)
-        if duplicate is not None:
-            payload = dict(duplicate.result)
-            payload["status"] = "duplicate"
-            return payload
-
-        window = state.participant_action_windows.get(submission.action_window_id)
-        if window is None or window.run_id != run_id or window.seat_id != session.seat_id:
-            raise ParticipantProtocolError(
-                "action_window_not_found",
-                "Action window not found for this participant session",
-                run_id=run_id,
-                seat_id=session.seat_id,
-                action_window_id=submission.action_window_id,
-                reconnect_cursor=session.last_seen_cursor,
-            )
-        validate_submission_for_window(submission, window)
-
-        state.participant_action_counter += 1
-        accepted_event_id = f"evt_participant_action_{state.participant_action_counter:04d}"
-        next_revision = window.game_revision + 1
-        next_cursor = f"event:{_event_index_from_cursor(window.reconnect_cursor) + 1}"
-        result = {
-            "schema_version": ACTION_SUBMIT_RESULT_SCHEMA_VERSION,
-            "status": "accepted",
-            "action_window_id": window.action_window_id,
-            "game_revision": next_revision,
-            "accepted_event_id": accepted_event_id,
-            "reconnect_cursor": next_cursor,
-        }
-        state.participant_idempotency.record_or_duplicate(submission, result)
-        state.participant_action_windows[window.action_window_id] = ActionWindow(
-            action_window_id=window.action_window_id,
-            run_id=window.run_id,
-            seat_id=window.seat_id,
-            phase=window.phase,
-            round=window.round,
-            game_revision=next_revision,
-            opened_at_event_id=window.opened_at_event_id,
-            deadline_at=window.deadline_at,
-            allowed_actions=window.allowed_actions,
-            required=window.required,
-            default_on_timeout=window.default_on_timeout,
-            status="accepted",
-            reconnect_cursor=next_cursor,
-            skippable=window.skippable,
-            ai_takeover_allowed=window.ai_takeover_allowed,
-        )
-        return dict(result)
 
 
 def participant_sse_events(
@@ -257,60 +203,13 @@ def participant_sse_events(
     events: list[tuple[str, dict[str, object]]] = [
         ("run_status", {"run_id": run_id, "status": run_status})
     ]
-    with state.lock:
-        window = _open_window_for_session_locked(state, session)
+    window = state.participant_controller.open_window_for(
+        run_id=session.run_id,
+        seat_id=session.seat_id,
+    )
     if window is not None:
         events.append(("action_window_opened", window.to_payload()))
     return events
-
-
-def _ensure_stub_action_window_locked(
-    state: ObserverServerState,
-    *,
-    run_id: str,
-    seat_id: str,
-) -> ActionWindow:
-    existing = [
-        window for window in state.participant_action_windows.values()
-        if window.run_id == run_id and window.seat_id == seat_id
-    ]
-    for window in existing:
-        if window.status == "open":
-            return window
-    if existing:
-        return existing[-1]
-
-    window = ActionWindow(
-        action_window_id=f"aw_{run_id}_{seat_id}_0001",
-        run_id=run_id,
-        seat_id=seat_id,
-        phase="p3c_stub",
-        round=0,
-        game_revision=0,
-        opened_at_event_id="evt_participant_stub_0000",
-        deadline_at=_format_instant(datetime.now(UTC) + timedelta(minutes=5)),
-        allowed_actions=("speech", "pass"),
-        required=False,
-        default_on_timeout="pass",
-        status="open",
-        reconnect_cursor="event:0",
-    )
-    state.participant_action_windows[window.action_window_id] = window
-    return window
-
-
-def _open_window_for_session_locked(
-    state: ObserverServerState,
-    session: ParticipantSession,
-) -> ActionWindow | None:
-    for window in state.participant_action_windows.values():
-        if (
-            window.run_id == session.run_id
-            and window.seat_id == session.seat_id
-            and window.status == "open"
-        ):
-            return window
-    return None
 
 
 def _extract_bearer_token(header: str | None) -> str | None:
@@ -342,7 +241,3 @@ def _parse_instant(value: str) -> datetime:
     except ValueError:
         parsed = parsedate_to_datetime(value)
     return _normalize_now(parsed)
-
-
-def _event_index_from_cursor(cursor: str) -> int:
-    return int(validate_reconnect_cursor(cursor).split(":", 1)[1])
