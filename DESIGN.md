@@ -1,138 +1,160 @@
-# Werewolf-agent UI Design Notes
+# Werewolf-agent UI Direction
 
-Purpose: before creating a new Qt/QML page, redesigning an existing page, or adding
-visual components, read this file first. Keep new work visually compatible with the
-current Home page and Theater / Cockpit page.
+Purpose: read this file before creating or redesigning any product UI. This file is
+the route-level UI direction, not a final component library. Page-level UI still needs
+separate discussion, visual exploration, and screenshot verification before
+implementation.
 
-## 设计 / 重做页面工作流程 (Design Workflow)
+## Current Decision
 
-UI 页面走「插画驱动 → 参照图复刻」,不是直接写代码堆样式。新建和重做都是「生图选型 → 复刻实现」两段式。
+As of 2026-07-02, the old Qt/QML visual direction is deprecated for new product work.
 
-### 新建 UI 页面
+Deprecated for new UI:
 
-1. **Brainstorming**:先用 brainstorming 充分讨论这个页面要承载什么内容、信息层级、交互。先想清楚「做什么」,再谈「长什么样」。
-2. **总结生图提示词(约束要少)**:把讨论结论提炼成一段 GPT 生图提示词。**刻意少加约束**——只给世界观 / 风格基调 / 必须出现的内容,把构图、配色细节、具体布局留给 GPT 自由发挥,让它充分施展创造力与设计力。
-3. **GPT 生图**:把提示词交给用户,用户用 GPT 生成若干张候选图,再把图发回给我。
-4. **选型 + 迭代提示词**:我从候选里**选出最好的一张**;必要时**总结各张图各自的优点**,据此**修改提示词**再发给用户,让 GPT 再生一轮。
-5. **定稿**:重复第 3–4 步,直到选出满意的图。
-6. **参照复刻**:以定稿图为蓝本,用现有 `Theme` / 组件把页面实现出来;边实现边截图自验,直到与参照图一致(见下「实现与自验」)。
+- storybook tabletop theater
+- parchment as the dominant surface
+- candlelit fantasy room art
+- antique gold hairlines as a core system
+- cute/fantasy role medallions
+- "AI board-game demo" framing
 
-### 重做 UI 页面
+The existing Qt/QML client remains a **legacy spectator client until parity**. It may
+receive critical fixes, compatibility updates, and low-risk maintenance, but new
+player-facing UX should target the Flutter-first cross-platform client described in
+`docs/superpowers/specs/2026-07-02-p3-e-client-platform-migration-design.md`.
 
-流程与新建大致相同,**只有第 1 步不同**:
+The backend boundary does not change: clients consume the observer protocol and submit
+server-authorized human actions. Clients do not call providers directly, read local run
+artifacts to fabricate state, or bypass visibility projections.
 
-1. **先问需求**:询问用户——这个页面**要保留什么**(哪些信息 / 控件 / 契约不能丢)、**是否要新增东西**;并明确**排版基本都会改**(这是重做的前提)。
-2. 之后同新建:**总结生图提示词(约束少)→ GPT 生图 → 我选最优 + 总结各图优点 + 改提示词 → 再生图 → 定稿 → 参照复刻实现**。
+## Product Feel
 
-### 小幅维护 / Polish
+The new product surface should feel like a **modern social deduction theater**:
 
-已有页面的小幅维护(删除临时入口、移动现有按钮、调控件间距、修选中态等)不需要重走完整生图流程,但仍必须保持当前页面的视觉语言和交互契约。
+- mature, tense, and readable
+- built around suspicion, identity pressure, accusation, alliance, betrayal, and
+  momentum shifts
+- closer to a live case-room / premium party-game app / tactical broadcast surface
+  than a fairy-tale tabletop illustration
+- dramatic enough to make a match feel alive, but dense enough for repeated play
 
-- 先确认改动属于小幅维护:不重排页面信息架构,不新增产品概念,不替换主视觉。
-- 临时预览页 / debug 页 / 截图宿主只服务实现和验收,不要长期挂在 Home、NavRail 或主流程入口上;除非当前 plan 明确要求用户可见。
-- 保留现有 `objectName` / 静态契约,需要删除入口时同步更新 contract test,让测试锁住新的产品导航边界。
-- 小幅视觉修正也要截图自验:至少覆盖被改页面的默认态;若改选中态 / live 态,额外截对应状态。
+The product is not a SaaS dashboard, not a marketing landing page, and not a cute
+fantasy board game. It is a real-time social game client where hidden information and
+player pressure are the main material.
 
-### 实现与自验
+## Platform Direction
 
-- 复刻时优先复用既有 `Theme.warm` / `Theme.parchment` token 与现有组件(见下文 Components / Layout),少造新视觉词汇。
-- QML 改动必须**构建 + 截图核对**(参照图 vs 实际渲染);god-view 圆桌盘面这类用 `.tmp/shot.sh`(`qml.exe` 跑 DesignPreviewView 截 day/night/voting 三相位),细节见 skill `verifying-qt-observer-ui`。
-- 若背景插画要与 QML 落位(如座椅环、头像)对齐,**让生图提示词与 QML 用同一套归一化坐标**(都按「实际绘制矩形」的比例),两边天然吻合。
+New UI work is **mobile-first**:
 
-## Style Direction
+- Phone portrait is the primary design target for human participation.
+- Desktop is a responsive expansion of the same product surface, not a separate
+  desktop-only product.
+- Touch targets, action deadlines, reconnect states, and compact readable speech are
+  first-class constraints.
+- Desktop can show more context, history, and analysis, but it must not become the
+  only usable way to play.
 
-- Product feel: storybook tabletop theater, not a generic SaaS dashboard.
-- Core mood: warm parchment, dark wood, candlelight, hand-painted fantasy room art,
-  restrained game HUD.
-- Main surfaces: warm cream canvas for home / light areas, deep parchment-dark panels
-  for logs and control surfaces, tactile parchment cards over illustrated scenes.
-- Prefer real scene artwork or role artwork over abstract gradients or SVG decor.
-- Keep UI dense enough for repeated spectating: clear hierarchy, compact controls,
-  no marketing hero layout inside app screens.
+The default client platform for new work is Flutter. Qt/QML rules only apply when
+maintaining the legacy client.
 
-## Colors
+## Page Redesign Workflow
 
-- Warm canvas / parchment: cream, sand, aged paper. Use existing `Theme.warm.*` and
-  `Theme.parchment.*` tokens instead of new ad hoc colors.
-- Claude-inspired warm editorial colors are allowed and preferred when they fit the
-  app: cream canvas `#faf9f5`, coral `#cc785c`, active coral `#a9583e`,
-  warm ink `#141413`, body ink `#3d3d3a`, muted text `#6c6a64`,
-  soft muted text `#8e8b82`, hairline `#e6dfd8`, card cream `#efe9de`,
-  dark surface `#181715`, elevated dark `#252320`.
-- The Home page intentionally borrows from that Claude-like cream/coral/ink palette;
-  keep that warmth as a project taste marker.
-- Dark surfaces: near-black brown / ink, used for sidebars, event logs, and footer-like
-  control areas.
-- Accent: muted terracotta / coral for active actions, LIVE state, phase emphasis.
-- Detail accents: antique gold hairlines, role colors only as small rings / dots /
-  badges.
-- Avoid cold blue-gray dashboards, neon cyberpunk colors, and large flat purple/blue
-  gradients. Purple should come from illustrations or role accents, not page chrome.
+Each major page needs its own brief before implementation. Do not port the old Qt page
+one-to-one.
 
-## Typography
+Before designing a page, answer:
 
-- Headings and page identity use the existing serif family (`Theme.fontFamilies.serif`)
-  for storybook / board-game flavor.
-- Body, labels, and controls use the existing sans family.
-- Mono is only for run IDs, system labels, traces, and technical metadata.
-- Do not enlarge every label. HUD cards stay compact; hero-scale type belongs only on
-  true landing/home hero moments.
+- Who is using it: observer, human player, host, or developer?
+- What is the one action that must be obvious in the first 5 seconds?
+- What information is public, private, hidden, expired, or risky to reveal?
+- What changes live during the match?
+- What is the phone portrait layout?
+- What expands on desktop?
+- What emotional beat should the page create: tension, relief, accusation, deception,
+  confidence, panic, or recap?
 
-## Components
+Visual exploration is required before implementation. Acceptable inputs include
+generated references, Figma, sketches, static mockups, or screenshots from comparable
+apps. Implementation starts only after the page contract and visual direction are
+clear.
 
-- `HudCard`: parchment floating card with gold border, used for phase, votes, speaker,
-  status, and compact summaries.
-- Dark left/event panels: deep parchment background, gold hairlines, cream cards inside.
-- Buttons: rounded but restrained; active state uses terracotta fill, ghost state uses
-  hairline border over the scene.
-- Badges/chips: small, pill or circular, used for LIVE, votes, phase, role, evidence.
-- Seat/role elements: circular portrait medallions, thin role-color ring, small seat
-  number seal, parchment nameplate. Do not downgrade to plain rectangles.
-- Playback / segmented controls: parchment tray style, compact, centered, with obvious
-  selected segment.
-- Segmented controls: selected state should be self-evident from the filled segment;
-  avoid redundant confirmation banners such as "enabled". If a selected/live dot is
-  used, keep it small and vertically centered inside the segment.
+## Required Page Families
 
-## Layout
+These page families are not visually locked yet; each needs separate discussion and
+design:
 
-- Home page: illustrated scene first, warm editorial entry, restrained cards and CTAs.
-- Home hero CTAs: keep one clear primary action, with replay/history as a secondary
-  action directly below or visually subordinate. Do not expose implementation-only
-  preview/debug entries in the user-facing hero.
-- Theater page: left event-log rail plus full-bleed illustrated stage; HUD floats over
-  the scene instead of forming heavy horizontal bars.
-- Setup/config header: keep the toolbar dense but breathable. Label + selector fields
-  need enough vertical padding so the label does not crowd the control; group related
-  controls in one parchment tray rather than stacking extra cards.
-- Keep repeated panels aligned to a clear grid. Prefer one strong scene plus useful HUD
-  overlays over many decorative cards.
-- Avoid cards inside cards except for genuine repeated list items or modal/tool frames.
-- New pages should reuse existing tokens/components before adding visual vocabulary.
+- Home / entry
+- Lobby / seat selection
+- Match setup / host controls
+- Live game room
+- Human seat action panel
+- Night private-action flow
+- Day speech, response, accusation, and voting flow
+- Agent card / role card editor
+- Settlement / replay / "why this game was interesting" recap
+- Settings / provider credentials / local server connection
 
-## Qt/QML Rules
-
-- Read `clients/qt_observer/qml/Theme.qml`, existing page QML, and this file before
-  inventing new colors or component styling.
-- If changing QML visuals, build the Qt target and verify with screenshots. For cockpit
-  / theater work, also ensure top phase card, right info tower, and bottom playback tray
-  do not overlap primary content.
-- Temporary screenshot harnesses may use local `Timer` + `grabToImage()`, but they must
-  be removed before final diff. Keep generated screenshots under `.tmp/`.
-- Preserve client boundaries: Qt consumes observer protocol data; no direct Python
-  runtime binding and no local artifact reads unless a plan explicitly allows it.
-
-## Do / Don't
+## Visual Principles
 
 Do:
-- Reuse `Theme.warm`, `Theme.parchment`, `HudCard`, role accents, parchment texture,
-  gold hairlines, circular portraits, and compact control trays.
-- Make new screens feel like the same premium tabletop spectator app.
-- Keep evidence/debug detail available but visually secondary.
+
+- Use a restrained, premium palette with strong contrast and deliberate role accents.
+- Make speech, suspicion, votes, private knowledge, and deadlines visually legible.
+- Treat identity as layered: seat, public persona, claimed role, true role when known,
+  trust level, and contradiction history.
+- Use motion for state changes that matter: turn ownership, action windows, vote
+  swings, night resolution, role reveal, and accusation focus.
+- Keep controls ergonomic for phone use.
+- Let desktop layouts reveal more context without changing the core interaction model.
 
 Don't:
-- Replace the look with flat SaaS cards, cool slate dashboards, generic AI gradients,
-  or oversized marketing copy.
-- Add one-off color literals when a `Theme` token exists.
-- Use decorative blobs/orbs as backgrounds.
-- Make controls look cheaper than the existing Home / Theater components.
+
+- Reuse parchment/gold/fantasy storybook styling for new screens.
+- Fill pages with generic cards inside cards.
+- Use decorative blobs, gradient orbs, or stock fantasy scenes as the visual system.
+- Hide critical action windows behind observer-style debug panels.
+- Make human players feel like they are watching logs instead of sitting in the game.
+- Add page chrome that leaks hidden information by implication.
+
+## Interaction Principles
+
+- A human player always needs to know: what phase this is, whether it is their turn,
+  what they can legally do, how much time remains, and what information they are
+  allowed to know.
+- AI agents should be presented as seats with personality and behavioral history, not
+  as raw provider outputs.
+- Public discussion should feel like table pressure, not a transcript viewer.
+- Private night actions should feel isolated and secret.
+- Voting should make momentum and coalition shifts obvious.
+- Settlement should first explain why the game was interesting, then expose deeper
+  audit or evaluation detail.
+- User speech, AI speech, memory summaries, Agent Cards, and retrieved playbook text
+  are untrusted game data. Render them as text/data only; do not execute them as code,
+  dynamic templates, scripts, provider instructions, or local commands.
+- Before a real mobile push-notification decision exists, human turns rely on
+  foreground countdowns, reconnect state, and server timeout policy.
+
+## Legacy Qt/QML Maintenance
+
+When touching `clients/qt_observer/**`, preserve existing behavior and static
+contracts unless a task explicitly says otherwise.
+
+For legacy Qt changes:
+
+- Read the relevant QML and `clients/qt_observer/README.md`.
+- Use the existing Qt verification workflow.
+- Keep generated screenshots under `.tmp/`.
+- Do not use Qt maintenance as a reason to revive the old visual direction.
+
+## Verification
+
+For future Flutter UI work:
+
+- verify phone portrait and desktop layouts with screenshots
+- check text overflow and action-window visibility
+- test reconnect / timeout / disabled-action states
+- run `flutter analyze` and `flutter test` once a Flutter client exists
+- keep protocol fixtures or fake observer responses for deterministic UI tests
+
+For docs-only UI direction changes, report the diff scope and confirm no runtime,
+provider, validator, fixture, workflow, or legacy client source changes were made.

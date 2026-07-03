@@ -150,6 +150,8 @@ P3-A 的第一份 schema 应优先定义四层资产,而不是单一 `AgentCard`
 
 新增概念 `AgentContextPacket`,作为 prompt 组装前的结构化上下文。它不是立即要求改代码的字段名,但后续实现应围绕这个边界设计。
 
+P3-A-3 的最小实现不要求一次做完全部分区。首版只需要 Board facts / Self facts / Private facts / Public timeline / Episodic notes 五类能闭环;Commitments、Suspicion graph、Team memory、Retrieved playbook 和 Prompt budget report 可以先定义 schema 边界,按 P3-B/P3-D 需要逐步启用。
+
 建议分区:
 
 1. **Board facts**:公开规则、角色构成、胜负条件。
@@ -203,6 +205,8 @@ P3-A 的第一份 schema 应优先定义四层资产,而不是单一 `AgentCard`
 - `ClaimRecord` 渲染时必须保留"某人声称"语义,不得升级成"某人是"。
 - 当新的可见信息推翻旧判断时,不得原地覆盖;写入新 record 并让旧 record `superseded` 或 `retracted`。
 - 任何 record 注入 prompt 前都必须经过 audience/visibility entitlement 检查。
+
+Claim/commitment ledger 的单一归属在 P3-A:它定义 record kinds、provenance、status 和注入语义。P3-B0 的 `SpeechAct` 只是产生 `ClaimRecord` / `CommitmentRecord` 的来源之一,不得另建一套并行 ledger。
 
 ### 4.3 Memory lifecycle
 
@@ -343,6 +347,8 @@ reconnect_cursor
 ```
 
 所有人类动作必须由 server 根据当前 `action_window_id`、`game_revision` 和 session token 接受或拒绝。客户端不能靠本地 artifact、旧 snapshot 或 God view 伪造行动。
+
+P3-C-0 必须先形成 server-side action protocol spec,再进入 Flutter 真人 seat 实现。该 spec 至少定义:action window 查询/提交端点、session token 生命周期、idempotency key、`game_revision` 冲突语义、`reconnect_cursor` 恢复语义、超时策略(skip/pass/ai_takeover)和可见性拒绝错误码。
 
 ### 6.2 Prompt Injection Boundary for Human Text and Memory
 

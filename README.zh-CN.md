@@ -2,7 +2,7 @@
 
 **一个可参与、可观战、可审计的狼人杀 Agent Theater。**
 
-开局前配置 AI Agent 座位,以上帝视角实时观战整局推理与博弈,结束后查看结算战报——每一次决策、发言、投票背后都有完整可审计的事件日志。AI-vs-AI 是默认实验形态;真人作为角色加入实时局是后续一等能力。
+开局前配置 AI Agent 座位,以上帝视角实时观战整局推理与博弈,结束后查看结算战报——每一次决策、发言、投票背后都有完整可审计的事件日志。AI-vs-AI 是默认实验形态;真人控制座位是当前 P3 方向的一等能力。
 
 简体中文 | [English](README.md)
 
@@ -12,15 +12,16 @@
 
 Werewolf-agent 是一个 **client-agnostic 的狼人杀 Agent Theater**。Python 对局引擎驱动 6 人社交推理局,所有座位都处于严格的信息隔离之下——狼人不知道谁是预言家、预言家的查验结果只有自己可见,并且每个座位的上下文可被证明只由它有权看到的事件构建。
 
-对局既可以完全离线运行(确定性 fake provider,默认模式),也可以接入真实 LLM API 实时对战。当前默认产品路径是 AI-vs-AI;新路线优先增强角色扮演 Agent,再接入真人控制座位。每局都会产出结构化、可重放的事件流,支撑观战、结算战报、历史回放与后续评测。
+对局既可以完全离线运行(确定性 fake provider,默认模式),也可以接入真实 LLM API 实时对战。当前默认产品路径是 AI-vs-AI;新路线优先增强角色扮演 Agent,在 P3 接入真人控制座位,并设计 Flutter-first 移动/桌面客户端。每局都会产出结构化、可重放的事件流,支撑观战、结算战报、历史回放与后续评测。
 
 ## 核心特性
 
 - **涌现式对局引擎** — 6 人局(2 狼人、1 预言家、1 女巫、2 村民):狼人共识刀人、预言家查验、女巫救/毒、白天发言、投票、处决、胜负裁决。动态回合、无剧本。猎人角色变体已在 action runtime 中实现(`rules_v1_1`)。
 - **自带 AI(BYO-key)** — 按座位配置 provider/模型/prompt/温度。内置预设:DeepSeek、OpenAI、Anthropic,以及 9 家 OpenAI 兼容厂商(智谱 GLM、Moonshot、通义千问、MiniMax、SiliconFlow、xAI、Gemini、ModelScope、OpenRouter),并支持完全自定义端点。API key 始终留在本机;只有本地 Python server 会调用供应商接口。
-- **Qt 剧场客户端** — 上帝视角实时观战(座位环、发言剧场、证据控制台、播放控制)、对局配置沙盘、剧场内结算覆盖层与滚动战报、历史对局回看与管理。
+- **当前 Qt 剧场客户端** — 上帝视角实时观战(座位环、发言剧场、证据控制台、播放控制)、对局配置沙盘、剧场内结算覆盖层与滚动战报、历史对局回看与管理。它保留为 legacy 桌面客户端,直到 Flutter-first 跨平台客户端达到基本 parity。
+- **移动优先玩家客户端设计中** — P3-E 定义 Flutter-first 跨平台客户端,面向手机优先的真人参与和桌面扩展,同时保留现有 backend protocol。
 - **诚实链路** — 事件溯源日志(`events.jsonl`、快照、prompt manifest、provider 调用链、故障审计)、执行真相 HUD(`LIVE_API` vs `SIMULATION`)、可见性投影(上帝/公开/各角色视角),以及在信息泄漏或规则违例时立刻报错的运行时不变量。
-- **Agent 优先路线** — P3 当前聚焦角色卡、单局记忆、Agent harness、桌面发言和真人座位;评测、复盘、排行榜后移到 P4。
+- **Agent 优先、玩家优先路线** — P3 当前聚焦角色卡、单局记忆、Agent harness、桌面发言、真人座位,以及 Flutter-first 移动/桌面跨平台客户端;评测、复盘、排行榜后移到 P4。
 - **评测地基就绪** — 确定性评分、规则归因、带分臂指标的消融实验台、字节锁定的 prompt 版本化与修订台账、差分测试、固定种子的确定性模拟。
 - **零依赖后端** — Python 后端只用标准库,跑离线对局无需 `pip install` 任何东西。
 
@@ -41,10 +42,15 @@ Python 对局引擎 + agent/provider 循环              src/werewolf_eval/
         ▼
 Qt 6 / QML 剧场客户端                              clients/qt_observer/
   · 实时观战 · 对局配置 · 结算战报 · 历史回放
-  · 真人参战座位计划复用同一 observer 协议
+  · legacy 桌面客户端,保留到 Flutter parity
+        │
+        ▼
+Flutter-first 跨平台客户端                         计划中
+  · 移动优先真人座位 · 实时房间 · 桌面扩展
+  · 复用同一 observer 协议,不直连 provider
 ```
 
-observer 协议是硬边界:任何客户端(现在是 Qt,未来可以是 Web)消费同一套 REST/SSE 接口,绝不接触引擎内部实现或 provider 密钥。
+observer 协议是硬边界:任何客户端(现在是 Qt,下一步是 Flutter)消费同一套 REST/SSE 接口,绝不接触引擎内部实现或 provider 密钥。
 
 ## 快速开始
 
@@ -107,7 +113,7 @@ PYTHONPATH=src python -m unittest discover -s tests -p "test_*.py"
 | 路径 | 内容 |
 |------|------|
 | `src/werewolf_eval/` | Python 后端:涌现引擎、`action_runtime/`(能力系统)、provider 与注册表、observer server、事件/日志 schema 与校验、评分与归因、`invariants/` 安全网、`ablation/` 实验台 |
-| `clients/qt_observer/` | Qt 6 / QML 剧场客户端([客户端 README](clients/qt_observer/README.md)) |
+| `clients/qt_observer/` | 当前 Qt 6 / QML 剧场客户端;作为 legacy 桌面表面保留到跨平台 parity([客户端 README](clients/qt_observer/README.md)) |
 | `tests/` | Python 测试套件(80 个文件) |
 | `tools/`、`scripts/` | live 验证与开发/冒烟工具 |
 | `docs/` | 项目文档——从 [`PROJECT_MAP.md`](docs/PROJECT_MAP.md) 开始读 |
@@ -119,7 +125,7 @@ PYTHONPATH=src python -m unittest discover -s tests -p "test_*.py"
 |------|------|------|
 | **P1 — 数据与事件地基** | 日志 schema/校验/评分/归因、引擎与 provider 契约、实时事件骨架、observer 协议 + server | ✅ 完成 |
 | **P2 — 观战式 AI-vs-AI 对局客户端** | 涌现引擎、BYO-key 多供应商配置、实时剧场 UI、结算战报 | ✅ 完成 |
-| **P3 — Agent 角色体验 · 真人参与** | 角色卡、单局记忆、roleplay harness、桌面发言、真人座位 | 🚧 当前方向 |
+| **P3 — Agent 角色体验 · 真人参与 · 跨平台客户端** | 角色卡、单局记忆、roleplay harness、桌面发言、真人座位、Flutter-first 移动/桌面客户端 | 🚧 当前方向 |
 | **P4 — 评测 · 复盘 · 排行榜** | 结算深化为复盘分析;按模型、角色、Agent Card、记忆策略排行 | ⏳ 后移 |
 
 [`docs/PROJECT_MAP.md`](docs/PROJECT_MAP.md) 是权威产品地图(阶段视图 + 系统视图)。
@@ -131,7 +137,7 @@ PYTHONPATH=src python -m unittest discover -s tests -p "test_*.py"
 | [PROJECT_MAP](docs/PROJECT_MAP.md) | **权威** — 产品阶段、模块状态、系统视图(SYS-xx) |
 | [PRODUCT_ONE_PAGER](docs/PRODUCT_ONE_PAGER.md) | 产品定义:用户、输入、输出、价值 |
 | [TASKS](docs/TASKS.md) | 压缩任务索引 |
-| [DESIGN](DESIGN.md) | UI / QML 视觉方向 |
+| [DESIGN](DESIGN.md) | UI 方向:新跨平台表面 + legacy Qt 维护边界 |
 | [Specs](docs/superpowers/specs/) | 重要切片的设计规格 |
 | [Plans](docs/superpowers/plans/) | 当前实现计划 |
 | [ADRs](docs/adr/) | 架构决策(observer 协议、action runtime 编排器) |
@@ -140,4 +146,4 @@ PYTHONPATH=src python -m unittest discover -s tests -p "test_*.py"
 
 ## 项目背景
 
-项目源于一个多智能体系统课题:构建能自主完成信息不对称博弈的狼人杀 AI Agent Team——每个 Agent 按角色拥有独立目标、策略与行动空间,在严格信息隔离约束下推理、发言、决策;系统需要完整对局引擎、结构化全程可观测,以及观战 UI。项目先从「评测 + 复盘」方向生长出可审计运行地基,现在路线转向更强的 Agent 角色体验:角色卡、单局记忆、桌面发言、阵营计划,以及后续真人玩家进入同一套可审计对局循环。
+项目源于一个多智能体系统课题:构建能自主完成信息不对称博弈的狼人杀 AI Agent Team——每个 Agent 按角色拥有独立目标、策略与行动空间,在严格信息隔离约束下推理、发言、决策;系统需要完整对局引擎、结构化全程可观测,以及观战 UI。项目先从「评测 + 复盘」方向生长出可审计运行地基,现在路线转向更强的 Agent 角色体验:角色卡、单局记忆、桌面发言、阵营计划,以及 P3 真人玩家进入同一套可审计对局循环。

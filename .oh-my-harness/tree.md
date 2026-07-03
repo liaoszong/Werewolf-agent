@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 511
+- Entries: 512
 
 ```text
 ./
@@ -246,7 +246,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │       ├── 2026-06-13-livecockpit-godseye-redesign-phase2-design.md
 │   │       ├── 2026-06-13-werewolf-game-client-redesign-design.md
 │   │       ├── 2026-06-20-r0-windows-distribution-baseline.md
-│   │       └── 2026-07-02-agent-roleplay-human-game-pivot-design.md
+│   │       ├── 2026-07-02-agent-roleplay-human-game-pivot-design.md
+│   │       └── 2026-07-02-p3-e-client-platform-migration-design.md
 │   ├── CHECKPOINT_TEMPLATE.md
 │   ├── EVALUATION_RUBRIC.md
 │   ├── PRODUCT_ONE_PAGER.md

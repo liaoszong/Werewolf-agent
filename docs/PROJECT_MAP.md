@@ -11,9 +11,11 @@
 
 ## 一句话产品愿景
 
-一个**可参与、可观战的狼人杀 Agent Theater**:每个座位不是一次 API 调用,而是有角色卡、记忆、私有目标、阵营协作、发言风格和博弈策略的 Agent。对局要先像真人狼人杀一样有拉踩、伪装、对跳、结盟、背刺、复盘价值;AI-vs-AI 是默认实验形态,但产品方向必须容纳真人扮演一个角色加入实时局。
+一个**移动优先、可参与、可观战的狼人杀 Agent Theater**:每个座位不是一次 API 调用,而是有角色卡、记忆、私有目标、阵营协作、发言风格和博弈策略的 Agent。对局要先像真人狼人杀一样有拉踩、伪装、对跳、结盟、背刺、复盘价值;AI-vs-AI 是默认实验形态,但产品方向必须容纳真人在手机或桌面端扮演一个角色加入实时局。
 
 > 2026-07-02 路线转向:旧路线把重心放在"可审计 AI-vs-AI + 评测/排行榜",工程地基成立,但 Agent 体验太薄,对局无聊。新路线把 **Agent 角色体验与真人参与** 放到 P3,评测/排行榜后移为 P4。SillyTavern 的角色卡/群聊/Lorebook/RAG/摘要/Prompt Inspector 是角色扮演参考;Claude Code / learn-claude-code 的 agent harness、记忆、上下文压缩、工具/权限、子智能体和 team protocol 是工程参考。详见 `docs/superpowers/specs/2026-07-02-agent-roleplay-human-game-pivot-design.md`。
+>
+> 2026-07-02 客户端路线转向:当前 Qt/QML 观战器保留为 legacy,直到新客户端达到基本 parity;新玩家端按 **Flutter-first client rewrite + backend protocol retained** 推进。旧 storybook/parchment/童话桌游视觉方向废弃,各页面 UI 重新讨论和设计。详见 `docs/superpowers/specs/2026-07-02-p3-e-client-platform-migration-design.md`。
 
 ---
 
@@ -23,7 +25,7 @@
 |---|---|---|---|
 | **P1** | 数据与事件地基 | ✅ 完成 | 后端原语:日志 schema/校验/评分/归因、引擎与 provider 契约、实时事件骨架、observer 协议+server。 |
 | **P2** | 观战式 AI-vs-AI 对局客户端 | ✅ 完成 | 对局可自演化、可配置、可实时观战,并能进入结算与历史回看。 |
-| **P3** | Agent 角色体验 · 真人参与 | 🚧 当前方向 | 把"座位=API 调用"升级为"座位=有角色卡、记忆、策略与行动工具的 Agent";随后支持真人座位加入同一实时局。 |
+| **P3** | Agent 角色体验 · 真人参与 · 跨平台客户端 | 🚧 当前方向 | 把"座位=API 调用"升级为"座位=有角色卡、记忆、策略与行动工具的 Agent";同时把玩家端迁到移动优先的跨平台客户端,让真人座位加入同一实时局。 |
 | **P4** | 评测 · 复盘 · 排行榜 | ⏳ 后移 | 在更有趣的 Agent/真人对局之上做复盘、归因、版本对战与排行榜。 |
 
 ---
@@ -86,9 +88,11 @@
 
 ---
 
-## P3 · Agent 角色体验 · 真人参与 🚧(当前方向)
+## P3 · Agent 角色体验 · 真人参与 · 跨平台客户端 🚧(当前方向)
 
 > 当前问题:项目已经能跑、能观战、能审计,但"好玩"不足。多数座位仍像同质化 API 调用:没有稳定人格、没有可持续记忆、没有局内目标管理、没有私密阵营协作,也没有真人坐进去参与博弈。P3 的目标是把狼人杀里真正有趣的点做出来:伪装、欺骗、试探、对跳、结盟、转票、遗言、私聊协作、记仇、复盘。
+>
+> 客户端问题同样阻塞 P3:当前 Qt/QML UI 过于桌面观战器,且 storybook/parchment/童话桌游方向已被废弃。P3 的玩家端必须移动优先,支持真人入座、实时发言/投票/夜间行动,并在桌面端保持同一套产品表面。新客户端路线见 P3-E。
 
 ### P3 设计参照
 
@@ -107,6 +111,9 @@
 | **P3-B 博弈脚手架与桌面发言** | 先建 P3-B0 Structured SpeechAct Contract,再把白天讨论从"顺序发言+投票"升级为可回应、可追问、可对跳、可转票的 table-talk;狼人私密频道、发言-投票一致性、轻量计划器进入 ActionEnvelope 上游。 | ⏳ 下一模块 |
 | **P3-C 真人座位实时参与** | 首版只做本地单真人村民 seat,完整支持村民观察/发言/回应/投票/遗言/超时/重连;后续再扩真人狼人、预言家、女巫、多真人。所有真人动作由 server action_window 控制。 | ⏳ 后续模块 |
 | **P3-D 趣味性复盘入口** | 结算先回答"这局哪里好看/哪里蠢/谁骗过了谁",再接评测指标;把 P4 的评测能力挂到玩家能理解的戏剧节点上。 | ⏳ 后续模块 |
+| **P3-E 跨平台真人客户端迁移** | 新玩家端按 Flutter-first 重写,移动端优先、桌面端复用同一产品表面;Qt/QML 只作为 legacy 保留到 parity。保留 Python backend / observer REST+SSE / provider gateway / 日志与可见性边界。 | 🚧 当前设计 |
+
+**P3 并行与前置关系:** P3-E-1/E-2 是 observer-first 客户端切片,可以与 P3-A/P3-B 并行推进;P3-E-3 真人村民座位硬依赖 P3-C-0 server action protocol spec 和最小 action-window endpoint。P3-C 的产品价值又依赖 P3-A/P3-B 让 AI 具备足够角色感和回应能力,否则真人只是进入一局无聊 AI 对局。
 
 ### P3-A 工作任务(当前模块,细化到工作任务粒度)
 
@@ -117,11 +124,29 @@
 | **P3-A-2 Agent memory packet** | 在现有 observation_text 之上建立 `AgentContextPacket`:Fact/Claim/Belief/Commitment/TeamPlan/StaticPlaybook 分层,包含 source ids、audience_scope、confidence、status、supersedes、prompt block hash 与调用成本记录。 | ⏳ 待 plan |
 | **P3-A-3 First playable roleplay arm(shadow-safe)** | 先做 6 人基础板的最小 Agent 化闭环:卡片差异可见、记忆引用可追溯、belief 与 fact 不混淆、狼人共享计划不泄漏、旧 baseline 在 shadow mode 下保持可比、调用成本可审计。追问/转票/戏剧节点归 P3-B/P3-D。 | ⏳ 待 plan |
 
+### P3-C 工作任务(真人参与通道,细化到工作任务粒度)
+
+| 工作任务 | 描述 | 状态 |
+|---|---|---|
+| **P3-C-0 Server action protocol spec** | 先定义真人动作的 observer/server 协议:action window 查询/提交、session token 生命周期、idempotency key、game revision、reconnect cursor、超时策略(skip/pass/ai_takeover)和可见性拒绝语义。P3-E-3 不得在客户端 spec 内临时发明这些端点。 | ⏳ 待 plan |
+
+### P3-E 工作任务(客户端路线,细化到工作任务粒度)
+
+| 工作任务 | 描述 | 状态 |
+|---|---|---|
+| **P3-E-0 客户端迁移路线 spec** | 正式记录 Flutter-first client rewrite、Qt legacy until parity、backend protocol retained;同步废弃 storybook/parchment/童话桌游 UI 方向。 | ✅ 文档中 |
+| **P3-E-1 Flutter protocol spike** | 新 Flutter 客户端连接现有 observer server:配置 base URL、列出 runs、跟随 SSE、渲染最小 live room;不读本地 artifact,不碰 provider。若 P3-C-0 stub 已存在,加 trivial human action round-trip 去风险。 | ⏳ 待 plan |
+| **P3-E-2 Mobile-first live room slice** | 以手机竖屏为主布局,完成可替代 Qt 基础观战的实时对局房间;桌面端是响应式扩展而非另一个产品。 | ⏳ 待 plan |
+| **P3-E-3 Human villager seat slice** | 接 P3-C 的首个真人村民座位:合法视野、发言、回应、投票、遗言、超时、重连,全部由 server action_window 控制。前置:P3-C-0 spec + 最小 server endpoint。 | ⏳ 待 plan |
+| **P3-E-4 Desktop parity / Qt retirement gate** | 先达 player parity(启动/接入、观战、常用配置、真人入座、结算回看);Qt 归档/移除还要求 developer parity(证据/推理轨迹/provider/发行更新等工具链)或另行决策。 | ⏳ 后续 |
+
 ### P3 成功口径
 
 - **有趣优先:**发言不再大面积同质化;同一局中能看到稳定人格、记忆引用、对跳/反驳/拉票/转票。
 - **博弈优先:**狼人会围绕伪装目标协作,好人会围绕公开/私有信息形成推理链,不同角色行动不只是"合法 JSON"。
 - **真人可玩:**真人 seat 不需要上帝视角也能完整参与;AI 能回应真人发言,不是把真人当旁白。
+- **移动优先:**默认假设玩家在手机上参与;桌面端是更宽的同一套客户端,不是唯一入口。
+- **可证伪的好玩门槛:** P3 不能只证明"合法/安全";至少要有轻量趣味性验收,例如盲评能高于随机地区分不同 AgentCard,且样例局出现可标注的对跳、反驳、拉票或转票节点。
 - **安全不退:**所有 Agent 记忆、摘要、RAG、playbook 注入都必须过 SYS-A4 可见性边界;不能把私有事实包装成"记忆"泄漏给不该知道的 seat。
 - **成本可控:**默认一名玩家一次行动最多一次玩家模型调用;确定性 harness 负责 context selection、source entitlement、claim ledger 和预算裁剪。反思/记忆更新首版不得扩成多轮 planner。
 
@@ -176,8 +201,9 @@
 | **SYS-C3** | 质量防线 | 三件套:Differential Testing(差分测试)· **Runtime Verification / Semantic Oracle**(不变量安全网)· Deterministic Simulation Testing(fake 脚本+固定种子,对标 FoundationDB DST) | 差分:②a 的 OLD-oracle gate;安全网:`docs/superpowers/specs/2026-06-09-p2a-invariant-safety-net-design.md`(PLAN-READY);DST:`emergent_fake_script.py` + seed 体系 | ✅ 三件套全部就位(2026-06-10):安全网已合并(`src/werewolf_eval/invariants/`,7 不变量 + B1 防泄漏×4站点 + B4 防双死×3站点 + 50-seed fuzz,字节中立);剩 engine-level fuzz、B2/B3 守卫跟 ledger/EffectQueue |
 | **SYS-C4** | 桌面发行与更新 | Desktop Distribution / In-App Update | `scripts/release/`, `src/werewolf_eval/release_host/`, `clients/qt_observer/qml/ProviderSettingsView.qml` | ✅ R0 完成:PyInstaller onedir bootstrapper、frozen observer server、Qt deployment tree、Velopack package、GitHub Releases source、host-owned update RPC、Settings 内更新 UI、安装态本地 E2E 与数据保留验证 |
 | **SYS-C5** | 真人参与通道 | Human-in-the-loop Game Client / Participant Seat Gateway | observer REST/SSE + Qt setup/theater;未来新增 human seat action endpoints/UI | ⏳ P3-C 待建。首版本地单真人村民;真人 seat 必须走 server-controlled `SeatController` / `action_window_id` / session token / idempotency key / reconnect cursor;客户端不得读取本地 artifact 或 god snapshot 伪造参战视角。 |
+| **SYS-C6** | 跨平台玩家客户端与设计系统 | Cross-platform Client Platform / Design System | 当前:`clients/qt_observer/` legacy;未来:`clients/flutter_app/`(暂定) | 🚧 P3-E 设计中。新客户端按 Flutter-first、mobile-first 建立;Qt/QML 保留到 parity。旧 storybook/parchment/童话视觉只属于 legacy,不得作为新页面默认方向。客户端边界仍是 observer protocol,不直连 provider、不读本地 artifact。 |
 
-> **系统间的关键依赖**(讨论重构顺序时用):SYS-A2 的 ledger 是女巫迁移前提;SYS-C3 安全网是 A2 后续所有大刀(ledger/EffectQueue/NightPlan)的护栏,先网后刀;P3-A 先建 SYS-B5 Agent Card 与 SYS-B1 AgentContextPacket,再让 SYS-B4 harness 消费它;SYS-B1 的情景/语义记忆依赖 SYS-A4 可见性检查(I4b)防泄漏;SYS-C5 真人参与必须复用 SYS-A4/SYS-B2/SYS-C2,不能绕过 observer 协议。
+> **系统间的关键依赖**(讨论重构顺序时用):SYS-A2 的 ledger 是女巫迁移前提;SYS-C3 安全网是 A2 后续所有大刀(ledger/EffectQueue/NightPlan)的护栏,先网后刀;P3-A 先建 SYS-B5 Agent Card 与 SYS-B1 AgentContextPacket,再让 SYS-B4 harness 消费它;SYS-B1 的情景/语义记忆依赖 SYS-A4 可见性检查(I4b)防泄漏;SYS-C5 真人参与必须复用 SYS-A4/SYS-B2/SYS-C2,不能绕过 observer 协议;SYS-C6 新客户端必须复用 SYS-C2/SYS-C5 协议边界,不能变成另一个 runtime。
 
 ---
 

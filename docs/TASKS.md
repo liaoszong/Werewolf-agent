@@ -50,7 +50,13 @@
 | P3-A：Agent Card + Memory Spine | planned | — |
 | P3-B：博弈脚手架与桌面发言 | planned | — |
 | P3-C：真人座位实时参与 | planned | — |
+| P3-C-0：真人 action protocol spec | planned | `docs/PROJECT_MAP.md`, future P3-C server action protocol spec |
 | P3-D：趣味性复盘入口 | planned | — |
+| P3-E-0：跨平台客户端迁移路线 spec | completed | `docs/PROJECT_MAP.md`, `DESIGN.md`, `docs/superpowers/specs/2026-07-02-p3-e-client-platform-migration-design.md` |
+| P3-E-1：Flutter protocol spike | planned | future Flutter client protocol spike |
+| P3-E-2：Mobile-first live room slice | planned | future Flutter live-room slice |
+| P3-E-3：Human villager seat slice | planned | depends on P3-C-0 and server-side action windows |
+| P3-E-4：Desktop parity / Qt retirement gate | planned | future parity review |
 
 ## P4 — downstream
 
