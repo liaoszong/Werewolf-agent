@@ -704,23 +704,34 @@ class ActionIdempotencyTracker:
     def __init__(self) -> None:
         self._records: dict[str, dict[str, _IdempotencyRecord]] = {}
 
+    def duplicate_for(
+        self,
+        submission: ParticipantActionSubmission,
+    ) -> IdempotencyOutcome | None:
+        """Return the original result for a repeated key, or raise on conflict."""
+        window_records = self._records.get(submission.action_window_id, {})
+        existing = window_records.get(submission.idempotency_key)
+        if existing is None:
+            return None
+        if existing.fingerprint != submission.idempotency_fingerprint():
+            raise _protocol_error(
+                "idempotency_conflict",
+                "idempotency_key was already used for a different action payload",
+                action_window_id=submission.action_window_id,
+            )
+        return IdempotencyOutcome("duplicate", copy.deepcopy(existing.result))
+
     def record_or_duplicate(
         self,
         submission: ParticipantActionSubmission,
         result: Mapping[str, object],
     ) -> IdempotencyOutcome:
+        duplicate = self.duplicate_for(submission)
+        if duplicate is not None:
+            return duplicate
+
         window_records = self._records.setdefault(submission.action_window_id, {})
         fingerprint = submission.idempotency_fingerprint()
-        existing = window_records.get(submission.idempotency_key)
-        if existing is not None:
-            if existing.fingerprint != fingerprint:
-                raise _protocol_error(
-                    "idempotency_conflict",
-                    "idempotency_key was already used for a different action payload",
-                    action_window_id=submission.action_window_id,
-                )
-            return IdempotencyOutcome("duplicate", copy.deepcopy(existing.result))
-
         stored_result = copy.deepcopy(dict(result))
         window_records[submission.idempotency_key] = _IdempotencyRecord(
             fingerprint=fingerprint,

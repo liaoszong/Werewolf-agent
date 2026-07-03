@@ -66,6 +66,14 @@ GET_ROUTES: tuple[Route, ...] = (
     Route(("api", "configs", "{config_id}"), "_route_config_detail"),
     Route(("api", "profiles"), "_route_profiles_list"),
     Route(("api", "profiles", "{name}"), "_route_profile_detail"),
+    Route(
+        ("api", "runs", "{run_id}", "participant", "state"),
+        "_route_participant_state",
+    ),
+    Route(
+        ("api", "runs", "{run_id}", "participant", "events"),
+        "_route_participant_events",
+    ),
     # Run group: validate_run_id → 404 "Run not found: {id}" → perspective →
     # RUN_SUB_ROUTES, all inside _route_run_scoped (matches the historical
     # single-block structure, including 404 wording precedence).
@@ -103,6 +111,8 @@ POST_ROUTES: tuple[Route, ...] = (
         loopback_message="runs interrupt is loopback-only",
         same_origin=True,
     ),
+    Route(("api", "runs", "{run_id}", "participants", "join"), "_route_participants_join"),
+    Route(("api", "runs", "{run_id}", "participant", "actions"), "_route_participant_actions"),
     Route(("api", "profiles", "validate"), "_route_profile_validate"),
     Route(
         ("api", "configs", "import"),

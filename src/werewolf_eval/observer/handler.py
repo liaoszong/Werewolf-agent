@@ -26,6 +26,16 @@ from werewolf_eval.observer.credentials_api import (
     _provider_models_result,
 )
 from werewolf_eval.observer.launch import execute_profile_launch
+from werewolf_eval.observer.participant_api import (
+    authenticate_participant_session,
+    build_participant_state_payload,
+    issue_participant_session,
+    participant_error_response,
+    participant_sse_events,
+    reject_participant_perspective_override,
+    run_not_found_response,
+    submit_participant_action,
+)
 from werewolf_eval.observer.routes import (
     DELETE_ROUTES,
     GET_ROUTES,
@@ -60,6 +70,10 @@ from werewolf_eval.observer_protocol import (
 from werewolf_eval.observer_visibility import (
     VisibilityProjectionError,
     build_projection_envelope,
+)
+from werewolf_eval.participant_protocol import (
+    PARTICIPANT_SESSION_SCHEMA_VERSION,
+    ParticipantProtocolError,
 )
 from werewolf_eval.profile_config import (
     ProfileValidationError,
@@ -196,6 +210,28 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
         qs = parse_qs(parsed.query)
         raw = qs.get("perspective", ["god"])[0]
         return normalize_perspective(raw)
+
+    def _has_query_key(self, key: str) -> bool:
+        parsed = urlparse(self.path)
+        return key in parse_qs(parsed.query)
+
+    def _send_participant_error(self, status: int, payload: dict[str, object]) -> None:
+        self._send_json(status, payload)
+
+    def _send_participant_protocol_error(self, exc: ParticipantProtocolError) -> None:
+        status, payload = participant_error_response(exc)
+        self._send_participant_error(status, payload)
+
+    def _send_participant_sse(self, events: list[tuple[str, dict[str, object]]]) -> None:
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+        self.send_header("Cache-Control", "no-cache")
+        self.send_header("Connection", "close")
+        self.end_headers()
+        for event_name, payload in events:
+            data = json.dumps(payload, ensure_ascii=False, sort_keys=True)
+            self.wfile.write(f"event: {event_name}\ndata: {data}\n\n".encode("utf-8"))
+        self.close_connection = True
 
     # -- logging -----------------------------------------------------------
 
@@ -335,6 +371,59 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
             self._send_error_json(400, "invalid_profile", str(exc))
             return
         self._send_json(200, redact_secret_values(data))
+
+    def _route_participant_state(self, params: dict[str, str]) -> None:
+        run_id = params["run_id"]
+        run_dir = self._run_dir(run_id)
+        if not run_dir.is_dir():
+            self._send_participant_error(*run_not_found_response(run_id))
+            return
+        if self._has_query_key("perspective"):
+            self._send_participant_error(*reject_participant_perspective_override(run_id))
+            return
+        try:
+            session = authenticate_participant_session(
+                self._get_state(),
+                run_id=run_id,
+                authorization_header=self.headers.get("Authorization"),
+            )
+            payload = build_participant_state_payload(
+                self._get_state(),
+                run_id=run_id,
+                run_dir=run_dir,
+                session=session,
+                run_status=self._get_status(run_id, run_dir),
+            )
+        except ParticipantProtocolError as exc:
+            self._send_participant_protocol_error(exc)
+            return
+        self._send_json(200, payload)
+
+    def _route_participant_events(self, params: dict[str, str]) -> None:
+        run_id = params["run_id"]
+        run_dir = self._run_dir(run_id)
+        if not run_dir.is_dir():
+            self._send_participant_error(*run_not_found_response(run_id))
+            return
+        if self._has_query_key("perspective"):
+            self._send_participant_error(*reject_participant_perspective_override(run_id))
+            return
+        try:
+            session = authenticate_participant_session(
+                self._get_state(),
+                run_id=run_id,
+                authorization_header=self.headers.get("Authorization"),
+            )
+            events = participant_sse_events(
+                self._get_state(),
+                run_id=run_id,
+                session=session,
+                run_status=self._get_status(run_id, run_dir),
+            )
+        except ParticipantProtocolError as exc:
+            self._send_participant_protocol_error(exc)
+            return
+        self._send_participant_sse(events)
 
     # -- GET run group --------------------------------------------------------
 
@@ -546,6 +635,65 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
         else:
             self._send_error_json(code, str(payload.get("error", "bad_request")),
                                   str(payload.get("detail", "")))
+
+    def _route_participants_join(self, params: dict[str, str]) -> None:
+        run_id = params["run_id"]
+        run_dir = self._run_dir(run_id)
+        if not run_dir.is_dir():
+            self._send_participant_error(*run_not_found_response(run_id))
+            return
+        if self._has_query_key("perspective"):
+            self._send_participant_error(*reject_participant_perspective_override(run_id))
+            return
+        body = self._read_json_body()
+        try:
+            session = issue_participant_session(
+                self._get_state(),
+                run_id=run_id,
+                request_payload=body,
+            )
+        except ParticipantProtocolError as exc:
+            self._send_participant_protocol_error(exc)
+            return
+        self._send_json(
+            200,
+            {
+                "schema_version": PARTICIPANT_SESSION_SCHEMA_VERSION,
+                "run_id": session.run_id,
+                "seat_id": session.seat_id,
+                "participant_session_token": session.participant_session_token,
+                "perspective": session.perspective,
+                "reconnect_cursor": session.last_seen_cursor,
+            },
+        )
+
+    def _route_participant_actions(self, params: dict[str, str]) -> None:
+        run_id = params["run_id"]
+        run_dir = self._run_dir(run_id)
+        if not run_dir.is_dir():
+            self._send_participant_error(*run_not_found_response(run_id))
+            return
+        if self._has_query_key("perspective"):
+            self._send_participant_error(*reject_participant_perspective_override(run_id))
+            return
+        body = self._read_json_body()
+        try:
+            session = authenticate_participant_session(
+                self._get_state(),
+                run_id=run_id,
+                authorization_header=self.headers.get("Authorization"),
+            )
+            payload = submit_participant_action(
+                self._get_state(),
+                run_id=run_id,
+                session=session,
+                request_payload=body,
+                run_status=self._get_status(run_id, run_dir),
+            )
+        except ParticipantProtocolError as exc:
+            self._send_participant_protocol_error(exc)
+            return
+        self._send_json(200, payload)
 
     def _route_credentials_post(self, params: dict[str, str]) -> None:
         content_type = self.headers.get("Content-Type", "")

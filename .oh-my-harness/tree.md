@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 515
+- Entries: 517
 
 ```text
 ./
@@ -310,6 +310,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       │   ├── factory.py
 │       │   ├── handler.py
 │       │   ├── launch.py
+│       │   ├── participant_api.py
 │       │   ├── release_manifest.py
 │       │   ├── routes.py
 │       │   ├── run_manager.py
@@ -526,6 +527,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── test_openai_provider.py
 │   ├── test_p2a2_live_path.py
 │   ├── test_participant_protocol.py
+│   ├── test_participant_routes.py
 │   ├── test_profile_config.py
 │   ├── test_prompt_renderers.py
 │   ├── test_prompt_v2_invariants.py

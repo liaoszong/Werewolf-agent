@@ -128,7 +128,8 @@
 
 | 工作任务 | 描述 | 状态 |
 |---|---|---|
-| **P3-C-0 Server action protocol spec** | 先定义真人动作的 observer/server 协议:action window 查询/提交、session token 生命周期、idempotency key、game revision、reconnect cursor、超时策略(skip/pass/ai_takeover)和可见性拒绝语义。P3-E-3 不得在客户端 spec 内临时发明这些端点。 | ✅ 文档中 |
+| **P3-C-0 Server action protocol spec + minimal server skeleton** | 已定义真人动作的 observer/server 协议,并落地最小代码切片:协议类型/校验器/错误 envelope、join/state/events/actions 路由骨架、本地开发 join code、session token、idempotency、role projection、安全拒绝语义。仍不接真实 game loop。 | ✅ 已实现 |
+| **P3-C-1 Human villager seat game-loop integration** | 把 P3-C-0 action window 接入真实 `SeatController` / game loop,首版只做本地单真人村民 seat:观察、发言/回应、投票、遗言、超时、重连。不得绕过 server action_window 或读取 god artifact。 | ⏳ 待 plan |
 
 ### P3-E 工作任务(客户端路线,细化到工作任务粒度)
 
@@ -200,7 +201,7 @@
 | **SYS-C2** | 观战与回放 | Replay / Spectator System | observer server(REST/SSE)+ Qt 剧场/结算 | ✅ 主体完成;P3-D 趣味性节点展示与 P4-A 逐人深度复盘待做 |
 | **SYS-C3** | 质量防线 | 三件套:Differential Testing(差分测试)· **Runtime Verification / Semantic Oracle**(不变量安全网)· Deterministic Simulation Testing(fake 脚本+固定种子,对标 FoundationDB DST) | 差分:②a 的 OLD-oracle gate;安全网:`docs/superpowers/specs/2026-06-09-p2a-invariant-safety-net-design.md`(PLAN-READY);DST:`emergent_fake_script.py` + seed 体系 | ✅ 三件套全部就位(2026-06-10):安全网已合并(`src/werewolf_eval/invariants/`,7 不变量 + B1 防泄漏×4站点 + B4 防双死×3站点 + 50-seed fuzz,字节中立);剩 engine-level fuzz、B2/B3 守卫跟 ledger/EffectQueue |
 | **SYS-C4** | 桌面发行与更新 | Desktop Distribution / In-App Update | `scripts/release/`, `src/werewolf_eval/release_host/`, `clients/qt_observer/qml/ProviderSettingsView.qml` | ✅ R0 完成:PyInstaller onedir bootstrapper、frozen observer server、Qt deployment tree、Velopack package、GitHub Releases source、host-owned update RPC、Settings 内更新 UI、安装态本地 E2E 与数据保留验证 |
-| **SYS-C5** | 真人参与通道 | Human-in-the-loop Game Client / Participant Seat Gateway | observer REST/SSE + Qt setup/theater;未来新增 human seat action endpoints/UI | ⏳ P3-C 待建。首版本地单真人村民;真人 seat 必须走 server-controlled `SeatController` / `action_window_id` / session token / idempotency key / reconnect cursor;客户端不得读取本地 artifact 或 god snapshot 伪造参战视角。 |
+| **SYS-C5** | 真人参与通道 | Human-in-the-loop Game Client / Participant Seat Gateway | observer REST/SSE + participant action endpoints;未来新增 human seat UI | 🚧 P3-C-0 协议与最小 route skeleton 已建;P3-C-1 仍需接真实 game loop。首版本地单真人村民;真人 seat 必须走 server-controlled `SeatController` / `action_window_id` / session token / idempotency key / reconnect cursor;客户端不得读取本地 artifact 或 god snapshot 伪造参战视角。 |
 | **SYS-C6** | 跨平台玩家客户端与设计系统 | Cross-platform Client Platform / Design System | 当前:`clients/qt_observer/` legacy;未来:`clients/flutter_app/`(暂定) | 🚧 P3-E 设计中。新客户端按 Flutter-first、mobile-first 建立;Qt/QML 保留到 parity。旧 storybook/parchment/童话视觉只属于 legacy,不得作为新页面默认方向。客户端边界仍是 observer protocol,不直连 provider、不读本地 artifact。 |
 
 > **系统间的关键依赖**(讨论重构顺序时用):SYS-A2 的 ledger 是女巫迁移前提;SYS-C3 安全网是 A2 后续所有大刀(ledger/EffectQueue/NightPlan)的护栏,先网后刀;P3-A 先建 SYS-B5 Agent Card 与 SYS-B1 AgentContextPacket,再让 SYS-B4 harness 消费它;SYS-B1 的情景/语义记忆依赖 SYS-A4 可见性检查(I4b)防泄漏;SYS-C5 真人参与必须复用 SYS-A4/SYS-B2/SYS-C2,不能绕过 observer 协议;SYS-C6 新客户端必须复用 SYS-C2/SYS-C5 协议边界,不能变成另一个 runtime。

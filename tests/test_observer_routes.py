@@ -80,6 +80,14 @@ class GetTableTests(unittest.TestCase):
             self._handler_for(["api", "providers", "deepseek", "models"]),
             "_route_provider_models",
         )
+        self.assertEqual(
+            self._handler_for(["api", "runs", "r1", "participant", "state"]),
+            "_route_participant_state",
+        )
+        self.assertEqual(
+            self._handler_for(["api", "runs", "r1", "participant", "events"]),
+            "_route_participant_events",
+        )
 
     def test_schema_wins_over_profile_name_capture(self) -> None:
         m = _match(GET_ROUTES, ["api", "profiles", "schema"])
@@ -143,6 +151,16 @@ class PostDeleteTableTests(unittest.TestCase):
         self.assertEqual(m[0].handler_name, "_route_runs_post")
         self.assertIsNone(m[0].loopback_message)  # cross-origin ONLY — asymmetric
         self.assertTrue(m[0].same_origin)
+
+        m = _match(POST_ROUTES, ["api", "runs", "r1", "participants", "join"])
+        self.assertEqual(m[0].handler_name, "_route_participants_join")
+        self.assertIsNone(m[0].loopback_message)
+        self.assertFalse(m[0].same_origin)
+
+        m = _match(POST_ROUTES, ["api", "runs", "r1", "participant", "actions"])
+        self.assertEqual(m[0].handler_name, "_route_participant_actions")
+        self.assertIsNone(m[0].loopback_message)
+        self.assertFalse(m[0].same_origin)
 
         m = _match(POST_ROUTES, ["api", "profiles", "validate"])
         self.assertEqual(m[0].handler_name, "_route_profile_validate")
