@@ -72,6 +72,7 @@ Rules:
 - A token never grants artifact access.
 - A token never grants god projection.
 - A token can be revoked when the run ends, the seat is no longer human-controlled, or the host resets the session.
+- First slice has no token refresh endpoint. Use a long local-dev TTL; after expiry the client must join again and receive a fresh token.
 
 ### ActionWindow
 
@@ -94,10 +95,10 @@ reconnect_cursor
 Rules:
 
 - The server creates action windows; the client cannot request arbitrary turns.
-- Only one open required window may exist for a given human seat.
-- `game_revision` changes when the game advances in a way that can stale a submission.
+- First slice allows at most one open action window per human seat, whether required or optional.
+- `game_revision` is monotonically increasing. It changes only when an event changes that seat's visible game state or the legality of the current/openable window.
 - `allowed_actions` is rendered from server truth, not inferred by the client.
-- `reconnect_cursor` lets the client resume from a known stream/event position.
+- `reconnect_cursor` is monotonic and comparable by its numeric event index. Clients should treat the string as opaque except for equality/ordering checks.
 
 ### ParticipantActionSubmission
 
@@ -114,6 +115,7 @@ client_sent_at?
 Rules:
 
 - `idempotency_key` is required for every submit.
+- The idempotency scope is `action_window_id`; the same key may be reused in a different window, though clients should still generate fresh keys.
 - Repeating the same `idempotency_key` for the same window returns the first result.
 - Reusing an `idempotency_key` with different payload is rejected as conflict.
 - `payload` is action-type-specific but always validated by server-side action contracts.
@@ -255,6 +257,7 @@ Rules:
 - SSE data is filtered to the participant session perspective.
 - The stream may include action-window state, but never raw hidden facts.
 - Clients should treat SSE as a convenience; reconnect must be correct through `GET participant/state`.
+- Recommended reconnect sequence: call `GET participant/state`, render its `open_action_window`, then resume SSE from the returned `reconnect_cursor`.
 
 ---
 
@@ -264,10 +267,10 @@ P3-C first slice needs these human-facing action types:
 
 | action_type | Phase | Payload | Notes |
 |---|---|---|---|
-| `speech` | day discussion | `{ "text": string, "reply_to_event_ids"?: string[], "addressed_seats"?: string[] }` | Free text is untrusted game data. Length capped server-side. |
+| `speech` | day discussion | `{ "text": string, "reply_to_event_ids"?: string[], "addressed_seats"?: string[] }` | Free text is untrusted game data. First-slice cap: <= 2000 Unicode scalar values; error responses include the configured cap. |
 | `response` | limited response window | same as `speech` | Triggered by table-talk rules; not an infinite chat loop. |
 | `vote` | day voting | `{ "target": "p1".."p6" }` | Target must be alive and legal. |
-| `final_words` | post-execution if allowed | `{ "text": string }` | Optional by ruleset. |
+| `final_words` | post-execution if allowed | `{ "text": string }` | Optional by ruleset. Same text cap as `speech`. |
 | `pass` | any optional window | `{}` | Only legal when the server marks the window optional or passable. |
 
 Later roles can add `seer_check`, `witch_save`, `witch_poison`, `werewolf_kill_vote`, and `team_message`, but those are out of P3-C first slice.
@@ -292,7 +295,7 @@ Errors are machine-readable and stable. HTTP codes are transport hints; clients 
 | 422 | `illegal_action` | Action kind or payload is not legal in this window. |
 | 423 | `run_not_accepting_actions` | Run not running or paused/interrupted. |
 
-All rejection responses include:
+Rejection responses use one envelope and include context when it is known. `schema_version`, `error_code`, and `message` are always required. `run_id`, `seat_id`, `action_window_id`, `current_game_revision`, and `reconnect_cursor` are required only after the server has authenticated the session and resolved the run/window context; they are omitted for `missing_or_invalid_session` and may be omitted for `run_not_found`.
 
 ```json
 {
@@ -323,7 +326,7 @@ Rules:
 - `pass`: submit deterministic pass/no-op.
 - `ai_takeover`: hand the current window to an AI controller and label the event as takeover.
 
-P3-C first slice should prefer `pass` for optional speech/response windows and `ai_takeover` or deterministic fallback for required votes, chosen by profile. The important invariant is auditability: timeout outcome must create explicit events, not silently mutate game state.
+P3-C first slice supports `pass` for optional speech/response windows and profile-gated `ai_takeover` for required votes. `skip` remains in the protocol for later rulesets but should not be used by the first villager slice unless an explicit window is marked skippable. The important invariant is auditability: timeout outcome must create explicit events, not silently mutate game state.
 
 Mobile push notification is out of scope. Before push exists, UX relies on foreground countdowns, reconnect, and server timeouts.
 
@@ -363,7 +366,7 @@ Final logs should be able to explain a human turn without needing client-local f
 
 ## 10. Security Boundary
 
-P3-C consumes the ADR rule that observer `perspective` is a presentation lens, not authorization. Participant routes must therefore introduce real authorization:
+P3-C consumes the ADR rule that observer `perspective` is a presentation lens, not authorization; see `docs/adr/2026-06-12-observer-perspective-not-access-control.md`. Participant routes must therefore introduce real authorization:
 
 - Session token binds caller to run + seat.
 - Participant endpoints reject `perspective` query overrides.
@@ -415,9 +418,13 @@ Future implementation gates:
 - submit without valid session is rejected;
 - duplicate idempotency key returns the original result;
 - same idempotency key with different payload is rejected;
+- the same idempotency key may be reused across different windows without collision;
 - stale `game_revision` is rejected with current revision and reconnect cursor;
+- `game_revision` bumps only on seat-visible state or action-legality changes;
 - timeout emits explicit auditable event;
 - reconnect after SSE drop returns current role-safe state;
+- token expiry requires re-join in the first slice;
+- text over the configured cap is rejected with `invalid_payload` and the cap value;
 - adversarial player text is rendered/stored as untrusted game data only.
 
 ---
@@ -431,4 +438,3 @@ Future implementation gates:
 - No client-side legality engine.
 - No direct provider calls from any client.
 - No replacement of existing observer routes.
-
