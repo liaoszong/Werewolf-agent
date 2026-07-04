@@ -1,0 +1,128 @@
+import 'dart:math';
+
+import 'package:flutter/foundation.dart';
+
+import '../protocol/participant_api_client.dart';
+import '../protocol/participant_models.dart';
+
+enum ConnectionStatus {
+  idle,
+  connecting,
+  connected,
+  reconnecting,
+  sessionExpired,
+  failed,
+}
+
+class SessionController extends ChangeNotifier {
+  SessionController({required ParticipantApiClient participantApi})
+      : _participantApi = participantApi;
+
+  final ParticipantApiClient _participantApi;
+  final Random _random = Random();
+
+  ParticipantSession? session;
+  ParticipantState? state;
+  ConnectionStatus connectionStatus = ConnectionStatus.idle;
+  String? lastError;
+
+  Future<void> joinAndLoad({
+    required String runId,
+    required String seatId,
+    required String joinCode,
+  }) async {
+    connectionStatus = ConnectionStatus.connecting;
+    lastError = null;
+    notifyListeners();
+    try {
+      session = await _participantApi.join(
+        runId: runId,
+        seatId: seatId,
+        joinCode: joinCode,
+      );
+      await refreshState();
+      connectionStatus = ConnectionStatus.connected;
+    } on ParticipantApiError catch (error) {
+      connectionStatus = error.errorCode == 'missing_or_invalid_session'
+          ? ConnectionStatus.sessionExpired
+          : ConnectionStatus.failed;
+      lastError = error.message;
+    } catch (error) {
+      connectionStatus = ConnectionStatus.failed;
+      lastError = error.toString();
+    }
+    notifyListeners();
+  }
+
+  Future<void> refreshState() async {
+    final active = session;
+    if (active == null) return;
+    state = await _participantApi.state(
+      runId: active.runId,
+      token: active.token,
+    );
+    notifyListeners();
+  }
+
+  Future<void> recoverAfterDisconnect() async {
+    connectionStatus = ConnectionStatus.reconnecting;
+    notifyListeners();
+    try {
+      await refreshState();
+      connectionStatus = ConnectionStatus.connected;
+      lastError = null;
+    } on ParticipantApiError catch (error) {
+      connectionStatus = error.errorCode == 'missing_or_invalid_session'
+          ? ConnectionStatus.sessionExpired
+          : ConnectionStatus.failed;
+      lastError = error.message;
+    }
+    notifyListeners();
+  }
+
+  Future<void> submitSpeech(String text) {
+    return _submitCurrentWindow('speech', {'text': text});
+  }
+
+  Future<void> submitStructuredAction({
+    required String actionType,
+    required Map<String, dynamic> payload,
+  }) {
+    return _submitCurrentWindow(actionType, payload);
+  }
+
+  Future<void> _submitCurrentWindow(
+    String actionType,
+    Map<String, dynamic> payload,
+  ) async {
+    final active = session;
+    final window = state?.openActionWindow;
+    if (active == null || window == null) return;
+    try {
+      await _participantApi.submitAction(
+        runId: active.runId,
+        token: active.token,
+        payload: {
+          'action_window_id': window.id,
+          'game_revision': window.gameRevision,
+          'idempotency_key': _newIdempotencyKey(),
+          'action_type': actionType,
+          'payload': payload,
+        },
+      );
+      await refreshState();
+    } on ParticipantApiError catch (error) {
+      lastError = error.message;
+      if (error.reconnectCursor != null) {
+        await recoverAfterDisconnect();
+      }
+      notifyListeners();
+    }
+  }
+
+  String _newIdempotencyKey() {
+    final micros = DateTime.now().microsecondsSinceEpoch;
+    final suffix = _random.nextInt(1 << 32).toRadixString(16);
+    return 'flutter-$micros-$suffix';
+  }
+}
