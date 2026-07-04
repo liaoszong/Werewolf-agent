@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../app/app_strings.dart';
 import '../protocol/participant_models.dart';
 import 'app_theme.dart';
 
@@ -13,11 +14,13 @@ class ComposerRail extends StatefulWidget {
   const ComposerRail({
     super.key,
     required this.window,
+    this.errorMessage,
     required this.onSubmitSpeech,
     required this.onSubmitStructuredAction,
   });
 
   final ActionWindow? window;
+  final String? errorMessage;
   final SpeechSubmit onSubmitSpeech;
   final StructuredSubmit onSubmitStructuredAction;
 
@@ -52,6 +55,7 @@ class _ComposerRailState extends State<ComposerRail> {
     if (window == null || _collapsed) {
       return _CollapsedHandle(
         enabled: window != null,
+        errorMessage: widget.errorMessage,
         onTap: () => setState(() => _collapsed = false),
       );
     }
@@ -59,6 +63,7 @@ class _ComposerRailState extends State<ComposerRail> {
       return _TextComposer(
         controller: _text,
         label: _textActionLabel(window),
+        errorMessage: widget.errorMessage,
         onCollapse: () => setState(() => _collapsed = true),
         onSend: () async {
           final text = _text.text.trim();
@@ -72,6 +77,7 @@ class _ComposerRailState extends State<ComposerRail> {
       window: window,
       actionType: _primaryStructuredAction(window.allowedActions),
       selectedTarget: _selectedTarget,
+      errorMessage: widget.errorMessage,
       onTargetSelected: (target) => setState(() => _selectedTarget = target),
       onPass: () {
         widget.onSubmitStructuredAction('pass', const {});
@@ -98,41 +104,51 @@ class _ComposerRailState extends State<ComposerRail> {
   }
 
   String _textActionLabel(ActionWindow window) {
+    final strings = AppLanguageScope.of(context);
     if (window.allowedActions.contains('final_words') &&
         !window.allowedActions.contains('speech')) {
-      return '留下遗言';
+      return strings.finalWords;
     }
-    return '发言';
+    return strings.speech;
   }
 }
 
 class _CollapsedHandle extends StatelessWidget {
   const _CollapsedHandle({
     required this.enabled,
+    required this.errorMessage,
     required this.onTap,
   });
 
   final bool enabled;
+  final String? errorMessage;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    final strings = AppLanguageScope.of(context);
     return SafeArea(
       top: false,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(0, 2, 0, 6),
-        child: Center(
-          child: IconButton(
-            key: const Key('composer-collapsed-handle'),
-            tooltip: enabled ? '展开行动框' : '暂无行动',
-            onPressed: enabled ? onTap : null,
-            icon: Icon(
-              Icons.keyboard_arrow_up_rounded,
-              color: enabled
-                  ? WerewolfAppTheme.accent
-                  : WerewolfAppTheme.textMuted,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (errorMessage != null) _ComposerError(message: errorMessage!),
+            Center(
+              child: IconButton(
+                key: const Key('composer-collapsed-handle'),
+                tooltip: enabled ? strings.expandComposer : strings.noAction,
+                onPressed: enabled ? onTap : null,
+                icon: Icon(
+                  Icons.keyboard_arrow_up_rounded,
+                  color: enabled
+                      ? WerewolfAppTheme.accent
+                      : WerewolfAppTheme.textMuted,
+                ),
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );
@@ -143,61 +159,70 @@ class _TextComposer extends StatelessWidget {
   const _TextComposer({
     required this.controller,
     required this.label,
+    required this.errorMessage,
     required this.onCollapse,
     required this.onSend,
   });
 
   final TextEditingController controller;
   final String label;
+  final String? errorMessage;
   final VoidCallback onCollapse;
   final VoidCallback onSend;
 
   @override
   Widget build(BuildContext context) {
+    final strings = AppLanguageScope.of(context);
     return SafeArea(
       top: false,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(10, 6, 10, 10),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: WerewolfAppTheme.surface,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: const Color(0xFF2D3744)),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(4, 4, 6, 4),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                IconButton(
-                  key: const Key('composer-collapse-button'),
-                  tooltip: '收起行动框',
-                  onPressed: onCollapse,
-                  icon: const Icon(Icons.keyboard_arrow_down_rounded),
-                ),
-                Expanded(
-                  child: TextField(
-                    key: const Key('composer-text-input'),
-                    controller: controller,
-                    minLines: 1,
-                    maxLines: 4,
-                    textInputAction: TextInputAction.newline,
-                    decoration: InputDecoration(
-                      hintText: '$label...',
-                      border: InputBorder.none,
-                      isDense: true,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (errorMessage != null) _ComposerError(message: errorMessage!),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: WerewolfAppTheme.surface,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: const Color(0xFF2D3744)),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(4, 4, 6, 4),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    IconButton(
+                      key: const Key('composer-collapse-button'),
+                      tooltip: strings.collapseComposer,
+                      onPressed: onCollapse,
+                      icon: const Icon(Icons.keyboard_arrow_down_rounded),
                     ),
-                  ),
+                    Expanded(
+                      child: TextField(
+                        key: const Key('composer-text-input'),
+                        controller: controller,
+                        minLines: 1,
+                        maxLines: 4,
+                        textInputAction: TextInputAction.newline,
+                        decoration: InputDecoration(
+                          hintText: '$label...',
+                          border: InputBorder.none,
+                          isDense: true,
+                        ),
+                      ),
+                    ),
+                    IconButton.filled(
+                      key: const Key('composer-send-button'),
+                      tooltip: strings.send,
+                      onPressed: onSend,
+                      icon: const Icon(Icons.arrow_upward_rounded),
+                    ),
+                  ],
                 ),
-                IconButton.filled(
-                  key: const Key('composer-send-button'),
-                  tooltip: '发送',
-                  onPressed: onSend,
-                  icon: const Icon(Icons.arrow_upward_rounded),
-                ),
-              ],
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );
@@ -209,6 +234,7 @@ class _StructuredComposer extends StatelessWidget {
     required this.window,
     required this.actionType,
     required this.selectedTarget,
+    required this.errorMessage,
     required this.onTargetSelected,
     required this.onPass,
     required this.onCollapse,
@@ -218,6 +244,7 @@ class _StructuredComposer extends StatelessWidget {
   final ActionWindow window;
   final String actionType;
   final String? selectedTarget;
+  final String? errorMessage;
   final ValueChanged<String> onTargetSelected;
   final VoidCallback onPass;
   final VoidCallback onCollapse;
@@ -225,6 +252,7 @@ class _StructuredComposer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final strings = AppLanguageScope.of(context);
     final canPass = window.allowedActions.contains('pass');
     final needsTarget = actionType != 'pass';
     return SafeArea(
@@ -240,29 +268,35 @@ class _StructuredComposer extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (errorMessage != null) _ComposerError(message: errorMessage!),
               Row(
                 children: [
                   IconButton(
                     key: const Key('composer-collapse-button'),
-                    tooltip: '收起行动框',
+                    tooltip: strings.collapseComposer,
                     onPressed: onCollapse,
                     icon: const Icon(Icons.keyboard_arrow_down_rounded),
                   ),
                   Expanded(
                     child: Text(
-                      _actionLabel(actionType),
+                      strings.actionLabel(actionType),
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                   ),
                   if (canPass)
                     TextButton(
                       onPressed: onPass,
-                      child: const Text('跳过'),
+                      child: Text(strings.pass),
                     ),
                 ],
               ),
               if (needsTarget) ...[
                 const SizedBox(height: 4),
+                Text(
+                  strings.candidateTargets,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
@@ -292,7 +326,7 @@ class _StructuredComposer extends StatelessWidget {
                       actionType == 'pass' || selectedTarget != null
                           ? onConfirm
                           : null,
-                  child: const Text('确认'),
+                  child: Text(strings.confirm),
                 ),
               ),
             ],
@@ -302,17 +336,39 @@ class _StructuredComposer extends StatelessWidget {
     );
   }
 
-  String _actionLabel(String actionType) {
-    return switch (actionType) {
-      'vote' => '投票',
-      'werewolf_kill' => '选择击杀目标',
-      'seer_check' => '选择查验目标',
-      'witch_save' => '选择解药目标',
-      'witch_poison' => '选择毒药目标',
-      'guard_protect' => '选择守护目标',
-      'hunter_shoot' => '选择开枪目标',
-      'pass' => '跳过行动',
-      _ => '选择行动',
-    };
+}
+
+class _ComposerError extends StatelessWidget {
+  const _ComposerError({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(6, 0, 6, 8),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: WerewolfAppTheme.danger.withValues(alpha: 0.14),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: WerewolfAppTheme.danger.withValues(alpha: 0.35)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+          child: Row(
+            children: [
+              const Icon(Icons.error_outline_rounded, size: 18, color: WerewolfAppTheme.danger),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  message,
+                  style: const TextStyle(color: WerewolfAppTheme.textPrimary),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

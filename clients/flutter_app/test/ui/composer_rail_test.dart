@@ -114,6 +114,19 @@ void main() {
     expect(find.byKey(const Key('composer-collapsed-handle')), findsOneWidget);
     expect(find.byKey(const Key('composer-text-input')), findsNothing);
   });
+
+  testWidgets('composer rail displays server rejection errors', (tester) async {
+    await tester.pumpWidget(TestHarness(
+      child: ComposerRail(
+        window: _window(['vote']),
+        errorMessage: '目标不合法',
+        onSubmitSpeech: (_) async {},
+        onSubmitStructuredAction: (actionType, payload) async {},
+      ),
+    ));
+
+    expect(find.text('目标不合法'), findsOneWidget);
+  });
 }
 
 class TestHarness extends StatelessWidget {

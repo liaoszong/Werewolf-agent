@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 671
+- Entries: 676
 
 ```text
 ./
@@ -150,6 +150,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   ├── lib/
 │   │   │   ├── src/
 │   │   │   │   ├── app/
+│   │   │   │   │   ├── app_settings.dart
+│   │   │   │   │   ├── app_strings.dart
 │   │   │   │   │   ├── session_controller.dart
 │   │   │   │   │   └── werewolf_app.dart
 │   │   │   │   ├── protocol/
@@ -158,6 +160,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   │   │   │   └── participant_models.dart
 │   │   │   │   ├── screens/
 │   │   │   │   │   ├── connect_screen.dart
+│   │   │   │   │   ├── home_shell.dart
 │   │   │   │   │   ├── identity_confirm_screen.dart
 │   │   │   │   │   └── live_room_screen.dart
 │   │   │   │   └── ui/
@@ -225,6 +228,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   ├── test/
 │   │   │   ├── app/
 │   │   │   │   └── session_controller_test.dart
+│   │   │   ├── platform/
+│   │   │   │   └── android_manifest_test.dart
 │   │   │   ├── protocol/
 │   │   │   │   ├── participant_api_client_test.dart
 │   │   │   │   └── participant_models_test.dart
@@ -234,6 +239,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   │   └── widget/
 │   │   │       ├── app_smoke_test.dart
 │   │   │       ├── entry_flow_test.dart
+│   │   │       ├── home_shell_test.dart
 │   │   │       └── live_room_screen_test.dart
 │   │   ├── web/
 │   │   │   ├── icons/

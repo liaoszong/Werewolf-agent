@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:werewolf_app/src/app/session_controller.dart';
 import 'package:werewolf_app/src/protocol/participant_api_client.dart';
@@ -10,6 +12,7 @@ class FakeParticipantApiClient extends ParticipantApiClient {
   final List<String> allowedActions;
   int stateCalls = 0;
   Map<String, dynamic>? lastSubmit;
+  final sseController = StreamController<ParticipantSseEvent>.broadcast();
 
   @override
   Future<ParticipantSession> join({
@@ -73,6 +76,15 @@ class FakeParticipantApiClient extends ParticipantApiClient {
       acceptedEventId: 'evt_5',
       gameRevision: 8,
     );
+  }
+
+  @override
+  Stream<ParticipantSseEvent> events({
+    required String runId,
+    required String token,
+    required String cursor,
+  }) {
+    return sseController.stream;
   }
 }
 
@@ -139,5 +151,25 @@ void main() {
 
     expect(controller.connectionStatus, ConnectionStatus.connected);
     expect(api.stateCalls, 2);
+  });
+
+  test('join starts participant SSE and refreshes state on room events',
+      () async {
+    final api = FakeParticipantApiClient();
+    final controller = SessionController(participantApi: api);
+    await controller.joinAndLoad(
+      runId: 'run_1',
+      seatId: 'p3',
+      joinCode: 'local-dev-code',
+    );
+
+    api.sseController.add(const ParticipantSseEvent(
+      name: 'action_window_opened',
+      data: {'action_window_id': 'aw_2'},
+    ));
+    await Future<void>.delayed(Duration.zero);
+
+    expect(api.stateCalls, 2);
+    await api.sseController.close();
   });
 }

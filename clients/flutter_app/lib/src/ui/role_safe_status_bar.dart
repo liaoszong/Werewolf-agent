@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../app/session_controller.dart';
+import '../app/app_strings.dart';
 import '../protocol/participant_models.dart';
 import 'app_theme.dart';
 
@@ -16,8 +17,9 @@ class RoleSafeStatusBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final strings = AppLanguageScope.of(context);
     final seat = state?.seatId.toUpperCase() ?? '--';
-    final activity = _activityLabel(state);
+    final activity = _activityLabel(strings, state);
     return DecoratedBox(
       decoration: const BoxDecoration(color: WerewolfAppTheme.surface),
       child: Padding(
@@ -31,7 +33,7 @@ class RoleSafeStatusBar extends StatelessWidget {
               ),
             ),
             Text(
-              _connectionLabel(connectionStatus),
+              _connectionLabel(strings, connectionStatus),
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
@@ -40,32 +42,32 @@ class RoleSafeStatusBar extends StatelessWidget {
     );
   }
 
-  String _activityLabel(ParticipantState? state) {
+  String _activityLabel(AppStrings strings, ParticipantState? state) {
     if (state?.openActionWindow != null) {
-      return '等待你操作';
+      return strings.waitingForYou;
     }
     final phase = state?.projection['phase'] as String? ??
         state?.openActionWindow?.phase ??
         state?.runStatus;
     return switch (phase) {
-      'night' => '夜间行动中',
-      'vote' => '投票中',
-      'day' => '公开讨论',
-      'completed' => '游戏结束',
-      'finished' => '游戏结束',
-      'running' => '房间同步中',
-      _ => '房间同步中',
+      'night' => strings.nightInProgress,
+      'vote' => strings.voting,
+      'day' => strings.discussion,
+      'completed' => strings.gameOver,
+      'finished' => strings.gameOver,
+      'running' => strings.roomSyncing,
+      _ => strings.roomSyncing,
     };
   }
 
-  String _connectionLabel(ConnectionStatus status) {
+  String _connectionLabel(AppStrings strings, ConnectionStatus status) {
     return switch (status) {
-      ConnectionStatus.reconnecting => '正在重连',
-      ConnectionStatus.connected => '已连接',
-      ConnectionStatus.connecting => '连接中',
-      ConnectionStatus.sessionExpired => '会话失效',
-      ConnectionStatus.failed => '连接异常',
-      ConnectionStatus.idle => '未连接',
+      ConnectionStatus.reconnecting => strings.reconnecting,
+      ConnectionStatus.connected => strings.connected,
+      ConnectionStatus.connecting => strings.connecting,
+      ConnectionStatus.sessionExpired => strings.sessionExpired,
+      ConnectionStatus.failed => strings.connectionFailed,
+      ConnectionStatus.idle => strings.idle,
     };
   }
 }

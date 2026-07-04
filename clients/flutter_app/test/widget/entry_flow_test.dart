@@ -39,6 +39,15 @@ class ImmediateApiClient extends ParticipantApiClient {
       'reconnect_cursor': 'event:1',
     });
   }
+
+  @override
+  Stream<ParticipantSseEvent> events({
+    required String runId,
+    required String token,
+    required String cursor,
+  }) {
+    return const Stream.empty();
+  }
 }
 
 void main() {

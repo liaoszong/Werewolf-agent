@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../app/app_strings.dart';
 import 'app_theme.dart';
 
 class SpeechFeed extends StatelessWidget {
@@ -10,7 +11,7 @@ class SpeechFeed extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (events.isEmpty) {
-      return const Center(child: Text('等待可见房间事件...'));
+      return Center(child: Text(AppLanguageScope.of(context).visibleEventsWaiting));
     }
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(14, 10, 14, 96),

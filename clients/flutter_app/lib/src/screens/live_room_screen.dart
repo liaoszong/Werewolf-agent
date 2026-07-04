@@ -30,6 +30,7 @@ class LiveRoomScreen extends StatelessWidget {
                 ),
                 ComposerRail(
                   window: controller.state?.openActionWindow,
+                  errorMessage: controller.lastError,
                   onSubmitSpeech: controller.submitSpeech,
                   onSubmitStructuredAction: (actionType, payload) {
                     return controller.submitStructuredAction(

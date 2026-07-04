@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
@@ -20,6 +21,7 @@ class SessionController extends ChangeNotifier {
 
   final ParticipantApiClient _participantApi;
   final Random _random = Random();
+  StreamSubscription<ParticipantSseEvent>? _eventSubscription;
 
   ParticipantSession? session;
   ParticipantState? state;
@@ -42,6 +44,7 @@ class SessionController extends ChangeNotifier {
       );
       await refreshState();
       connectionStatus = ConnectionStatus.connected;
+      _startEventStream();
     } on ParticipantApiError catch (error) {
       connectionStatus = error.errorCode == 'missing_or_invalid_session'
           ? ConnectionStatus.sessionExpired
@@ -71,6 +74,7 @@ class SessionController extends ChangeNotifier {
       await refreshState();
       connectionStatus = ConnectionStatus.connected;
       lastError = null;
+      _startEventStream();
     } on ParticipantApiError catch (error) {
       connectionStatus = error.errorCode == 'missing_or_invalid_session'
           ? ConnectionStatus.sessionExpired
@@ -115,6 +119,7 @@ class SessionController extends ChangeNotifier {
           'payload': payload,
         },
       );
+      lastError = null;
       await refreshState();
     } on ParticipantApiError catch (error) {
       lastError = error.message;
@@ -129,5 +134,42 @@ class SessionController extends ChangeNotifier {
     final micros = DateTime.now().microsecondsSinceEpoch;
     final suffix = _random.nextInt(1 << 32).toRadixString(16);
     return 'flutter-$micros-$suffix';
+  }
+
+  void _startEventStream() {
+    final active = session;
+    if (active == null) return;
+    unawaited(_eventSubscription?.cancel());
+    final cursor = state?.reconnectCursor ?? active.reconnectCursor;
+    _eventSubscription = _participantApi
+        .events(runId: active.runId, token: active.token, cursor: cursor)
+        .listen(
+      (event) async {
+        if (_shouldRefreshForEvent(event.name)) {
+          await refreshState();
+        }
+      },
+      onError: (Object error) {
+        connectionStatus = ConnectionStatus.reconnecting;
+        lastError = error.toString();
+        notifyListeners();
+        unawaited(recoverAfterDisconnect());
+      },
+    );
+  }
+
+  bool _shouldRefreshForEvent(String eventName) {
+    return eventName == 'run_status' ||
+        eventName == 'action_window_opened' ||
+        eventName == 'action_window_updated' ||
+        eventName == 'action_window_closed' ||
+        eventName == 'action_window_timed_out' ||
+        eventName == 'runtime_event';
+  }
+
+  @override
+  void dispose() {
+    unawaited(_eventSubscription?.cancel());
+    super.dispose();
   }
 }
