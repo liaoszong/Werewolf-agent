@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 676
+- Entries: 691
 
 ```text
 ./
@@ -47,7 +47,13 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   └── tree.mjs
 │   └── hooks.json
 ├── .github/
+│   ├── scripts/
+│   │   └── android-update/
+│   │       └── common.ps1
 │   └── workflows/
+│       ├── build-android-internal.yml
+│       ├── build-android-production-candidate.yml
+│       ├── promote-android-production.yml
 │       └── tests.yml
 ├── clients/
 │   ├── flutter_app/
@@ -79,8 +85,10 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   │   │   │   │   │   │   └── ic_launcher.png
 │   │   │   │   │   │   │   ├── values/
 │   │   │   │   │   │   │   │   └── styles.xml
-│   │   │   │   │   │   │   └── values-night/
-│   │   │   │   │   │   │       └── styles.xml
+│   │   │   │   │   │   │   ├── values-night/
+│   │   │   │   │   │   │   │   └── styles.xml
+│   │   │   │   │   │   │   └── xml/
+│   │   │   │   │   │   │       └── apk_provider_paths.xml
 │   │   │   │   │   │   └── AndroidManifest.xml
 │   │   │   │   │   └── profile/
 │   │   │   │   │       └── AndroidManifest.xml
@@ -152,6 +160,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   │   │   ├── app/
 │   │   │   │   │   ├── app_settings.dart
 │   │   │   │   │   ├── app_strings.dart
+│   │   │   │   │   ├── build_info.dart
 │   │   │   │   │   ├── session_controller.dart
 │   │   │   │   │   └── werewolf_app.dart
 │   │   │   │   ├── protocol/
@@ -163,11 +172,16 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   │   │   │   ├── home_shell.dart
 │   │   │   │   │   ├── identity_confirm_screen.dart
 │   │   │   │   │   └── live_room_screen.dart
-│   │   │   │   └── ui/
-│   │   │   │       ├── app_theme.dart
-│   │   │   │       ├── composer_rail.dart
-│   │   │   │       ├── role_safe_status_bar.dart
-│   │   │   │       └── speech_feed.dart
+│   │   │   │   ├── ui/
+│   │   │   │   │   ├── app_theme.dart
+│   │   │   │   │   ├── composer_rail.dart
+│   │   │   │   │   ├── role_safe_status_bar.dart
+│   │   │   │   │   └── speech_feed.dart
+│   │   │   │   └── update/
+│   │   │   │       ├── update_android.dart
+│   │   │   │       ├── update_models.dart
+│   │   │   │       ├── update_repository.dart
+│   │   │   │       └── update_service.dart
 │   │   │   └── main.dart
 │   │   ├── linux/
 │   │   │   ├── flutter/
@@ -229,13 +243,18 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   │   ├── app/
 │   │   │   │   └── session_controller_test.dart
 │   │   │   ├── platform/
-│   │   │   │   └── android_manifest_test.dart
+│   │   │   │   ├── android_manifest_test.dart
+│   │   │   │   └── android_release_config_test.dart
 │   │   │   ├── protocol/
 │   │   │   │   ├── participant_api_client_test.dart
 │   │   │   │   └── participant_models_test.dart
 │   │   │   ├── ui/
 │   │   │   │   ├── composer_rail_test.dart
 │   │   │   │   └── speech_feed_test.dart
+│   │   │   ├── update/
+│   │   │   │   ├── build_info_test.dart
+│   │   │   │   ├── update_android_test.dart
+│   │   │   │   └── update_service_test.dart
 │   │   │   └── widget/
 │   │   │       ├── app_smoke_test.dart
 │   │   │       ├── entry_flow_test.dart
@@ -437,6 +456,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── prs/
 │   │   ├── 2026-05-30--phase2-next-step-research.md
 │   │   └── 2026-05-30--s5-semantic-label-research.md
+│   ├── release/
+│   │   └── android-update-channels.md
 │   ├── semantic-labeling/
 │   │   ├── s5-label-contract.md
 │   │   └── s5-label-prompts.md

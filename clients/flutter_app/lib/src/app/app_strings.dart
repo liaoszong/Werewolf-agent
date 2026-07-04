@@ -29,11 +29,12 @@ class AppStrings {
   static AppStrings forLanguage(AppLanguage language) => AppStrings._(language);
 
   String get appTitle => _t('狼人杀观察席', 'Werewolf Observer');
-  String get appKicker => _t('AI 对局 · 真人席位 · 本地协议', 'AI matches · Human seat · Local protocol');
+  String get appKicker =>
+      _t('AI 对局 · 真人席位 · 本地协议', 'AI matches · Human seat · Local protocol');
   String get appIntro => _t(
-        '连接本地 observer server，选择一局进行中的对局，以合法参与者视角加入。',
-        'Connect to the local observer server, choose a live match, and join through the participant perspective.',
-      );
+    '连接本地 observer server，选择一局进行中的对局，以合法参与者视角加入。',
+    'Connect to the local observer server, choose a live match, and join through the participant perspective.',
+  );
   String get home => _t('首页', 'Home');
   String get matches => _t('对局', 'Matches');
   String get room => _t('房间', 'Room');
@@ -56,13 +57,20 @@ class AppStrings {
   String get interrupted => _t('中断', 'Interrupted');
   String get unknown => _t('未知', 'Unknown');
   String get runListHint => _t(
-        '从 observer server 读取对局列表；真机请把 Base URL 改成电脑的局域网 IP。',
-        'Runs are loaded from the observer server. On a phone, use the LAN IP of the computer.',
-      );
+    '从 observer server 读取对局列表；真机请把 Base URL 改成电脑的局域网 IP。',
+    'Runs are loaded from the observer server. On a phone, use the LAN IP of the computer.',
+  );
   String get emptyRoomTitle => _t('尚未加入席位', 'No seat joined');
-  String get emptyRoomBody => _t('先在「对局」里选择一局，再进入你的参与者视角。', 'Choose a match first, then enter your participant room.');
-  String get participantPerspective => _t('参与者视角，不是上帝视角', 'Participant perspective, not god view');
-  String get legalInfoOnly => _t('你只会看到当前席位合法可见的信息。夜间他人行动会显示为等待状态。', 'You only see information legal for this seat. Hidden night actions stay as waiting state.');
+  String get emptyRoomBody => _t(
+    '先在「对局」里选择一局，再进入你的参与者视角。',
+    'Choose a match first, then enter your participant room.',
+  );
+  String get participantPerspective =>
+      _t('参与者视角，不是上帝视角', 'Participant perspective, not god view');
+  String get legalInfoOnly => _t(
+    '你只会看到当前席位合法可见的信息。夜间他人行动会显示为等待状态。',
+    'You only see information legal for this seat. Hidden night actions stay as waiting state.',
+  );
   String get enterRoom => _t('进入房间', 'Enter Room');
   String get languageLabel => _t('语言', 'Language');
   String get connection => _t('连接', 'Connection');
@@ -70,12 +78,19 @@ class AppStrings {
   String get seatId => _t('席位 ID', 'Seat ID');
   String get joinCode => _t('加入码', 'Join code');
   String get saveConnection => _t('保存连接设置', 'Save Connection');
-  String get invalidBaseUrl => _t('请输入有效的 observer base URL', 'Enter a valid observer base URL');
+  String get invalidBaseUrl =>
+      _t('请输入有效的 observer base URL', 'Enter a valid observer base URL');
+  String get updates => _t('应用更新', 'App Updates');
+  String get currentVersion => _t('当前版本', 'Current version');
+  String get availableVersion => _t('可用版本', 'Available version');
+  String get checkUpdates => _t('检查更新', 'Check Updates');
+  String get downloadInstall => _t('下载并安装', 'Download & Install');
   String get phoneLanHint => _t(
-        'Android 真机不能使用 127.0.0.1；请填写运行 Python server 的电脑局域网地址。',
-        'Android devices cannot use 127.0.0.1. Use the LAN address of the computer running the Python server.',
-      );
-  String get visibleEventsWaiting => _t('等待可见房间事件...', 'Waiting for visible room events...');
+    'Android 真机不能使用 127.0.0.1；请填写运行 Python server 的电脑局域网地址。',
+    'Android devices cannot use 127.0.0.1. Use the LAN address of the computer running the Python server.',
+  );
+  String get visibleEventsWaiting =>
+      _t('等待可见房间事件...', 'Waiting for visible room events...');
   String get waitingForYou => _t('等待你操作', 'Waiting for you');
   String get nightInProgress => _t('夜间行动中', 'Night actions');
   String get voting => _t('投票中', 'Voting');
@@ -96,7 +111,8 @@ class AppStrings {
   String get finalWords => _t('留下遗言', 'Final words');
   String get pass => _t('跳过', 'Pass');
   String get confirm => _t('确认', 'Confirm');
-  String get candidateTargets => _t('候选目标，服务器会确认是否合法', 'Candidate targets; server confirms legality');
+  String get candidateTargets =>
+      _t('候选目标，服务器会确认是否合法', 'Candidate targets; server confirms legality');
   String get vote => _t('投票', 'Vote');
   String get chooseAction => _t('选择行动', 'Choose action');
 

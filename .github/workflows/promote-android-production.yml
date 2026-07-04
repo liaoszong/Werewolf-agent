@@ -1,0 +1,106 @@
+name: Promote Android Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing production candidate tag to promote, for example v0.2.0+2
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  promote-production:
+    name: Promote candidate manifest to stable
+    runs-on: ubuntu-latest
+    env:
+      STABLE_MANIFEST_PATH: updates/stable.json
+
+    steps:
+      - name: Checkout source helpers
+        uses: actions/checkout@v4
+
+      - name: Download candidate metadata
+        id: candidate
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          $candidateDir = Join-Path $env:RUNNER_TEMP "candidate"
+          New-Item -ItemType Directory -Force -Path $candidateDir | Out-Null
+          gh release download $env:RELEASE_TAG `
+            --repo $env:GITHUB_REPOSITORY `
+            --pattern latest.json `
+            --pattern build-metadata.json `
+            --dir $candidateDir
+
+          $manifestPath = Join-Path $candidateDir "latest.json"
+          $metadataPath = Join-Path $candidateDir "build-metadata.json"
+          if (-not (Test-Path -LiteralPath $manifestPath)) {
+            throw "Candidate release is missing latest.json."
+          }
+          if (-not (Test-Path -LiteralPath $metadataPath)) {
+            throw "Candidate release is missing build-metadata.json."
+          }
+
+          . .github/scripts/android-update/common.ps1
+          Assert-AndroidProductionPromotionCandidate `
+            -ManifestPath $manifestPath `
+            -MetadataPath $metadataPath
+
+          "manifest_path=$manifestPath" >> $env:GITHUB_OUTPUT
+          "metadata_path=$metadataPath" >> $env:GITHUB_OUTPUT
+
+      - name: Publish stable manifest to GitHub Pages
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MANIFEST_PATH: ${{ steps.candidate.outputs.manifest_path }}
+        run: |
+          git clone --depth 1 --branch gh-pages "https://x-access-token:$env:GH_TOKEN@github.com/$env:GITHUB_REPOSITORY.git" pages 2>$null
+          if (-not (Test-Path pages/.git)) {
+            git init pages
+            Push-Location pages
+            git checkout -b gh-pages
+            git remote add origin "https://x-access-token:$env:GH_TOKEN@github.com/$env:GITHUB_REPOSITORY.git"
+            Pop-Location
+          }
+          New-Item -ItemType Directory -Force -Path "pages/updates" | Out-Null
+          Copy-Item -Path $env:MANIFEST_PATH -Destination "pages/$env:STABLE_MANIFEST_PATH" -Force
+          Push-Location pages
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add $env:STABLE_MANIFEST_PATH
+          if (git diff --cached --quiet) {
+            Write-Host "Stable manifest unchanged."
+          } else {
+            git commit -m "promote android stable manifest ${{ inputs.release_tag }}"
+            git push origin gh-pages
+          }
+          Pop-Location
+
+      - name: Mark release as production
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          gh release edit $env:RELEASE_TAG `
+            --repo $env:GITHUB_REPOSITORY `
+            --prerelease=false `
+            --latest=true
+
+      - name: Publish summary
+        shell: pwsh
+        run: |
+          @"
+          ## Werewolf-agent Android production promoted
+
+          - Release: ${{ inputs.release_tag }}
+          - Stable manifest: https://${{ github.repository_owner }}.github.io/Werewolf-agent/$env:STABLE_MANIFEST_PATH
+          - Source manifest asset: latest.json
+          - Source metadata asset: build-metadata.json
+          "@ >> $env:GITHUB_STEP_SUMMARY

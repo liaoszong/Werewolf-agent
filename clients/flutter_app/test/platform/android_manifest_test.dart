@@ -4,13 +4,19 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('release Android manifest allows local observer network access', () {
-    final manifest = File('android/app/src/main/AndroidManifest.xml')
-        .readAsStringSync();
+    final manifest = File(
+      'android/app/src/main/AndroidManifest.xml',
+    ).readAsStringSync();
 
     expect(
       manifest,
       contains('android.permission.INTERNET'),
       reason: 'Release APK must be able to call the observer server.',
+    );
+    expect(
+      manifest,
+      contains('android.permission.REQUEST_INSTALL_PACKAGES'),
+      reason: 'Release APK must be able to open the Android package installer.',
     );
     expect(
       manifest,

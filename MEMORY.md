@@ -32,6 +32,38 @@ machine secrets here.
 
 ## Entries
 
+### 2026-07-04 - Flutter Android Remote Update Channels
+
+- Added BatteryCtrl-style lightweight Android remote update support to the
+  Flutter client.
+- Channels:
+  - Internal: `io.werewolfagent.werewolf_app.internal`,
+    `updates/internal.json`, prerelease workflow.
+  - Production: `io.werewolfagent.werewolf_app`,
+    `updates/stable.json`, candidate + promote workflow.
+- Update client behavior: checks schema v1 manifest, validates matching
+  `build-metadata.json`, downloads APK, checks size and SHA256, inspects APK
+  package/version/signing certificate via Android MethodChannel, then opens the
+  Android system installer. It does not do silent install or hot update.
+- Added Android flavor/signing split, FileProvider cache root
+  `werewolf_updates/`, and Settings-page update controls.
+- Added workflows:
+  - `.github/workflows/build-android-internal.yml`
+  - `.github/workflows/build-android-production-candidate.yml`
+  - `.github/workflows/promote-android-production.yml`
+- Added release operation doc:
+  `docs/release/android-update-channels.md`.
+- Verification:
+  - `flutter analyze`
+  - `flutter test` passing 42 tests
+  - `flutter build apk --debug --flavor internal --target-platform android-arm64`
+  - `flutter build apk --debug --flavor production --target-platform android-arm64`
+  - `flutter build apk --release --flavor internal --target-platform android-arm64 ...`
+  - `.github/scripts/android-update/common.ps1` artifact generation smoke
+    passed when `ANDROID_HOME` / `ANDROID_SDK_ROOT` pointed at `G:\Android\Sdk`.
+- Caveat: actual GitHub publication requires configuring Android signing
+  secrets and GitHub Pages `gh-pages` branch root before running the workflows.
+
 ### 2026-07-04 - P3-E-1 Flutter Human Seat Client
 
 - Completed and merged P3-E-1 on `main` at `70d8ba3`.

@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../app/app_settings.dart';
 import '../app/app_strings.dart';
+import '../app/build_info.dart';
 import '../app/session_controller.dart';
 import '../protocol/observer_api_client.dart';
 import '../ui/app_theme.dart';
+import '../update/update_models.dart';
+import '../update/update_repository.dart';
 import 'live_room_screen.dart';
 
 typedef ObserverClientFactory = ObserverApiClient Function(Uri baseUri);
@@ -14,11 +17,13 @@ class HomeShell extends StatefulWidget {
   const HomeShell({
     super.key,
     required this.settingsController,
+    required this.updateRepository,
     required this.observerClientFactory,
     required this.sessionControllerFactory,
   });
 
   final AppSettingsController settingsController;
+  final UpdateRepository updateRepository;
   final ObserverClientFactory observerClientFactory;
   final SessionControllerFactory sessionControllerFactory;
 
@@ -83,13 +88,17 @@ class _HomeShellState extends State<HomeShell> {
                 setState(() => _needsIdentityConfirm = false);
               },
             ),
-            _SettingsPage(settingsController: _settings),
+            _SettingsPage(
+              settingsController: _settings,
+              updateRepository: widget.updateRepository,
+            ),
           ],
         ),
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
-        onDestinationSelected: (index) => setState(() => _selectedIndex = index),
+        onDestinationSelected: (index) =>
+            setState(() => _selectedIndex = index),
         destinations: [
           NavigationDestination(
             icon: const Icon(Icons.home_outlined),
@@ -211,16 +220,16 @@ class _HomePage extends StatelessWidget {
                   Text(
                     strings.appTitle,
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          color: WerewolfAppTheme.textPrimary,
-                          fontWeight: FontWeight.w800,
-                        ),
+                      color: WerewolfAppTheme.textPrimary,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     strings.appKicker,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: WerewolfAppTheme.accent,
-                        ),
+                      color: WerewolfAppTheme.accent,
+                    ),
                   ),
                 ],
               ),
@@ -231,9 +240,9 @@ class _HomePage extends StatelessWidget {
         const SizedBox(height: 18),
         Text(
           strings.appIntro,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: WerewolfAppTheme.textMuted,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: WerewolfAppTheme.textMuted),
         ),
         const SizedBox(height: 22),
         _ServerCard(
@@ -246,14 +255,17 @@ class _HomePage extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(strings.activeMatch, style: Theme.of(context).textTheme.titleMedium),
+              Text(
+                strings.activeMatch,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
               const SizedBox(height: 10),
               if (activeRuns.isEmpty)
                 Text(
                   strings.noActiveRuns,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: WerewolfAppTheme.textMuted,
-                      ),
+                    color: WerewolfAppTheme.textMuted,
+                  ),
                 )
               else
                 for (final run in activeRuns.take(3))
@@ -269,7 +281,9 @@ class _HomePage extends StatelessWidget {
                   onPressed: onChooseMatch,
                   icon: const Icon(Icons.arrow_forward_rounded),
                   label: Text(
-                    activeRuns.isEmpty ? strings.chooseMatch : strings.continueObserving,
+                    activeRuns.isEmpty
+                        ? strings.chooseMatch
+                        : strings.continueObserving,
                   ),
                 ),
               ),
@@ -310,9 +324,9 @@ class _MatchesPage extends StatelessWidget {
               child: Text(
                 strings.matches,
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      color: WerewolfAppTheme.textPrimary,
-                      fontWeight: FontWeight.w800,
-                    ),
+                  color: WerewolfAppTheme.textPrimary,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ),
             IconButton(
@@ -323,10 +337,7 @@ class _MatchesPage extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 8),
-        Text(
-          strings.runListHint,
-          style: Theme.of(context).textTheme.bodySmall,
-        ),
+        Text(strings.runListHint, style: Theme.of(context).textTheme.bodySmall),
         if (error != null) ...[
           const SizedBox(height: 12),
           Text(error!, style: const TextStyle(color: WerewolfAppTheme.danger)),
@@ -380,7 +391,10 @@ class _RoomPage extends StatelessWidget {
             children: [
               const Icon(Icons.event_seat_outlined, size: 42),
               const SizedBox(height: 14),
-              Text(strings.emptyRoomTitle, style: Theme.of(context).textTheme.titleMedium),
+              Text(
+                strings.emptyRoomTitle,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
               const SizedBox(height: 8),
               Text(
                 strings.emptyRoomBody,
@@ -423,9 +437,9 @@ class _IdentityConfirmPane extends StatelessWidget {
           Text(
             strings.seatIdentity(seat),
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  color: WerewolfAppTheme.textPrimary,
-                  fontWeight: FontWeight.w800,
-                ),
+              color: WerewolfAppTheme.textPrimary,
+              fontWeight: FontWeight.w800,
+            ),
           ),
           const SizedBox(height: 12),
           Text(strings.participantPerspective),
@@ -452,9 +466,13 @@ class _IdentityConfirmPane extends StatelessWidget {
 }
 
 class _SettingsPage extends StatefulWidget {
-  const _SettingsPage({required this.settingsController});
+  const _SettingsPage({
+    required this.settingsController,
+    required this.updateRepository,
+  });
 
   final AppSettingsController settingsController;
+  final UpdateRepository updateRepository;
 
   @override
   State<_SettingsPage> createState() => _SettingsPageState();
@@ -467,6 +485,7 @@ class _SettingsPageState extends State<_SettingsPage> {
   String? _error;
 
   AppSettingsController get _settings => widget.settingsController;
+  UpdateRepository get _updates => widget.updateRepository;
 
   @override
   void initState() {
@@ -474,10 +493,12 @@ class _SettingsPageState extends State<_SettingsPage> {
     _baseUrl = TextEditingController(text: _settings.baseUri.toString());
     _seatId = TextEditingController(text: _settings.seatId);
     _joinCode = TextEditingController(text: _settings.joinCode);
+    _updates.addListener(_handleUpdateChanged);
   }
 
   @override
   void dispose() {
+    _updates.removeListener(_handleUpdateChanged);
     _baseUrl.dispose();
     _seatId.dispose();
     _joinCode.dispose();
@@ -493,16 +514,19 @@ class _SettingsPageState extends State<_SettingsPage> {
         Text(
           strings.settings,
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                color: WerewolfAppTheme.textPrimary,
-                fontWeight: FontWeight.w800,
-              ),
+            color: WerewolfAppTheme.textPrimary,
+            fontWeight: FontWeight.w800,
+          ),
         ),
         const SizedBox(height: 18),
         _Panel(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(strings.languageLabel, style: Theme.of(context).textTheme.titleMedium),
+              Text(
+                strings.languageLabel,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
               const SizedBox(height: 10),
               const _LanguageToggle(),
             ],
@@ -513,7 +537,10 @@ class _SettingsPageState extends State<_SettingsPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(strings.connection, style: Theme.of(context).textTheme.titleMedium),
+              Text(
+                strings.connection,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
               const SizedBox(height: 12),
               TextField(
                 controller: _baseUrl,
@@ -533,10 +560,16 @@ class _SettingsPageState extends State<_SettingsPage> {
               ),
               if (_error != null) ...[
                 const SizedBox(height: 10),
-                Text(_error!, style: const TextStyle(color: WerewolfAppTheme.danger)),
+                Text(
+                  _error!,
+                  style: const TextStyle(color: WerewolfAppTheme.danger),
+                ),
               ],
               const SizedBox(height: 12),
-              Text(strings.phoneLanHint, style: Theme.of(context).textTheme.bodySmall),
+              Text(
+                strings.phoneLanHint,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
               const SizedBox(height: 14),
               SizedBox(
                 width: double.infinity,
@@ -547,6 +580,98 @@ class _SettingsPageState extends State<_SettingsPage> {
               ),
             ],
           ),
+        ),
+        const SizedBox(height: 14),
+        _Panel(child: _buildUpdatePanel(context, strings)),
+      ],
+    );
+  }
+
+  Widget _buildUpdatePanel(BuildContext context, AppStrings strings) {
+    final state = _updates.state;
+    final manifest = state.availableUpdate;
+    final progress = state.progress;
+    final latestLogs = state.logs.take(4).toList(growable: false);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(strings.updates, style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 8),
+        Text(
+          '${strings.currentVersion}: ${BuildInfo.appVersion} · ${BuildInfo.updateChannel}',
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+        if (state.message != null) ...[
+          const SizedBox(height: 10),
+          Text(
+            state.message!,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: state.status == UpdateStatus.error
+                  ? WerewolfAppTheme.danger
+                  : WerewolfAppTheme.textPrimary,
+            ),
+          ),
+        ],
+        if (state.errorMessage != null &&
+            state.errorMessage != state.message) ...[
+          const SizedBox(height: 8),
+          Text(
+            state.errorMessage!,
+            style: const TextStyle(color: WerewolfAppTheme.danger),
+          ),
+        ],
+        if (manifest != null) ...[
+          const SizedBox(height: 12),
+          Text(
+            '${strings.availableVersion}: ${manifest.versionName} (${manifest.versionCode})',
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            manifest.releaseNotes,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ],
+        if (progress != null) ...[
+          const SizedBox(height: 12),
+          LinearProgressIndicator(value: progress.clamp(0.0, 1.0)),
+        ],
+        if (latestLogs.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          for (final log in latestLogs)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Text(
+                log.message,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: log.level == UpdateLogLevel.error
+                      ? WerewolfAppTheme.danger
+                      : WerewolfAppTheme.textMuted,
+                ),
+              ),
+            ),
+        ],
+        const SizedBox(height: 14),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: state.isBusy ? null : _updates.checkNow,
+                icon: const Icon(Icons.system_update_alt_rounded),
+                label: Text(strings.checkUpdates),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: state.isBusy || manifest == null
+                    ? null
+                    : _updates.downloadAndInstall,
+                icon: const Icon(Icons.download_rounded),
+                label: Text(strings.downloadInstall),
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -564,6 +689,11 @@ class _SettingsPageState extends State<_SettingsPage> {
       ..setSeatId(_seatId.text)
       ..setJoinCode(_joinCode.text);
     setState(() => _error = null);
+  }
+
+  void _handleUpdateChanged() {
+    if (!mounted) return;
+    setState(() {});
   }
 }
 
@@ -610,8 +740,12 @@ class _ServerCard extends StatelessWidget {
       child: Row(
         children: [
           Icon(
-            runsError == null ? Icons.cloud_done_outlined : Icons.cloud_off_outlined,
-            color: runsError == null ? WerewolfAppTheme.witch : WerewolfAppTheme.danger,
+            runsError == null
+                ? Icons.cloud_done_outlined
+                : Icons.cloud_off_outlined,
+            color: runsError == null
+                ? WerewolfAppTheme.witch
+                : WerewolfAppTheme.danger,
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -715,10 +849,7 @@ class _Panel extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFF2D3744)),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: child,
-      ),
+      child: Padding(padding: const EdgeInsets.all(16), child: child),
     );
   }
 }

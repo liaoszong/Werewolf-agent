@@ -4,19 +4,26 @@ import '../protocol/observer_api_client.dart';
 import '../protocol/participant_api_client.dart';
 import '../screens/home_shell.dart';
 import '../ui/app_theme.dart';
+import '../update/update_android.dart';
+import '../update/update_models.dart';
+import '../update/update_repository.dart';
+import '../update/update_service.dart';
 import 'app_settings.dart';
 import 'app_strings.dart';
+import 'build_info.dart';
 import 'session_controller.dart';
 
 class WerewolfApp extends StatefulWidget {
   const WerewolfApp({
     super.key,
     this.settingsController,
+    this.updateRepository,
     this.observerClientFactory,
     this.sessionControllerFactory,
   });
 
   final AppSettingsController? settingsController;
+  final UpdateRepository? updateRepository;
   final ObserverClientFactory? observerClientFactory;
   final SessionControllerFactory? sessionControllerFactory;
 
@@ -26,17 +33,22 @@ class WerewolfApp extends StatefulWidget {
 
 class _WerewolfAppState extends State<WerewolfApp> {
   late final AppSettingsController _settingsController;
+  late final UpdateRepository _updateRepository;
 
   @override
   void initState() {
     super.initState();
     _settingsController = widget.settingsController ?? AppSettingsController();
+    _updateRepository = widget.updateRepository ?? _defaultUpdateRepository();
   }
 
   @override
   void dispose() {
     if (widget.settingsController == null) {
       _settingsController.dispose();
+    }
+    if (widget.updateRepository == null) {
+      _updateRepository.dispose();
     }
     super.dispose();
   }
@@ -55,10 +67,12 @@ class _WerewolfAppState extends State<WerewolfApp> {
             theme: WerewolfAppTheme.darkTheme(),
             home: HomeShell(
               settingsController: _settingsController,
+              updateRepository: _updateRepository,
               observerClientFactory:
                   widget.observerClientFactory ?? _defaultObserverClientFactory,
               sessionControllerFactory:
-                  widget.sessionControllerFactory ?? _defaultSessionControllerFactory,
+                  widget.sessionControllerFactory ??
+                  _defaultSessionControllerFactory,
             ),
           ),
         );
@@ -73,6 +87,27 @@ class _WerewolfAppState extends State<WerewolfApp> {
   SessionController _defaultSessionControllerFactory(Uri baseUri) {
     return SessionController(
       participantApi: ParticipantApiClient(baseUri: baseUri),
+    );
+  }
+
+  UpdateRepository _defaultUpdateRepository() {
+    final apkInstaller = MethodChannelUpdateApkInstaller();
+    return UpdateRepository(
+      service: UpdateService(
+        manifestClient: HttpUpdateManifestClient(),
+        metadataClient: HttpUpdateBuildMetadataClient(),
+        downloader: HttpUpdateApkDownloader(),
+        archiveValidator: const MethodChannelApkArchiveValidator(),
+        installer: apkInstaller,
+      ),
+      manifestUri: BuildInfo.updateManifestUri,
+      manifestFallbackUris: BuildInfo.updateManifestFallbackUris,
+      runtimeConfig: UpdateRuntimeConfig(
+        channel: BuildInfo.updateChannel,
+        applicationId: BuildInfo.updateApplicationId,
+        currentVersionCode: BuildInfo.appVersionCode,
+      ),
+      cacheDirectoryProvider: apkInstaller.updateCacheDirectory,
     );
   }
 }

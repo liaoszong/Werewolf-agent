@@ -1,0 +1,188 @@
+name: Build Android Internal
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Internal release tag, for example v0.2.0-internal.1+201
+        required: true
+        type: string
+      release_notes:
+        description: Notes written into updates/internal.json
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build-internal:
+    name: Build internal APK and publish internal manifest
+    runs-on: ubuntu-latest
+    env:
+      APK_NAME: werewolf-agent-internal-arm64.apk
+      UPDATE_MANIFEST_URL: https://${{ github.repository_owner }}.github.io/Werewolf-agent/updates/internal.json
+      UPDATE_MANIFEST_FALLBACK_URLS: ${{ vars.INTERNAL_UPDATE_MANIFEST_FALLBACK_URLS }}
+      PAGES_MANIFEST_PATH: updates/internal.json
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Parse internal version
+        id: version
+        shell: pwsh
+        env:
+          INTERNAL_RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_NOTES: ${{ inputs.release_notes }}
+        run: |
+          . .github/scripts/android-update/common.ps1
+          $version = Get-AndroidReleaseVersion `
+            -ReleaseTag $env:INTERNAL_RELEASE_TAG `
+            -ReleaseNotes $env:RELEASE_NOTES `
+            -DefaultReleaseNotes "Werewolf-agent Android internal release."
+          "tag=$($version.Tag)" >> $env:GITHUB_OUTPUT
+          "version_name=$($version.VersionName)" >> $env:GITHUB_OUTPUT
+          "version_code=$($version.VersionCode)" >> $env:GITHUB_OUTPUT
+          "release_notes_path=$($version.ReleaseNotesPath)" >> $env:GITHUB_OUTPUT
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Resolve dependencies
+        working-directory: clients/flutter_app
+        run: flutter pub get
+
+      - name: Analyze
+        working-directory: clients/flutter_app
+        run: dart analyze
+
+      - name: Test Flutter client
+        working-directory: clients/flutter_app
+        run: flutter test
+
+      - name: Set up internal signing
+        shell: pwsh
+        env:
+          INTERNAL_ANDROID_KEYSTORE_BASE64: ${{ secrets.INTERNAL_ANDROID_KEYSTORE_BASE64 }}
+          INTERNAL_ANDROID_KEY_PROPERTIES: ${{ secrets.INTERNAL_ANDROID_KEY_PROPERTIES }}
+        run: |
+          . .github/scripts/android-update/common.ps1
+          Write-AndroidSigningFiles `
+            -Channel internal `
+            -KeystoreBase64 $env:INTERNAL_ANDROID_KEYSTORE_BASE64 `
+            -KeyProperties $env:INTERNAL_ANDROID_KEY_PROPERTIES
+
+      - name: Build internal arm64 release APK
+        working-directory: clients/flutter_app
+        shell: pwsh
+        env:
+          VERSION_NAME: ${{ steps.version.outputs.version_name }}
+          VERSION_CODE: ${{ steps.version.outputs.version_code }}
+          GIT_COMMIT: ${{ github.sha }}
+        run: |
+          $shortSha = $env:GIT_COMMIT.Substring(0, 7)
+          $buildTime = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+          flutter build apk --release --flavor internal --target-platform android-arm64 `
+            --android-project-arg requireInternalSigning=true `
+            --build-name $env:VERSION_NAME `
+            --build-number $env:VERSION_CODE `
+            --dart-define "APP_VERSION=$($env:VERSION_NAME)+$($env:VERSION_CODE)" `
+            --dart-define "UPDATE_MANIFEST_URL=$env:UPDATE_MANIFEST_URL" `
+            --dart-define "UPDATE_MANIFEST_FALLBACK_URLS=$env:UPDATE_MANIFEST_FALLBACK_URLS" `
+            --dart-define "UPDATE_CHANNEL=internal" `
+            --dart-define "UPDATE_APPLICATION_ID=io.werewolfagent.werewolf_app.internal" `
+            --dart-define "GIT_COMMIT=$shortSha" `
+            --dart-define "BUILD_TIME=$buildTime"
+
+      - name: Generate internal update artifacts
+        id: artifacts
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          VERSION_NAME: ${{ steps.version.outputs.version_name }}
+          VERSION_CODE: ${{ steps.version.outputs.version_code }}
+          RELEASE_NOTES_PATH: ${{ steps.version.outputs.release_notes_path }}
+          GIT_COMMIT: ${{ github.sha }}
+        run: |
+          . .github/scripts/android-update/common.ps1
+          $artifacts = New-AndroidUpdateArtifacts `
+            -Channel internal `
+            -ApplicationId "io.werewolfagent.werewolf_app.internal" `
+            -VersionName $env:VERSION_NAME `
+            -VersionCode ([int]$env:VERSION_CODE) `
+            -ReleaseTag $env:RELEASE_TAG `
+            -GitCommit $env:GIT_COMMIT `
+            -ApkPath "clients/flutter_app/build/app/outputs/flutter-apk/app-internal-release.apk" `
+            -ApkName $env:APK_NAME `
+            -ReleaseNotesPath $env:RELEASE_NOTES_PATH `
+            -OutputDirectory $env:RUNNER_TEMP
+          "apk_path=$($artifacts.ApkPath)" >> $env:GITHUB_OUTPUT
+          "manifest_path=$($artifacts.ManifestPath)" >> $env:GITHUB_OUTPUT
+          "metadata_path=$($artifacts.MetadataPath)" >> $env:GITHUB_OUTPUT
+          "sha256=$($artifacts.ApkSha256)" >> $env:GITHUB_OUTPUT
+          "size_bytes=$($artifacts.ApkSizeBytes)" >> $env:GITHUB_OUTPUT
+
+      - name: Upload internal release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          prerelease: true
+          files: |
+            ${{ steps.artifacts.outputs.apk_path }}
+            ${{ steps.artifacts.outputs.manifest_path }}
+            ${{ steps.artifacts.outputs.metadata_path }}
+
+      - name: Publish internal manifest to GitHub Pages
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MANIFEST_PATH: ${{ steps.artifacts.outputs.manifest_path }}
+        run: |
+          git clone --depth 1 --branch gh-pages "https://x-access-token:$env:GH_TOKEN@github.com/$env:GITHUB_REPOSITORY.git" pages 2>$null
+          if (-not (Test-Path pages/.git)) {
+            git init pages
+            Push-Location pages
+            git checkout -b gh-pages
+            git remote add origin "https://x-access-token:$env:GH_TOKEN@github.com/$env:GITHUB_REPOSITORY.git"
+            Pop-Location
+          }
+          New-Item -ItemType Directory -Force -Path "pages/updates" | Out-Null
+          Copy-Item -Path $env:MANIFEST_PATH -Destination "pages/$env:PAGES_MANIFEST_PATH" -Force
+          Push-Location pages
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add $env:PAGES_MANIFEST_PATH
+          if (git diff --cached --quiet) {
+            Write-Host "Internal manifest unchanged."
+          } else {
+            git commit -m "publish android internal manifest ${{ steps.version.outputs.tag }}"
+            git push origin gh-pages
+          }
+          Pop-Location
+
+      - name: Publish summary
+        shell: pwsh
+        run: |
+          @"
+          ## Werewolf-agent Android internal build
+
+          - Channel: internal
+          - Version: ${{ steps.version.outputs.version_name }} (${{ steps.version.outputs.version_code }})
+          - Release: ${{ steps.version.outputs.tag }}
+          - Manifest: $env:UPDATE_MANIFEST_URL
+          - APK size: ${{ steps.artifacts.outputs.size_bytes }} bytes
+          - SHA256: ${{ steps.artifacts.outputs.sha256 }}
+          "@ >> $env:GITHUB_STEP_SUMMARY

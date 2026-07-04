@@ -49,4 +49,10 @@ clients/qt_observer/build/
 # Release virtualenv (isolated from dev — never committed)
 .venv-release/
 
+# Android release signing files
+clients/flutter_app/android/internal-key.properties
+clients/flutter_app/android/production-key.properties
+clients/flutter_app/android/app/internal-upload-keystore.jks
+clients/flutter_app/android/app/production-upload-keystore.jks
+
 .worktrees/
