@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "channel": "production",
+  "applicationId": "io.werewolfagent.werewolf_app",
+  "versionName": "0.2.1",
+  "versionCode": 211,
+  "releaseTag": "v0.2.1+211",
+  "gitCommit": "2b3f9fd5124567548b353140e8979f7cd212ede9",
+  "signingCertificateSha256": "0d3ba273daf7d9a28214758e88ba058397e03d40be744b6c617ab522b8d9316d",
+  "apkUrl": "https://github.com/liaoszong/Werewolf-agent/releases/download/v0.2.1+211/werewolf-agent-production-arm64.apk",
+  "sha256": "f6b420d4013a1effb8c6ab6796e927e520bcd2a88d334dec26637ddb7abce9dc",
+  "sizeBytes": 19187330,
+  "releaseNotes": "Android 正式版首个候选：接入应用内远程更新、独立 Production 通道和真人席位 Flutter 客户端基线。",
+  "publishedAt": "2026-07-04T13:51:11Z"
+}
