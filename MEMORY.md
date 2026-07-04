@@ -84,6 +84,9 @@ machine secrets here.
   after this work (`ContextBudgetGateDocsTests` root docs expectation and a
   settlement cache test). Flutter analyze/tests/builds and all Android release
   workflows passed.
+- Post-push CI for docs commit `53cb365` matched the prior `2b3f9fd` tests run:
+  `flutter-client` and `windows-gate` passed; `unittest` stayed red with
+  three missing-`pytest` import errors plus the two historical failures above.
 
 ### 2026-07-04 - P3-E-1 Flutter Human Seat Client
 
