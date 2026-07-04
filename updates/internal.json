@@ -2,14 +2,14 @@
   "schemaVersion": 1,
   "channel": "internal",
   "applicationId": "io.werewolfagent.werewolf_app.internal",
-  "versionName": "0.2.1-internal.1",
-  "versionCode": 211,
-  "releaseTag": "v0.2.1-internal.1+211",
-  "gitCommit": "2b3f9fd5124567548b353140e8979f7cd212ede9",
+  "versionName": "0.2.1-internal.2",
+  "versionCode": 212,
+  "releaseTag": "v0.2.1-internal.2+212",
+  "gitCommit": "fa81c8c66c7243da6703924f4e8372f0c64b4655",
   "signingCertificateSha256": "6aecb1c9680abbeef2731a90529e985e6a36bb130c1539ade7951fa9f3f3cca9",
-  "apkUrl": "https://github.com/liaoszong/Werewolf-agent/releases/download/v0.2.1-internal.1+211/werewolf-agent-internal-arm64.apk",
-  "sha256": "eadd9c1f414be42d78e7b691b7f5eb19a778d99132e3dcc555dd86a061a3131a",
+  "apkUrl": "https://github.com/liaoszong/Werewolf-agent/releases/download/v0.2.1-internal.2+212/werewolf-agent-internal-arm64.apk",
+  "sha256": "d38443d97caac3eeb1cf64bb28fc6d1aafb55c722579fd7205663ea948b61aa9",
   "sizeBytes": 19187346,
-  "releaseNotes": "Android 内测首发：接入应用内远程更新、独立 Internal 通道和真人席位 Flutter 客户端基线。",
-  "publishedAt": "2026-07-04T13:44:53Z"
+  "releaseNotes": "内测：默认连接 PaleInk 公网 observer，新增服务器快捷预设，并补充 Docker 部署文件。",
+  "publishedAt": "2026-07-04T14:23:44Z"
 }
