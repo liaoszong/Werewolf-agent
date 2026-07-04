@@ -92,6 +92,21 @@ GitHub Pages is enabled from the `gh-pages` branch root:
 Internal:
 
 - Workflow run:
+  `https://github.com/liaoszong/Werewolf-agent/actions/runs/28709022366`
+- Release:
+  `https://github.com/liaoszong/Werewolf-agent/releases/tag/v0.2.1-internal.2%2B212`
+- Manifest:
+  `https://liaoszong.github.io/Werewolf-agent/updates/internal.json`
+- APK: `werewolf-agent-internal-arm64.apk`
+- Size: `19187346`
+- SHA256:
+  `d38443d97caac3eeb1cf64bb28fc6d1aafb55c722579fd7205663ea948b61aa9`
+- Notes: defaults the Flutter app to the PaleInk public observer and adds
+  quick server presets plus Docker deploy docs.
+
+Previous internal:
+
+- Workflow run:
   `https://github.com/liaoszong/Werewolf-agent/actions/runs/28708039101`
 - Release:
   `https://github.com/liaoszong/Werewolf-agent/releases/tag/v0.2.1-internal.1%2B211`

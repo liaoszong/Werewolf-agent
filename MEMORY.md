@@ -68,6 +68,22 @@ machine secrets here.
     returned `{"service":"werewolf-observer","status":"ok"}`.
   - Local Docker build was not run because Docker CLI is not installed on the
     Windows workstation.
+- Pushed commit `fa81c8c` to `main` and published Android Internal release
+  `v0.2.1-internal.2+212`:
+  - Workflow run:
+    `https://github.com/liaoszong/Werewolf-agent/actions/runs/28709022366`
+  - Release:
+    `https://github.com/liaoszong/Werewolf-agent/releases/tag/v0.2.1-internal.2%2B212`
+  - Manifest:
+    `https://liaoszong.github.io/Werewolf-agent/updates/internal.json`
+  - APK: `werewolf-agent-internal-arm64.apk`
+  - Size: `19187346`
+  - SHA256:
+    `d38443d97caac3eeb1cf64bb28fc6d1aafb55c722579fd7205663ea948b61aa9`
+- Post-push CI for commit `fa81c8c`: `flutter-client` and `windows-gate`
+  passed; `unittest` failed with the existing missing-`pytest` import errors
+  in CI plus the two local historical failures
+  (`ContextBudgetGateDocsTests` and settlement cache).
 - APK artifact built with `flutter build apk`:
   - `clients/flutter_app/build/app/outputs/flutter-apk/app-release.apk`
   - size at build time: 48,346,266 bytes
