@@ -81,7 +81,12 @@ class SessionController extends ChangeNotifier {
   }
 
   Future<void> submitSpeech(String text) {
-    return _submitCurrentWindow('speech', {'text': text});
+    final actions = state?.openActionWindow?.allowedActions ?? const [];
+    final actionType =
+        actions.contains('final_words') && !actions.contains('speech')
+            ? 'final_words'
+            : 'speech';
+    return _submitCurrentWindow(actionType, {'text': text});
   }
 
   Future<void> submitStructuredAction({
