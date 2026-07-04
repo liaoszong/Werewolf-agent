@@ -36,8 +36,9 @@ Default reads should be small and current:
 3. `docs/PROJECT_MAP.md` — current phase and relevant system-view (SYS-xx) rows.
 4. `DESIGN.md` when the task touches UI, visual design, QML styling, or page redesign.
 5. `docs/TASKS.md` only when checking a specific task's status/outputs.
-6. `docs/superpowers/plans/**` / `docs/superpowers/specs/**` for the active or relevant plan/spec.
-7. Exact source/test ranges only when needed.
+6. `MEMORY.md` when resuming context or closing an important task.
+7. `docs/superpowers/plans/**` / `docs/superpowers/specs/**` for the active or relevant plan/spec.
+8. Exact source/test ranges only when needed.
 
 ## Push Discipline (单人直推纪律)
 
@@ -83,5 +84,6 @@ Only run log validators when the change touches log contracts or fixtures.
 
 ## Maintenance
 
+- Update `MEMORY.md` after important task closeout; do not store secrets there.
 - Only stable facts belong here.
 - Keep this file short. Link volatile details to canonical docs instead of copying them.

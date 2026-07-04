@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 670
+- Entries: 671
 
 ```text
 ./
@@ -809,6 +809,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 ├── launch-theater.bat
 ├── launch-theater.py
 ├── live-check.bat
+├── MEMORY.md
 ├── pyproject.toml
 ├── README.md
 ├── README.zh-CN.md

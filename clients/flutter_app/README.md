@@ -54,3 +54,31 @@ Default local fields:
 The client joins the profile-bound human seat selected by the backend profile.
 Future multi-human seat picking should be inserted before identity confirmation,
 without weakening the participant protocol boundary.
+
+## Android APK
+
+Build a local release APK from this directory:
+
+```powershell
+flutter build apk
+```
+
+Default output:
+
+```text
+clients/flutter_app/build/app/outputs/flutter-apk/app-release.apk
+```
+
+The generated APK is a build artifact and is not tracked by git. If you need to
+keep the APK, do not run `flutter clean` until the file has been copied or
+otherwise preserved.
+
+## Local Cleanup
+
+Repository-local temporary output can be large. It is safe to clear old
+repository-local `.tmp/` contents and clean, merged worktrees under
+`.worktrees/` when they are no longer needed. Keep dirty worktrees until their
+changes are reviewed or intentionally discarded.
+
+Flutter build output under `clients/flutter_app/build/` can be removed with
+`flutter clean`, but that also removes the generated APK path above.
