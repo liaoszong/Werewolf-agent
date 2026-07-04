@@ -9,7 +9,7 @@ import 'package:werewolf_app/src/protocol/participant_models.dart';
 
 class FakeObserverApiClient extends ObserverApiClient {
   FakeObserverApiClient({this.runs = const []})
-      : super(baseUri: Uri.parse('http://127.0.0.1:8765'));
+    : super(baseUri: Uri.parse('http://127.0.0.1:8765'));
 
   final List<RunSummary> runs;
 
@@ -18,7 +18,8 @@ class FakeObserverApiClient extends ObserverApiClient {
 }
 
 class FakeParticipantApiClient extends ParticipantApiClient {
-  FakeParticipantApiClient() : super(baseUri: Uri.parse('http://127.0.0.1:8765'));
+  FakeParticipantApiClient()
+    : super(baseUri: Uri.parse('http://127.0.0.1:8765'));
 
   String? joinedRunId;
   final sseController = StreamController<ParticipantSseEvent>.broadcast();
@@ -67,14 +68,16 @@ class FakeParticipantApiClient extends ParticipantApiClient {
 }
 
 void main() {
-  testWidgets('home defaults to Chinese and exposes bottom navigation',
-      (tester) async {
-    await tester.pumpWidget(WerewolfApp(
-      observerClientFactory: (_) => FakeObserverApiClient(),
-      sessionControllerFactory: (_) => SessionController(
-        participantApi: FakeParticipantApiClient(),
+  testWidgets('home defaults to Chinese and exposes bottom navigation', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      WerewolfApp(
+        observerClientFactory: (_) => FakeObserverApiClient(),
+        sessionControllerFactory: (_) =>
+            SessionController(participantApi: FakeParticipantApiClient()),
       ),
-    ));
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('狼人杀观察席'), findsOneWidget);
@@ -85,14 +88,16 @@ void main() {
     expect(find.text('Werewolf Agent'), findsNothing);
   });
 
-  testWidgets('language toggle switches primary shell copy to English',
-      (tester) async {
-    await tester.pumpWidget(WerewolfApp(
-      observerClientFactory: (_) => FakeObserverApiClient(),
-      sessionControllerFactory: (_) => SessionController(
-        participantApi: FakeParticipantApiClient(),
+  testWidgets('language toggle switches primary shell copy to English', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      WerewolfApp(
+        observerClientFactory: (_) => FakeObserverApiClient(),
+        sessionControllerFactory: (_) =>
+            SessionController(participantApi: FakeParticipantApiClient()),
       ),
-    ));
+    );
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('EN'));
@@ -105,16 +110,44 @@ void main() {
     expect(find.text('Settings'), findsOneWidget);
   });
 
-  testWidgets('matches tab lists observer runs and can join one', (tester) async {
-    final participant = FakeParticipantApiClient();
-    await tester.pumpWidget(WerewolfApp(
-      observerClientFactory: (_) => FakeObserverApiClient(runs: const [
-        RunSummary(runId: 'run_1', status: 'running'),
-      ]),
-      sessionControllerFactory: (_) => SessionController(
-        participantApi: participant,
+  testWidgets('settings exposes cloud and local observer presets', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      WerewolfApp(
+        observerClientFactory: (_) => FakeObserverApiClient(),
+        sessionControllerFactory: (_) =>
+            SessionController(participantApi: FakeParticipantApiClient()),
       ),
-    ));
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('设置'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('http://api.paleink.cc:8765'), findsOneWidget);
+    expect(find.text('PaleInk 云服务器'), findsOneWidget);
+    expect(find.text('本机开发'), findsOneWidget);
+
+    await tester.tap(find.text('本机开发'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('http://127.0.0.1:8765'), findsOneWidget);
+  });
+
+  testWidgets('matches tab lists observer runs and can join one', (
+    tester,
+  ) async {
+    final participant = FakeParticipantApiClient();
+    await tester.pumpWidget(
+      WerewolfApp(
+        observerClientFactory: (_) => FakeObserverApiClient(
+          runs: const [RunSummary(runId: 'run_1', status: 'running')],
+        ),
+        sessionControllerFactory: (_) =>
+            SessionController(participantApi: participant),
+      ),
+    );
     await tester.pump();
     await tester.pump();
 

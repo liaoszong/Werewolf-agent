@@ -59,6 +59,8 @@
 | P3-D：趣味性复盘入口 | planned | — |
 | P3-E-0：跨平台客户端迁移路线 spec | completed | `docs/PROJECT_MAP.md`, `DESIGN.md`, `docs/superpowers/specs/2026-07-02-p3-e-client-platform-migration-design.md` |
 | P3-E-1：Flutter protocol spike | completed | `clients/flutter_app/`, `clients/flutter_app/lib/src/protocol/participant_api_client.dart`, `clients/flutter_app/lib/src/app/session_controller.dart`, `clients/flutter_app/lib/src/screens/live_room_screen.dart`, `clients/flutter_app/lib/src/ui/composer_rail.dart` |
+| P3-E-1a：Flutter Android update channels | completed | `docs/release/android-update-channels.md`, `.github/workflows/build-android-internal.yml`, `.github/workflows/build-android-production-candidate.yml`, `.github/workflows/promote-android-production.yml`, `clients/flutter_app/android/app/build.gradle.kts`, `clients/flutter_app/lib/src/update/` |
+| P3-E-1b：Public observer deploy + mobile server preset | completed | `Dockerfile`, `deploy/docker-compose.yml`, `deploy/README.md`, `tests/test_deploy_contract.py`, `clients/flutter_app/lib/src/app/app_settings.dart`, `clients/flutter_app/lib/src/screens/home_shell.dart` |
 | P3-E-2：Mobile-first live room slice | planned | future Flutter live-room slice |
 | P3-E-3：Human seat client slice | planned | depends on P3-C-0 and P3-C-1b profile-driven single-human backend |
 | P3-E-4：Desktop parity / Qt retirement gate | planned | future parity review |

@@ -57,8 +57,8 @@ class AppStrings {
   String get interrupted => _t('中断', 'Interrupted');
   String get unknown => _t('未知', 'Unknown');
   String get runListHint => _t(
-    '从 observer server 读取对局列表；真机请把 Base URL 改成电脑的局域网 IP。',
-    'Runs are loaded from the observer server. On a phone, use the LAN IP of the computer.',
+    '从 observer server 读取对局列表；可使用 PaleInk 云服务器或本机开发服务。',
+    'Runs are loaded from the observer server. Use PaleInk Cloud or a local dev server.',
   );
   String get emptyRoomTitle => _t('尚未加入席位', 'No seat joined');
   String get emptyRoomBody => _t(
@@ -75,6 +75,7 @@ class AppStrings {
   String get languageLabel => _t('语言', 'Language');
   String get connection => _t('连接', 'Connection');
   String get baseUrl => _t('Observer Base URL', 'Observer Base URL');
+  String get quickServer => _t('快捷服务器', 'Quick Server');
   String get seatId => _t('席位 ID', 'Seat ID');
   String get joinCode => _t('加入码', 'Join code');
   String get saveConnection => _t('保存连接设置', 'Save Connection');
@@ -86,8 +87,8 @@ class AppStrings {
   String get checkUpdates => _t('检查更新', 'Check Updates');
   String get downloadInstall => _t('下载并安装', 'Download & Install');
   String get phoneLanHint => _t(
-    'Android 真机不能使用 127.0.0.1；请填写运行 Python server 的电脑局域网地址。',
-    'Android devices cannot use 127.0.0.1. Use the LAN address of the computer running the Python server.',
+    '默认连接 PaleInk 云服务器；本机开发时，Android 真机不能使用 127.0.0.1，需要电脑局域网地址。',
+    'Defaults to PaleInk Cloud. For local development on Android, use the computer LAN address instead of 127.0.0.1.',
   );
   String get visibleEventsWaiting =>
       _t('等待可见房间事件...', 'Waiting for visible room events...');
@@ -142,6 +143,13 @@ class AppStrings {
       'hunter_shoot' => _t('选择开枪目标', 'Choose shot target'),
       'pass' => pass,
       _ => chooseAction,
+    };
+  }
+
+  String serverPresetLabel(ObserverServerPreset preset) {
+    return switch (preset) {
+      ObserverServerPreset.paleInkCloud => _t('PaleInk 云服务器', 'PaleInk Cloud'),
+      ObserverServerPreset.localDev => _t('本机开发', 'Local Dev'),
     };
   }
 

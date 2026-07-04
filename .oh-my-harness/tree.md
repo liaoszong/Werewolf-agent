@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 691
+- Entries: 696
 
 ```text
 ./
@@ -394,6 +394,9 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       ├── main.cpp
 │       ├── Main.qml
 │       └── README.md
+├── deploy/
+│   ├── docker-compose.yml
+│   └── README.md
 ├── docs/
 │   ├── adr/
 │   │   ├── 0001-client-agnostic-live-observer-protocol.md
@@ -731,6 +734,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── test_deepseek_live_smoke.py
 │   ├── test_deepseek_provider_game.py
 │   ├── test_deepseek_provider.py
+│   ├── test_deploy_contract.py
 │   ├── test_emergent_engine.py
 │   ├── test_emergent_ledger_golden.py
 │   ├── test_emergent_role_projection.py
@@ -828,11 +832,13 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── backfill_seer_claim_metrics.py
 │   ├── generate_golden_prompts.py
 │   └── live_check_deepseek.py
+├── .dockerignore
 ├── .gitattributes
 ├── .gitignore
 ├── AGENTS.md
 ├── CLAUDE.md
 ├── DESIGN.md
+├── Dockerfile
 ├── launch-theater.bat
 ├── launch-theater.py
 ├── live-check.bat

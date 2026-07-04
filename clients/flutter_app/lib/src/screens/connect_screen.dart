@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../app/app_settings.dart';
 import '../app/session_controller.dart';
 import '../protocol/participant_api_client.dart';
 import '../ui/app_theme.dart';
@@ -8,10 +9,7 @@ import 'identity_confirm_screen.dart';
 typedef SessionControllerFactory = SessionController Function(Uri baseUri);
 
 class ConnectScreen extends StatefulWidget {
-  const ConnectScreen({
-    super.key,
-    this.controllerFactory,
-  });
+  const ConnectScreen({super.key, this.controllerFactory});
 
   final SessionControllerFactory? controllerFactory;
 
@@ -20,7 +18,7 @@ class ConnectScreen extends StatefulWidget {
 }
 
 class _ConnectScreenState extends State<ConnectScreen> {
-  final _baseUrl = TextEditingController(text: 'http://127.0.0.1:8765');
+  final _baseUrl = TextEditingController(text: hostedObserverBaseUriString);
   final _runId = TextEditingController();
   final _seatId = TextEditingController(text: 'p3');
   final _joinCode = TextEditingController(text: 'local-dev-code');
@@ -129,9 +127,11 @@ class _ConnectScreenState extends State<ConnectScreen> {
     );
     if (!mounted) return;
     if (controller.connectionStatus == ConnectionStatus.connected) {
-      await Navigator.of(context).push(MaterialPageRoute<void>(
-        builder: (_) => IdentityConfirmScreen(controller: controller),
-      ));
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => IdentityConfirmScreen(controller: controller),
+        ),
+      );
       if (mounted) {
         setState(() => _joining = false);
       }

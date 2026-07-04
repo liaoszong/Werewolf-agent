@@ -19,7 +19,7 @@ Matches can run fully offline (deterministic fake provider, the default) or live
 - **Emergent game engine** — 6 players (2 werewolves, 1 seer, 1 witch, 2 villagers): night kills with wolf consensus, seer checks, witch save/poison, day speeches, votes, executions, win adjudication. Dynamic rounds, no scripts. A hunter role variant ships in the action runtime (`rules_v1_1`).
 - **Bring your own AI** — per-seat provider/model/prompt/temperature configuration. Built-in presets: DeepSeek, OpenAI, Anthropic, plus 9 OpenAI-compatible vendors (Zhipu GLM, Moonshot, Qwen, MiniMax, SiliconFlow, xAI, Gemini, ModelScope, OpenRouter) and fully custom endpoints. API keys stay on your machine; only the local Python server ever calls a provider.
 - **Current Qt theater client** — live god-view spectating (seat ring, speech theater, evidence console, playback controls), match setup sandbox, in-theater settlement overlay with a scrolling battle report, and a history view for replaying or managing past runs. It remains the legacy desktop client until the Flutter-first cross-platform client reaches parity.
-- **Mobile-first player client in design** — P3-E defines a Flutter-first cross-platform client for phone-first human participation and desktop expansion, while preserving the existing backend protocol.
+- **Flutter-first player client** — the mobile-first Flutter client can join profile-bound human seats through the observer/participant protocol, submit speech/votes/role actions, and use Android Internal/Production update channels. It defaults to the PaleInk public observer for early mobile smoke testing and still supports local development servers.
 - **Honest by construction** — event-sourced logs (`events.jsonl`, snapshots, prompt manifest, provider traces, failure audits), executed-truth HUD (`LIVE_API` vs `SIMULATION`), visibility projections (God / Public / per-Role), and runtime invariants that fail loudly on information leaks or rule violations.
 - **Agent-first, player-first roadmap** — P3 now focuses on role cards, game-scoped memory, agent harnesses, table-talk, human seats, and a Flutter-first mobile/desktop client. Evaluation, replay analysis, and leaderboards move downstream to P4.
 - **Evaluation-ready foundation** — deterministic scoring, rule attribution, an ablation harness with per-arm metrics, byte-locked prompt versioning with a revision ledger, differential testing, and seeded deterministic simulation.
@@ -45,8 +45,9 @@ Qt 6 / QML theater client                         clients/qt_observer/
   · legacy desktop client until Flutter parity
         │
         ▼
-Flutter-first cross-platform client               planned
+Flutter-first cross-platform client               clients/flutter_app/
   · mobile-first human seats · live room · desktop expansion
+  · Android remote update channels
   · same observer protocol, no direct provider calls
 ```
 
@@ -62,10 +63,38 @@ The first public Windows installer is not code-signed yet. Windows may show an "
 
 After installation, launch Werewolf-agent from the desktop or Start menu. Future stable updates are handled in the client under Settings -> About & Updates: check for updates, review the target version and release notes, then choose Download and Restart when no match is queued or running.
 
+### Android Flutter client
+
+The Flutter Android client is the mobile-first participant surface. It talks to
+the observer/participant REST+SSE protocol only; it does not read local run
+artifacts, call model providers, or handle provider API keys.
+
+Early mobile builds default to the PaleInk public observer:
+
+```text
+http://api.paleink.cc:8765
+```
+
+That endpoint is an HTTP smoke target for development and testing. Do not send
+real provider keys through it until HTTPS and access control are in place. For
+local development, switch the app's Settings -> Connection preset to Local Dev
+or enter the LAN address of the machine running the Python observer server.
+
+Android APK updates use separate channels:
+
+- Internal manifest: `https://liaoszong.github.io/Werewolf-agent/updates/internal.json`
+- Production manifest: `https://liaoszong.github.io/Werewolf-agent/updates/stable.json`
+
+See [`docs/release/android-update-channels.md`](docs/release/android-update-channels.md)
+for the release workflow, signing-secret setup, and published APK evidence. See
+[`deploy/README.md`](deploy/README.md) for the public observer Docker deploy.
+
 ### Prerequisites
 
 - **Python 3.12+** — no third-party packages needed.
 - **Qt 6.8+ and CMake 3.16+** — only for building the desktop client.
+- **Flutter stable + Android SDK** — only for building the Flutter Android
+  client locally.
 
 ### One-click launch (Windows)
 
@@ -90,6 +119,22 @@ cmake --build .tmp/qt-observer-build --config Debug
 .\.tmp\qt-observer-build\appqt_observer.exe --observer-base-url http://127.0.0.1:8765
 ```
 
+### Docker observer server deploy
+
+For a hosted mobile endpoint, deploy the observer server with Docker:
+
+```bash
+cd deploy
+sudo docker compose up -d --build
+curl http://api.paleink.cc:8765/health
+```
+
+The compose service exposes `8765` and persists run data in the
+`werewolf_runs` Docker volume. See [deploy/README.md](deploy/README.md) for the
+full server setup, upgrade, and verification commands. Use plain HTTP only for
+early testing; put the service behind HTTPS before submitting real provider
+keys over the network.
+
 ### Playing with real AI
 
 Offline deterministic mode is the unconditional default and needs no keys. For a live match:
@@ -108,12 +153,23 @@ PYTHONPATH=src python -m unittest discover -s tests -p "test_*.py"
 
 ~1,000 tests cover the engine, action runtime, observer protocol, providers, scoring, invariants, and the Qt↔Python static contract. Qt-side tests: `ctest --test-dir .tmp/qt-observer-build`.
 
+Flutter client checks:
+
+```bash
+cd clients/flutter_app
+flutter pub get
+dart analyze
+flutter test
+```
+
 ## Repository layout
 
 | Path | What lives there |
 |------|------------------|
 | `src/werewolf_eval/` | Python backend: emergent engine, `action_runtime/` (ability system), providers & registry, observer server, event/log schemas + validators, scoring & attribution, `invariants/` safety net, `ablation/` harness |
 | `clients/qt_observer/` | Current Qt 6 / QML theater client; legacy desktop surface until cross-platform parity ([client README](clients/qt_observer/README.md)) |
+| `clients/flutter_app/` | Flutter-first mobile/desktop client for participant seats, live room, and Android update checks |
+| `deploy/` | Docker Compose deployment for the public observer smoke server |
 | `tests/` | Python test suite (80 files) |
 | `tools/`, `scripts/` | Live-check and dev/smoke utilities |
 | `docs/` | Project docs — start at [`PROJECT_MAP.md`](docs/PROJECT_MAP.md) |
@@ -142,6 +198,8 @@ PYTHONPATH=src python -m unittest discover -s tests -p "test_*.py"
 | [Plans](docs/superpowers/plans/) | Current implementation plans |
 | [ADRs](docs/adr/) | Architecture decisions (observer protocol, action runtime orchestrator) |
 | [Qt client README](clients/qt_observer/README.md) | Building, running, and testing the theater client |
+| [Android update channels](docs/release/android-update-channels.md) | Flutter Android Internal/Production update and release workflow |
+| [Observer Docker deploy](deploy/README.md) | Public observer smoke deployment for mobile testing |
 | [EVALUATION_RUBRIC](docs/EVALUATION_RUBRIC.md) | Scoring system reference (P4) |
 
 ## Background

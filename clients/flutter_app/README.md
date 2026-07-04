@@ -29,9 +29,15 @@ $env:PYTHONPATH='src'
 python -m unittest tests.test_participant_protocol tests.test_participant_routes tests.test_participant_game_loop tests.test_observer_routes -v
 ```
 
-## Local Run
+## Run
 
-Start the observer server from repository root:
+By default, the app points at the hosted observer server:
+
+```text
+http://api.paleink.cc:8765
+```
+
+For local development, start the observer server from repository root:
 
 ```powershell
 $env:PYTHONPATH='src'
@@ -45,11 +51,15 @@ Set-Location clients/flutter_app
 flutter run
 ```
 
-Default local fields:
+Default fields:
 
-- Observer base URL: `http://127.0.0.1:8765`
+- Observer base URL: `http://api.paleink.cc:8765`
 - Seat ID: `p3`
 - Join code: `local-dev-code`
+
+The Settings tab includes quick presets for `PaleInk Cloud` and local
+development. On a physical Android device, `127.0.0.1` points at the phone, not
+the computer; use the computer LAN address for a local server.
 
 The client joins the profile-bound human seat selected by the backend profile.
 Future multi-human seat picking should be inserted before identity confirmation,

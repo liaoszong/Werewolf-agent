@@ -548,6 +548,13 @@ class _SettingsPageState extends State<_SettingsPage> {
                 decoration: InputDecoration(labelText: strings.baseUrl),
               ),
               const SizedBox(height: 10),
+              Text(
+                strings.quickServer,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 8),
+              _buildServerPresetChips(strings),
+              const SizedBox(height: 10),
               TextField(
                 controller: _seatId,
                 textCapitalization: TextCapitalization.characters,
@@ -689,6 +696,30 @@ class _SettingsPageState extends State<_SettingsPage> {
       ..setSeatId(_seatId.text)
       ..setJoinCode(_joinCode.text);
     setState(() => _error = null);
+  }
+
+  Widget _buildServerPresetChips(AppStrings strings) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        for (final preset in ObserverServerPreset.values)
+          ChoiceChip(
+            label: Text(strings.serverPresetLabel(preset)),
+            selected: _baseUrl.text.trim() == preset.baseUri.toString(),
+            onSelected: (_) => _applyServerPreset(preset),
+          ),
+      ],
+    );
+  }
+
+  void _applyServerPreset(ObserverServerPreset preset) {
+    final baseUri = preset.baseUri;
+    setState(() {
+      _baseUrl.text = baseUri.toString();
+      _error = null;
+    });
+    _settings.setBaseUri(baseUri);
   }
 
   void _handleUpdateChanged() {

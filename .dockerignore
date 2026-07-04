@@ -1,0 +1,12 @@
+.git
+.runs
+.tmp
+.pytest_cache
+__pycache__
+*.pyc
+.venv-release
+.worktrees
+.logs
+clients/flutter_app/build
+clients/qt_observer/build
+docs/secrets

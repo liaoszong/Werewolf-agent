@@ -1,8 +1,21 @@
 import 'package:flutter/foundation.dart';
 
-enum AppLanguage {
-  zh,
-  en,
+enum AppLanguage { zh, en }
+
+const hostedObserverBaseUriString = 'http://api.paleink.cc:8765';
+const localObserverBaseUriString = 'http://127.0.0.1:8765';
+
+enum ObserverServerPreset { paleInkCloud, localDev }
+
+extension ObserverServerPresetData on ObserverServerPreset {
+  Uri get baseUri {
+    return switch (this) {
+      ObserverServerPreset.paleInkCloud => Uri.parse(
+        hostedObserverBaseUriString,
+      ),
+      ObserverServerPreset.localDev => Uri.parse(localObserverBaseUriString),
+    };
+  }
 }
 
 class AppSettingsController extends ChangeNotifier {
@@ -11,10 +24,10 @@ class AppSettingsController extends ChangeNotifier {
     Uri? baseUri,
     String seatId = 'p3',
     String joinCode = 'local-dev-code',
-  })  : _language = language,
-        _baseUri = baseUri ?? Uri.parse('http://127.0.0.1:8765'),
-        _seatId = seatId,
-        _joinCode = joinCode;
+  }) : _language = language,
+       _baseUri = baseUri ?? ObserverServerPreset.paleInkCloud.baseUri,
+       _seatId = seatId,
+       _joinCode = joinCode;
 
   AppLanguage _language;
   Uri _baseUri;

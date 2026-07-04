@@ -1,0 +1,15 @@
+services:
+  werewolf-observer:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: werewolf-observer:local
+    container_name: werewolf-observer
+    restart: unless-stopped
+    ports:
+      - "8765:8765"
+    volumes:
+      - werewolf_runs:/data/runs
+
+volumes:
+  werewolf_runs:

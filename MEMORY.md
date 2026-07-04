@@ -32,6 +32,49 @@ machine secrets here.
 
 ## Entries
 
+### 2026-07-04 - Public Observer Endpoint + Flutter Server Preset
+
+- Bound `api.paleink.cc` to Tencent Cloud server `43.159.168.39` and verified
+  public health over `http://api.paleink.cc:8765/health`.
+- Added Docker deployment files for the observer server:
+  - `Dockerfile`
+  - `.dockerignore`
+  - `deploy/docker-compose.yml`
+  - `deploy/README.md`
+- Docker deploy contract: expose TCP `8765`, persist runs in Docker volume
+  `werewolf_runs:/data/runs`, and start
+  `werewolf_eval.run_observer_server --host 0.0.0.0 --port 8765 --runs-dir /data/runs --allow-live-api`.
+- Flutter app now defaults to `http://api.paleink.cc:8765` and the Settings
+  page exposes quick presets for PaleInk Cloud and Local Dev. This keeps the
+  observer/participant protocol boundary unchanged.
+- Updated docs:
+  - `README.md`
+  - `README.zh-CN.md`
+  - `clients/flutter_app/README.md`
+  - `docs/release/android-update-channels.md`
+  - `docs/PROJECT_MAP.md`
+  - `docs/TASKS.md`
+- Added regression coverage:
+  - `clients/flutter_app/test/widget/home_shell_test.dart` covers the server
+    preset UI.
+  - `tests/test_deploy_contract.py` covers Dockerfile/compose/deploy README
+    static contract.
+- Verification:
+  - `flutter analyze` passed.
+  - `flutter test` passed 43 tests.
+  - `$env:PYTHONPATH='src'; $env:NO_PROXY='*'; python -m unittest tests.test_deploy_contract -v` passed 3 tests.
+  - `git diff --check` passed.
+  - Public health checks for both `api.paleink.cc:8765` and `43.159.168.39:8765`
+    returned `{"service":"werewolf-observer","status":"ok"}`.
+  - Local Docker build was not run because Docker CLI is not installed on the
+    Windows workstation.
+- APK artifact built with `flutter build apk`:
+  - `clients/flutter_app/build/app/outputs/flutter-apk/app-release.apk`
+  - size at build time: 48,346,266 bytes
+- Caveat: the Tencent server is currently running the earlier one-off Docker
+  container. To migrate it to the repo compose deploy, pull these changes on
+  the server and run `sudo docker compose up -d --build` from `deploy/`.
+
 ### 2026-07-04 - Flutter Android Remote Update Channels
 
 - Added BatteryCtrl-style lightweight Android remote update support to the

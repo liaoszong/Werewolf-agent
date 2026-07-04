@@ -20,6 +20,20 @@ Internal releases are prereleases and update `updates/internal.json` directly.
 Production first builds a prerelease candidate. Promotion reuses that exact APK
 and only publishes `updates/stable.json`; it must not rebuild.
 
+## Observer endpoint defaults
+
+The Android app's participant client talks to the observer/participant protocol,
+not to GitHub. Early mobile builds default to:
+
+```text
+http://api.paleink.cc:8765
+```
+
+The Settings page exposes quick server presets for PaleInk Cloud and Local Dev.
+For local development on a physical Android device, use the computer LAN address
+instead of `127.0.0.1`. The public HTTP endpoint is for smoke testing; put it
+behind HTTPS and access control before using real provider credentials.
+
 ## GitHub setup
 
 Enable GitHub Pages from the `gh-pages` branch root.
