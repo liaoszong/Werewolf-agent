@@ -1,8 +1,13 @@
 # Project Memory
 
-Purpose: keep durable, human-readable facts that future agents should check
-after major task closeout. This file is for project memory, not secrets, logs,
-or large transcripts.
+Purpose: this is the cross-session truth entry for Werewolf-agent. Future
+agents should read it after `AGENTS.md` when starting or resuming non-trivial
+work, then follow the canonical docs/code it points to.
+
+This file keeps durable, human-readable facts, not secrets, logs, or large
+transcripts. It does not replace route authorities such as
+`docs/PROJECT_MAP.md`; it records what changed, why it matters, and where to
+verify current state.
 
 ## Update Rule
 

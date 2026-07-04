@@ -32,11 +32,11 @@ Project runbooks live in `.agents/skills/<name>/SKILL.md`. Read the matching one
 Default reads should be small and current:
 
 1. User request and this file.
-2. `README.md`.
-3. `docs/PROJECT_MAP.md` — current phase and relevant system-view (SYS-xx) rows.
-4. `DESIGN.md` when the task touches UI, visual design, QML styling, or page redesign.
-5. `docs/TASKS.md` only when checking a specific task's status/outputs.
-6. `MEMORY.md` when resuming context or closing an important task.
+2. `MEMORY.md` — cross-session truth entry; use it to route what to verify next, not as a replacement for canonical docs/code.
+3. `README.md`.
+4. `docs/PROJECT_MAP.md` — current phase and relevant system-view (SYS-xx) rows.
+5. `DESIGN.md` when the task touches UI, visual design, QML styling, or page redesign.
+6. `docs/TASKS.md` only when checking a specific task's status/outputs.
 7. `docs/superpowers/plans/**` / `docs/superpowers/specs/**` for the active or relevant plan/spec.
 8. Exact source/test ranges only when needed.
 
