@@ -70,6 +70,39 @@ Multiple fallback URLs may be separated by comma, semicolon, or newline.
    - Publishes `updates/stable.json`
    - Marks the GitHub Release as latest and not prerelease
 
+## Published 2026-07-04
+
+GitHub Pages is enabled from the `gh-pages` branch root:
+`https://liaoszong.github.io/Werewolf-agent/`.
+
+Internal:
+
+- Workflow run:
+  `https://github.com/liaoszong/Werewolf-agent/actions/runs/28708039101`
+- Release:
+  `https://github.com/liaoszong/Werewolf-agent/releases/tag/v0.2.1-internal.1%2B211`
+- Manifest:
+  `https://liaoszong.github.io/Werewolf-agent/updates/internal.json`
+- APK: `werewolf-agent-internal-arm64.apk`
+- Size: `19187346`
+- SHA256:
+  `eadd9c1f414be42d78e7b691b7f5eb19a778d99132e3dcc555dd86a061a3131a`
+
+Production:
+
+- Candidate workflow run:
+  `https://github.com/liaoszong/Werewolf-agent/actions/runs/28708187657`
+- Promote workflow run:
+  `https://github.com/liaoszong/Werewolf-agent/actions/runs/28708345316`
+- Release:
+  `https://github.com/liaoszong/Werewolf-agent/releases/tag/v0.2.1%2B211`
+- Manifest:
+  `https://liaoszong.github.io/Werewolf-agent/updates/stable.json`
+- APK: `werewolf-agent-production-arm64.apk`
+- Size: `19187330`
+- SHA256:
+  `f6b420d4013a1effb8c6ab6796e927e520bcd2a88d334dec26637ddb7abce9dc`
+
 ## Local checks
 
 ```powershell

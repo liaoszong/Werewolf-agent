@@ -36,6 +36,8 @@ machine secrets here.
 
 - Added BatteryCtrl-style lightweight Android remote update support to the
   Flutter client.
+- Landed Flutter baseline commit `d98fbea` first, then update-channel commit
+  `2b3f9fd` on `main`.
 - Channels:
   - Internal: `io.werewolfagent.werewolf_app.internal`,
     `updates/internal.json`, prerelease workflow.
@@ -61,8 +63,27 @@ machine secrets here.
   - `flutter build apk --release --flavor internal --target-platform android-arm64 ...`
   - `.github/scripts/android-update/common.ps1` artifact generation smoke
     passed when `ANDROID_HOME` / `ANDROID_SDK_ROOT` pointed at `G:\Android\Sdk`.
-- Caveat: actual GitHub publication requires configuring Android signing
-  secrets and GitHub Pages `gh-pages` branch root before running the workflows.
+- GitHub publication completed:
+  - GitHub Pages enabled from `gh-pages` branch root:
+    `https://liaoszong.github.io/Werewolf-agent/`.
+  - Internal run `28708039101` published prerelease
+    `v0.2.1-internal.1+211`; `updates/internal.json` returned 200 and points
+    at `werewolf-agent-internal-arm64.apk`, size `19187346`, SHA256
+    `eadd9c1f414be42d78e7b691b7f5eb19a778d99132e3dcc555dd86a061a3131a`.
+  - Production candidate run `28708187657` published prerelease
+    `v0.2.1+211`; promote run `28708345316` reused the candidate manifest,
+    wrote `updates/stable.json`, and marked the release latest/non-prerelease.
+  - `updates/stable.json` returned 200 and points at
+    `werewolf-agent-production-arm64.apk`, size `19187330`, SHA256
+    `f6b420d4013a1effb8c6ab6796e927e520bcd2a88d334dec26637ddb7abce9dc`.
+- Android signing secrets were configured in GitHub Actions. A local backup of
+  generated signing material exists outside the repo under
+  `G:\Werewolf-agent-signing\android\20260704-214032`; do not commit or print
+  secret contents.
+- Caveat: full Python unittest still had two unrelated historical failures
+  after this work (`ContextBudgetGateDocsTests` root docs expectation and a
+  settlement cache test). Flutter analyze/tests/builds and all Android release
+  workflows passed.
 
 ### 2026-07-04 - P3-E-1 Flutter Human Seat Client
 
