@@ -216,6 +216,13 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         return key in parse_qs(parsed.query)
 
+    def _query_value(self, key: str) -> str | None:
+        parsed = urlparse(self.path)
+        values = parse_qs(parsed.query).get(key)
+        if not values:
+            return None
+        return values[0]
+
     def _send_participant_error(self, status: int, payload: dict[str, object]) -> None:
         self._send_json(status, payload)
 
@@ -420,6 +427,7 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
                 run_id=run_id,
                 session=session,
                 run_status=self._get_status(run_id, run_dir),
+                cursor=self._query_value("cursor"),
             )
         except ParticipantProtocolError as exc:
             self._send_participant_protocol_error(exc)

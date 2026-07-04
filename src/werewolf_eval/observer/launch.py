@@ -38,6 +38,14 @@ LaunchOutcome = (
 )
 
 
+def _human_seat_ids(resolved_seats: list[dict]) -> list[str]:
+    return [
+        str(seat["player_id"])
+        for seat in resolved_seats
+        if seat.get("provider") == "human"
+    ]
+
+
 def execute_profile_launch(
     state: ObserverServerState, body: dict[str, object]
 ) -> LaunchOutcome:
@@ -83,11 +91,16 @@ def execute_profile_launch(
         )
 
     run_id = str(plr["run_id"])
-    # SHAPE gate (AFTER validate) — live only. Resolve seats once (role-shuffle applied via
-    # run_id) and reuse for the launcher resolution (per-seat credential check).
-    resolved_seats: list[dict] = []
+    # Resolve seats once (role-shuffle applied via run_id) so launcher selection,
+    # participant wiring, and resolved-profile artifact all agree.
+    resolved_seats = resolve_profile_for_run(profile, run_id=run_id)
+    human_seats = _human_seat_ids(resolved_seats)
+    if len(human_seats) > 1:
+        return ("error", 400, "invalid_profile", "only one human-controlled seat is supported")
+
+    # SHAPE gate (AFTER validate) — live only. Reuses resolved seats for the
+    # per-seat credential check.
     if mode == "live":
-        resolved_seats = resolve_profile_for_run(profile, run_id=run_id)
         shape_reject = _check_live_profile_shape(resolved_seats)
         if shape_reject is not None:
             return ("error", *shape_reject)
@@ -103,6 +116,12 @@ def execute_profile_launch(
             return ("error", *live_reject)
     else:
         base = state.launcher
+        if human_seats and state.human_profile_fake_launcher_factory is not None:
+            base = state.human_profile_fake_launcher_factory(
+                state.participant_controller,
+                resolved_seats=resolved_seats,
+                human_seat_ids=human_seats,
+            )
     run_dir.mkdir(parents=True)
 
     # Write release-manifest.json synchronously (R0). Must succeed or the run
@@ -136,6 +155,8 @@ def execute_profile_launch(
     )
 
     def _profile_launcher(rid: str, rdir: Path, base: RunLauncher = base) -> int:
+        for seat_id in human_seats:
+            state.participant_controller.configure_human_seat(rid, seat_id)
         return base(rid, rdir)
 
     payload: dict[str, object] = {
@@ -144,4 +165,6 @@ def execute_profile_launch(
         "mode": plr["mode"],
         "status": "queued",
     }
+    if human_seats:
+        payload["participant"] = {"seat_id": human_seats[0]}
     return ("launch", run_id, run_dir, _profile_launcher, payload)

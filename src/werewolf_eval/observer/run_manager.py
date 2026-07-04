@@ -54,9 +54,10 @@ def _resolve_live_launcher_for_launch(
     Keys flow ONLY into the launcher closures (provider Authorization), never
     returned."""
     used = {str(seat.get("provider")) for seat in resolved_seats}
+    credential_providers = used - {"human"}
     creds: dict[str, ProviderCredential] = {}
     missing: list[str] = []
-    for provider in sorted(used):
+    for provider in sorted(credential_providers):
         key = state.credential_store.get(provider)
         if key:
             creds[provider] = ProviderCredential(
@@ -66,6 +67,18 @@ def _resolve_live_launcher_for_launch(
             missing.append(provider)
 
     if not missing and state.multi_provider_launcher_factory is not None:
+        human_seat_ids = [
+            str(seat.get("player_id"))
+            for seat in resolved_seats
+            if seat.get("provider") == "human"
+        ]
+        if human_seat_ids:
+            return state.multi_provider_launcher_factory(
+                resolved_seats,
+                creds,
+                participant_controller=state.participant_controller,
+                human_seat_ids=human_seat_ids,
+            ), None
         return state.multi_provider_launcher_factory(resolved_seats, creds), None
     if missing:
         return None, (
@@ -111,7 +124,7 @@ def _check_live_profile_shape(
     — the per-seat credential requirement is enforced at launcher resolution.
     Returns ``(status, code, message)`` to reject, or ``None`` to proceed."""
     providers = {seat.get("provider") for seat in resolved_seats}
-    unsupported = providers - set(PROVIDER_REGISTRY)
+    unsupported = providers - set(PROVIDER_REGISTRY) - {"human"}
     if unsupported:
         return (
             400,

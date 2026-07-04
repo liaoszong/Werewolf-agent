@@ -92,6 +92,26 @@ class RuntimeEventWriterTests(TestCase):
                 self.assertEqual(ev["seq"], i)
                 self.assertEqual(ev["event_id"], [e0, e1, e2][i]["event_id"])
 
+    def test_write_partial_log_retries_transient_replace_permission_error(self) -> None:
+        with TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            writer = RuntimeEventWriter("test_run", out, clock=lambda: "T")
+            original_replace = Path.replace
+            calls = {"count": 0}
+
+            def flaky_replace(self: Path, target: Path) -> Path:
+                calls["count"] += 1
+                if calls["count"] == 1:
+                    raise PermissionError("transient lock")
+                return original_replace(self, target)
+
+            with mock.patch.object(Path, "replace", flaky_replace):
+                path = writer.write_partial_log("game-log.json", {"game_id": "g"})
+
+            self.assertEqual(path.name, "game-log.json")
+            self.assertGreaterEqual(calls["count"], 2)
+            self.assertEqual(json.loads(path.read_text(encoding="utf-8")), {"game_id": "g"})
+
     def test_read_events_rejects_duplicate_event_id(self) -> None:
         """read_events_jsonl must reject lines sharing an event_id."""
         dup_id = str(uuid.uuid4())

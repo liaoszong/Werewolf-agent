@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 import threading
 import unittest
+from dataclasses import replace
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
@@ -211,6 +213,7 @@ class ParticipantRouteTests(TestCase):
                 )
                 self.assertEqual(status, 200)
                 self.assertIsNone(after["open_action_window"])
+                self.assertEqual(after["reconnect_cursor"], accepted["reconnect_cursor"])
             finally:
                 server.shutdown()
                 server.server_close()
@@ -239,6 +242,122 @@ class ParticipantRouteTests(TestCase):
                 self.assertEqual(body["run_id"], "run_one")
                 self.assertEqual(body["seat_id"], "p3")
                 self.assertNotIn(token, json.dumps(body))
+            finally:
+                server.shutdown()
+                server.server_close()
+
+    def test_participant_sse_rejects_invalid_cursor(self) -> None:
+        with TemporaryDirectory() as tmp:
+            runs = Path(tmp)
+            _make_run(runs, "run_cursor")
+            server, base_url = _start_server(runs)
+            try:
+                _, join = _request_json(
+                    base_url,
+                    "/api/runs/run_cursor/participants/join",
+                    method="POST",
+                    payload={"seat_id": "p3", "join_code": "local-dev-code"},
+                )
+                token = str(join["participant_session_token"])
+                status, body = _request_json(
+                    base_url,
+                    "/api/runs/run_cursor/participant/events?cursor=bad-cursor",
+                    headers={"Authorization": f"Bearer {token}"},
+                )
+                self.assertEqual(status, 400)
+                self.assertEqual(body["schema_version"], "p3c.error.v1")
+                self.assertEqual(body["error_code"], "invalid_payload")
+                self.assertNotIn(token, json.dumps(body))
+            finally:
+                server.shutdown()
+                server.server_close()
+
+    def test_revoked_or_expired_session_requires_rejoin(self) -> None:
+        with TemporaryDirectory() as tmp:
+            runs = Path(tmp)
+            _make_run(runs, "run_session")
+            server, base_url = _start_server(runs)
+            try:
+                _, join = _request_json(
+                    base_url,
+                    "/api/runs/run_session/participants/join",
+                    method="POST",
+                    payload={"seat_id": "p3", "join_code": "local-dev-code"},
+                )
+                token = str(join["participant_session_token"])
+                auth = {"Authorization": f"Bearer {token}"}
+                with server.state.lock:  # type: ignore[attr-defined]
+                    session = server.state.participant_sessions[token]  # type: ignore[attr-defined]
+                    server.state.participant_sessions[token] = replace(  # type: ignore[attr-defined]
+                        session,
+                        revoked_at="2026-07-03T00:00:00Z",
+                    )
+                status, revoked = _request_json(
+                    base_url, "/api/runs/run_session/participant/state", headers=auth
+                )
+                self.assertEqual(status, 401)
+                self.assertEqual(revoked["error_code"], "missing_or_invalid_session")
+                self.assertNotIn(token, json.dumps(revoked))
+
+                _, rejoin = _request_json(
+                    base_url,
+                    "/api/runs/run_session/participants/join",
+                    method="POST",
+                    payload={"seat_id": "p3", "join_code": "local-dev-code"},
+                )
+                expired_token = str(rejoin["participant_session_token"])
+                expired_auth = {"Authorization": f"Bearer {expired_token}"}
+                expired_at = (datetime.now(UTC) - timedelta(seconds=1)).isoformat()
+                with server.state.lock:  # type: ignore[attr-defined]
+                    session = server.state.participant_sessions[expired_token]  # type: ignore[attr-defined]
+                    server.state.participant_sessions[expired_token] = replace(  # type: ignore[attr-defined]
+                        session,
+                        expires_at=expired_at,
+                    )
+                status, expired = _request_json(
+                    base_url, "/api/runs/run_session/participant/state", headers=expired_auth
+                )
+                self.assertEqual(status, 401)
+                self.assertEqual(expired["error_code"], "missing_or_invalid_session")
+                self.assertNotIn(expired_token, json.dumps(expired))
+            finally:
+                server.shutdown()
+                server.server_close()
+
+    def test_state_reconnect_cursor_advances_after_window_timeout(self) -> None:
+        with TemporaryDirectory() as tmp:
+            runs = Path(tmp)
+            _make_run(runs, "run_timeout")
+            server, base_url = _start_server(runs)
+            server.state.run_status["run_timeout"] = "running"  # type: ignore[attr-defined]
+            try:
+                _, join = _request_json(
+                    base_url,
+                    "/api/runs/run_timeout/participants/join",
+                    method="POST",
+                    payload={"seat_id": "p3", "join_code": "local-dev-code"},
+                )
+                token = str(join["participant_session_token"])
+                auth = {"Authorization": f"Bearer {token}"}
+                _, state = _request_json(
+                    base_url, "/api/runs/run_timeout/participant/state", headers=auth
+                )
+                window = state["open_action_window"]
+                self.assertIsInstance(window, dict)
+
+                self.assertIsNone(
+                    server.state.participant_controller.wait_for_action(  # type: ignore[attr-defined]
+                        str(window["action_window_id"]),
+                        timeout=0.01,
+                    )
+                )
+
+                status, after_timeout = _request_json(
+                    base_url, "/api/runs/run_timeout/participant/state", headers=auth
+                )
+                self.assertEqual(status, 200)
+                self.assertIsNone(after_timeout["open_action_window"])
+                self.assertEqual(after_timeout["reconnect_cursor"], "event:1")
             finally:
                 server.shutdown()
                 server.server_close()

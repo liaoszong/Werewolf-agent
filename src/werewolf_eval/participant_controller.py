@@ -185,6 +185,19 @@ class InMemoryParticipantActionController:
                     return None
                 self._condition.wait(remaining)
 
+    def latest_reconnect_cursor(self, *, run_id: str, seat_id: str) -> str | None:
+        """Return the latest known reconnect cursor for one participant seat."""
+        run_id = validate_participant_run_id(run_id)
+        seat_id = validate_seat_id(seat_id)
+        with self._condition:
+            cursors = [
+                window.reconnect_cursor for window in self._windows.values()
+                if window.run_id == run_id and window.seat_id == seat_id
+            ]
+        if not cursors:
+            return None
+        return max(cursors, key=_event_index_from_cursor)
+
     def submit_action(
         self,
         *,

@@ -8,6 +8,7 @@ round-trips without coupling to the real game loop.
 from __future__ import annotations
 
 import secrets
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from email.utils import parsedate_to_datetime
 from pathlib import Path
@@ -20,6 +21,7 @@ from werewolf_eval.participant_protocol import (
     ParticipantProtocolError,
     ParticipantSession,
     build_participant_error_envelope,
+    parse_reconnect_cursor,
     perspective_for_seat,
     validate_reconnect_cursor,
     validate_seat_id,
@@ -155,7 +157,15 @@ def build_participant_state_payload(
         run_id=session.run_id,
         seat_id=session.seat_id,
     )
-    reconnect_cursor = window.reconnect_cursor if window is not None else session.last_seen_cursor
+    reconnect_cursor = session.last_seen_cursor
+    controller_cursor = state.participant_controller.latest_reconnect_cursor(
+        run_id=session.run_id,
+        seat_id=session.seat_id,
+    )
+    if controller_cursor is not None:
+        reconnect_cursor = _newer_reconnect_cursor(reconnect_cursor, controller_cursor)
+    if window is not None:
+        reconnect_cursor = _newer_reconnect_cursor(reconnect_cursor, window.reconnect_cursor)
     return {
         "schema_version": PARTICIPANT_STATE_SCHEMA_VERSION,
         "run_id": run_id,
@@ -185,11 +195,20 @@ def submit_participant_action(
             seat_id=session.seat_id,
             reconnect_cursor=session.last_seen_cursor,
         )
-    return state.participant_controller.submit_action(
+    result = state.participant_controller.submit_action(
         run_id=run_id,
         seat_id=session.seat_id,
         payload=request_payload,
     )
+    reconnect_cursor = result.get("reconnect_cursor")
+    if isinstance(reconnect_cursor, str):
+        reconnect_cursor = validate_reconnect_cursor(reconnect_cursor)
+        with state.lock:
+            state.participant_sessions[session.participant_session_token] = replace(
+                session,
+                last_seen_cursor=reconnect_cursor,
+            )
+    return result
 
 
 def participant_sse_events(
@@ -198,8 +217,20 @@ def participant_sse_events(
     run_id: str,
     session: ParticipantSession,
     run_status: str,
+    cursor: str | None = None,
 ) -> list[tuple[str, dict[str, object]]]:
     """Return a finite skeleton event list for the participant SSE route."""
+    if cursor is not None:
+        try:
+            validate_reconnect_cursor(cursor)
+        except ParticipantProtocolError as exc:
+            raise ParticipantProtocolError(
+                "invalid_payload",
+                exc.message,
+                run_id=run_id,
+                seat_id=session.seat_id,
+                reconnect_cursor=session.last_seen_cursor,
+            ) from exc
     events: list[tuple[str, dict[str, object]]] = [
         ("run_status", {"run_id": run_id, "status": run_status})
     ]
@@ -241,3 +272,7 @@ def _parse_instant(value: str) -> datetime:
     except ValueError:
         parsed = parsedate_to_datetime(value)
     return _normalize_now(parsed)
+
+
+def _newer_reconnect_cursor(left: str, right: str) -> str:
+    return str(max(parse_reconnect_cursor(left), parse_reconnect_cursor(right)))

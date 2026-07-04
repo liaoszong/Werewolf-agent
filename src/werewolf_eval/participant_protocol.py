@@ -29,6 +29,12 @@ ALLOWED_ACTION_TYPES: tuple[str, ...] = (
     "vote",
     "final_words",
     "pass",
+    "werewolf_kill",
+    "seer_check",
+    "witch_save",
+    "witch_poison",
+    "guard_protect",
+    "hunter_shoot",
 )
 ACTION_WINDOW_STATUSES: tuple[str, ...] = (
     "open",
@@ -417,12 +423,20 @@ def validate_action_payload(
             raise _protocol_error("invalid_payload", "final_words payload requires text")
         return {"text": _validate_text(payload["text"], "text", cap=text_cap)}
 
-    if action_type == "vote":
+    if action_type in (
+        "vote",
+        "werewolf_kill",
+        "seer_check",
+        "witch_save",
+        "witch_poison",
+        "guard_protect",
+        "hunter_shoot",
+    ):
         extra = set(payload) - {"target"}
         if extra:
-            raise _protocol_error("invalid_payload", f"Unexpected vote payload keys: {sorted(extra)}")
+            raise _protocol_error("invalid_payload", f"Unexpected {action_type} payload keys: {sorted(extra)}")
         if "target" not in payload:
-            raise _protocol_error("invalid_payload", "vote payload requires target")
+            raise _protocol_error("invalid_payload", f"{action_type} payload requires target")
         return {"target": validate_seat_id(payload["target"])}
 
     if action_type == "pass":

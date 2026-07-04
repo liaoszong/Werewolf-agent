@@ -222,20 +222,13 @@ class ObserverLaunchContractTests(TestCase):
         with self.assertRaises(ObserverProtocolError):
             parse_launch_request({"template": "default_6p_fake", "extra": True})
 
-    def test_parse_launch_request_accepts_participant_villager_seat(self) -> None:
+    def test_parse_launch_request_accepts_participant_any_seat(self) -> None:
         result = parse_launch_request({
             "template": "default_6p_fake",
             "run_id": "participant_run",
-            "participant": {"seat_id": "p5"},
+            "participant": {"seat_id": "p1"},
         })
-        self.assertEqual(result["participant"], {"seat_id": "p5"})
-
-    def test_parse_launch_request_rejects_non_villager_participant_seat(self) -> None:
-        with self.assertRaises(ObserverProtocolError):
-            parse_launch_request({
-                "template": "default_6p_fake",
-                "participant": {"seat_id": "p1"},
-            })
+        self.assertEqual(result["participant"], {"seat_id": "p1"})
 
     def test_generate_run_id_uses_safe_uuid_suffix(self) -> None:
         rid1 = generate_run_id()

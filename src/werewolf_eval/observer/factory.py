@@ -11,6 +11,7 @@ from werewolf_eval.deepseek_launcher import build_multi_provider_launcher
 from werewolf_eval.observer.handler import ObserverRequestHandler
 from werewolf_eval.observer.state import ObserverServerState, RunLauncher
 from werewolf_eval.profile_config import build_default_profile, list_profiles
+from werewolf_eval.run_emergent_fake_runtime import build_profile_participant_emergent_fake_launcher
 from werewolf_eval.run_g1h_fake_runtime import run_fake_runtime
 
 
@@ -77,10 +78,18 @@ def create_observer_server(
 
     multi_provider_launcher_factory: Callable[..., RunLauncher] | None = None
     if live_enabled:
-        def multi_provider_launcher_factory(resolved_seats, credentials):  # type: ignore[misc]
+        def multi_provider_launcher_factory(  # type: ignore[misc]
+            resolved_seats,
+            credentials,
+            *,
+            participant_controller=None,
+            human_seat_ids=(),
+        ):
             return build_multi_provider_launcher(
                 resolved_seats=resolved_seats,
                 credentials=credentials,
+                participant_controller=participant_controller,
+                human_seat_ids=human_seat_ids,
                 max_requests=live_max_requests,
                 default_max_tokens=live_max_tokens,
             )
@@ -92,6 +101,7 @@ def create_observer_server(
         configs_dir=configs_dir,
         live_enabled=live_enabled,
         multi_provider_launcher_factory=multi_provider_launcher_factory,
+        human_profile_fake_launcher_factory=build_profile_participant_emergent_fake_launcher,
     )
 
     class _BoundHandler(ObserverRequestHandler):

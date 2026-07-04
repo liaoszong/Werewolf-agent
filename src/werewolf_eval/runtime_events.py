@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import time
 import uuid
 from collections.abc import Callable
 from datetime import datetime, timezone
@@ -79,6 +80,9 @@ SECRET_KEY_FRAGMENTS: tuple[str, ...] = (
     "access_key",
     "deepseek_api_key",
 )
+
+_PARTIAL_LOG_REPLACE_ATTEMPTS = 5
+_PARTIAL_LOG_REPLACE_RETRY_SECONDS = 0.02
 
 # ---------------------------------------------------------------------------
 # Exceptions
@@ -432,7 +436,7 @@ class RuntimeEventWriter:
         tmp.write_text(
             json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
         )
-        tmp.replace(path)
+        _replace_partial_log(tmp, path)
         return path
 
     def remove_partial_log(self, name: str) -> None:
@@ -455,6 +459,19 @@ class RuntimeEventWriter:
 # ---------------------------------------------------------------------------
 # Snapshot / projection builders
 # ---------------------------------------------------------------------------
+
+
+def _replace_partial_log(tmp: Path, path: Path) -> None:
+    """Replace a partial log, retrying transient Windows file-lock failures."""
+    for attempt in range(_PARTIAL_LOG_REPLACE_ATTEMPTS):
+        try:
+            tmp.replace(path)
+            return
+        except PermissionError:
+            if attempt == _PARTIAL_LOG_REPLACE_ATTEMPTS - 1:
+                raise
+            time.sleep(_PARTIAL_LOG_REPLACE_RETRY_SECONDS)
+
 
 def _known_role_teams() -> dict[str, str]:
     """role -> team facts from observer_protocol (derived from the ruleset,

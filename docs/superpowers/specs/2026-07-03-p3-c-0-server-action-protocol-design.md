@@ -38,14 +38,21 @@ Clients only render legal state and submit candidate actions. They do not derive
 
 P3-C first playable scope:
 
-- one local human villager seat;
+- one local human-controlled seat selected by profile seat config
+  (`provider="human"`), mapped to whichever current 6-seat role that seat owns;
 - one participant client per human seat;
 - LAN/local server topology from P3-E;
-- public discussion, response windows, voting, final words where the game rules allow them;
+- public discussion, voting, final words where the game rules allow them;
+- current engine-supported role actions through server-owned windows, including
+  werewolf kill, seer check, witch save/poison, guard protect, and hunter shot
+  when that seat's actual role allows them;
 - timeout and reconnect support;
-- no human wolf/seer/witch/private night ability yet.
+- no free-form `response` chat loop yet. `response` remains a protocol action
+  type, but the trigger/scheduling rules belong to P3-B table-talk.
 
-The protocol is shaped so later roles can reuse it, but P3-C-0 must not require implementing multi-human games, role-private abilities, accounts, matchmaking, cloud hosting, mobile push, or room-code discovery.
+The protocol is shaped so role actions reuse the same server-owned window model.
+P3-C-0 itself must not require implementing multi-human games, accounts,
+matchmaking, cloud hosting, mobile push, or room-code discovery.
 
 ---
 
@@ -272,8 +279,16 @@ P3-C first slice needs these human-facing action types:
 | `vote` | day voting | `{ "target": "p1".."p6" }` | Target must be alive and legal. |
 | `final_words` | post-execution if allowed | `{ "text": string }` | Optional by ruleset. Same text cap as `speech`. |
 | `pass` | any optional window | `{}` | Only legal when the server marks the window optional or passable. |
+| `werewolf_kill` | night ability | `{ "target": "p1".."p6" }` | Only legal for a human-controlled werewolf window. |
+| `seer_check` | night ability | `{ "target": "p1".."p6" }` | Only legal for a human-controlled seer window. |
+| `witch_save` | night ability | `{ "target": "p1".."p6" }` | Only legal when the server exposes a save window. |
+| `witch_poison` | night ability | `{ "target": "p1".."p6" }` | Only legal when the server exposes a poison window. |
+| `guard_protect` | night ability | `{ "target": "p1".."p6" }` | Only legal for a human-controlled guard window. |
+| `hunter_shoot` | death cascade | `{ "target": "p1".."p6" }` | Only legal when the human-controlled hunter may shoot. |
 
-Later roles can add `seer_check`, `witch_save`, `witch_poison`, `werewolf_kill_vote`, and `team_message`, but those are out of P3-C first slice.
+Later slices can add table-talk `response` scheduling, wolf `team_message`,
+multi-human coordination, richer target legality, and client UX around the same
+server-owned window contract.
 
 ---
 
@@ -391,16 +406,20 @@ Client-side state is never trusted for legality or visibility. Client clocks may
 - Stub one action window and trivial submit round-trip for P3-E-1 risk probe.
 - No full game-loop integration yet.
 
-### P3-C-1 Villager Seat Integration
+### P3-C-1 Single Human Seat Integration
 
-- Thread real action windows into day speech/response/vote/final-word windows.
+- Thread real action windows into day speech/vote/final-word windows and current
+  role actions for one profile-selected human seat.
 - Ensure human seat receives only role-safe projections.
 - Add timeout behavior and reconnect smoke.
 
-### P3-C-2 Multi-role Expansion
+### P3-C-2 Multi-human / Table-talk Expansion
 
-- Add role-private abilities after the villager slice proves the protocol.
-- Extend visibility tests before enabling human wolf/seer/witch.
+- Add scheduled response windows after P3-B defines table-talk rules.
+- Add multi-human rooms/sessions only after the single-seat protocol remains
+  stable under Flutter client pressure.
+- Extend visibility tests before enabling any new private channel such as wolf
+  team messages.
 
 ---
 
@@ -434,7 +453,8 @@ Future implementation gates:
 - No cloud auth, accounts, matchmaking, lobby, or room-code discovery.
 - No mobile push service.
 - No raw artifact authorization redesign beyond participant routes refusing artifacts.
-- No human wolf/seer/witch in the first slice.
+- No multi-human room, lobby, account, or cloud session in the first slice.
+- No unscheduled free-form table chat; response windows are gated by P3-B.
 - No client-side legality engine.
 - No direct provider calls from any client.
 - No replacement of existing observer routes.

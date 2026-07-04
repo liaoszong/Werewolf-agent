@@ -36,6 +36,7 @@ TYPE_LABELS = {
     "witch_poison": "女巫毒人",
     "witch_pass": "女巫弃药",  # emitted by the engine; was missing -> raw token
     "player_speech": "发言",
+    "final_words": "遗言",
     "player_vote": "投票",
     "player_eliminated": "玩家出局",
     "role_revealed": "身份公开",

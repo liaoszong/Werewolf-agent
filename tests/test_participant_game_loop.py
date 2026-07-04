@@ -12,9 +12,15 @@ from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 from werewolf_eval.emergent_engine import EmergentBudget, EmergentGameEngine, build_emergent_config
-from werewolf_eval.emergent_fake_script import build_emergent_fake_agents, build_villager_win_script
+from werewolf_eval.emergent_fake_script import (
+    build_emergent_fake_agents,
+    build_villager_win_script,
+    build_werewolf_win_script,
+)
 from werewolf_eval.observer_server import create_observer_server
 from werewolf_eval.participant_controller import InMemoryParticipantActionController
+
+_HUMAN_TURN_KINDS = {"human_action", "human_timeout", "invalid_then_fallback"}
 
 
 def _request_json(
@@ -62,9 +68,27 @@ def _submit_for_window(
     elif "vote" in actions:
         action_type = "vote"
         payload = {"target": "p1"}
+    elif "final_words" in actions:
+        action_type = "final_words"
+        payload = {"text": f"human final words from {seat_id} r{window['round']}"}
+    elif "werewolf_kill" in actions:
+        action_type = "werewolf_kill"
+        payload = {"target": "p5"}
+    elif "seer_check" in actions:
+        action_type = "seer_check"
+        payload = {"target": "p1"}
+    elif "witch_save" in actions or "witch_poison" in actions:
+        action_type = "pass"
+        payload = {}
+    elif "guard_protect" in actions:
+        action_type = "guard_protect"
+        payload = {"target": "p6"}
+    elif "hunter_shoot" in actions:
+        action_type = "pass"
+        payload = {}
     else:
         raise AssertionError(f"unexpected window actions: {actions}")
-    submit(
+    result = submit(
         run_id=run_id,
         seat_id=seat_id,
         payload={
@@ -75,9 +99,146 @@ def _submit_for_window(
             "payload": payload,
         },
     )
+    if isinstance(result, tuple):
+        status, body = result
+        if status != 200:
+            raise AssertionError(f"participant submit failed: {status} {body}")
 
 
 class ParticipantGameLoopTests(unittest.TestCase):
+    def _run_engine_with_human_seat(
+        self,
+        seat_id: str,
+        *,
+        script_builder=build_villager_win_script,
+        timeout_seconds: float = 5,
+        skip_action_windows: set[str] | None = None,
+    ):
+        run_id = f"p3c1b_{seat_id}"
+        controller = InMemoryParticipantActionController()
+        controller.configure_human_seat(run_id, seat_id)
+        outcome_box: dict[str, object] = {}
+        skip_action_windows = skip_action_windows or set()
+
+        def run_engine() -> None:
+            try:
+                agents = build_emergent_fake_agents(script_builder())
+                agents.pop(seat_id, None)
+                engine = EmergentGameEngine(
+                    config=build_emergent_config(game_id=run_id),
+                    agents=agents,
+                    budget=EmergentBudget(max_requests=80, max_day_rounds=3),
+                    participant_controller=controller,
+                    human_seat_ids={seat_id},
+                    participant_action_timeout_seconds=timeout_seconds,
+                )
+                outcome_box["outcome"] = engine.run()
+            except BaseException as exc:  # noqa: BLE001 - thread test must surface failures
+                outcome_box["error"] = exc
+
+        thread = threading.Thread(target=run_engine, daemon=True)
+        thread.start()
+        seen: set[str] = set()
+        deadline = time.monotonic() + 15
+        while thread.is_alive() and time.monotonic() < deadline:
+            window = controller.wait_for_open_window(run_id, seat_id, timeout=0.2)
+            if window is None or window.action_window_id in seen:
+                continue
+            seen.add(window.action_window_id)
+            if set(window.allowed_actions) & skip_action_windows:
+                continue
+            _submit_for_window(
+                lambda **kw: controller.submit_action(**kw),
+                run_id=run_id,
+                seat_id=seat_id,
+                window=window.to_payload(),
+                idempotency_key=f"idem-{len(seen)}",
+            )
+        thread.join(timeout=10)
+        self.assertFalse(thread.is_alive(), f"engine did not finish for {seat_id}")
+        if "error" in outcome_box:
+            raise outcome_box["error"]  # type: ignore[misc]
+        outcome = outcome_box["outcome"]
+        self.assertEqual(outcome.status, "completed")
+        return outcome
+
+    def test_engine_uses_human_final_words_when_seat_dies_without_provider_agent(self) -> None:
+        outcome = self._run_engine_with_human_seat(
+            "p5",
+            script_builder=build_werewolf_win_script,
+        )
+
+        final_words = [
+            event for event in outcome.game_log["events"]
+            if event["type"] == "final_words" and event["actor"] == "p5"
+        ]
+        self.assertTrue(final_words)
+        self.assertIn("human final words from p5", final_words[0]["data"]["summary"])
+        p5_turns = [turn for turn in outcome.provider_turns if turn["actor"] == "p5"]
+        self.assertTrue(p5_turns)
+        self.assertTrue(all(turn["kind"] in _HUMAN_TURN_KINDS for turn in p5_turns))
+        self.assertTrue(all(not turn["live_requested"] for turn in p5_turns))
+
+    def test_human_final_words_timeout_does_not_block_game(self) -> None:
+        outcome = self._run_engine_with_human_seat(
+            "p5",
+            script_builder=build_werewolf_win_script,
+            timeout_seconds=0.05,
+            skip_action_windows={"final_words"},
+        )
+
+        final_words = [
+            event for event in outcome.game_log["events"]
+            if event["type"] == "final_words" and event["actor"] == "p5"
+        ]
+        self.assertEqual(final_words, [])
+        p5_timeouts = [
+            turn for turn in outcome.provider_turns
+            if turn["actor"] == "p5" and turn["kind"] == "human_timeout"
+        ]
+        self.assertTrue(p5_timeouts)
+
+    def test_engine_uses_human_seer_night_action_without_provider_agent(self) -> None:
+        outcome = self._run_engine_with_human_seat("p3")
+
+        seer_checks = [
+            event for event in outcome.game_log["events"]
+            if event["type"] == "seer_check" and event["actor"] == "p3"
+        ]
+        self.assertTrue(seer_checks)
+        self.assertEqual(seer_checks[0]["target"], "p1")
+        p3_turns = [turn for turn in outcome.provider_turns if turn["actor"] == "p3"]
+        self.assertTrue(p3_turns)
+        self.assertTrue(all(turn["kind"] in _HUMAN_TURN_KINDS for turn in p3_turns))
+        self.assertTrue(all(not turn["live_requested"] for turn in p3_turns))
+
+    def test_engine_uses_human_witch_action_without_provider_agent(self) -> None:
+        outcome = self._run_engine_with_human_seat("p4")
+
+        witch_passes = [
+            event for event in outcome.game_log["events"]
+            if event["type"] == "witch_pass" and event["actor"] == "p4"
+        ]
+        self.assertTrue(witch_passes)
+        p4_turns = [turn for turn in outcome.provider_turns if turn["actor"] == "p4"]
+        self.assertTrue(p4_turns)
+        self.assertTrue(all(turn["kind"] in _HUMAN_TURN_KINDS for turn in p4_turns))
+        self.assertTrue(all(not turn["live_requested"] for turn in p4_turns))
+
+    def test_engine_uses_human_werewolf_action_without_provider_agent(self) -> None:
+        outcome = self._run_engine_with_human_seat("p1")
+
+        wolf_kills = [
+            event for event in outcome.game_log["events"]
+            if event["type"] == "werewolf_kill" and event["actor"] == "p1"
+        ]
+        self.assertTrue(wolf_kills)
+        self.assertEqual(wolf_kills[0]["target"], "p5")
+        p1_turns = [turn for turn in outcome.provider_turns if turn["actor"] == "p1"]
+        self.assertTrue(p1_turns)
+        self.assertTrue(all(turn["kind"] in _HUMAN_TURN_KINDS for turn in p1_turns))
+        self.assertTrue(all(not turn["live_requested"] for turn in p1_turns))
+
     def test_engine_uses_participant_speech_and_vote_without_provider_turns(self) -> None:
         run_id = "p3c1_engine"
         controller = InMemoryParticipantActionController()
@@ -199,7 +360,11 @@ class ParticipantGameLoopTests(unittest.TestCase):
                             idempotency_key=f"http-{len(seen)}",
                         )
                     time.sleep(0.05)
-                self.assertEqual(server.state.run_status.get("p3c1_http"), "completed")  # type: ignore[attr-defined]
+                self.assertEqual(
+                    server.state.run_status.get("p3c1_http"),  # type: ignore[attr-defined]
+                    "completed",
+                    server.state.run_errors,  # type: ignore[attr-defined]
+                )
                 game = json.loads((runs / "p3c1_http" / "game-log.json").read_text(encoding="utf-8"))
                 self.assertTrue(
                     any(

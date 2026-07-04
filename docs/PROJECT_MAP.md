@@ -109,11 +109,11 @@
 |---|---|---|
 | **P3-A Agent Runtime Contract + Memory Spine** | 先锁四层 ownership:SeatCharacterCard / RolePolicy / RuntimeAgentState / ProviderProfile;再建单局 scoped memory、私有笔记、怀疑图、承诺/矛盾记录。所有记忆注入带 provenance、真相层级、status 与 visibility guard。 | 🚧 当前模块 |
 | **P3-B 博弈脚手架与桌面发言** | 先建 P3-B0 Structured SpeechAct Contract,再把白天讨论从"顺序发言+投票"升级为可回应、可追问、可对跳、可转票的 table-talk;狼人私密频道、发言-投票一致性、轻量计划器进入 ActionEnvelope 上游。 | ⏳ 下一模块 |
-| **P3-C 真人座位实时参与** | 首版只做本地单真人村民 seat,完整支持村民观察/发言/回应/投票/遗言/超时/重连;后续再扩真人狼人、预言家、女巫、多真人。所有真人动作由 server action_window 控制。 | 🚧 当前切片 |
+| **P3-C 真人座位实时参与** | 首版后端支持本地单真人 seat,由 profile 的 seat provider=`human` 选择,可映射当前基础板任意 seat/角色;被选中的 seat 不构造 AI provider,所有真人动作由 server action_window 控制。多真人、账号/房间、完整玩家端 UX 仍后续。 | 🚧 当前切片 |
 | **P3-D 趣味性复盘入口** | 结算先回答"这局哪里好看/哪里蠢/谁骗过了谁",再接评测指标;把 P4 的评测能力挂到玩家能理解的戏剧节点上。 | ⏳ 后续模块 |
 | **P3-E 跨平台真人客户端迁移** | 新玩家端按 Flutter-first 重写,移动端优先、桌面端复用同一产品表面;Qt/QML 只作为 legacy 保留到 parity。保留 Python backend / observer REST+SSE / provider gateway / 日志与可见性边界。 | 🚧 当前设计 |
 
-**P3 并行与前置关系:** P3-E-1/E-2 是 observer-first 客户端切片,可以与 P3-A/P3-B 并行推进;P3-E-3 真人村民座位硬依赖 P3-C-0 server action protocol spec 和最小 action-window endpoint。P3-C 的产品价值又依赖 P3-A/P3-B 让 AI 具备足够角色感和回应能力,否则真人只是进入一局无聊 AI 对局。
+**P3 并行与前置关系:** P3-E-1/E-2 是 observer-first 客户端切片,可以与 P3-A/P3-B 并行推进;P3-E-3 真人 seat 客户端硬依赖 P3-C server action protocol 与 profile-driven single-human 后端。P3-C 的产品价值又依赖 P3-A/P3-B 让 AI 具备足够角色感和回应能力,否则真人只是进入一局无聊 AI 对局。
 
 ### P3-A 工作任务(当前模块,细化到工作任务粒度)
 
@@ -129,8 +129,11 @@
 | 工作任务 | 描述 | 状态 |
 |---|---|---|
 | **P3-C-0 Server action protocol spec + minimal server skeleton** | 已定义真人动作的 observer/server 协议,并落地最小代码切片:协议类型/校验器/错误 envelope、join/state/events/actions 路由骨架、本地开发 join code、session token、idempotency、role projection、安全拒绝语义。仍不接真实 game loop。 | ✅ 已实现 |
-| **P3-C-1 Human villager seat game-loop integration** | 把 P3-C-0 action window 接入真实 game loop,首版只做本地单真人村民 seat:观察、发言/回应、投票、遗言、超时、重连。不得绕过 server action_window 或读取 god artifact。P3-C-1a 已接通发言与投票;回应、遗言、超时 UX、重连 smoke 仍待后续切片。 | 🚧 进行中 |
+| **P3-C-1 Single human seat game-loop integration** | 把 P3-C-0 action window 接入真实 game loop。P3-C-1a 先接通模板本地真人村民发言/投票;P3-C-1b 改为 profile-driven single human seat,seat provider=`human` 时该 seat 不接 AI provider,夜间角色动作与白天发言/投票都走 participant action window。P3-C-1c 补真人遗言、可选窗口超时不阻塞、session/reconnect cursor smoke。P3-C-1d 收紧 SSE cursor、过期/撤销 session 和 role-selectable spec 口径。`response` 依赖 P3-B table-talk,不在 P3-C 单独硬造。 | ✅ 已实现 |
 | **P3-C-1a Human villager speech/vote game-loop slice** | 新增 in-memory participant action controller,让 observer participant routes 与 `EmergentGameEngine` 共享 action window/idempotency;模板 launch 显式 `participant.seat_id` 时,本地单真人村民可通过 server action_window 提交白天发言和投票。provider 统计不把真人动作计为 live provider 请求。 | ✅ 已实现 |
+| **P3-C-1b Profile-driven single human seat backend** | profile schema/provider 下拉新增 `human`;只允许 seat_overrides 中最多一个 human seat;fake/live profile launch 都配置 participant controller;live credential gate 跳过 human provider 但仍要求其它 AI provider key;engine 对真人狼人/预言家/女巫/村民的当前动作不访问 `_agents[seat]`,改由 action window 驱动。 | ✅ 已实现 |
+| **P3-C-1c Final words + reconnect/timeout backend smoke** | 真人 seat 死亡/出局后打开可选 `final_words` action window;提交后进入 public game-log,超时/`pass` 不阻塞对局且不当作 AI provider failure。participant session 在提交后推进 `last_seen_cursor`,state payload 在窗口超时后也返回最新 reconnect cursor。 | ✅ 已实现 |
+| **P3-C-1d Participant route hardening + spec alignment** | Participant SSE 显式校验 `cursor=event:<n>`;过期/撤销 session 在 HTTP state 路径返回 `missing_or_invalid_session` 且不泄漏 token;P3-C-0 spec 从 villager-only 口径改为 profile-driven single human seat 可映射当前角色动作。 | ✅ 已实现 |
 
 ### P3-E 工作任务(客户端路线,细化到工作任务粒度)
 
@@ -139,7 +142,7 @@
 | **P3-E-0 客户端迁移路线 spec** | 正式记录 Flutter-first client rewrite、Qt legacy until parity、backend protocol retained;同步废弃 storybook/parchment/童话桌游 UI 方向。 | ✅ 文档中 |
 | **P3-E-1 Flutter protocol spike** | 新 Flutter 客户端连接现有 observer server:配置 base URL、列出 runs、跟随 SSE、渲染最小 live room;不读本地 artifact,不碰 provider。若 P3-C-0 stub 已存在,加 trivial human action round-trip 去风险。 | ⏳ 待 plan |
 | **P3-E-2 Mobile-first live room slice** | 以手机竖屏为主布局,完成可替代 Qt 基础观战的实时对局房间;桌面端是响应式扩展而非另一个产品。 | ⏳ 待 plan |
-| **P3-E-3 Human villager seat slice** | 接 P3-C 的首个真人村民座位:合法视野、发言、回应、投票、遗言、超时、重连,全部由 server action_window 控制。前置:P3-C-0 spec + 最小 server endpoint。 | ⏳ 待 plan |
+| **P3-E-3 Human seat client slice** | 接 P3-C 的 single human seat 后端:合法视野、发言、角色动作、投票、遗言、超时、重连,全部由 server action_window 控制。前置:P3-C-0 protocol + P3-C-1b profile-driven backend。 | ⏳ 待 plan |
 | **P3-E-4 Desktop parity / Qt retirement gate** | 先达 player parity(启动/接入、观战、常用配置、真人入座、结算回看);Qt 归档/移除还要求 developer parity(证据/推理轨迹/provider/发行更新等工具链)或另行决策。 | ⏳ 后续 |
 
 ### P3 成功口径
@@ -202,7 +205,7 @@
 | **SYS-C2** | 观战与回放 | Replay / Spectator System | observer server(REST/SSE)+ Qt 剧场/结算 | ✅ 主体完成;P3-D 趣味性节点展示与 P4-A 逐人深度复盘待做 |
 | **SYS-C3** | 质量防线 | 三件套:Differential Testing(差分测试)· **Runtime Verification / Semantic Oracle**(不变量安全网)· Deterministic Simulation Testing(fake 脚本+固定种子,对标 FoundationDB DST) | 差分:②a 的 OLD-oracle gate;安全网:`docs/superpowers/specs/2026-06-09-p2a-invariant-safety-net-design.md`(PLAN-READY);DST:`emergent_fake_script.py` + seed 体系 | ✅ 三件套全部就位(2026-06-10):安全网已合并(`src/werewolf_eval/invariants/`,7 不变量 + B1 防泄漏×4站点 + B4 防双死×3站点 + 50-seed fuzz,字节中立);剩 engine-level fuzz、B2/B3 守卫跟 ledger/EffectQueue |
 | **SYS-C4** | 桌面发行与更新 | Desktop Distribution / In-App Update | `scripts/release/`, `src/werewolf_eval/release_host/`, `clients/qt_observer/qml/ProviderSettingsView.qml` | ✅ R0 完成:PyInstaller onedir bootstrapper、frozen observer server、Qt deployment tree、Velopack package、GitHub Releases source、host-owned update RPC、Settings 内更新 UI、安装态本地 E2E 与数据保留验证 |
-| **SYS-C5** | 真人参与通道 | Human-in-the-loop Game Client / Participant Seat Gateway | observer REST/SSE + participant action endpoints;未来新增 human seat UI | 🚧 P3-C-0 协议与最小 route skeleton 已建;P3-C-1a 已把本地单真人村民的白天发言/投票接入 `EmergentGameEngine`。后续仍需回应、遗言、超时 UX、重连 smoke。真人 seat 必须走 server-controlled `action_window_id` / session token / idempotency key / reconnect cursor;客户端不得读取本地 artifact 或 god snapshot 伪造参战视角。 |
+| **SYS-C5** | 真人参与通道 | Human-in-the-loop Game Client / Participant Seat Gateway | observer REST/SSE + participant action endpoints;未来新增 human seat UI | 🚧 P3-C-0 协议与 route skeleton 已建;P3-C-1 已支持 profile-driven single human seat,被选 seat 不构造 AI provider,当前基础板角色动作、白天发言/投票、遗言、超时与 reconnect cursor smoke 接入 `EmergentGameEngine` action windows。后续仍需 P3-B `response`/table-talk、多真人、账号/房间和完整玩家端 UX。真人 seat 必须走 server-controlled `action_window_id` / session token / idempotency key / reconnect cursor;客户端不得读取本地 artifact 或 god snapshot 伪造参战视角。 |
 | **SYS-C6** | 跨平台玩家客户端与设计系统 | Cross-platform Client Platform / Design System | 当前:`clients/qt_observer/` legacy;未来:`clients/flutter_app/`(暂定) | 🚧 P3-E 设计中。新客户端按 Flutter-first、mobile-first 建立;Qt/QML 保留到 parity。旧 storybook/parchment/童话视觉只属于 legacy,不得作为新页面默认方向。客户端边界仍是 observer protocol,不直连 provider、不读本地 artifact。 |
 
 > **系统间的关键依赖**(讨论重构顺序时用):SYS-A2 的 ledger 是女巫迁移前提;SYS-C3 安全网是 A2 后续所有大刀(ledger/EffectQueue/NightPlan)的护栏,先网后刀;P3-A 先建 SYS-B5 Agent Card 与 SYS-B1 AgentContextPacket,再让 SYS-B4 harness 消费它;SYS-B1 的情景/语义记忆依赖 SYS-A4 可见性检查(I4b)防泄漏;SYS-C5 真人参与必须复用 SYS-A4/SYS-B2/SYS-C2,不能绕过 observer 协议;SYS-C6 新客户端必须复用 SYS-C2/SYS-C5 协议边界,不能变成另一个 runtime。

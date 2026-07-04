@@ -253,14 +253,12 @@ class EmergentGameEngine:
         self._participant_action_timeout_seconds = participant_action_timeout_seconds
         if self._human_seat_ids and self._participant_controller is None:
             raise ValueError("human_seat_ids requires participant_controller")
+        if len(self._human_seat_ids) > 1:
+            raise ValueError("P3-C-1b supports at most one human participant seat")
         for seat_id in self._human_seat_ids:
             player = self._players_by_id.get(seat_id)
             if player is None:
                 raise ValueError(f"unknown human participant seat: {seat_id}")
-            if player.role != "villager":
-                raise ValueError(
-                    f"P3-C-1 first slice only supports human villager seats, got {seat_id}={player.role}"
-                )
 
         self._events: list[dict[str, Any]] = []
         self._decisions: list[dict[str, Any]] = []
@@ -374,6 +372,7 @@ class EmergentGameEngine:
         *,
         actor: str,
         rnd: int,
+        phase: str = "day",
         response_kind: str,
         action_window_id: str,
         kind: str = HUMAN_ACTION,
@@ -382,7 +381,7 @@ class EmergentGameEngine:
         turn: dict[str, Any] = {
             "request_id": f"{self._game_id}_r{rnd:02d}_{actor}_{action_window_id}",
             "round": rnd,
-            "phase": "day",
+            "phase": phase,
             "actor": actor,
             "response_kind": response_kind,
             "live_requested": False,
@@ -739,17 +738,207 @@ class EmergentGameEngine:
         self._emit(e.phase, rnd, e.etype, e.actor, e.target, e.visibility, e.summary)
         return target
 
+    def _participant_target_action(
+        self,
+        *,
+        actor: str,
+        rnd: int,
+        phase: str,
+        action_type: str,
+        target: object,
+        engine_action: str | None = None,
+    ) -> AgentAction:
+        return AgentAction(
+            actor=actor,
+            action=engine_action or action_type,
+            target=str(target),
+            phase=phase,
+            round=rnd,
+            reason_summary=f"human participant {engine_action or action_type}",
+            decision_type="inference_based",
+            source_label=HUMAN_PARTICIPANT_SOURCE_LABEL,
+        )
+
+    def _await_participant_action(
+        self,
+        *,
+        actor: str,
+        rnd: int,
+        phase: str,
+        allowed_actions: tuple[str, ...],
+        required: bool,
+        default_on_timeout: str,
+        response_kind: str = "action",
+        record_timeout_failure: bool = True,
+    ) -> tuple[Any, dict[str, Any], Any]:
+        window = self._participant_controller.open_action_window(
+            run_id=self._game_id,
+            seat_id=actor,
+            phase=phase,
+            round=rnd,
+            game_revision=self._seq,
+            opened_at_event_id=self._participant_opened_at_event_id(),
+            deadline_at=self._participant_deadline_at(),
+            allowed_actions=allowed_actions,
+            required=required,
+            default_on_timeout=default_on_timeout,
+            reconnect_cursor=self._participant_reconnect_cursor(),
+        )
+        self._emit_participant_runtime_event("action_window_opened", window=window)
+        submission = self._participant_controller.wait_for_action(
+            window.action_window_id,
+            timeout=self._participant_action_timeout_seconds,
+        )
+        if submission is None:
+            turn = self._record_human_participant_turn(
+                actor=actor,
+                rnd=rnd,
+                phase="night" if phase.startswith("night") else "day",
+                response_kind=response_kind,
+                action_window_id=window.action_window_id,
+                kind=HUMAN_TIMEOUT,
+                fallback_reason=f"participant {phase} timed out",
+            )
+            if record_timeout_failure:
+                self._record_failure(rnd, "night" if phase.startswith("night") else "day",
+                                     actor, "timeout", f"{actor} participant {phase} timed out")
+            self._emit_participant_runtime_event(
+                "action_window_timed_out",
+                window=window,
+                payload={"status": "timed_out"},
+            )
+            return None, turn, window
+
+        turn = self._record_human_participant_turn(
+            actor=actor,
+            rnd=rnd,
+            phase="night" if phase.startswith("night") else "day",
+            response_kind=response_kind,
+            action_window_id=window.action_window_id,
+        )
+        self._emit_participant_runtime_event(
+            "action_accepted",
+            window=window,
+            payload={"status": "accepted", "action_type": submission.action_type},
+        )
+        return submission, turn, window
+
+    def _resolve_participant_final_words(self, player_id: str, rnd: int, phase: str) -> None:
+        if not self._is_human_seat(player_id):
+            return
+        submission, _turn, _window = self._await_participant_action(
+            actor=player_id,
+            rnd=rnd,
+            phase=f"{phase}_final_words",
+            allowed_actions=("final_words", "pass"),
+            required=False,
+            default_on_timeout="pass",
+            response_kind="speech",
+            record_timeout_failure=False,
+        )
+        if submission is None or submission.action_type != "final_words":
+            return
+        payload = submission.payload if isinstance(submission.payload, dict) else {}
+        text = str(payload.get("text", "")).strip()
+        if not text:
+            return
+        self._emit(phase, rnd, "final_words", player_id, "none", "public", text)
+
+    def _run_participant_single_turn(
+        self,
+        resolver,
+        *,
+        actor: str,
+        role: str,
+        registry_phase: str,
+        emit_phase: str,
+        window_phase: str,
+        action_type: str,
+        engine_action: str | None,
+        rnd: int,
+        refs=(),
+    ) -> str | None:
+        submission, turn, _window = self._await_participant_action(
+            actor=actor,
+            rnd=rnd,
+            phase=window_phase,
+            allowed_actions=(action_type,),
+            required=True,
+            default_on_timeout="pass",
+        )
+        live_action = None
+        if submission is not None:
+            payload = submission.payload if isinstance(submission.payload, dict) else {}
+            live_action = self._participant_target_action(
+                actor=actor,
+                rnd=rnd,
+                phase=emit_phase,
+                action_type=action_type,
+                target=payload.get("target"),
+                engine_action=engine_action,
+            )
+        decision_window = self._decision_window(
+            rnd,
+            actor,
+            role,
+            registry_phase,
+            emit_phase,
+            live_action,
+            refs,
+        )
+        adj = resolver.adjudicate(decision_window)
+        if adj.skip:
+            return None
+        if adj.failure is not None:
+            self._record_failure(rnd, emit_phase, actor, adj.failure.kind, adj.failure.reason, adj.failure.target)
+        if adj.downgrade_reason is not None:
+            self._downgrade_turn(turn, adj.downgrade_reason)
+        target = adj.accepted_target if adj.rng_pick is None else self._draw(adj.rng_pick)
+        plan = resolver.render(decision_window, target, adj.decision_type)
+        d = plan.decision
+        self._decision(d.actor, d.scope, d.phase, d.action, d.target, d.dtype, d.reason,
+                       rnd=rnd, request_id=turn.get("request_id"),
+                       refs=list(d.refs) or None, consensus_id=d.consensus_id)
+        e = plan.event
+        self._emit(e.phase, rnd, e.etype, e.actor, e.target, e.visibility, e.summary)
+        return target
+
     def _run_seer(self, rnd):
         seers = [pid for pid in self._alive if self._players_by_id[pid].role == "seer"]
         if not seers:
             return None
+        if self._is_human_seat(seers[0]):
+            return self._run_participant_single_turn(
+                SeerResolver(),
+                actor=seers[0],
+                role="seer",
+                registry_phase="night",
+                emit_phase="night",
+                window_phase="night_seer",
+                action_type="seer_check",
+                engine_action="seer_check",
+                rnd=rnd,
+            )
         return self._run_single_turn(SeerResolver(), seers[0], "seer", "night", "night", "night", rnd)
 
     def _run_guard(self, rnd):
         guards = [pid for pid in self._alive if self._players_by_id[pid].role == "guard"]
         if not guards:
             return None
-        target = self._run_single_turn(GuardResolver(), guards[0], "guard", "night", "night", "night", rnd)
+        if self._is_human_seat(guards[0]):
+            target = self._run_participant_single_turn(
+                GuardResolver(),
+                actor=guards[0],
+                role="guard",
+                registry_phase="night",
+                emit_phase="night",
+                window_phase="night_guard",
+                action_type="guard_protect",
+                engine_action="guard_protect",
+                rnd=rnd,
+            )
+        else:
+            target = self._run_single_turn(GuardResolver(), guards[0], "guard", "night", "night", "night", rnd)
         if target is not None:
             # the ACTUALLY effective protect target (fallback included) drives next
             # night's exclude_last_guarded — spec §2 patch: not the model's raw intent.
@@ -776,102 +965,18 @@ class EmergentGameEngine:
         return leaders[self._rng.randrange(len(leaders))]
 
     def _run_participant_vote(self, actor: str, role: str, rnd: int, refs=()) -> str | None:
-        window = self._participant_controller.open_action_window(
-            run_id=self._game_id,
-            seat_id=actor,
-            phase="day_vote",
-            round=rnd,
-            game_revision=self._seq,
-            opened_at_event_id=self._participant_opened_at_event_id(),
-            deadline_at=self._participant_deadline_at(),
-            allowed_actions=("vote",),
-            required=True,
-            default_on_timeout="ai_takeover",
-            reconnect_cursor=self._participant_reconnect_cursor(),
-            ai_takeover_allowed=True,
-        )
-        self._emit_participant_runtime_event("action_window_opened", window=window)
-        submission = self._participant_controller.wait_for_action(
-            window.action_window_id,
-            timeout=self._participant_action_timeout_seconds,
-        )
-        live_action = None
-        if submission is None:
-            turn = self._record_human_participant_turn(
-                actor=actor,
-                rnd=rnd,
-                response_kind="action",
-                action_window_id=window.action_window_id,
-                kind=HUMAN_TIMEOUT,
-                fallback_reason="participant vote timed out",
-            )
-            self._record_failure(rnd, "day", actor, "timeout", f"{actor} participant vote timed out")
-            self._emit_participant_runtime_event(
-                "action_window_timed_out",
-                window=window,
-                payload={"status": "timed_out"},
-            )
-        else:
-            payload = submission.payload if isinstance(submission.payload, dict) else {}
-            target = payload.get("target")
-            live_action = AgentAction(
-                actor=actor,
-                action="player_vote",
-                target=str(target),
-                phase="day",
-                round=rnd,
-                reason_summary="human participant vote",
-                decision_type="inference_based",
-                source_label=HUMAN_PARTICIPANT_SOURCE_LABEL,
-            )
-            turn = self._record_human_participant_turn(
-                actor=actor,
-                rnd=rnd,
-                response_kind="action",
-                action_window_id=window.action_window_id,
-            )
-            self._emit_participant_runtime_event(
-                "action_accepted",
-                window=window,
-                payload={"status": "accepted", "action_type": submission.action_type},
-            )
-
-        resolver = VoteResolver()
-        decision_window = self._decision_window(
-            rnd,
-            actor,
-            role,
-            "day_vote",
-            "day",
-            live_action,
-            refs,
-        )
-        adj = resolver.adjudicate(decision_window)
-        if adj.skip:
-            return None
-        if adj.failure is not None:
-            self._record_failure(rnd, "day", actor, adj.failure.kind, adj.failure.reason, adj.failure.target)
-        if adj.downgrade_reason is not None:
-            self._downgrade_turn(turn, adj.downgrade_reason)
-        target = adj.accepted_target if adj.rng_pick is None else self._draw(adj.rng_pick)
-        plan = resolver.render(decision_window, target, adj.decision_type)
-        d = plan.decision
-        self._decision(
-            d.actor,
-            d.scope,
-            d.phase,
-            d.action,
-            d.target,
-            d.dtype,
-            d.reason,
+        return self._run_participant_single_turn(
+            VoteResolver(),
+            actor=actor,
+            role=role,
+            registry_phase="day_vote",
+            emit_phase="day",
+            window_phase="day_vote",
+            action_type="vote",
+            engine_action="player_vote",
             rnd=rnd,
-            request_id=turn.get("request_id"),
-            refs=list(d.refs) or None,
-            consensus_id=d.consensus_id,
+            refs=refs,
         )
-        e = plan.event
-        self._emit(e.phase, rnd, e.etype, e.actor, e.target, e.visibility, e.summary)
-        return target
 
     # ---- win condition -------------------------------------------------
 
@@ -893,18 +998,23 @@ class EmergentGameEngine:
         consensus_id = f"{self._game_id}_consensus_r{rnd:02d}"
         proposals: list[tuple[str, str]] = []
         for wolf in wolves:
-            action, err, turn = self._provider_action(wolf, "night", rnd)
-            if err is not None:
-                if isinstance(err, ProviderActionError):
-                    self._record_failure(rnd, "night", wolf, err.failure.kind, err.failure.reason, err.failure.target)
-                else:
-                    self._record_failure(rnd, "night", wolf, "agent_error", f"{wolf} raised {type(err).__name__}: {err}")
-                continue
-            if not self._action_legal(wolf, self._players_by_id[wolf].role, "night", action):
-                self._record_failure(rnd, "night", wolf, "invalid_action", f"{wolf} proposed invalid kill {action.target}", action.target)
-                self._downgrade_turn(turn, f"engine rejected kill target {action.target}")
-                continue
-            proposals.append((wolf, action.target))
+            if self._is_human_seat(wolf):
+                target = self._run_participant_wolf_kill(wolf, rnd)
+                if target is not None:
+                    proposals.append((wolf, target))
+            else:
+                action, err, turn = self._provider_action(wolf, "night", rnd)
+                if err is not None:
+                    if isinstance(err, ProviderActionError):
+                        self._record_failure(rnd, "night", wolf, err.failure.kind, err.failure.reason, err.failure.target)
+                    else:
+                        self._record_failure(rnd, "night", wolf, "agent_error", f"{wolf} raised {type(err).__name__}: {err}")
+                    continue
+                if not self._action_legal(wolf, self._players_by_id[wolf].role, "night", action):
+                    self._record_failure(rnd, "night", wolf, "invalid_action", f"{wolf} proposed invalid kill {action.target}", action.target)
+                    self._downgrade_turn(turn, f"engine rejected kill target {action.target}")
+                    continue
+                proposals.append((wolf, action.target))
         candidates = tuple(pid for pid in self._seat_order
                            if pid in self._alive and self._players_by_id[pid].team != "werewolf")
         ww = WolfWindow(rnd=rnd, wolves=tuple(wolves), proposals=tuple(proposals),
@@ -919,6 +1029,31 @@ class EmergentGameEngine:
         self._decision(r.primary, "team", "night", "werewolf_kill", target, adj.decision_type, r.reason, rnd=rnd, request_id=None, consensus_id=consensus_id)
         self._emit("night", rnd, "werewolf_kill", r.primary, target, "werewolf_team", f"Wolf team kills {target}.")
         return target
+
+    def _run_participant_wolf_kill(self, wolf: str, rnd: int) -> str | None:
+        submission, turn, _window = self._await_participant_action(
+            actor=wolf,
+            rnd=rnd,
+            phase="night_werewolf",
+            allowed_actions=("werewolf_kill",),
+            required=True,
+            default_on_timeout="pass",
+        )
+        if submission is None:
+            return None
+        payload = submission.payload if isinstance(submission.payload, dict) else {}
+        action = self._participant_target_action(
+            actor=wolf,
+            rnd=rnd,
+            phase="night",
+            action_type="werewolf_kill",
+            target=payload.get("target"),
+        )
+        if not self._action_legal(wolf, self._players_by_id[wolf].role, "night", action):
+            self._record_failure(rnd, "night", wolf, "invalid_action", f"{wolf} proposed invalid kill {action.target}", action.target)
+            self._downgrade_turn(turn, f"engine rejected kill target {action.target}")
+            return None
+        return action.target
 
     def _build_consensus_entry(self, consensus_id, rnd, wolves, target, primary, supporters, status):
         responses = []
@@ -977,6 +1112,8 @@ class EmergentGameEngine:
         if not witches:
             return False, None, save_used, poison_used
         witch = witches[0]
+        if self._is_human_seat(witch):
+            return self._resolve_participant_witch(rnd, victim, save_used, poison_used, witch)
         self._budget.charge()  # may raise BudgetExhausted -> propagates to run()
         provider = self._agents[witch].provider
         obs = self._build_obs(witch, "night", rnd)
@@ -1075,6 +1212,65 @@ class EmergentGameEngine:
             return False, target, save_used, True
         # pass
         self._decision(witch, "single", "night", WITCH_PASS, "none", FALLBACK_DECISION_TYPE, f"{witch} uses no potion", rnd=rnd, request_id=request.request_id)
+        self._emit("night", rnd, WITCH_PASS, witch, "none", "witch", f"Witch {witch} uses no potion.")
+        return False, None, save_used, poison_used
+
+    def _resolve_participant_witch(
+        self,
+        rnd: int,
+        victim: str | None,
+        save_used: bool,
+        poison_used: bool,
+        witch: str,
+    ) -> tuple[bool, str | None, bool, bool]:
+        allowed: list[str] = []
+        if not save_used and victim is not None:
+            allowed.append(WITCH_SAVE)
+        if not poison_used:
+            allowed.append(WITCH_POISON)
+        allowed.append("pass")
+        submission, turn, _window = self._await_participant_action(
+            actor=witch,
+            rnd=rnd,
+            phase="night_witch",
+            allowed_actions=tuple(allowed),
+            required=False,
+            default_on_timeout="pass",
+        )
+        action_name = WITCH_PASS
+        target: str | None = None
+        if submission is not None and submission.action_type != "pass":
+            payload = submission.payload if isinstance(submission.payload, dict) else {}
+            action_name = submission.action_type
+            target = str(payload.get("target"))
+
+        if action_name == WITCH_SAVE:
+            self_save_late = target == witch and rnd != 1
+            if save_used or victim is None or target != victim or self_save_late:
+                reason = ("witch self-save only allowed on the first night"
+                          if self_save_late else f"invalid witch_save target={target}")
+                self._record_failure(rnd, "night", witch, "invalid_action", f"{witch} {reason}", target)
+                self._downgrade_turn(turn, reason)
+                action_name = WITCH_PASS
+        elif action_name == WITCH_POISON:
+            if poison_used or target not in self._alive or target == witch:
+                self._record_failure(rnd, "night", witch, "invalid_action", f"{witch} invalid witch_poison target={target}", target)
+                self._downgrade_turn(turn, f"invalid witch_poison target={target}")
+                action_name = WITCH_PASS
+        elif action_name != WITCH_PASS:
+            self._record_failure(rnd, "night", witch, "invalid_action", f"{witch} unknown witch action {action_name}")
+            self._downgrade_turn(turn, f"unknown witch action {action_name}")
+            action_name = WITCH_PASS
+
+        if action_name == WITCH_SAVE:
+            self._decision(witch, "single", "night", WITCH_SAVE, victim, "inference_based", f"witch saves {victim}", rnd=rnd, request_id=turn.get("request_id"))
+            self._emit("night", rnd, WITCH_SAVE, witch, victim, "witch", f"Witch {witch} saves {victim}.")
+            return True, None, True, poison_used
+        if action_name == WITCH_POISON:
+            self._decision(witch, "single", "night", WITCH_POISON, target, "retaliatory", f"witch poisons {target}", rnd=rnd, request_id=turn.get("request_id"))
+            self._emit("night", rnd, WITCH_POISON, witch, target, "witch", f"Witch {witch} poisons {target}.")
+            return False, target, save_used, True
+        self._decision(witch, "single", "night", WITCH_PASS, "none", FALLBACK_DECISION_TYPE, f"{witch} uses no potion", rnd=rnd, request_id=turn.get("request_id"))
         self._emit("night", rnd, WITCH_PASS, witch, "none", "witch", f"Witch {witch} uses no potion.")
         return False, None, save_used, poison_used
 
@@ -1276,6 +1472,7 @@ class EmergentGameEngine:
             assert_death_commit_once(target, self._death_committed)
             self._emit(phase, rnd, "player_died", "system", target, "all",
                        f"{target} was shot by {dead}.")
+            self._resolve_participant_final_words(target, rnd, phase)
             self._trigger_on_death(target, rnd, phase, "hunter_shoot")
 
     def _resolve_hunter_shot(self, hunter: str, rnd: int, phase: str) -> str | None:
@@ -1285,6 +1482,8 @@ class EmergentGameEngine:
         pass; charge budget; record a decision + provider_turn; emit the event. Returns the
         shot target, or None for a pass / no valid target. Draws NO self._rng, so it never
         perturbs the seeded RNG order of a 4-role game."""
+        if self._is_human_seat(hunter):
+            return self._resolve_participant_hunter_shot(hunter, rnd, phase)
         self._budget.charge()
         obs = self._build_obs(hunter, phase, rnd)
         rendered = self._render_obs(obs)
@@ -1355,6 +1554,39 @@ class EmergentGameEngine:
             self._record_failure(rnd, phase, hunter, "invalid_action", f"{hunter} unknown hunter action {action_name}", target)
             self._downgrade_turn(turn, f"unknown hunter action {action_name}")
             action_name, target = "hunter_pass", None
+
+        if action_name == "hunter_shoot" and target is not None:
+            self._decision(hunter, "single", phase, "hunter_shoot", target, "retaliatory", f"hunter {hunter} shoots {target}", rnd=rnd, request_id=turn.get("request_id"))
+            self._emit(phase, rnd, "hunter_shoot", hunter, target, "public", f"Hunter {hunter} shoots {target}.")
+            return target
+        self._decision(hunter, "single", phase, "hunter_pass", "none", FALLBACK_DECISION_TYPE, f"{hunter} does not shoot", rnd=rnd, request_id=turn.get("request_id"))
+        self._emit(phase, rnd, "hunter_pass", hunter, "none", "public", f"Hunter {hunter} does not shoot.")
+        return None
+
+    def _resolve_participant_hunter_shot(self, hunter: str, rnd: int, phase: str) -> str | None:
+        submission, turn, _window = self._await_participant_action(
+            actor=hunter,
+            rnd=rnd,
+            phase=f"{phase}_hunter",
+            allowed_actions=("hunter_shoot", "pass"),
+            required=False,
+            default_on_timeout="pass",
+        )
+        action_name, target = "hunter_pass", None
+        if submission is not None and submission.action_type == "hunter_shoot":
+            payload = submission.payload if isinstance(submission.payload, dict) else {}
+            action_name = "hunter_shoot"
+            target = str(payload.get("target"))
+
+        if action_name == "hunter_shoot":
+            ab = next((a for a in self._registry.on_death_abilities("hunter")
+                       if a.action_id == "hunter_shoot"), None)
+            pred = TARGET_RULES.get(ab.target_rule) if ab else None
+            legal = pred is not None and target is not None and pred(self._runtime_state(), hunter, target)
+            if not legal:
+                self._record_failure(rnd, phase, hunter, "invalid_action", f"{hunter} invalid hunter_shoot {target}", target)
+                self._downgrade_turn(turn, f"invalid hunter_shoot {target}")
+                action_name, target = "hunter_pass", None
 
         if action_name == "hunter_shoot" and target is not None:
             self._decision(hunter, "single", phase, "hunter_shoot", target, "retaliatory", f"hunter {hunter} shoots {target}", rnd=rnd, request_id=turn.get("request_id"))
@@ -1436,6 +1668,7 @@ class EmergentGameEngine:
                 self._alive.discard(pid)
                 assert_death_commit_once(pid, self._death_committed)
                 self._emit("night", rnd, "player_died", "system", pid, "all", f"{pid} died during the night.")
+                self._resolve_participant_final_words(pid, rnd, "night")
                 # A-2 cause comes from the settler (the actual lethal source), NOT from
                 # pid==victim: a guard-canceled wolf kill on a poisoned target dies by
                 # poison, so a poisoned hunter must not shoot even when pid==wolf_victim.
@@ -1467,6 +1700,7 @@ class EmergentGameEngine:
                 role = self._players_by_id[eliminated].role
                 self._emit("day", rnd, "player_eliminated", "system", eliminated, "all", f"{eliminated} eliminated by vote.")
                 self._emit("day", rnd, "role_revealed", "system", eliminated, "all", f"{eliminated} revealed as {role}.")
+                self._resolve_participant_final_words(eliminated, rnd, "day")
                 self._trigger_on_death(eliminated, rnd, "day", "vote")
 
             self._write_god_snapshot(f"god_view_r{rnd}_day", rnd, "day")

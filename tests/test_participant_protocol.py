@@ -229,6 +229,37 @@ class ParticipantProtocolTests(unittest.TestCase):
         self.assertEqual(envelope["current_game_revision"], 9)
         self.assertEqual(envelope["reconnect_cursor"], "event:50")
 
+    def test_role_action_payloads_validate_target_seats(self):
+        for action_type in (
+            "werewolf_kill",
+            "seer_check",
+            "witch_save",
+            "witch_poison",
+            "guard_protect",
+            "hunter_shoot",
+        ):
+            with self.subTest(action_type=action_type):
+                submission = ParticipantActionSubmission(
+                    action_window_id="aw_0001",
+                    game_revision=7,
+                    idempotency_key=f"idem-{action_type}",
+                    action_type=action_type,
+                    payload={"target": "p1"},
+                )
+                self.assertEqual(submission.payload, {"target": "p1"})
+
+    def test_role_action_payloads_reject_bad_target(self):
+        with self.assertRaises(ParticipantProtocolError) as ctx:
+            ParticipantActionSubmission(
+                action_window_id="aw_0001",
+                game_revision=7,
+                idempotency_key="idem-bad-seer",
+                action_type="seer_check",
+                payload={"target": "p9"},
+            )
+
+        self.assertEqual(ctx.exception.error_code, "invalid_payload")
+
 
 if __name__ == "__main__":
     unittest.main()

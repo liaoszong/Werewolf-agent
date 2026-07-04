@@ -65,6 +65,46 @@ class ProfileValidationTests(unittest.TestCase):
             "p3": {"provider": "deepseek", "model": "deepseek-chat", "prompt": "x", "strategy": "cautious"},
         }))
 
+    def test_allows_single_human_seat_override(self):
+        profile = _valid_profile(seat_overrides={
+            "p3": {"provider": "human", "model": "none", "strategy": "default"},
+        })
+
+        validate_profile(profile)
+        seats = resolve_profile(profile)
+        p3 = next(seat for seat in seats if seat["player_id"] == "p3")
+        self.assertEqual(p3["provider"], "human")
+        self.assertEqual(p3["model"], "none")
+
+    def test_rejects_human_provider_in_role_defaults(self):
+        profile = _valid_profile()
+        profile["role_defaults"]["seer"]["provider"] = "human"
+        profile["role_defaults"]["seer"]["model"] = "none"
+
+        with self.assertRaises(ProfileValidationError):
+            validate_profile(profile)
+
+    def test_rejects_multiple_human_seat_overrides(self):
+        with self.assertRaises(ProfileValidationError):
+            validate_profile(_valid_profile(seat_overrides={
+                "p3": {"provider": "human", "model": "none", "strategy": "default"},
+                "p4": {"provider": "human", "model": "none", "strategy": "default"},
+            }))
+
+    def test_human_resolved_artifact_has_no_effective_model_knobs(self):
+        artifact = build_resolved_profile_artifact(
+            _valid_profile(seat_overrides={
+                "p3": {"provider": "human", "model": "none", "strategy": "default"},
+            }),
+            run_id="human_artifact",
+        )
+        p3 = next(seat for seat in artifact["seats"] if seat["player_id"] == "p3")
+        self.assertEqual(p3["provider"], "human")
+        self.assertEqual(p3["model"], "none")
+        self.assertIsNone(p3["temperature"])
+        self.assertIsNone(p3["effective_temperature"])
+        self.assertIsNone(p3["max_tokens"])
+
     def test_rejects_bad_schema_version(self):
         with self.assertRaises(ProfileValidationError):
             validate_profile(_valid_profile(schema_version="wrong"))
@@ -346,11 +386,12 @@ class ProfileSchemaTests(unittest.TestCase):
             {
                 "fake_deterministic", "deepseek", "openai", "anthropic", "openai_compatible",
                 "zhipu", "moonshot", "qwen", "minimax", "siliconflow",
-                "xai", "gemini", "modelscope", "openrouter",
+                "xai", "gemini", "modelscope", "openrouter", "human",
             },
         )
         self.assertEqual(s["models"]["deepseek"], ["deepseek-chat", "deepseek-reasoner"])
         self.assertEqual(s["models"]["fake_deterministic"], ["none"])
+        self.assertEqual(s["models"]["human"], ["none"])
         self.assertIn("default", s["strategies"])
         self.assertEqual(s["seat_roles"]["p1"], "werewolf")
         self.assertEqual(s["seat_roles"]["p3"], "seer")
@@ -369,11 +410,11 @@ class ProfileSchemaTests(unittest.TestCase):
         from werewolf_eval.profile_config import ALLOWED_PROVIDERS
         from werewolf_eval.provider_registry import PROVIDER_REGISTRY
         self.assertTrue(set(PROVIDER_REGISTRY) <= ALLOWED_PROVIDERS)
-        # Equality (minus the fake provider, which has no ProviderSpec) catches the
+        # Equality (minus non-registry local controller providers) catches the
         # OTHER drift: a stale/typo'd id in the literal that no registry backs —
         # it would pass profile validation but be rejected at live launch as
-        # unsupported_live_provider. The only allowed non-registry id is the fake.
-        self.assertEqual(ALLOWED_PROVIDERS - {"fake_deterministic"}, set(PROVIDER_REGISTRY))
+        # unsupported_live_provider. The allowed non-registry ids are fake + human.
+        self.assertEqual(ALLOWED_PROVIDERS - {"fake_deterministic", "human"}, set(PROVIDER_REGISTRY))
 
     def test_allowed_providers_includes_preset_vendors(self):
         from werewolf_eval.profile_config import ALLOWED_PROVIDERS

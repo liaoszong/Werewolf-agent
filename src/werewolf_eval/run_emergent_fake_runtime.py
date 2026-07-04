@@ -72,6 +72,8 @@ def run_emergent_fake_runtime(
     max_day_rounds: int = 3,
     participant_controller: object | None = None,
     human_seat_id: str | None = None,
+    human_seat_ids: set[str] | frozenset[str] | tuple[str, ...] = (),
+    seat_roles: dict[str, str] | None = None,
     participant_action_timeout_seconds: float = 60.0,
 ) -> int:
     """Run one fake-deterministic emergent game writing the full observer spine.
@@ -83,8 +85,13 @@ def run_emergent_fake_runtime(
     out_dir.mkdir(parents=True, exist_ok=True)
     writer = RuntimeEventWriter(run_id=game_id, out_dir=out_dir)
 
-    config = build_emergent_config(game_id=game_id)
+    config = build_emergent_config(game_id=game_id, seat_roles=seat_roles)
     agents = build_emergent_fake_agents(SCRIPTS[script]())
+    human_ids = set(human_seat_ids)
+    if human_seat_id is not None:
+        human_ids.add(human_seat_id)
+    for seat_id in human_ids:
+        agents.pop(seat_id, None)
     engine = EmergentGameEngine(
         config=config,
         agents=agents,
@@ -93,7 +100,7 @@ def run_emergent_fake_runtime(
         budget=EmergentBudget(max_requests=max_requests, max_day_rounds=max_day_rounds),
         runtime_events=writer,
         participant_controller=participant_controller,
-        human_seat_ids={human_seat_id} if human_seat_id is not None else (),
+        human_seat_ids=human_ids,
         participant_action_timeout_seconds=participant_action_timeout_seconds,
     )
     outcome = engine.run()
@@ -125,7 +132,7 @@ def run_emergent_fake_runtime(
             {
                 "player_id": p.player_id,
                 "role": p.role,
-                "provider": "fake_deterministic",
+                "provider": "human" if p.player_id in human_ids else "fake_deterministic",
                 "model": "none",
             }
             for p in config.players
@@ -181,7 +188,7 @@ def build_participant_emergent_fake_launcher(
     max_day_rounds: int = 3,
     participant_action_timeout_seconds: float = 60.0,
 ):
-    """Build a fake launcher that gives one villager seat to a participant.
+    """Build a fake launcher that gives one seat to a participant.
 
     P3-C-1 first slice keeps this template-only and in-memory. The controller is
     injected from observer state so HTTP submissions and the engine thread share
@@ -198,7 +205,41 @@ def build_participant_emergent_fake_launcher(
             max_requests=max_requests,
             max_day_rounds=max_day_rounds,
             participant_controller=participant_controller,
-            human_seat_id=human_seat_id,
+            human_seat_ids={human_seat_id},
+            participant_action_timeout_seconds=participant_action_timeout_seconds,
+        )
+
+    return _launcher
+
+
+def build_profile_participant_emergent_fake_launcher(
+    participant_controller: object,
+    *,
+    resolved_seats: list[dict],
+    human_seat_ids: set[str] | frozenset[str] | tuple[str, ...],
+    script: str = "villager_win",
+    seed: int = 0,
+    max_requests: int = 80,
+    max_day_rounds: int = 3,
+    participant_action_timeout_seconds: float = 60.0,
+):
+    """Build a fake profile launcher that respects resolved roles and human seats."""
+    human_ids = frozenset(human_seat_ids)
+    seat_roles = {str(seat["player_id"]): str(seat["role"]) for seat in resolved_seats}
+
+    def _launcher(run_id: str, run_dir: Path) -> int:
+        for seat_id in human_ids:
+            participant_controller.configure_human_seat(run_id, seat_id)
+        return run_emergent_fake_runtime(
+            game_id=run_id,
+            out_dir=Path(run_dir),
+            script=script,
+            seed=seed,
+            max_requests=max_requests,
+            max_day_rounds=max_day_rounds,
+            participant_controller=participant_controller,
+            human_seat_ids=human_ids,
+            seat_roles=seat_roles,
             participant_action_timeout_seconds=participant_action_timeout_seconds,
         )
 

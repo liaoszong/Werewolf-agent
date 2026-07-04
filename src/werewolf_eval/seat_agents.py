@@ -55,6 +55,8 @@ def build_seat_agents(
     for seat in resolved_seats:
         pid = seat["player_id"]
         provider_id = seat["provider"]
+        if provider_id == "human":
+            continue
         cred = credentials.get(provider_id)
         if cred is None or not cred.key:
             raise ValueError(

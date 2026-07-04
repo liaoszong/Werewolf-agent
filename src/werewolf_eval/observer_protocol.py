@@ -436,8 +436,8 @@ def parse_launch_request(payload: dict[str, object]) -> dict[str, object]:
                 f"{sorted(participant_extra)}.  Allowed: {sorted(participant_allowed_keys)}"
             )
         seat_id = participant.get("seat_id")
-        if seat_id not in {"p5", "p6"}:
-            raise ObserverProtocolError("participant.seat_id must be one of: p5, p6")
+        if seat_id not in {"p1", "p2", "p3", "p4", "p5", "p6"}:
+            raise ObserverProtocolError("participant.seat_id must be one of: p1, p2, p3, p4, p5, p6")
         launch["participant"] = {"seat_id": seat_id}
 
     return launch

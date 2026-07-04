@@ -1132,6 +1132,14 @@ def _mixed_model_deepseek_profile(name: str = "mixedmodel") -> dict:
     return p
 
 
+def _human_seat_profile(name: str = "humanseat", seat_id: str = "p3") -> dict:
+    p = _deepseek_profile(name)
+    p["seat_overrides"] = {
+        seat_id: {"provider": "human", "model": "none", "prompt": "", "strategy": "default"}
+    }
+    return p
+
+
 def _resolved_seats(provider: str, model: str) -> list[dict]:
     return [{"player_id": f"p{i}", "provider": provider, "model": model} for i in range(1, 7)]
 
@@ -1211,6 +1219,13 @@ class LiveGateHelperTests(TestCase):
         seats[0]["model"] = "none"
         result = _check_live_profile_shape(seats)
         self.assertEqual(result[1], "unsupported_live_provider")  # type: ignore[index]
+
+    def test_shape_allows_single_human_seat_with_live_providers(self) -> None:
+        seats = _resolved_seats("deepseek", "deepseek-chat")
+        seats[2]["provider"] = "human"
+        seats[2]["model"] = "none"
+
+        self.assertIsNone(_check_live_profile_shape(seats))
 
     # -- exit-code → reason map -------------------------------------------
 
@@ -1413,6 +1428,16 @@ class LiveDispatchTests(TestCase):
         self.assertTrue((rd / "fake.sentinel").exists())
         self.assertFalse((rd / "live.sentinel").exists())
 
+    def test_mode_fake_with_human_seat_configures_participant(self) -> None:
+        body = {"profile": _human_seat_profile(seat_id="p4"), "run_id": "r_human_fake", "mode": "fake"}
+        h, runs = self._dispatch(body, live_enabled=False)
+        rd = self._run_dir(runs, "r_human_fake")
+
+        self.assertEqual(h.responses[-1][0], 202)
+        self.assertEqual(h.responses[-1][1]["participant"], {"seat_id": "p4"})
+        self.assertTrue((rd / "fake.sentinel").exists())
+        self.assertTrue(h.server.state.participant_controller.is_human_seat("r_human_fake", "p4"))
+
     # 2b. fake + role_shuffle.enabled → 400 (artifact/engine alignment; spec §1.1)
     def test_fake_mode_with_role_shuffle_is_400(self) -> None:
         prof = _deepseek_profile()
@@ -1497,6 +1522,45 @@ class LiveDispatchTests(TestCase):
         rd = self._run_dir(runs, "r_live")
         self.assertTrue((rd / "live.sentinel").exists())
         self.assertFalse((rd / "fake.sentinel").exists())
+
+    def test_live_human_seat_skips_human_credential_and_configures_participant(self) -> None:
+        from werewolf_eval.credential_store import CredentialStore
+        cs = CredentialStore()
+        cs.set("deepseek", "sk-ds")
+        captured: dict = {}
+
+        def multi_factory(resolved_seats, credentials, **kwargs):
+            captured["providers"] = {s["provider"] for s in resolved_seats}
+            captured["creds"] = set(credentials)
+            captured["participant_controller"] = kwargs.get("participant_controller")
+            captured["human_seat_ids"] = set(kwargs.get("human_seat_ids", ()))
+
+            def _run(rid, rdir):
+                (rdir / "human-live.sentinel").write_text("human-live", encoding="utf-8")
+                return 0
+
+            return _run
+
+        body = {"profile": _human_seat_profile(seat_id="p3"), "run_id": "r_human_live", "mode": "live"}
+        h, runs = self._dispatch(body, live_enabled=True, credential_store=cs, multi_factory=multi_factory)
+
+        self.assertEqual(h.responses[-1][0], 202)
+        self.assertEqual(h.responses[-1][1]["participant"], {"seat_id": "p3"})
+        self.assertTrue((self._run_dir(runs, "r_human_live") / "human-live.sentinel").exists())
+        self.assertEqual(captured["providers"], {"deepseek", "human"})
+        self.assertEqual(captured["creds"], {"deepseek"})
+        self.assertEqual(captured["human_seat_ids"], {"p3"})
+        self.assertIs(captured["participant_controller"], h.server.state.participant_controller)
+        self.assertTrue(h.server.state.participant_controller.is_human_seat("r_human_live", "p3"))
+
+    def test_live_human_seat_still_requires_ai_provider_credential(self) -> None:
+        body = {"profile": _human_seat_profile(seat_id="p3"), "run_id": "r_human_no_cred", "mode": "live"}
+
+        h, runs = self._dispatch(body, live_enabled=True)
+
+        self.assertEqual(h.responses[-1][0], 403)
+        self.assertEqual(h.responses[-1][1]["code"], "missing_api_key")
+        self.assertFalse(self._run_dir(runs, "r_human_no_cred").exists())
 
     # P2-B-4: mixed-provider profile + per-seat client creds → multi launcher ran.
     def _mixed_provider_profile(self):

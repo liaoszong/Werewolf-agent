@@ -40,6 +40,10 @@ class ObserverServerState:
     # tests can pass a fake (no network); built with the server live limits in
     # create_observer_server.
     multi_provider_launcher_factory: Callable[..., RunLauncher] | None = None
+    # P3-C-1b: fake profile launches with a human seat must use a profile-aware
+    # emergent fake launcher (resolved roles + participant controller). Tests may
+    # leave this unset to exercise dispatch with a tiny fake launcher.
+    human_profile_fake_launcher_factory: Callable[..., RunLauncher] | None = None
     # R0 release metadata — populated from CLI args or sensible defaults.
     # instance_id is generated once per server start; owner_token comes from
     # --release-owner-token; release_version defaults to the VERSION file.

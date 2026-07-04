@@ -31,16 +31,19 @@ ALLOWED_PROVIDERS: frozenset[str] = frozenset(
         # stays registry-free; test_allowed_providers_superset_of_registry guards it.
         "zhipu", "moonshot", "qwen", "minimax", "siliconflow",
         "xai", "gemini", "modelscope", "openrouter",
+        # P3-C-1b: local participant controller, not a model gateway provider.
+        "human",
     }
 )
 ALLOWED_MODELS: dict[str, frozenset[str]] = {
     "fake_deterministic": frozenset({"none"}),
+    "human": frozenset({"none"}),
     "deepseek": frozenset({"deepseek-chat", "deepseek-reasoner"}),
 }
 # P2-B-1 r2: providers whose model is validated against ALLOWED_MODELS. Live
 # providers are deliberately absent (they trust the live model list); only the
 # deterministic fake provider keeps a strict model allowlist.
-_MODEL_ALLOWLIST_PROVIDERS: frozenset[str] = frozenset({"fake_deterministic"})
+_MODEL_ALLOWLIST_PROVIDERS: frozenset[str] = frozenset({"fake_deterministic", "human"})
 
 # P2-B-3: optional per-seat sampling knobs (numeric, unlike the string config keys).
 TEMPERATURE_MIN: float = 0.0
@@ -229,6 +232,10 @@ def _check_fragment(fragment: object, *, where: str, required: bool) -> None:
             continue
         if not isinstance(value, str):
             raise ProfileValidationError(f"{where}.{field_name} must be a string")
+    if where.startswith("role_defaults.") and fragment.get("provider") == "human":
+        raise ProfileValidationError(
+            f"{where}.provider may not be 'human'; human control is seat-level only"
+        )
     prompt = fragment.get("prompt")
     if isinstance(prompt, str) and len(prompt) > PROMPT_MAX_LEN:
         raise ProfileValidationError(f"{where}.prompt exceeds {PROMPT_MAX_LEN} chars")
@@ -358,8 +365,16 @@ def validate_profile(profile: object) -> None:
         counts[role] = counts.get(role, 0) + 1
     if counts != CANONICAL_DEFAULT_6P_ROLES:
         raise ProfileValidationError("role multiset must match canonical default_6p")
+    human_seats: list[str] = []
     for seat in DEFAULT_SEAT_IDS:
-        _check_resolved_seat(_resolve_seat(profile, seat, seat_roles[seat]), seat)
+        resolved_seat = _resolve_seat(profile, seat, seat_roles[seat])
+        _check_resolved_seat(resolved_seat, seat)
+        if resolved_seat.get("provider") == "human":
+            human_seats.append(seat)
+    if len(human_seats) > 1:
+        raise ProfileValidationError(
+            f"only one human-controlled seat is supported, got {human_seats}"
+        )
 
 
 def resolve_profile(profile: dict) -> list[dict]:
@@ -448,11 +463,14 @@ def build_resolved_profile_artifact(
                 # (explicit value, else the DEFAULT_LIVE_TEMPERATURE policy). Single-sourced so
                 # old(API default) vs new(0.8) live runs are distinguishable in the artifact.
                 "effective_temperature": (
-                    seat_cfg["temperature"] if seat_cfg.get("temperature") is not None
-                    else DEFAULT_LIVE_TEMPERATURE
+                    None if seat_cfg["provider"] == "human"
+                    else (
+                        seat_cfg["temperature"] if seat_cfg.get("temperature") is not None
+                        else DEFAULT_LIVE_TEMPERATURE
+                    )
                 ),
                 "max_tokens": seat_cfg.get("max_tokens"),
-                "prompt_hash": _hash_text(prompt) if prompt else "",
+                "prompt_hash": "" if seat_cfg["provider"] == "human" else (_hash_text(prompt) if prompt else ""),
             }
         )
     return {

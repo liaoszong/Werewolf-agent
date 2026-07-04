@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Callable, Mapping
+from typing import Callable, Iterable, Mapping
 
 from werewolf_eval.deepseek_provider import DeepSeekProviderConfig
 from werewolf_eval.provider_registry import build_provider
@@ -234,6 +234,8 @@ def build_multi_provider_launcher(
     *,
     resolved_seats: list[dict],
     credentials: Mapping[str, ProviderCredential],
+    participant_controller: object | None = None,
+    human_seat_ids: Iterable[str] = (),
     max_requests: int = DEFAULT_MAX_LIVE_REQUESTS,
     max_day_rounds: int = DEFAULT_MAX_DAY_ROUNDS,
     timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS,
@@ -250,8 +252,13 @@ def build_multi_provider_launcher(
     server gate in P2-B-4 rejects with 403 before reaching here). ``runner`` is
     injectable for offline tests; the budget-exhausted → exit 3 mapping mirrors
     the single-provider launcher."""
+    human_ids = frozenset(human_seat_ids)
+
     def _launcher(run_id: str, run_dir: Path) -> int:
         rdir = Path(run_dir)
+        if participant_controller is not None:
+            for seat_id in human_ids:
+                participant_controller.configure_human_seat(run_id, seat_id)
         agents = build_seat_agents(
             resolved_seats,
             credentials,
@@ -263,15 +270,19 @@ def build_multi_provider_launcher(
         # Engine roles come from the resolved seats (role-shuffle is applied upstream in
         # resolve_profile_for_run). Off -> default roles -> default board (byte-identical).
         seat_roles = {s["player_id"]: s["role"] for s in resolved_seats}
-        code = runner(
-            game_id=run_id,
-            out_dir=rdir,
-            provider_factory=lambda pid: agents[pid],
-            model="",  # per-seat models live on each provider; no single model
-            max_requests_per_game=max_requests,
-            max_day_rounds=max_day_rounds,
-            seat_roles=seat_roles,
-        )
+        runner_kwargs = {
+            "game_id": run_id,
+            "out_dir": rdir,
+            "provider_factory": lambda pid: agents[pid],
+            "model": "",  # per-seat models live on each provider; no single model
+            "max_requests_per_game": max_requests,
+            "max_day_rounds": max_day_rounds,
+            "seat_roles": seat_roles,
+        }
+        if human_ids:
+            runner_kwargs["participant_controller"] = participant_controller
+            runner_kwargs["human_seat_ids"] = human_ids
+        code = runner(**runner_kwargs)
         if code == 0:
             return 0
         if _audit_is_budget_exhausted(rdir / "failure-audit.json"):

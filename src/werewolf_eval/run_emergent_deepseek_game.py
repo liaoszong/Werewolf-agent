@@ -58,12 +58,26 @@ def _provider_identity(agents: dict[str, ProviderAgent]) -> tuple[str, str]:
     return name, label
 
 
-def _seat_manifest_agents(agents: dict[str, ProviderAgent], fallback_model: str) -> list[dict]:
+def _seat_manifest_agents(
+    agents: dict[str, ProviderAgent],
+    fallback_model: str,
+    *,
+    human_seat_ids: set[str] | None = None,
+) -> list[dict]:
     """Per-seat manifest rows. ``provider.model or fallback_model`` preserves the
     legacy single-model manifest (the fake provider's model is None) while giving
     real per-seat models under multi-provider; persona → per-seat prompt_hash."""
     rows: list[dict] = []
+    human_seat_ids = human_seat_ids or set()
     for pid in PLAYER_IDS:
+        if pid in human_seat_ids:
+            rows.append({
+                "player_id": pid,
+                "provider": "human",
+                "model": "none",
+                "prompt": "",
+            })
+            continue
         if pid not in agents:
             continue
         provider = agents[pid].provider
@@ -158,6 +172,8 @@ def run_emergent_deepseek_game(
     seat_roles: dict[str, str] | None = None,
     prompt_version: str = "prompt_v1",
     scaffold_provider_factory=None,
+    participant_controller: object | None = None,
+    human_seat_ids: set[str] | frozenset[str] | tuple[str, ...] = (),
 ) -> int:
     # Fail-loud before any side effects (writer/engine construction).
     renderer = get_renderer(prompt_version)
@@ -176,7 +192,8 @@ def run_emergent_deepseek_game(
             raise ValueError(f"{prompt_version} requires scaffold_provider_factory (scribe provider)")
         scaffold_agent = scaffold_provider_factory()
     writer = RuntimeEventWriter(run_id=game_id, out_dir=out_dir)
-    agents = {pid: provider_factory(pid) for pid in PLAYER_IDS}
+    human_ids = set(human_seat_ids)
+    agents = {pid: provider_factory(pid) for pid in PLAYER_IDS if pid not in human_ids}
     # P2-B-3: run-level identity derived from the seat providers (uniform or mixed);
     # an explicit source_label overrides. Legacy/fake paths derive "deepseek".
     provider_name, derived_label = _provider_identity(agents)
@@ -190,6 +207,8 @@ def run_emergent_deepseek_game(
         runtime_events=writer,
         prompt_version=prompt_version,
         scaffold_agent=scaffold_agent,
+        participant_controller=participant_controller,
+        human_seat_ids=human_ids,
     )
     outcome = engine.run()
 
@@ -210,7 +229,7 @@ def run_emergent_deepseek_game(
     manifest = build_prompt_manifest(
         run_id=game_id,
         source_label=effective_label,
-        agents=_seat_manifest_agents(agents, model),
+        agents=_seat_manifest_agents(agents, model, human_seat_ids=human_ids),
         evaluation_bucket=evaluation_bucket(
             rules_version=engine.rules_version,
             prompt_version=engine.prompt_version,

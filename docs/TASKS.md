@@ -49,15 +49,18 @@
 | P3-A-0：Agent 角色体验与真人参与路线转向 | completed | `docs/PROJECT_MAP.md`, `docs/superpowers/specs/2026-07-02-agent-roleplay-human-game-pivot-design.md` |
 | P3-A：Agent Card + Memory Spine | planned | — |
 | P3-B：博弈脚手架与桌面发言 | planned | — |
-| P3-C：真人座位实时参与 | in_progress | P3-C-0 protocol + route skeleton complete; P3-C-1a speech/vote game-loop slice complete |
+| P3-C：真人座位实时参与 | in_progress | P3-C-0 protocol + route skeleton complete; P3-C-1d single-human backend closeout complete; remaining response/table-talk depends on P3-B |
 | P3-C-0：真人 action protocol spec + minimal server skeleton | completed | `docs/PROJECT_MAP.md`, `docs/superpowers/specs/2026-07-03-p3-c-0-server-action-protocol-design.md`, `src/werewolf_eval/participant_protocol.py`, `src/werewolf_eval/observer/participant_api.py`, `tests/test_participant_protocol.py`, `tests/test_participant_routes.py` |
-| P3-C-1：真人村民 seat 接入 game loop | in_progress | first slice complete; response/final_words/timeout UX/reconnect smoke pending |
+| P3-C-1：single human seat 接入 game loop | completed | P3-C-1a villager speech/vote slice complete; P3-C-1b profile-driven single human seat backend complete; P3-C-1c final_words/reconnect/timeout backend smoke complete; P3-C-1d route hardening/spec alignment complete; response remains pending with P3-B table-talk |
 | P3-C-1a：真人村民发言/投票 game-loop 切片 | completed | `src/werewolf_eval/participant_controller.py`, `src/werewolf_eval/emergent_engine.py`, `src/werewolf_eval/run_emergent_fake_runtime.py`, `src/werewolf_eval/observer/participant_api.py`, `tests/test_participant_game_loop.py` |
+| P3-C-1b：profile-driven single human seat 后端 | completed | `src/werewolf_eval/profile_config.py`, `src/werewolf_eval/observer/launch.py`, `src/werewolf_eval/observer/run_manager.py`, `src/werewolf_eval/emergent_engine.py`, `src/werewolf_eval/run_emergent_fake_runtime.py`, `src/werewolf_eval/run_emergent_deepseek_game.py`, `tests/test_profile_config.py`, `tests/test_observer_server.py`, `tests/test_participant_game_loop.py` |
+| P3-C-1c：遗言 + 重连/超时后端 smoke | completed | `src/werewolf_eval/emergent_engine.py`, `src/werewolf_eval/participant_controller.py`, `src/werewolf_eval/observer/participant_api.py`, `src/werewolf_eval/display_labels.py`, `tests/test_participant_game_loop.py`, `tests/test_participant_routes.py` |
+| P3-C-1d：participant route hardening + spec alignment | completed | `src/werewolf_eval/observer/handler.py`, `src/werewolf_eval/observer/participant_api.py`, `tests/test_participant_routes.py`, `docs/superpowers/specs/2026-07-03-p3-c-0-server-action-protocol-design.md`, `docs/PROJECT_MAP.md` |
 | P3-D：趣味性复盘入口 | planned | — |
 | P3-E-0：跨平台客户端迁移路线 spec | completed | `docs/PROJECT_MAP.md`, `DESIGN.md`, `docs/superpowers/specs/2026-07-02-p3-e-client-platform-migration-design.md` |
 | P3-E-1：Flutter protocol spike | planned | future Flutter client protocol spike |
 | P3-E-2：Mobile-first live room slice | planned | future Flutter live-room slice |
-| P3-E-3：Human villager seat slice | planned | depends on P3-C-0 and server-side action windows |
+| P3-E-3：Human seat client slice | planned | depends on P3-C-0 and P3-C-1b profile-driven single-human backend |
 | P3-E-4：Desktop parity / Qt retirement gate | planned | future parity review |
 
 ## P4 — downstream
