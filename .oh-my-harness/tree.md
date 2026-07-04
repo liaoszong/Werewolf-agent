@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 519
+- Entries: 520
 
 ```text
 ./
@@ -248,7 +248,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │       ├── 2026-06-20-r0-windows-distribution-baseline.md
 │   │       ├── 2026-07-02-agent-roleplay-human-game-pivot-design.md
 │   │       ├── 2026-07-02-p3-e-client-platform-migration-design.md
-│   │       └── 2026-07-03-p3-c-0-server-action-protocol-design.md
+│   │       ├── 2026-07-03-p3-c-0-server-action-protocol-design.md
+│   │       └── 2026-07-04-p3-e-mobile-first-human-seat-client-design.md
 │   ├── CHECKPOINT_TEMPLATE.md
 │   ├── EVALUATION_RUBRIC.md
 │   ├── PRODUCT_ONE_PAGER.md
