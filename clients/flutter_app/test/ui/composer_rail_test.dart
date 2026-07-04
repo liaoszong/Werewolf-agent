@@ -64,6 +64,28 @@ void main() {
     expect(payload, {'target': 'p2'});
   });
 
+  testWidgets('pass button submits pass action instead of pass target',
+      (tester) async {
+    String? action;
+    Map<String, dynamic>? payload;
+    await tester.pumpWidget(TestHarness(
+      child: ComposerRail(
+        window: _window(['vote', 'pass']),
+        onSubmitSpeech: (_) async {},
+        onSubmitStructuredAction: (type, body) async {
+          action = type;
+          payload = body;
+        },
+      ),
+    ));
+
+    await tester.tap(find.text('跳过'));
+    await tester.pump();
+
+    expect(action, 'pass');
+    expect(payload, <String, dynamic>{});
+  });
+
   testWidgets('active composer can collapse to bottom handle', (tester) async {
     await tester.pumpWidget(TestHarness(
       child: ComposerRail(

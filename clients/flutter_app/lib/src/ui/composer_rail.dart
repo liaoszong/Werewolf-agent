@@ -73,6 +73,9 @@ class _ComposerRailState extends State<ComposerRail> {
       actionType: _primaryStructuredAction(window.allowedActions),
       selectedTarget: _selectedTarget,
       onTargetSelected: (target) => setState(() => _selectedTarget = target),
+      onPass: () {
+        widget.onSubmitStructuredAction('pass', const {});
+      },
       onCollapse: () => setState(() => _collapsed = true),
       onConfirm: () async {
         final action = _primaryStructuredAction(window.allowedActions);
@@ -207,6 +210,7 @@ class _StructuredComposer extends StatelessWidget {
     required this.actionType,
     required this.selectedTarget,
     required this.onTargetSelected,
+    required this.onPass,
     required this.onCollapse,
     required this.onConfirm,
   });
@@ -215,6 +219,7 @@ class _StructuredComposer extends StatelessWidget {
   final String actionType;
   final String? selectedTarget;
   final ValueChanged<String> onTargetSelected;
+  final VoidCallback onPass;
   final VoidCallback onCollapse;
   final VoidCallback onConfirm;
 
@@ -251,7 +256,7 @@ class _StructuredComposer extends StatelessWidget {
                   ),
                   if (canPass)
                     TextButton(
-                      onPressed: () => onTargetSelected('pass'),
+                      onPressed: onPass,
                       child: const Text('跳过'),
                     ),
                 ],
