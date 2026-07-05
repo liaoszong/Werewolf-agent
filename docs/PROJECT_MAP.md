@@ -122,7 +122,7 @@
 | **P3-A-0 路线转向 spec** | 正式记录从"评测/排行榜优先"转向"Agent 角色体验 + 真人参与优先";把 SillyTavern 与 Claude Code/learn-claude-code 参考转译成 Werewolf-agent 架构。 | ✅ 文档中 |
 | **P3-A-1 Agent asset ownership/schema** | 定义 SeatCharacterCard(角色无关人格)、RolePolicy(按真实身份加载)、RuntimeSeatState/RuntimeTeamState(每局新建)、ProviderProfile(模型/温度/预算)和 ExecutionContract(提示/动作/工具/解析契约)的最小 schema-first bridge。已落地纯 schema/validation/audience artifact 和 legacy profile projection,不改 prompt/provider/runtime 行为。 | ✅ 完成 |
 | **P3-A-2 Mobile RolePolicy editor** | 移动端角色页改为 RolePolicyPack 作用域的身份策略入口:两列角色卡、全屏详情、策略预设、战术偏好、角色行动偏好、证据/context 偏好和只读运行时组合说明。不得把 RolePolicy 重新绑定到 SeatCharacterCard、ProviderProfile、ExecutionContract 或 RuntimeState;Flutter-only 阶段只能是本地草稿预览,真实保存需先建资产仓库。P3-A-2a Flutter 本地草稿 UI 与 P3-A-2b 最小 RolePolicyPack/RolePolicy 资产仓库已完成;P3-A-2c runtime 消费仍待做。 | 🚧 in progress |
-| **P3-A-3 Agent memory packet** | 在现有 observation_text 之上建立 `AgentContextPacket`:Fact/Claim/Belief/Commitment/TeamPlan/StaticPlaybook 分层,包含 source ids、audience_scope、confidence、status、supersedes、prompt block hash 与调用成本记录。 | ⏳ 待 plan |
+| **P3-A-3 Agent memory packet** | 在现有 observation_text 之上建立 `AgentContextPacket`:Fact/Claim/Belief/Commitment/TeamPlan/StaticPlaybook 分层,包含 source ids、audience_scope、status、supersedes、render metadata 与 context budget。已完成纯 schema/helper 切片:`validate_agent_context_packet`、`validate_memory_record`、`render_record_summary`、`select_visible_packet`;不改 runtime/provider/prompt 行为。 | ✅ 完成 |
 | **P3-A-4 First playable roleplay arm(shadow-safe)** | 先做 6 人基础板的最小 Agent 化闭环:卡片差异可见、记忆引用可追溯、belief 与 fact 不混淆、狼人共享计划不泄漏、旧 baseline 在 shadow mode 下保持可比、调用成本可审计。追问/转票/戏剧节点归 P3-B/P3-D。 | ⏳ 待 plan |
 
 ### P3-C 工作任务(真人参与通道,细化到工作任务粒度)

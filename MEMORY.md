@@ -32,6 +32,29 @@ machine secrets here.
 
 ## Entries
 
+### 2026-07-05 - P3-A-3 AgentContextPacket Memory Schema
+
+- Completed P3-A-3 as a pure schema/helper slice with no runtime, provider, or
+  prompt byte consumption.
+- Scope delivered:
+  - Added `src/werewolf_eval/agent_context_packet.py`.
+  - Added `tests/test_agent_context_packet.py`.
+  - Defined `AgentContextPacket` validation, `MemoryRecord` validation,
+    record summary rendering, and visibility-scoped packet selection.
+  - Covered Fact/Claim/Belief/Commitment/TeamPlan/StaticPlaybook semantics:
+    engine/runtime facts require provenance, claims and beliefs render as
+    non-truth summaries, commitments/team plans are non-facts, and old records
+    remain superseded/retracted rather than overwritten.
+  - Enforced TeamPlan faction-private authorized audience and context budget
+    reporting for included, compacted, and dropped blocks.
+- Verification:
+  - `$env:PYTHONPATH='src'; $env:NO_PROXY='*'; python -m unittest tests.test_agent_context_packet tests.test_agent_assets tests.test_role_policy_registry -v` passed 31 tests.
+  - `$env:PYTHONPATH='src'; $env:NO_PROXY='*'; python -m unittest discover -s tests -p "test_*.py"` passed 1462 tests, skipped 2.
+- Boundary: no runtime, provider, prompt byte, observer/participant protocol,
+  validator, generated fixture, Flutter UI, or workflow behavior was changed.
+  P3-A-2c remains the first runtime-consumption slice and must follow prompt
+  byte/version rules if model-visible text changes.
+
 ### 2026-07-05 - P3-A-2b RolePolicy Asset Registry
 
 - Completed P3-A-2b as a backend asset-registry slice with no runtime
