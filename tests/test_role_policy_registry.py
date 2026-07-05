@@ -170,6 +170,38 @@ class RolePolicyRegistryTests(unittest.TestCase):
                         changes=changes,
                     )
 
+    def test_rejects_extra_authority_fields_in_applicability(self):
+        registry = build_default_role_policy_registry()
+
+        base_applicability = {
+            "ruleset_id": "rules_v1_2",
+            "seat_count": [6],
+            "required_roles": ["werewolf", "seer", "witch", "villager"],
+            "optional_roles": ["guard", "hunter"],
+            "phase_protocol_version": "phase_protocol_v2",
+            "team_channel_policy": "wolf_private_plan_v1",
+        }
+        authority_fields = [
+            "engine_entitlement",
+            "action_window",
+            "teamStatePermissions",
+            "runtime_agent_state_ref",
+            "runtime_team_state_ref",
+        ]
+        for field in authority_fields:
+            with self.subTest(field=field):
+                with self.assertRaises(RolePolicyRegistryError):
+                    registry.create_draft(
+                        pack_id="standard_six_player_balanced",
+                        role="seer",
+                        changes={
+                            "applicability": {
+                                **base_applicability,
+                                field: "forbidden",
+                            }
+                        },
+                    )
+
     def test_accepts_supported_policy_section_fields(self):
         registry = build_default_role_policy_registry()
 

@@ -78,6 +78,16 @@ _POLICY_STR_LIST_FIELDS = frozenset(
         "forbidden_behavior",
     }
 )
+_POLICY_APPLICABILITY_FIELDS = frozenset(
+    {
+        "ruleset_id",
+        "seat_count",
+        "required_roles",
+        "optional_roles",
+        "phase_protocol_version",
+        "team_channel_policy",
+    }
+)
 _NORMALIZED_FORBIDDEN_POLICY_FIELDS = frozenset(
     re.sub(r"[^a-z0-9]", "", field.lower()) for field in _FORBIDDEN_POLICY_FIELDS
 )
@@ -438,6 +448,7 @@ def _check_policy_patch(obj: dict[str, Any]) -> None:
         raise RolePolicyRegistryError(f"RolePolicy contains forbidden fields: {forbidden}")
     _check_no_forbidden_policy_fields(obj)
     _check_no_secret(obj)
+    _check_policy_applicability_fields(obj)
     _check_policy_section_fields(obj)
     _check_policy_str_list_fields(obj)
 
@@ -485,6 +496,41 @@ def _check_policy_section_fields(obj: dict[str, Any]) -> None:
                 raise RolePolicyRegistryError(
                     f"RolePolicy.{section}.{key} must be strategy text"
                 )
+
+
+def _check_policy_applicability_fields(obj: dict[str, Any]) -> None:
+    if "applicability" not in obj:
+        return
+    applicability = obj["applicability"]
+    if not isinstance(applicability, dict):
+        raise RolePolicyRegistryError("RolePolicy.applicability must be object")
+    extra = sorted(set(applicability) - _POLICY_APPLICABILITY_FIELDS)
+    if extra:
+        raise RolePolicyRegistryError(
+            f"RolePolicy.applicability has unsupported fields: {extra}"
+    )
+    for key in ("ruleset_id", "phase_protocol_version", "team_channel_policy"):
+        if key in applicability and not isinstance(applicability[key], str):
+            raise RolePolicyRegistryError(
+                f"RolePolicy.applicability.{key} must be string"
+            )
+    if "seat_count" in applicability and (
+        not isinstance(applicability["seat_count"], list)
+        or not all(
+            isinstance(item, int) and item > 0 for item in applicability["seat_count"]
+        )
+    ):
+        raise RolePolicyRegistryError(
+            "RolePolicy.applicability.seat_count must be positive integers"
+        )
+    for key in ("required_roles", "optional_roles"):
+        if key in applicability and (
+            not isinstance(applicability[key], list)
+            or not all(isinstance(item, str) for item in applicability[key])
+        ):
+            raise RolePolicyRegistryError(
+                f"RolePolicy.applicability.{key} must be list[str]"
+            )
 
 
 def _check_policy_str_list_fields(obj: dict[str, Any]) -> None:

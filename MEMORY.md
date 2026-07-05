@@ -55,14 +55,17 @@ machine secrets here.
     `team_policy`.
   - Strategy list fields are registry-checked as `list[str]` to prevent
     structured authority payloads inside otherwise allowed RolePolicy fields.
+  - `RolePolicy.applicability` is registry-allowlisted and type-checked so it
+    cannot carry engine entitlement, action windows, runtime state refs, or
+    team-state permission fields.
   - Registry rejects RolePolicy payloads that try to persist
     `seat_character_card_ref`, provider/execution/runtime refs, team plans,
     extra-call budgets, visibility entitlement, or legal action windows.
   - Registry rejects secret-like keys/values and delegates policy schema checks
     through `validate_role_policy()`.
 - Verification:
-  - `$env:PYTHONPATH='src'; $env:NO_PROXY='*'; python -m unittest tests.test_role_policy_registry tests.test_agent_assets -v` passed 23 tests.
-  - `$env:PYTHONPATH='src'; $env:NO_PROXY='*'; python -m unittest discover -s tests -p "test_*.py"` passed 1454 tests, skipped 2.
+  - `$env:PYTHONPATH='src'; $env:NO_PROXY='*'; python -m unittest tests.test_role_policy_registry tests.test_agent_assets -v` passed 24 tests.
+  - `$env:PYTHONPATH='src'; $env:NO_PROXY='*'; python -m unittest discover -s tests -p "test_*.py"` passed 1455 tests, skipped 2.
 - Boundary: no runtime, provider, prompt byte, observer/participant protocol,
   validator, generated fixture, Flutter UI, or workflow behavior was changed.
   P3-A-2c remains the first runtime-consumption slice and must follow prompt
