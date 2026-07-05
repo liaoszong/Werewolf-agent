@@ -54,6 +54,22 @@ _FORBIDDEN_POLICY_KEY_FRAGMENTS = (
     "legalactionwindow",
 )
 _ALLOWED_NORMALIZED_POLICY_KEYS = frozenset({"usesteamplan"})
+_POLICY_SECTION_FIELDS = {
+    "ability_use_policy": frozenset(
+        {
+            "werewolf_kill",
+            "seer_check",
+            "witch_save",
+            "witch_poison",
+            "player_vote",
+            "guard_protect",
+            "hunter_shoot",
+        }
+    ),
+    "claim_policy": frozenset({"identity_claims"}),
+    "deception_policy": frozenset({"allowed", "style"}),
+    "team_policy": frozenset({"uses_team_plan", "protect_teammates"}),
+}
 _NORMALIZED_FORBIDDEN_POLICY_FIELDS = frozenset(
     re.sub(r"[^a-z0-9]", "", field.lower()) for field in _FORBIDDEN_POLICY_FIELDS
 )
@@ -175,10 +191,15 @@ class RolePolicyRegistry:
                 f"RolePolicy draft {draft_id!r} is stale for role {role!r}"
             )
         policy = copy.deepcopy(draft["policy"])
+        draft_ref = _policy_ref(policy)
+        would_mutate_base_ref = (
+            draft_ref == base_ref and self._policies.get(base_ref) != policy
+        )
         if (
             base_ref in referenced_policy_refs
             or base_ref in registry_referenced_refs
             or current_ref != base_ref
+            or would_mutate_base_ref
         ):
             base_policy_id, base_version = _split_policy_ref(base_ref)
             policy["policy_id"] = base_policy_id
@@ -410,6 +431,7 @@ def _check_policy_patch(obj: dict[str, Any]) -> None:
         raise RolePolicyRegistryError(f"RolePolicy contains forbidden fields: {forbidden}")
     _check_no_forbidden_policy_fields(obj)
     _check_no_secret(obj)
+    _check_policy_section_fields(obj)
 
 
 def _check_no_forbidden_policy_fields(obj: Any, path: str = "") -> None:
@@ -431,6 +453,30 @@ def _check_no_forbidden_policy_fields(obj: Any, path: str = "") -> None:
     elif isinstance(obj, list):
         for index, value in enumerate(obj):
             _check_no_forbidden_policy_fields(value, f"{path}{index}.")
+
+
+def _check_policy_section_fields(obj: dict[str, Any]) -> None:
+    for section, allowed_fields in _POLICY_SECTION_FIELDS.items():
+        if section not in obj:
+            continue
+        section_obj = obj[section]
+        if not isinstance(section_obj, dict):
+            raise RolePolicyRegistryError(f"RolePolicy.{section} must be object")
+        extra = sorted(set(section_obj) - allowed_fields)
+        if extra:
+            raise RolePolicyRegistryError(
+                f"RolePolicy.{section} has unsupported fields: {extra}"
+            )
+        for key, value in section_obj.items():
+            if key in {"allowed", "uses_team_plan"}:
+                if not isinstance(value, bool):
+                    raise RolePolicyRegistryError(
+                        f"RolePolicy.{section}.{key} must be boolean"
+                    )
+            elif not isinstance(value, str):
+                raise RolePolicyRegistryError(
+                    f"RolePolicy.{section}.{key} must be strategy text"
+                )
 
 
 def _check_no_secret(obj: Any, path: str = "") -> None:

@@ -137,6 +137,12 @@ class RolePolicyRegistryTests(unittest.TestCase):
             {"team_policy": {"timeoutBudgetSeconds": 90}},
             {"ability_use_policy": {"legalActionWindow": "night:any"}},
             {"claim_policy": {"visibilityEntitlement": "god_view"}},
+            {"ability_use_policy": {"runtime_agent_state_ref": "state_1"}},
+            {"ability_use_policy": {"runtimeAgentStateRef": "state_1"}},
+            {"team_policy": {"runtime_team_state_ref": "team_state_1"}},
+            {"team_policy": {"teamStatePermissions": "wolf_private"}},
+            {"ability_use_policy": {"action_window": "night:any"}},
+            {"claim_policy": {"engine_entitlement": "god_view"}},
         ]
         for changes in nested_payloads:
             with self.subTest(changes=changes):
@@ -146,6 +152,32 @@ class RolePolicyRegistryTests(unittest.TestCase):
                         role="werewolf",
                         changes=changes,
                     )
+
+    def test_accepts_supported_policy_section_fields(self):
+        registry = build_default_role_policy_registry()
+
+        draft = registry.create_draft(
+            pack_id="standard_six_player_balanced",
+            role="seer",
+            changes={
+                "ability_use_policy": {
+                    "seer_check": "prioritize high-impact low-trust claims"
+                },
+                "claim_policy": {
+                    "identity_claims": "reveal only after a useful check chain"
+                },
+                "deception_policy": {
+                    "allowed": False,
+                    "style": "avoid false claims",
+                },
+            },
+        )
+
+        self.assertEqual(
+            draft["policy"]["ability_use_policy"]["seer_check"],
+            "prioritize high-impact low-trust claims",
+        )
+        self.assertFalse(draft["policy"]["deception_policy"]["allowed"])
 
     def test_rejects_secret_like_values(self):
         registry = build_default_role_policy_registry()
@@ -266,6 +298,38 @@ class RolePolicyRegistryTests(unittest.TestCase):
                 "seer"
             ],
             f"{first_policy['policy_id']}@{first_policy['version']}",
+        )
+
+    def test_publish_rejects_parallel_in_place_draft_without_current_ref(self):
+        registry = build_default_role_policy_registry()
+        old_ref = registry.get_pack("standard_six_player_balanced")[
+            "role_policy_refs"
+        ]["seer"]
+        first = registry.create_draft(
+            pack_id="standard_six_player_balanced",
+            role="seer",
+            changes={"goals": ["first branch"]},
+        )
+        second = registry.create_draft(
+            pack_id="standard_six_player_balanced",
+            role="seer",
+            changes={"goals": ["second branch"]},
+        )
+        first_policy = registry.publish_draft(
+            first["draft_id"],
+            referenced_policy_refs=set(),
+        )
+
+        with self.assertRaises(RolePolicyRegistryError):
+            registry.publish_draft(
+                second["draft_id"],
+                referenced_policy_refs=set(),
+            )
+        first_ref = f"{first_policy['policy_id']}@{first_policy['version']}"
+        self.assertNotEqual(first_ref, old_ref)
+        self.assertEqual(
+            registry.resolve_policy_ref(first_ref)["goals"],
+            ["first branch"],
         )
 
     def test_publish_shared_pack_ref_creates_new_version(self):
