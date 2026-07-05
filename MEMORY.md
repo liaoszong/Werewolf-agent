@@ -47,18 +47,22 @@ machine secrets here.
   - Publishing a draft never mutates an existing `policy_id@version` with new
     content; same-ref edits branch to a fresh patch version before updating the
     pack ref.
+  - Stale drafts are rejected whenever the current pack ref has moved away from
+    the draft base ref, even if the current ref is externally referenced.
   - Strategy sub-blocks are registry-allowlisted so RolePolicy cannot smuggle
     runtime/team state refs, engine entitlement, action windows, or permission
     fields through `ability_use_policy`, `claim_policy`, `deception_policy`, or
     `team_policy`.
+  - Strategy list fields are registry-checked as `list[str]` to prevent
+    structured authority payloads inside otherwise allowed RolePolicy fields.
   - Registry rejects RolePolicy payloads that try to persist
     `seat_character_card_ref`, provider/execution/runtime refs, team plans,
     extra-call budgets, visibility entitlement, or legal action windows.
   - Registry rejects secret-like keys/values and delegates policy schema checks
     through `validate_role_policy()`.
 - Verification:
-  - `$env:PYTHONPATH='src'; $env:NO_PROXY='*'; python -m unittest tests.test_role_policy_registry tests.test_agent_assets -v` passed 21 tests.
-  - `$env:PYTHONPATH='src'; $env:NO_PROXY='*'; python -m unittest discover -s tests -p "test_*.py"` passed 1452 tests, skipped 2.
+  - `$env:PYTHONPATH='src'; $env:NO_PROXY='*'; python -m unittest tests.test_role_policy_registry tests.test_agent_assets -v` passed 23 tests.
+  - `$env:PYTHONPATH='src'; $env:NO_PROXY='*'; python -m unittest discover -s tests -p "test_*.py"` passed 1454 tests, skipped 2.
 - Boundary: no runtime, provider, prompt byte, observer/participant protocol,
   validator, generated fixture, Flutter UI, or workflow behavior was changed.
   P3-A-2c remains the first runtime-consumption slice and must follow prompt

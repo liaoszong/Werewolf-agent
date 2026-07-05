@@ -153,6 +153,23 @@ class RolePolicyRegistryTests(unittest.TestCase):
                         changes=changes,
                     )
 
+    def test_rejects_structured_values_in_strategy_lists(self):
+        registry = build_default_role_policy_registry()
+
+        payloads = [
+            {"information_priorities": [{"engine_entitlement": "god_view"}]},
+            {"playbook_refs": [{"action_window": "night:any"}]},
+            {"forbidden_behavior": [{"teamStatePermissions": "wolf_private"}]},
+        ]
+        for changes in payloads:
+            with self.subTest(changes=changes):
+                with self.assertRaises(RolePolicyRegistryError):
+                    registry.create_draft(
+                        pack_id="standard_six_player_balanced",
+                        role="seer",
+                        changes=changes,
+                    )
+
     def test_accepts_supported_policy_section_fields(self):
         registry = build_default_role_policy_registry()
 
@@ -230,22 +247,22 @@ class RolePolicyRegistryTests(unittest.TestCase):
             first["draft_id"],
             referenced_policy_refs={old_ref},
         )
-        second_policy = registry.publish_draft(
-            second["draft_id"],
-            referenced_policy_refs={old_ref, f"{first_policy['policy_id']}@{first_policy['version']}"},
-        )
-
         self.assertEqual(first_policy["version"], "1.0.1")
-        self.assertEqual(second_policy["version"], "1.0.2")
         first_ref = f"{first_policy['policy_id']}@{first_policy['version']}"
-        second_ref = f"{second_policy['policy_id']}@{second_policy['version']}"
+        with self.assertRaises(RolePolicyRegistryError):
+            registry.publish_draft(
+                second["draft_id"],
+                referenced_policy_refs={old_ref, first_ref},
+            )
         self.assertEqual(
             registry.resolve_policy_ref(first_ref)["goals"],
             ["publish first branch"],
         )
         self.assertEqual(
-            registry.resolve_policy_ref(second_ref)["goals"],
-            ["publish second branch"],
+            registry.get_pack("standard_six_player_balanced")["role_policy_refs"][
+                "seer"
+            ],
+            first_ref,
         )
 
     def test_publish_rejects_existing_policy_ref_collision(self):
@@ -298,6 +315,36 @@ class RolePolicyRegistryTests(unittest.TestCase):
                 "seer"
             ],
             f"{first_policy['policy_id']}@{first_policy['version']}",
+        )
+
+    def test_publish_rejects_stale_draft_even_when_current_ref_is_referenced(self):
+        registry = build_default_role_policy_registry()
+        first = registry.create_draft(
+            pack_id="standard_six_player_balanced",
+            role="seer",
+            changes={"policy_id": "local_seer_first"},
+        )
+        second = registry.create_draft(
+            pack_id="standard_six_player_balanced",
+            role="seer",
+            changes={"goals": ["stale branch"]},
+        )
+        first_policy = registry.publish_draft(
+            first["draft_id"],
+            referenced_policy_refs=set(),
+        )
+        current_ref = f"{first_policy['policy_id']}@{first_policy['version']}"
+
+        with self.assertRaises(RolePolicyRegistryError):
+            registry.publish_draft(
+                second["draft_id"],
+                referenced_policy_refs={current_ref},
+            )
+        self.assertEqual(
+            registry.get_pack("standard_six_player_balanced")["role_policy_refs"][
+                "seer"
+            ],
+            current_ref,
         )
 
     def test_publish_rejects_parallel_in_place_draft_without_current_ref(self):

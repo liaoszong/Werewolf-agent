@@ -70,6 +70,14 @@ _POLICY_SECTION_FIELDS = {
     "deception_policy": frozenset({"allowed", "style"}),
     "team_policy": frozenset({"uses_team_plan", "protect_teammates"}),
 }
+_POLICY_STR_LIST_FIELDS = frozenset(
+    {
+        "goals",
+        "information_priorities",
+        "playbook_refs",
+        "forbidden_behavior",
+    }
+)
 _NORMALIZED_FORBIDDEN_POLICY_FIELDS = frozenset(
     re.sub(r"[^a-z0-9]", "", field.lower()) for field in _FORBIDDEN_POLICY_FIELDS
 )
@@ -186,7 +194,7 @@ class RolePolicyRegistry:
             pack_id=pack_id,
             role=role,
         )
-        if current_ref != base_ref and current_ref not in referenced_policy_refs:
+        if current_ref != base_ref:
             raise RolePolicyRegistryError(
                 f"RolePolicy draft {draft_id!r} is stale for role {role!r}"
             )
@@ -198,7 +206,6 @@ class RolePolicyRegistry:
         if (
             base_ref in referenced_policy_refs
             or base_ref in registry_referenced_refs
-            or current_ref != base_ref
             or would_mutate_base_ref
         ):
             base_policy_id, base_version = _split_policy_ref(base_ref)
@@ -432,6 +439,7 @@ def _check_policy_patch(obj: dict[str, Any]) -> None:
     _check_no_forbidden_policy_fields(obj)
     _check_no_secret(obj)
     _check_policy_section_fields(obj)
+    _check_policy_str_list_fields(obj)
 
 
 def _check_no_forbidden_policy_fields(obj: Any, path: str = "") -> None:
@@ -477,6 +485,17 @@ def _check_policy_section_fields(obj: dict[str, Any]) -> None:
                 raise RolePolicyRegistryError(
                     f"RolePolicy.{section}.{key} must be strategy text"
                 )
+
+
+def _check_policy_str_list_fields(obj: dict[str, Any]) -> None:
+    for field in _POLICY_STR_LIST_FIELDS:
+        if field not in obj:
+            continue
+        value = obj[field]
+        if not isinstance(value, list) or not all(
+            isinstance(item, str) for item in value
+        ):
+            raise RolePolicyRegistryError(f"RolePolicy.{field} must be list[str]")
 
 
 def _check_no_secret(obj: Any, path: str = "") -> None:
