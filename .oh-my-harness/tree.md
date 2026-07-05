@@ -170,7 +170,6 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   │   │   ├── screens/
 │   │   │   │   │   ├── connect_screen.dart
 │   │   │   │   │   ├── home_shell.dart
-│   │   │   │   │   ├── identity_confirm_screen.dart
 │   │   │   │   │   └── live_room_screen.dart
 │   │   │   │   ├── ui/
 │   │   │   │   │   ├── app_theme.dart
@@ -502,7 +501,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │       ├── 2026-07-02-agent-roleplay-human-game-pivot-design.md
 │   │       ├── 2026-07-02-p3-e-client-platform-migration-design.md
 │   │       ├── 2026-07-03-p3-c-0-server-action-protocol-design.md
-│   │       └── 2026-07-04-p3-e-mobile-first-human-seat-client-design.md
+│   │       ├── 2026-07-04-p3-e-mobile-first-human-seat-client-design.md
+│   │       └── 2026-07-05-p3-a-1-agent-asset-ownership-schema-design.md
 │   ├── CHECKPOINT_TEMPLATE.md
 │   ├── EVALUATION_RUBRIC.md
 │   ├── PRODUCT_ONE_PAGER.md
