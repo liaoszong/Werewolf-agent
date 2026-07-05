@@ -40,6 +40,16 @@ Default reads should be small and current:
 7. `docs/superpowers/plans/**` / `docs/superpowers/specs/**` for the active or relevant plan/spec.
 8. Exact source/test ranges only when needed.
 
+## Context Budget Gate
+
+- Do not read long plan files in full by default. Prefer the focused task
+  context when present: `docs/generated-context/current-task.ctx.md`.
+- For plan-scoped context, use `scripts/context/build_plan_index.py` and
+  `scripts/context/build_task_context.py`; summarize validation with
+  `scripts/dev/validate_brief.py` and `.logs/validate/latest/summary.json`.
+- Do not use Repomix as the default context entry.
+- Do not introduce Semble, CodeGraph, or codebase-memory MCP unless a later plan explicitly allows it.
+
 ## Push Discipline (单人直推纪律)
 
 - 改代码前先看 `git status --short`：工作树脏必须先停下汇报，不默默纳入。

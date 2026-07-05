@@ -1,4 +1,5 @@
 import json
+import unittest
 
 from werewolf_eval.prompt_v3 import parse_scribe_claims, render_scribe_input, render_claim_digest, render_vote_scaffold
 
@@ -141,7 +142,6 @@ def test_system_for_routes_scaffold_speech_v3_and_vote_unchanged():
 
 
 # ------------------------------------------------------------------ Task 4 tests
-import pytest
 from fake_scribe import _FakeScribeProvider
 
 from werewolf_eval.emergent_engine import EmergentBudget, EmergentGameEngine, build_emergent_config
@@ -164,7 +164,7 @@ def _run_v3_engine(broken_scribe=False):
 
 def test_v3_requires_scaffold_agent():
     agents = build_emergent_fake_agents(build_villager_win_script())
-    with pytest.raises(ValueError, match="scaffold_agent"):
+    with unittest.TestCase().assertRaisesRegex(ValueError, "scaffold_agent"):
         EmergentGameEngine(config=build_emergent_config(game_id="v3_noscribe"),
                            agents=agents, seed=7, prompt_version="prompt_v3")
 
@@ -309,7 +309,7 @@ def test_runner_v3_threads_scribe_and_splits_turn_accounting(tmp_path):
 
 
 def test_runner_v3_without_scaffold_factory_fails_loud(tmp_path):
-    with pytest.raises(ValueError, match="scaffold"):
+    with unittest.TestCase().assertRaisesRegex(ValueError, "scaffold"):
         run_emergent_deepseek_game(
             game_id="v3_noscribe", out_dir=tmp_path, provider_factory=_fake_factory(),
             model="none", seed=7, prompt_version="prompt_v3",

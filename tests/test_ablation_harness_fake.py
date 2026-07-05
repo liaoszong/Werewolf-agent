@@ -1,4 +1,6 @@
 from pathlib import Path
+import unittest
+
 from werewolf_eval.ablation.arms import Arm
 from werewolf_eval.ablation.harness import run_arm
 from werewolf_eval.emergent_fake_script import build_emergent_fake_agents, build_villager_win_script
@@ -27,13 +29,10 @@ def test_run_arm_fake_smoke(tmp_path):
     assert (tmp_path / "fake_smoke" / "_index.jsonl").exists()
 
 
-import pytest
-
-
 def test_run_arm_rejects_unknown_prompt_version(tmp_path):
     # Unknown versions hard-fail before any side effects (no silent fallback).
     arm = Arm(label="bogus_arm", prompt_version="prompt_v99", n_games=1, seed_base=7)
-    with pytest.raises(ValueError, match="prompt_version"):
+    with unittest.TestCase().assertRaisesRegex(ValueError, "prompt_version"):
         run_arm(arm, out_root=tmp_path, factory_builder=build_fake_factory)
     assert not (tmp_path / "bogus_arm").exists()
 

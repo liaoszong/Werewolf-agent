@@ -99,9 +99,21 @@ class TestBuildSettlementResponse(unittest.TestCase):
             build_settlement_response(d, run_status="completed", run_id="r1")
             self.assertTrue((d / "settlement-bundle.json").exists())  # cached
             # second call reads cache: mutate the cache (keeping the CURRENT version so
-            # it's served, not recomputed), confirm the response reflects it.
+            # it's served, not recomputed), confirm the response reflects it. Current
+            # cache validity also requires the expected evaluation bucket.
             (d / "settlement-bundle.json").write_text(
-                '{"bundle_version":"' + BUNDLE_VERSION + '","run_id":"cached_marker"}',
+                json.dumps(
+                    {
+                        "bundle_version": BUNDLE_VERSION,
+                        "evaluation_bucket": {
+                            "rules_version": "unknown",
+                            "prompt_version": "unknown",
+                            "scoring_version": "scoring_v2",
+                            "comparison_key": "unknown__unknown__scoring_v2",
+                        },
+                        "run_id": "cached_marker",
+                    }
+                ),
                 encoding="utf-8",
             )
             r2 = build_settlement_response(d, run_status="completed", run_id="r1")

@@ -1,4 +1,4 @@
-import pytest
+import unittest
 from collections import Counter
 
 from werewolf_eval.action_runtime.ruleset import rules_v1_1
@@ -160,9 +160,8 @@ def test_action_contract_unchanged_under_v2():
 def test_system_for_rejects_unknown_version():
     # 纵深防御:engine/harness 已有 KNOWN 硬门;provider 层对漏网的未知版本
     # 同样 fail-loud,绝不静默降级到 v1(无静默兜底原则)
-    import pytest
     provider = OpenAICompatibleProvider(ChatProviderConfig(api_key="k", base_url="http://x", model="m"))
-    with pytest.raises(ValueError, match="prompt_version"):
+    with unittest.TestCase().assertRaisesRegex(ValueError, "prompt_version"):
         provider._system_for(_speech_req(prompt_version="prompt_v99"))
 
 
@@ -185,7 +184,7 @@ def _run_engine(prompt_version):
 
 
 def test_engine_rejects_unknown_prompt_version():
-    with pytest.raises(ValueError, match="prompt_version"):
+    with unittest.TestCase().assertRaisesRegex(ValueError, "prompt_version"):
         _run_engine("prompt_v99")
 
 
