@@ -32,6 +32,33 @@ machine secrets here.
 
 ## Entries
 
+### 2026-07-05 - CI Stability + Live Room Usability Slice
+
+- Fixed the ordinary GitHub `tests.yml` red workflow on `main`:
+  - Removed the unintended `pytest` import dependency from unittest-discovered
+    test modules.
+  - Restored the root `AGENTS.md` Context Budget Gate text expected by the
+    context-budget guard.
+  - Updated the settlement cache-hit test to include the current
+    `evaluation_bucket` validity requirement.
+- Pushed commit `74461c8` and verified GitHub run `28727974868` was fully green:
+  `unittest`, `windows-gate`, and `flutter-client` all passed.
+- Continued P3-E-2 live room usability:
+  - `RoleSafeStatusBar` now shows phase, round, seat perspective, and connection
+    state with a stronger waiting-for-you state.
+  - `SpeechFeed` now separates system timeline events from speech bubbles,
+    highlights the current human seat, and has a role-safe empty state.
+  - `ComposerRail` structured action windows now use a floating action panel with
+    phase/round/required chips and clearer target selection.
+- Verification:
+  - `flutter analyze` passed.
+  - `flutter test` passed 48 tests.
+  - Focused Flutter UI tests for speech feed, composer rail, and live room passed
+    10 tests.
+  - `$env:PYTHONPATH='src'; $env:NO_PROXY='*'; python -m unittest discover -s tests -p "test_*.py"` passed 1431 tests, skipped 2.
+- Boundary: no protocol, runtime, provider, validator, generated fixture, or
+  backend route behavior was changed.
+
 ### 2026-07-05 - Flutter Mobile Navigation + Appearance Shell
 
 - Reworked the Flutter home shell so the bottom navigation is top-level only:

@@ -125,6 +125,13 @@ class AppStrings {
   String get discussion => _t('公开讨论', 'Discussion');
   String get gameOver => _t('游戏结束', 'Game over');
   String get roomSyncing => _t('房间同步中', 'Room syncing');
+  String get currentRound => _t('当前轮次', 'Current round');
+  String get requiredAction => _t('必须操作', 'Required');
+  String get optionalAction => _t('可选操作', 'Optional');
+  String get actionWindowOpen => _t('行动窗口已开启', 'Action window open');
+  String get publicEvent => _t('公开事件', 'Public event');
+  String get systemEvent => _t('系统事件', 'System event');
+  String get playerSpeech => _t('玩家发言', 'Player speech');
   String get reconnecting => _t('正在重连', 'Reconnecting');
   String get connecting => _t('连接中', 'Connecting');
   String get sessionExpired => _t('会话失效', 'Session expired');
@@ -170,6 +177,37 @@ class AppStrings {
       'hunter_shoot' => _t('选择开枪目标', 'Choose shot target'),
       'pass' => pass,
       _ => chooseAction,
+    };
+  }
+
+  String phaseLabel(String? phase) {
+    return switch (phase) {
+      'night' => nightInProgress,
+      'day' => discussion,
+      'vote' || 'voting' => voting,
+      'completed' || 'finished' || 'game_over' => gameOver,
+      'running' => roomSyncing,
+      _ => roomSyncing,
+    };
+  }
+
+  String roundLabel(int? round) {
+    if (round == null || round <= 0) return currentRound;
+    return appLanguage == AppLanguage.zh ? '第 $round 轮' : 'Round $round';
+  }
+
+  String eventKindLabel(String kind) {
+    return switch (kind) {
+      'player_speech' || 'speech' => playerSpeech,
+      'final_words' => finalWords,
+      'player_vote' || 'vote' => vote,
+      'phase_changed' => _t('阶段变化', 'Phase change'),
+      'vote_started' => _t('投票开始', 'Vote started'),
+      'vote_ended' => _t('投票结束', 'Vote ended'),
+      'player_eliminated' => _t('放逐结果', 'Elimination'),
+      'player_died' => _t('死亡通告', 'Death notice'),
+      'game_completed' || 'game_over' => gameOver,
+      _ => systemEvent,
     };
   }
 

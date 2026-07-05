@@ -36,6 +36,7 @@ class LiveRoomScreen extends StatelessWidget {
                 Expanded(
                   child: SpeechFeed(
                     events: controller.state?.visibleEvents ?? const [],
+                    currentSeatId: controller.state?.seatId,
                   ),
                 ),
                 ComposerRail(

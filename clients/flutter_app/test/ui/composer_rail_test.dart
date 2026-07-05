@@ -88,6 +88,8 @@ void main() {
 
     expect(action, 'vote');
     expect(payload, {'target': 'p2'});
+    expect(find.byKey(const Key('structured-composer-shell')), findsOneWidget);
+    expect(find.byKey(const Key('action-window-chip')), findsWidgets);
   });
 
   testWidgets('pass button submits pass action instead of pass target', (

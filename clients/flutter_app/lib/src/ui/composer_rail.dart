@@ -300,76 +300,198 @@ class _StructuredComposer extends StatelessWidget {
     final needsTarget = actionType != 'pass';
     return SafeArea(
       top: false,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: palette.surface,
-          border: Border(top: BorderSide(color: palette.border)),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (errorMessage != null) _ComposerError(message: errorMessage!),
-              Row(
-                children: [
-                  IconButton(
-                    key: const Key('composer-collapse-button'),
-                    tooltip: strings.collapseComposer,
-                    onPressed: onCollapse,
-                    icon: const Icon(Icons.keyboard_arrow_down_rounded),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(10, 6, 10, 10),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (errorMessage != null) _ComposerError(message: errorMessage!),
+            DecoratedBox(
+              key: const Key('structured-composer-shell'),
+              decoration: BoxDecoration(
+                color: palette.surface,
+                borderRadius: BorderRadius.circular(26),
+                border: Border.all(
+                  color: palette.accent.withValues(alpha: 0.36),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: palette.shadow,
+                    blurRadius: 24,
+                    offset: const Offset(0, 10),
                   ),
-                  Expanded(
-                    child: Text(
-                      strings.actionLabel(actionType),
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                  ),
-                  if (canPass)
-                    TextButton(onPressed: onPass, child: Text(strings.pass)),
                 ],
               ),
-              if (needsTarget) ...[
-                const SizedBox(height: 4),
-                Text(
-                  strings.candidateTargets,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(8, 8, 10, 12),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    for (final seat in const [
-                      'p1',
-                      'p2',
-                      'p3',
-                      'p4',
-                      'p5',
-                      'p6',
-                    ])
-                      ChoiceChip(
-                        label: Text(seat.toUpperCase()),
-                        selected: selectedTarget == seat,
-                        onSelected: (_) => onTargetSelected(seat),
+                    Row(
+                      children: [
+                        IconButton(
+                          key: const Key('composer-collapse-button'),
+                          tooltip: strings.collapseComposer,
+                          onPressed: onCollapse,
+                          icon: Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            color: palette.textPrimary,
+                          ),
+                        ),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                strings.actionLabel(actionType),
+                                style: Theme.of(
+                                  context,
+                                ).textTheme.titleMedium?.copyWith(fontSize: 16),
+                              ),
+                              const SizedBox(height: 3),
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 6,
+                                children: [
+                                  _ActionWindowChip(
+                                    label: strings.actionWindowOpen,
+                                    icon: Icons.bolt_rounded,
+                                  ),
+                                  _ActionWindowChip(
+                                    label: strings.roundLabel(window.round),
+                                    icon: Icons.track_changes_rounded,
+                                  ),
+                                  _ActionWindowChip(
+                                    label: strings.phaseLabel(window.phase),
+                                    icon: Icons.timelapse_rounded,
+                                  ),
+                                  _ActionWindowChip(
+                                    label: window.required
+                                        ? strings.requiredAction
+                                        : strings.optionalAction,
+                                    icon: window.required
+                                        ? Icons.priority_high_rounded
+                                        : Icons.check_circle_outline_rounded,
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (canPass)
+                          TextButton(
+                            onPressed: onPass,
+                            child: Text(strings.pass),
+                          ),
+                      ],
+                    ),
+                    if (needsTarget) ...[
+                      const SizedBox(height: 10),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        child: Text(
+                          strings.candidateTargets,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
                       ),
+                      const SizedBox(height: 8),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        child: Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            for (final seat in const [
+                              'p1',
+                              'p2',
+                              'p3',
+                              'p4',
+                              'p5',
+                              'p6',
+                            ])
+                              ChoiceChip(
+                                label: Text(seat.toUpperCase()),
+                                selected: selectedTarget == seat,
+                                selectedColor: palette.accent.withValues(
+                                  alpha: palette.isDay ? 0.24 : 0.20,
+                                ),
+                                backgroundColor: palette.control,
+                                side: BorderSide(
+                                  color: selectedTarget == seat
+                                      ? palette.accent.withValues(alpha: 0.64)
+                                      : palette.border,
+                                ),
+                                labelStyle: TextStyle(
+                                  color: palette.textPrimary,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                                showCheckmark: false,
+                                onSelected: (_) => onTargetSelected(seat),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 12),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          key: const Key('composer-confirm-button'),
+                          onPressed:
+                              actionType == 'pass' || selectedTarget != null
+                              ? onConfirm
+                              : null,
+                          icon: const Icon(Icons.arrow_upward_rounded),
+                          label: Text(strings.confirm),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
-              ],
-              const SizedBox(height: 10),
-              Align(
-                alignment: Alignment.centerRight,
-                child: FilledButton(
-                  key: const Key('composer-confirm-button'),
-                  onPressed: actionType == 'pass' || selectedTarget != null
-                      ? onConfirm
-                      : null,
-                  child: Text(strings.confirm),
-                ),
               ),
-            ],
-          ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ActionWindowChip extends StatelessWidget {
+  const _ActionWindowChip({required this.label, required this.icon});
+
+  final String label;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = WerewolfAppTheme.colors(context);
+    return DecoratedBox(
+      key: const Key('action-window-chip'),
+      decoration: BoxDecoration(
+        color: palette.control,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: palette.border.withValues(alpha: 0.78)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 13, color: palette.textMuted),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: palette.textMuted,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
         ),
       ),
     );
