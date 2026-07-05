@@ -151,7 +151,11 @@ class RolePolicyRegistry:
         if base_ref in referenced_policy_refs:
             base_policy_id, base_version = _split_policy_ref(base_ref)
             policy["policy_id"] = base_policy_id
-            policy["version"] = _increment_patch_version(base_version)
+            policy["version"] = _next_unused_patch_version(
+                policy_id=base_policy_id,
+                base_version=base_version,
+                existing_refs=set(self._policies) | referenced_policy_refs,
+            )
         _validate_policy(policy)
         policy_ref = _policy_ref(policy)
         self._policies[policy_ref] = copy.deepcopy(policy)
@@ -187,8 +191,12 @@ class RolePolicyRegistry:
     def _validate_all(self) -> None:
         for pack in self._packs.values():
             _validate_pack(pack)
-            for policy_ref in pack["role_policy_refs"].values():
-                self.resolve_policy_ref(policy_ref)
+            for role, policy_ref in pack["role_policy_refs"].items():
+                policy = self.resolve_policy_ref(policy_ref)
+                if policy["role"] != role:
+                    raise RolePolicyRegistryError(
+                        f"RolePolicyPack role {role!r} points to {policy['role']!r}"
+                    )
         for policy in self._policies.values():
             _validate_policy(policy)
         for draft in self._drafts.values():
@@ -348,7 +356,22 @@ def _check_policy_patch(obj: dict[str, Any]) -> None:
     forbidden = sorted(set(obj) & _FORBIDDEN_POLICY_FIELDS)
     if forbidden:
         raise RolePolicyRegistryError(f"RolePolicy contains forbidden fields: {forbidden}")
+    _check_no_forbidden_policy_fields(obj)
     _check_no_secret(obj)
+
+
+def _check_no_forbidden_policy_fields(obj: Any, path: str = "") -> None:
+    if isinstance(obj, dict):
+        for key, value in obj.items():
+            key_text = str(key)
+            if key_text in _FORBIDDEN_POLICY_FIELDS:
+                raise RolePolicyRegistryError(
+                    f"RolePolicy contains forbidden field: {path}{key_text}"
+                )
+            _check_no_forbidden_policy_fields(value, f"{path}{key_text}.")
+    elif isinstance(obj, list):
+        for index, value in enumerate(obj):
+            _check_no_forbidden_policy_fields(value, f"{path}{index}.")
 
 
 def _check_no_secret(obj: Any, path: str = "") -> None:
@@ -388,6 +411,18 @@ def _increment_patch_version(version: str) -> str:
         raise RolePolicyRegistryError(f"cannot increment non-semver version {version!r}")
     major, minor, patch = (int(part) for part in parts)
     return f"{major}.{minor}.{patch + 1}"
+
+
+def _next_unused_patch_version(
+    *,
+    policy_id: str,
+    base_version: str,
+    existing_refs: set[str],
+) -> str:
+    version = _increment_patch_version(base_version)
+    while f"{policy_id}@{version}" in existing_refs:
+        version = _increment_patch_version(version)
+    return version
 
 
 def _next_draft_id(

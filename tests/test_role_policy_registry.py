@@ -116,6 +116,23 @@ class RolePolicyRegistryTests(unittest.TestCase):
                         changes={field: "forbidden"},
                     )
 
+    def test_rejects_nested_forbidden_ownership_fields(self):
+        registry = build_default_role_policy_registry()
+
+        nested_payloads = [
+            {"team_policy": {"team_plan_ref": "runtime_team_state_1"}},
+            {"ability_use_policy": {"legal_action_window": "night:any"}},
+            {"claim_policy": {"visibility_entitlement": "god_view"}},
+        ]
+        for changes in nested_payloads:
+            with self.subTest(changes=changes):
+                with self.assertRaises(RolePolicyRegistryError):
+                    registry.create_draft(
+                        pack_id="standard_six_player_balanced",
+                        role="werewolf",
+                        changes=changes,
+                    )
+
     def test_rejects_secret_like_values(self):
         registry = build_default_role_policy_registry()
 
@@ -146,6 +163,62 @@ class RolePolicyRegistryTests(unittest.TestCase):
             registry.get_pack("standard_six_player_balanced")["role_policy_refs"],
         )
         self.assertEqual(loaded.export(), registry.export())
+
+    def test_parallel_referenced_drafts_do_not_overwrite_versions(self):
+        registry = build_default_role_policy_registry()
+        old_ref = registry.get_pack("standard_six_player_balanced")[
+            "role_policy_refs"
+        ]["seer"]
+        first = registry.create_draft(
+            pack_id="standard_six_player_balanced",
+            role="seer",
+            changes={"goals": ["publish first branch"]},
+        )
+        second = registry.create_draft(
+            pack_id="standard_six_player_balanced",
+            role="seer",
+            changes={"goals": ["publish second branch"]},
+        )
+
+        first_policy = registry.publish_draft(
+            first["draft_id"],
+            referenced_policy_refs={old_ref},
+        )
+        second_policy = registry.publish_draft(
+            second["draft_id"],
+            referenced_policy_refs={old_ref, f"{first_policy['policy_id']}@{first_policy['version']}"},
+        )
+
+        self.assertEqual(first_policy["version"], "1.0.1")
+        self.assertEqual(second_policy["version"], "1.0.2")
+        first_ref = f"{first_policy['policy_id']}@{first_policy['version']}"
+        second_ref = f"{second_policy['policy_id']}@{second_policy['version']}"
+        self.assertEqual(
+            registry.resolve_policy_ref(first_ref)["goals"],
+            ["publish first branch"],
+        )
+        self.assertEqual(
+            registry.resolve_policy_ref(second_ref)["goals"],
+            ["publish second branch"],
+        )
+
+    def test_load_rejects_pack_role_ref_mismatch(self):
+        registry = build_default_role_policy_registry()
+        data = registry.export()
+        data["packs"]["standard_six_player_balanced"]["role_policy_refs"][
+            "seer"
+        ] = data["packs"]["standard_six_player_balanced"]["role_policy_refs"][
+            "werewolf"
+        ]
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "bad-role-policy-registry.json"
+            path.write_text(
+                __import__("json").dumps(data, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            with self.assertRaises(RolePolicyRegistryError):
+                RolePolicyRegistry.load(path)
 
 
 if __name__ == "__main__":
