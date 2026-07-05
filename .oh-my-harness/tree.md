@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 697
+- Entries: 699
 
 ```text
 ./
@@ -580,6 +580,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       │   ├── update_control.py
 │       │   └── velopack_runtime.py
 │       ├── __init__.py
+│       ├── agent_assets.py
 │       ├── artifacts.py
 │       ├── attribute_game.py
 │       ├── attribution.py
@@ -719,6 +720,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── test_action_runtime_triggers.py
 │   ├── test_action_runtime_turn.py
 │   ├── test_action_runtime_validator.py
+│   ├── test_agent_assets.py
 │   ├── test_anthropic_provider.py
 │   ├── test_artifacts.py
 │   ├── test_attribution.py

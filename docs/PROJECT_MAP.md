@@ -120,9 +120,10 @@
 | 工作任务 | 描述 | 状态 |
 |---|---|---|
 | **P3-A-0 路线转向 spec** | 正式记录从"评测/排行榜优先"转向"Agent 角色体验 + 真人参与优先";把 SillyTavern 与 Claude Code/learn-claude-code 参考转译成 Werewolf-agent 架构。 | ✅ 文档中 |
-| **P3-A-1 Agent asset ownership/schema** | 定义 SeatCharacterCard(角色无关人格)、RolePolicy(按真实身份加载)、RuntimeAgentState(每局新建)、ProviderProfile(模型/温度/预算)四层。用户可打包成预设,但 runtime 内部必须拆开。 | ⏳ 待 plan |
-| **P3-A-2 Agent memory packet** | 在现有 observation_text 之上建立 `AgentContextPacket`:Fact/Claim/Belief/Commitment/TeamPlan/StaticPlaybook 分层,包含 source ids、audience_scope、confidence、status、supersedes、prompt block hash 与调用成本记录。 | ⏳ 待 plan |
-| **P3-A-3 First playable roleplay arm(shadow-safe)** | 先做 6 人基础板的最小 Agent 化闭环:卡片差异可见、记忆引用可追溯、belief 与 fact 不混淆、狼人共享计划不泄漏、旧 baseline 在 shadow mode 下保持可比、调用成本可审计。追问/转票/戏剧节点归 P3-B/P3-D。 | ⏳ 待 plan |
+| **P3-A-1 Agent asset ownership/schema** | 定义 SeatCharacterCard(角色无关人格)、RolePolicy(按真实身份加载)、RuntimeSeatState/RuntimeTeamState(每局新建)、ProviderProfile(模型/温度/预算)和 ExecutionContract(提示/动作/工具/解析契约)的最小 schema-first bridge。已落地纯 schema/validation/audience artifact 和 legacy profile projection,不改 prompt/provider/runtime 行为。 | ✅ 完成 |
+| **P3-A-2 Mobile RolePolicy editor** | 移动端角色页改为 RolePolicyPack 作用域的身份策略入口:两列角色卡、全屏详情、策略预设、战术偏好、角色行动偏好、证据/context 偏好和只读运行时组合说明。不得把 RolePolicy 重新绑定到 SeatCharacterCard、ProviderProfile、ExecutionContract 或 RuntimeState;Flutter-only 阶段只能是本地草稿预览,真实保存需先建资产仓库。 | ⏳ 待 plan |
+| **P3-A-3 Agent memory packet** | 在现有 observation_text 之上建立 `AgentContextPacket`:Fact/Claim/Belief/Commitment/TeamPlan/StaticPlaybook 分层,包含 source ids、audience_scope、confidence、status、supersedes、prompt block hash 与调用成本记录。 | ⏳ 待 plan |
+| **P3-A-4 First playable roleplay arm(shadow-safe)** | 先做 6 人基础板的最小 Agent 化闭环:卡片差异可见、记忆引用可追溯、belief 与 fact 不混淆、狼人共享计划不泄漏、旧 baseline 在 shadow mode 下保持可比、调用成本可审计。追问/转票/戏剧节点归 P3-B/P3-D。 | ⏳ 待 plan |
 
 ### P3-C 工作任务(真人参与通道,细化到工作任务粒度)
 
@@ -195,7 +196,7 @@
 | **SYS-B2** | 决策协议 | Action Protocol / Structured Output | `action_runtime/envelope.py`(ActionEnvelope)+ strict-JSON;tool-calling 仅作消融轴 | ✅ baseline 统一 strict-JSON 已锁定(评测公平性不变量) |
 | **SYS-B3** | 模型接入网关 | Model Gateway / LLM Provider Abstraction | provider registry + BYO-key + 9 家 OpenAI 兼容预设 | ✅ 主体完成;剩 B5 收尾(per-seat token/成本汇总、退役 deepseek-only env 兜底) |
 | **SYS-B4** | 增强脚手架 | **Agent Scaffolding / Agent Harness**(计划、反思、工具、hooks、狼频道、发言-投票一致性) | 现有接缝 = 渲染器 `requires_scaffold` 标志 + `scaffold_model`(scribe provider);未来接 `AgentContextPacket` / roleplay harness | 🚧 P3 核心方向。边界已锁:脚手架在 ActionEnvelope 上游,baseline 永远裁判;不得把中间推理混入 action JSON。默认一玩家行动一次模型调用,额外 team/scaffold 调用必须单独记账。 |
-| **SYS-B5** | 角色卡与剧本资产 | Character Card / Persona Card / Playbook Library | 现有 `profile_config` 的 role prompt + seat persona;未来新增四层资产模型与本地资产库 | ⏳ P3-A 待建。对标 SillyTavern 的 Character Card/World Info,但 runtime 必须拆成 SeatCharacterCard / RolePolicy / RuntimeAgentState / ProviderProfile;本局状态永不回写角色卡本体。 |
+| **SYS-B5** | 角色卡与剧本资产 | Character Card / Persona Card / Playbook Library | 现有 `profile_config` 的 role prompt + seat persona;P3-A-1 新增纯 schema bridge `agent_assets.py` | 🌱 P3-A-1 已建 schema/validation/audience artifact 层。对标 SillyTavern 的 Character Card/World Info,但 runtime 必须拆成 SeatCharacterCard / RolePolicy / RuntimeSeatState/RuntimeTeamState / ProviderProfile / ExecutionContract;本局状态永不回写角色卡本体。尚未接入 prompt/runtime 消费。 |
 
 ### C 组 · 平台与质量面(Platform & Quality)
 

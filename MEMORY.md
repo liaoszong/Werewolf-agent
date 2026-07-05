@@ -32,6 +32,32 @@ machine secrets here.
 
 ## Entries
 
+### 2026-07-05 - P3-A-1 Agent Asset Ownership Schema Bridge
+
+- Completed P3-A-1 as a schema-first, runtime-neutral bridge.
+- Scope delivered:
+  - Added `src/werewolf_eval/agent_assets.py` with pure validators for
+    `SeatCharacterCard`, `RolePolicy`, `RuntimeSeatState`,
+    `RuntimeTeamState`, `ProviderProfile`, `ExecutionContract`, and
+    `AgentPreset`.
+  - Added legacy profile projection into audience-scoped artifacts:
+    `PublicRunManifest`, `SeatPrivateAssetSnapshot`,
+    `FactionPrivateAssetSnapshot`, and `PostgameAuditAssetSnapshot`.
+  - Public manifest intentionally excludes true roles, teams, RolePolicy refs,
+    runtime state refs, faction refs, and role words for hidden seats.
+  - Human seats do not receive provider profile refs for player model calls.
+  - `seat_overrides[seat].prompt` is represented as `LegacyPromptOverlay`, not
+    silently migrated into RolePolicy.
+  - Added RuntimeTeamState authorization helper for faction-private state.
+- Route/docs updated:
+  - `docs/PROJECT_MAP.md` reconciles P3-A numbering: P3-A-2 is now Mobile
+    RolePolicy editor; Agent memory packet moved to P3-A-3.
+  - `docs/TASKS.md` records P3-A-1 completed outputs.
+- Verification:
+  - `$env:PYTHONPATH='src'; $env:NO_PROXY='*'; python -m unittest tests.test_agent_assets tests.test_profile_config -v` passed 84 tests.
+- Boundary: no runtime, provider, prompt, validator, generated fixture, client,
+  or workflow behavior was changed.
+
 ### 2026-07-05 - P3-E-3 Human Seat Client Slice Closeout
 
 - Completed P3-E-3 as a Flutter-only human-seat client hardening slice.

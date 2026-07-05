@@ -47,7 +47,10 @@
 | Task | Status | Outputs |
 |---|---|---|
 | P3-A-0：Agent 角色体验与真人参与路线转向 | completed | `docs/PROJECT_MAP.md`, `docs/superpowers/specs/2026-07-02-agent-roleplay-human-game-pivot-design.md` |
-| P3-A：Agent Card + Memory Spine | planned | — |
+| P3-A：Agent Card + Memory Spine | in_progress | P3-A-1 schema bridge complete; P3-A-2 mobile RolePolicy editor and P3-A-3 memory packet remain planned |
+| P3-A-1：Agent asset ownership/schema | completed | `docs/superpowers/specs/2026-07-05-p3-a-1-agent-asset-ownership-schema-design.md`, `src/werewolf_eval/agent_assets.py`, `tests/test_agent_assets.py`; pure schema validators, legacy profile audience artifacts, human-seat provider boundary, legacy prompt overlay, RuntimeTeamState authorization |
+| P3-A-2：Mobile RolePolicy editor | planned | `docs/superpowers/specs/2026-07-05-p3-a-2-mobile-role-policy-editor-design.md`; implementation pending route/plan |
+| P3-A-3：Agent memory packet | planned | future `AgentContextPacket` / Fact-Claim-Belief-Commitment-TeamPlan schema |
 | P3-B：博弈脚手架与桌面发言 | planned | — |
 | P3-C：真人座位实时参与 | in_progress | P3-C-0 protocol + route skeleton complete; P3-C-1d single-human backend closeout complete; remaining response/table-talk depends on P3-B |
 | P3-C-0：真人 action protocol spec + minimal server skeleton | completed | `docs/PROJECT_MAP.md`, `docs/superpowers/specs/2026-07-03-p3-c-0-server-action-protocol-design.md`, `src/werewolf_eval/participant_protocol.py`, `src/werewolf_eval/observer/participant_api.py`, `tests/test_participant_protocol.py`, `tests/test_participant_routes.py` |
