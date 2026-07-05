@@ -5,10 +5,8 @@ import '../protocol/participant_models.dart';
 import 'app_theme.dart';
 
 typedef SpeechSubmit = Future<void> Function(String text);
-typedef StructuredSubmit = Future<void> Function(
-  String actionType,
-  Map<String, dynamic> payload,
-);
+typedef StructuredSubmit =
+    Future<void> Function(String actionType, Map<String, dynamic> payload);
 
 class ComposerRail extends StatefulWidget {
   const ComposerRail({
@@ -127,6 +125,7 @@ class _CollapsedHandle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final strings = AppLanguageScope.of(context);
+    final palette = WerewolfAppTheme.colors(context);
     return SafeArea(
       top: false,
       child: Padding(
@@ -142,9 +141,7 @@ class _CollapsedHandle extends StatelessWidget {
                 onPressed: enabled ? onTap : null,
                 icon: Icon(
                   Icons.keyboard_arrow_up_rounded,
-                  color: enabled
-                      ? WerewolfAppTheme.accent
-                      : WerewolfAppTheme.textMuted,
+                  color: enabled ? palette.accent : palette.textMuted,
                 ),
               ),
             ),
@@ -173,6 +170,7 @@ class _TextComposer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final strings = AppLanguageScope.of(context);
+    final palette = WerewolfAppTheme.colors(context);
     return SafeArea(
       top: false,
       child: Padding(
@@ -181,44 +179,88 @@ class _TextComposer extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (errorMessage != null) _ComposerError(message: errorMessage!),
-            DecoratedBox(
-              decoration: BoxDecoration(
-                color: WerewolfAppTheme.surface,
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: const Color(0xFF2D3744)),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(4, 4, 6, 4),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    IconButton(
-                      key: const Key('composer-collapse-button'),
-                      tooltip: strings.collapseComposer,
-                      onPressed: onCollapse,
-                      icon: const Icon(Icons.keyboard_arrow_down_rounded),
-                    ),
-                    Expanded(
-                      child: TextField(
-                        key: const Key('composer-text-input'),
-                        controller: controller,
-                        minLines: 1,
-                        maxLines: 4,
-                        textInputAction: TextInputAction.newline,
-                        decoration: InputDecoration(
-                          hintText: '$label...',
-                          border: InputBorder.none,
-                          isDense: true,
-                        ),
-                      ),
-                    ),
-                    IconButton.filled(
-                      key: const Key('composer-send-button'),
-                      tooltip: strings.send,
-                      onPressed: onSend,
-                      icon: const Icon(Icons.arrow_upward_rounded),
+            ConstrainedBox(
+              key: const Key('composer-input-shell'),
+              constraints: const BoxConstraints(minHeight: 54, maxHeight: 64),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: palette.surface,
+                  borderRadius: BorderRadius.circular(28),
+                  border: Border.all(color: palette.border),
+                  boxShadow: [
+                    BoxShadow(
+                      color: palette.shadow,
+                      blurRadius: 22,
+                      offset: const Offset(0, 10),
                     ),
                   ],
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(4, 3, 5, 3),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      SizedBox(
+                        width: 44,
+                        height: 44,
+                        child: IconButton(
+                          key: const Key('composer-collapse-button'),
+                          tooltip: strings.collapseComposer,
+                          onPressed: onCollapse,
+                          icon: Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            color: palette.textPrimary,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: TextField(
+                          key: const Key('composer-text-input'),
+                          controller: controller,
+                          minLines: 1,
+                          maxLines: 3,
+                          textAlignVertical: TextAlignVertical.center,
+                          textInputAction: TextInputAction.newline,
+                          style: TextStyle(
+                            color: palette.textPrimary,
+                            fontSize: 18,
+                            height: 1.2,
+                          ),
+                          decoration: InputDecoration(
+                            hintText: '$label...',
+                            hintStyle: TextStyle(
+                              color: palette.textMuted,
+                              fontSize: 18,
+                            ),
+                            border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
+                            filled: false,
+                            isDense: true,
+                            contentPadding: const EdgeInsets.symmetric(
+                              vertical: 12,
+                              horizontal: 2,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      SizedBox(
+                        width: 44,
+                        height: 44,
+                        child: IconButton.filled(
+                          key: const Key('composer-send-button'),
+                          tooltip: strings.send,
+                          onPressed: onSend,
+                          style: IconButton.styleFrom(
+                            backgroundColor: palette.textPrimary,
+                            foregroundColor: palette.background,
+                          ),
+                          icon: const Icon(Icons.arrow_upward_rounded),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -253,14 +295,15 @@ class _StructuredComposer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final strings = AppLanguageScope.of(context);
+    final palette = WerewolfAppTheme.colors(context);
     final canPass = window.allowedActions.contains('pass');
     final needsTarget = actionType != 'pass';
     return SafeArea(
       top: false,
       child: DecoratedBox(
-        decoration: const BoxDecoration(
-          color: WerewolfAppTheme.surface,
-          border: Border(top: BorderSide(color: Color(0xFF2D3744))),
+        decoration: BoxDecoration(
+          color: palette.surface,
+          border: Border(top: BorderSide(color: palette.border)),
         ),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
@@ -284,10 +327,7 @@ class _StructuredComposer extends StatelessWidget {
                     ),
                   ),
                   if (canPass)
-                    TextButton(
-                      onPressed: onPass,
-                      child: Text(strings.pass),
-                    ),
+                    TextButton(onPressed: onPass, child: Text(strings.pass)),
                 ],
               ),
               if (needsTarget) ...[
@@ -322,10 +362,9 @@ class _StructuredComposer extends StatelessWidget {
                 alignment: Alignment.centerRight,
                 child: FilledButton(
                   key: const Key('composer-confirm-button'),
-                  onPressed:
-                      actionType == 'pass' || selectedTarget != null
-                          ? onConfirm
-                          : null,
+                  onPressed: actionType == 'pass' || selectedTarget != null
+                      ? onConfirm
+                      : null,
                   child: Text(strings.confirm),
                 ),
               ),
@@ -335,7 +374,6 @@ class _StructuredComposer extends StatelessWidget {
       ),
     );
   }
-
 }
 
 class _ComposerError extends StatelessWidget {
@@ -345,24 +383,29 @@ class _ComposerError extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = WerewolfAppTheme.colors(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(6, 0, 6, 8),
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: WerewolfAppTheme.danger.withValues(alpha: 0.14),
+          color: palette.danger.withValues(alpha: 0.14),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: WerewolfAppTheme.danger.withValues(alpha: 0.35)),
+          border: Border.all(color: palette.danger.withValues(alpha: 0.35)),
         ),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
           child: Row(
             children: [
-              const Icon(Icons.error_outline_rounded, size: 18, color: WerewolfAppTheme.danger),
+              Icon(
+                Icons.error_outline_rounded,
+                size: 18,
+                color: palette.danger,
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   message,
-                  style: const TextStyle(color: WerewolfAppTheme.textPrimary),
+                  style: TextStyle(color: palette.textPrimary),
                 ),
               ),
             ],

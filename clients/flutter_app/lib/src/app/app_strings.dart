@@ -38,7 +38,14 @@ class AppStrings {
   String get home => _t('首页', 'Home');
   String get matches => _t('对局', 'Matches');
   String get room => _t('房间', 'Room');
+  String get roles => _t('角色', 'Roles');
+  String get history => _t('历史对局', 'History');
   String get settings => _t('设置', 'Settings');
+  String get appearance => _t('外观', 'Appearance');
+  String get dayStyle => _t('白天', 'Day');
+  String get nightStyle => _t('夜晚', 'Night');
+  String get switchToDayStyle => _t('切换到白天风格', 'Switch to day style');
+  String get switchToNightStyle => _t('切换到夜晚风格', 'Switch to night style');
   String get server => _t('服务器', 'Server');
   String get connected => _t('已连接', 'Connected');
   String get offline => _t('离线', 'Offline');
@@ -60,9 +67,23 @@ class AppStrings {
     '从 observer server 读取对局列表；可使用 PaleInk 云服务器或本机开发服务。',
     'Runs are loaded from the observer server. Use PaleInk Cloud or a local dev server.',
   );
+  String get roleLibraryTitle => _t('全部角色', 'All Roles');
+  String get roleLibraryIntro => _t(
+    '这里展示移动端可见的角色 Agent 设计说明。当前先只读预览允许编辑范围，不改后端协议。',
+    'This shows the mobile-visible role agent design. This slice previews allowed edits without changing the backend protocol.',
+  );
+  String get agentHarness => _t('Agent harness', 'Agent harness');
+  String get memory => _t('记忆', 'Memory');
+  String get prompt => _t('提示词', 'Prompt');
+  String get editable => _t('可编辑', 'Editable');
+  String get locked => _t('锁定', 'Locked');
+  String get historyIntro => _t(
+    '按 observer server 返回状态分组；已完成、进行中、中断的详情页后续会继续拆。',
+    'Grouped by observer server status. Completed, running, and interrupted details will be split in a later slice.',
+  );
   String get emptyRoomTitle => _t('尚未加入席位', 'No seat joined');
   String get emptyRoomBody => _t(
-    '先在「对局」里选择一局，再进入你的参与者视角。',
+    '先在首页选择一局，再进入你的参与者视角。',
     'Choose a match first, then enter your participant room.',
   );
   String get participantPerspective =>
@@ -86,6 +107,12 @@ class AppStrings {
   String get availableVersion => _t('可用版本', 'Available version');
   String get checkUpdates => _t('检查更新', 'Check Updates');
   String get downloadInstall => _t('下载并安装', 'Download & Install');
+  String get providerSettings => _t('供应商', 'Providers');
+  String get providerSettingsBody => _t(
+    '后续迁移桌面客户端的 BYO-key、Base URL、模型和启用状态。当前移动端先不保存密钥。',
+    'Next we will migrate the desktop client provider settings: BYO key, base URL, model, and enabled state. The mobile app does not store secrets yet.',
+  );
+  String get providerSettingsPending => _t('待接入', 'Pending');
   String get phoneLanHint => _t(
     '默认连接 PaleInk 云服务器；本机开发时，Android 真机不能使用 127.0.0.1，需要电脑局域网地址。',
     'Defaults to PaleInk Cloud. For local development on Android, use the computer LAN address instead of 127.0.0.1.',

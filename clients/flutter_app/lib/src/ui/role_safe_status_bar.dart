@@ -18,10 +18,15 @@ class RoleSafeStatusBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final strings = AppLanguageScope.of(context);
+    final palette = WerewolfAppTheme.colors(context);
     final seat = state?.seatId.toUpperCase() ?? '--';
     final activity = _activityLabel(strings, state);
     return DecoratedBox(
-      decoration: const BoxDecoration(color: WerewolfAppTheme.surface),
+      decoration: BoxDecoration(
+        color: palette.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: palette.border),
+      ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         child: Row(
@@ -46,7 +51,8 @@ class RoleSafeStatusBar extends StatelessWidget {
     if (state?.openActionWindow != null) {
       return strings.waitingForYou;
     }
-    final phase = state?.projection['phase'] as String? ??
+    final phase =
+        state?.projection['phase'] as String? ??
         state?.openActionWindow?.phase ??
         state?.runStatus;
     return switch (phase) {

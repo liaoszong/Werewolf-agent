@@ -11,7 +11,9 @@ class SpeechFeed extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (events.isEmpty) {
-      return Center(child: Text(AppLanguageScope.of(context).visibleEventsWaiting));
+      return Center(
+        child: Text(AppLanguageScope.of(context).visibleEventsWaiting),
+      );
     }
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(14, 10, 14, 96),
@@ -34,7 +36,8 @@ class SpeechFeed extends StatelessWidget {
   static String _extractText(Map<String, dynamic> event, String fallback) {
     final payload = event['payload'] ?? event['data'];
     if (payload is Map<String, dynamic>) {
-      final message = payload['message'] ?? payload['summary'] ?? payload['text'];
+      final message =
+          payload['message'] ?? payload['summary'] ?? payload['text'];
       if (message is String && message.isNotEmpty) return message;
     }
     return fallback;
@@ -59,13 +62,14 @@ class _SpeechBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = WerewolfAppTheme.colors(context);
     return Align(
       alignment: Alignment.centerLeft,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 340),
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: WerewolfAppTheme.surfaceElevated,
+            color: palette.surfaceElevated,
             borderRadius: BorderRadius.circular(18),
           ),
           child: Padding(
@@ -75,7 +79,7 @@ class _SpeechBubble extends StatelessWidget {
               children: [
                 Text(actor, style: Theme.of(context).textTheme.bodySmall),
                 const SizedBox(height: 6),
-                RichText(text: highlightSpeechText(text)),
+                RichText(text: highlightSpeechText(context, text)),
               ],
             ),
           ),
@@ -92,12 +96,13 @@ class _RuleEventPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = WerewolfAppTheme.colors(context);
     return Center(
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: WerewolfAppTheme.surface,
+          color: palette.surface,
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: const Color(0xFF2D3744)),
+          border: Border.all(color: palette.border),
         ),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
@@ -108,11 +113,9 @@ class _RuleEventPill extends StatelessWidget {
   }
 }
 
-InlineSpan highlightSpeechText(String text) {
-  final pattern = RegExp(
-    r'(P[1-6]|狼人|预言家|女巫|猎人|守卫|村民)',
-    caseSensitive: false,
-  );
+InlineSpan highlightSpeechText(BuildContext context, String text) {
+  final palette = WerewolfAppTheme.colors(context);
+  final pattern = RegExp(r'(P[1-6]|狼人|预言家|女巫|猎人|守卫|村民)', caseSensitive: false);
   final spans = <TextSpan>[];
   var cursor = 0;
   for (final match in pattern.allMatches(text)) {
@@ -120,32 +123,34 @@ InlineSpan highlightSpeechText(String text) {
       spans.add(TextSpan(text: text.substring(cursor, match.start)));
     }
     final token = match.group(0)!;
-    spans.add(TextSpan(
-      text: token,
-      style: TextStyle(
-        color: _highlightColor(token),
-        fontWeight: FontWeight.w800,
+    spans.add(
+      TextSpan(
+        text: token,
+        style: TextStyle(
+          color: _highlightColor(token, palette),
+          fontWeight: FontWeight.w800,
+        ),
       ),
-    ));
+    );
     cursor = match.end;
   }
   if (cursor < text.length) {
     spans.add(TextSpan(text: text.substring(cursor)));
   }
   return TextSpan(
-    style: const TextStyle(color: WerewolfAppTheme.textPrimary, height: 1.38),
+    style: TextStyle(color: palette.textPrimary, height: 1.38),
     children: spans,
   );
 }
 
-Color _highlightColor(String token) {
+Color _highlightColor(String token, WerewolfPalette palette) {
   return switch (token.toUpperCase()) {
-    '狼人' => WerewolfAppTheme.danger,
-    '预言家' => WerewolfAppTheme.seer,
-    '女巫' => WerewolfAppTheme.witch,
-    '猎人' => WerewolfAppTheme.accent,
+    '狼人' => palette.danger,
+    '预言家' => palette.seer,
+    '女巫' => palette.witch,
+    '猎人' => palette.accent,
     '守卫' => const Color(0xFF8CC8FF),
-    '村民' => WerewolfAppTheme.villager,
-    _ => Colors.white,
+    '村民' => palette.villager,
+    _ => palette.textPrimary,
   };
 }

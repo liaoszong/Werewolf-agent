@@ -64,7 +64,7 @@ class _WerewolfAppState extends State<WerewolfApp> {
           child: MaterialApp(
             title: strings.appTitle,
             debugShowCheckedModeBanner: false,
-            theme: WerewolfAppTheme.darkTheme(),
+            theme: WerewolfAppTheme.themeFor(_settingsController.appearance),
             home: HomeShell(
               settingsController: _settingsController,
               updateRepository: _updateRepository,

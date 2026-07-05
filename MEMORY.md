@@ -32,6 +32,45 @@ machine secrets here.
 
 ## Entries
 
+### 2026-07-05 - Flutter Mobile Navigation + Appearance Shell
+
+- Reworked the Flutter home shell so the bottom navigation is top-level only:
+  Home, Roles, History, Settings. Match picking and live room entry are now a
+  Home-owned flow, not duplicate bottom tabs.
+- Replaced Material `NavigationBar` with a custom floating rounded tab bar to
+  avoid the default blue ripple/indicator animation. Match picker and live room
+  flows hide bottom navigation and use an iOS-style floating back button.
+- Added two appearance styles: Night (Werewolf-themed dark palette) and Day
+  (Claude-like warm light palette). Home now has a compact day/night toggle in
+  the upper-right; language switching remains in Settings only.
+- Added a mobile role library with role cards for Werewolf, Seer, Witch,
+  Hunter, Villager, and Guard. Role detail sheets expose agent harness, memory,
+  prompt, and editable/locked scope. This is a read-only UI slice and does not
+  change prompt protocol or backend role policy.
+- Added a History page shell that groups observer runs by running/completed/
+  interrupted/failed status. Detailed completed/running/interrupted replay UX
+  remains a later discussion.
+- Kept Settings connection/update controls and added a Providers section that
+  explicitly marks BYO-key/base URL/model migration as pending. The mobile app
+  still does not store provider secrets.
+- Tightened the live-room composer into a ChatGPT/Claude-like rounded input bar
+  with larger vertically centered text and compact icon buttons.
+- Verification:
+  - `flutter test test/widget/home_shell_test.dart test/ui/composer_rail_test.dart` passed 14 tests.
+  - `flutter analyze` passed.
+  - `flutter test` passed 47 tests.
+  - `git diff --check` had only checkout CRLF warnings and no whitespace errors.
+- Local APK artifact built:
+  - `clients/flutter_app/build/app/outputs/flutter-apk/app-internal-release.apk`
+  - version: `0.2.1-internal.4+214`
+  - size: `19056082`
+  - SHA256:
+    `7a807da7fead347091c497033f7afad9105bd161f531a03eb9cc485757590177`
+- Caveat: this local APK is not published to GitHub Internal update manifest.
+  If installed over a GitHub-signed internal build, Android may reject it due to
+  signing-certificate mismatch unless rebuilt/published through the release
+  workflow or the old app is uninstalled.
+
 ### 2026-07-04 - Public Observer Endpoint + Flutter Server Preset
 
 - Bound `api.paleink.cc` to Tencent Cloud server `43.159.168.39` and verified
