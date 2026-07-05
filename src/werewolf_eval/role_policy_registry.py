@@ -39,6 +39,18 @@ _FORBIDDEN_POLICY_FIELDS = frozenset(
         "legal_action_window",
     }
 )
+_FORBIDDEN_POLICY_KEY_FRAGMENTS = (
+    "provider_profile",
+    "execution_contract",
+    "runtime_state",
+    "model_call",
+    "tool_round",
+    "call_budget",
+    "token_budget",
+    "timeout_budget",
+    "visibility_entitlement",
+    "legal_action_window",
+)
 _SECRET_KEY_FRAGMENTS = (
     "api_key",
     "api-key",
@@ -348,6 +360,10 @@ def _validate_draft(draft: dict[str, Any]) -> None:
         raise RolePolicyRegistryError("RolePolicyDraft.status invalid")
     _split_policy_ref(draft["base_policy_ref"])
     _validate_policy(draft["policy"])
+    if draft["policy"]["role"] != draft["role"]:
+        raise RolePolicyRegistryError(
+            f"RolePolicyDraft role {draft['role']!r} contains {draft['policy']['role']!r} policy"
+        )
 
 
 def _check_policy_patch(obj: dict[str, Any]) -> None:
@@ -364,7 +380,10 @@ def _check_no_forbidden_policy_fields(obj: Any, path: str = "") -> None:
     if isinstance(obj, dict):
         for key, value in obj.items():
             key_text = str(key)
-            if key_text in _FORBIDDEN_POLICY_FIELDS:
+            key_lower = key_text.lower()
+            if key_text in _FORBIDDEN_POLICY_FIELDS or any(
+                fragment in key_lower for fragment in _FORBIDDEN_POLICY_KEY_FRAGMENTS
+            ):
                 raise RolePolicyRegistryError(
                     f"RolePolicy contains forbidden field: {path}{key_text}"
                 )

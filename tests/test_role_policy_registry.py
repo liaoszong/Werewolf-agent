@@ -1,3 +1,4 @@
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -123,6 +124,10 @@ class RolePolicyRegistryTests(unittest.TestCase):
             {"team_policy": {"team_plan_ref": "runtime_team_state_1"}},
             {"ability_use_policy": {"legal_action_window": "night:any"}},
             {"claim_policy": {"visibility_entitlement": "god_view"}},
+            {"ability_use_policy": {"model_call_budget": 2}},
+            {"ability_use_policy": {"tool_rounds": 2}},
+            {"team_policy": {"timeout_budget_seconds": 90}},
+            {"claim_policy": {"provider_profile_id": "deepseek_default"}},
         ]
         for changes in nested_payloads:
             with self.subTest(changes=changes):
@@ -214,7 +219,30 @@ class RolePolicyRegistryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "bad-role-policy-registry.json"
             path.write_text(
-                __import__("json").dumps(data, ensure_ascii=False),
+                json.dumps(data, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            with self.assertRaises(RolePolicyRegistryError):
+                RolePolicyRegistry.load(path)
+
+    def test_load_rejects_draft_role_policy_mismatch(self):
+        registry = build_default_role_policy_registry()
+        draft = registry.create_draft(
+            pack_id="standard_six_player_balanced",
+            role="seer",
+            changes={"goals": ["seer draft"]},
+        )
+        data = registry.export()
+        data["drafts"][draft["draft_id"]]["policy"] = registry.resolve_policy_ref(
+            data["packs"]["standard_six_player_balanced"]["role_policy_refs"][
+                "werewolf"
+            ]
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "bad-draft-role-policy-registry.json"
+            path.write_text(
+                json.dumps(data, ensure_ascii=False),
                 encoding="utf-8",
             )
             with self.assertRaises(RolePolicyRegistryError):
