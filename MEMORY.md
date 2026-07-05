@@ -66,10 +66,18 @@ machine secrets here.
   - size: `19056082`
   - SHA256:
     `7a807da7fead347091c497033f7afad9105bd161f531a03eb9cc485757590177`
-- Caveat: this local APK is not published to GitHub Internal update manifest.
-  If installed over a GitHub-signed internal build, Android may reject it due to
-  signing-certificate mismatch unless rebuilt/published through the release
-  workflow or the old app is uninstalled.
+- Published Android Internal release `v0.2.1-internal.4+214` from GitHub
+  Actions using the internal signing secret:
+  - Workflow run:
+    `https://github.com/liaoszong/Werewolf-agent/actions/runs/28727243033`
+  - Release:
+    `https://github.com/liaoszong/Werewolf-agent/releases/tag/v0.2.1-internal.4%2B214`
+  - Manifest:
+    `https://liaoszong.github.io/Werewolf-agent/updates/internal.json`
+  - Signed APK asset: `werewolf-agent-internal-arm64.apk`
+  - Size: `19319730`
+  - SHA256:
+    `93ff694a8644980f0adc297131e9147ae655767463017cd3766500e36c7941ff`
 
 ### 2026-07-04 - Public Observer Endpoint + Flutter Server Preset
 
