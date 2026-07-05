@@ -32,6 +32,42 @@ machine secrets here.
 
 ## Entries
 
+### 2026-07-06 - P3-A-3b Runtime Evidence Closure for Continuity Shadow
+
+- Completed P3-A-3b as a strict validation/runtime-evidence closure for the
+  explicit `prompt_v6` + `p3a_continuity_shadow` path. `PROMPT_VERSION`
+  remains `prompt_v1`; this was not a default prompt flip, release, or real
+  provider run.
+- Scope delivered:
+  - Added `src/werewolf_eval/continuity_runtime.py` with a shadow-only
+    `RuntimeContinuityStore` that derives covered ability history from real
+    engine game events and applies deterministic fixture-authored commitment
+    and belief lifecycle signals for the runtime evidence scenario.
+  - Wired the store into `EmergentGameEngine` and
+    `run_emergent_deepseek_game` only when an explicit continuity runtime
+    scenario is requested under the continuity shadow arm.
+  - Extended `prompt_v6` continuity rendering metadata so selected continuity
+    records expose record ids/statuses in artifacts without adding those ids to
+    model-visible prompt text.
+  - Added malicious untrusted-text fixtures and tests proving untrusted card,
+    policy, claim, commitment, belief, and team-plan text does not change
+    `ProviderRequest.allowed_actions`, `allowed_targets`, trusted action
+    contract hash, or TeamPlan isolation.
+  - Wrote an ignored audit bundle under `.tmp/` with runtime evidence chains,
+    provider request audit, compiled contexts, and safe-vs-malicious authority
+    comparison.
+- Verification:
+  - `$env:PYTHONPATH='src'; $env:NO_PROXY='*'; python -m unittest tests.test_continuity_runtime_evidence -v` passed 3 tests.
+  - `$env:PYTHONPATH='src'; $env:NO_PROXY='*'; python -m unittest tests.test_continuity_context tests.test_continuity_runtime_evidence tests.test_prompt_versioning tests.test_prompt_renderers -v` passed 44 tests, skipped 1.
+  - `$env:PYTHONPATH='src'; $env:NO_PROXY='*'; python -m unittest tests.test_continuity_runtime_evidence tests.test_c3_negative_scan -v` passed 7 tests.
+  - `$env:PYTHONPATH='src'; $env:NO_PROXY='*'; python -m unittest discover -s tests -p "test_*.py"` passed 1488 tests, skipped 2.
+  - `git diff --exit-code -- tests/golden_prompts/prompt_v1 tests/golden_prompts/prompt_v2 tests/golden_prompts/prompt_v3 tests/golden_prompts/prompt_v4 tests/golden_prompts/prompt_v5` passed.
+- Boundary: no real provider/API call, release, workflow, Flutter UI, default
+  prompt selection, `prompt_v1`, or `prompt_v5` behavior was changed. Covered
+  runtime ability evidence is limited to seer and witch events in the shadow
+  evidence scenario; generic ability ledger and real-model robustness remain
+  follow-up work.
+
 ### 2026-07-05 - P3-A-4 First Playable Roleplay Shadow Arm
 
 - Completed P3-A-4 as an explicit `p3a_roleplay_shadow` arm, not a default

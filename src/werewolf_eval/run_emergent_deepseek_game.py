@@ -33,6 +33,11 @@ from werewolf_eval.provider_contract import (
 )
 from werewolf_eval.evaluation_versions import SCORING_VERSION, evaluation_bucket
 from werewolf_eval.runtime_events import RuntimeEventWriter, build_prompt_manifest, redact_secret_values
+from werewolf_eval.continuity_shadow_arm import (
+    CONTINUITY_SHADOW_ARM_ID,
+    build_continuity_shadow_bundle,
+)
+from werewolf_eval.continuity_runtime import RuntimeContinuityStore
 from werewolf_eval.roleplay_shadow_arm import (
     ROLEPLAY_SHADOW_ARM_ID,
     build_roleplay_shadow_bundle,
@@ -230,6 +235,8 @@ def run_emergent_deepseek_game(
     participant_controller: object | None = None,
     human_seat_ids: set[str] | frozenset[str] | tuple[str, ...] = (),
     roleplay_arm: str | None = None,
+    continuity_runtime_scenario: str | None = None,
+    malicious_untrusted_text: str | None = None,
 ) -> int:
     # Fail-loud before any side effects (writer/engine construction).
     renderer = get_renderer(prompt_version)
@@ -247,16 +254,43 @@ def run_emergent_deepseek_game(
         if scaffold_provider_factory is None:
             raise ValueError(f"{prompt_version} requires scaffold_provider_factory (scribe provider)")
         scaffold_agent = scaffold_provider_factory()
+    if (continuity_runtime_scenario or malicious_untrusted_text) and roleplay_arm != CONTINUITY_SHADOW_ARM_ID:
+        raise ValueError("continuity runtime evidence options require p3a_continuity_shadow")
     roleplay_bundle = None
+    continuity_recorder = None
     if roleplay_arm is not None:
-        if roleplay_arm != ROLEPLAY_SHADOW_ARM_ID:
+        if roleplay_arm not in {ROLEPLAY_SHADOW_ARM_ID, CONTINUITY_SHADOW_ARM_ID}:
             raise ValueError(f"unknown roleplay_arm {roleplay_arm!r}")
-        if prompt_version != "prompt_v5":
+        if roleplay_arm == ROLEPLAY_SHADOW_ARM_ID and prompt_version != "prompt_v5":
             raise ValueError("roleplay_arm requires prompt_version='prompt_v5'")
-        roleplay_bundle = build_roleplay_shadow_bundle(
+        if roleplay_arm == CONTINUITY_SHADOW_ARM_ID and prompt_version != "prompt_v6":
+            raise ValueError(
+                "p3a_continuity_shadow requires prompt_version='prompt_v6'"
+            )
+        bundle_builder = (
+            build_continuity_shadow_bundle
+            if roleplay_arm == CONTINUITY_SHADOW_ARM_ID
+            else build_roleplay_shadow_bundle
+        )
+        roleplay_bundle = bundle_builder(
             run_id=game_id,
             seat_roles={p.player_id: p.role for p in config.players},
+            **(
+                {"malicious_untrusted_text": malicious_untrusted_text}
+                if roleplay_arm == CONTINUITY_SHADOW_ARM_ID
+                else {}
+            ),
         )
+        if roleplay_arm == CONTINUITY_SHADOW_ARM_ID and continuity_runtime_scenario:
+            continuity_recorder = RuntimeContinuityStore(
+                run_id=game_id,
+                seat_roles={p.player_id: p.role for p in config.players},
+                agent_context_packets=roleplay_bundle["agent_context_packets"],
+                runtime_seat_states=roleplay_bundle["runtime_seat_states"],
+                runtime_team_states=roleplay_bundle["runtime_team_states"],
+                scenario_id=continuity_runtime_scenario,
+                malicious_untrusted_text=malicious_untrusted_text,
+            )
     writer = RuntimeEventWriter(run_id=game_id, out_dir=out_dir)
     human_ids = set(human_seat_ids)
     agents = {pid: provider_factory(pid) for pid in PLAYER_IDS if pid not in human_ids}
@@ -285,6 +319,10 @@ def run_emergent_deepseek_game(
         agent_context_packets=(
             roleplay_bundle["agent_context_packets"] if roleplay_bundle else None
         ),
+        roleplay_context_max_records=(
+            8 if roleplay_arm == CONTINUITY_SHADOW_ARM_ID else 6
+        ),
+        continuity_recorder=continuity_recorder,
         participant_controller=participant_controller,
         human_seat_ids=human_ids,
     )
@@ -339,6 +377,10 @@ def run_emergent_deepseek_game(
         manifest["roleplay_public_manifest"] = roleplay_bundle["public_run_manifest"]
     writer.write_prompt_manifest(manifest)
     if roleplay_bundle is not None:
+        if continuity_recorder is not None:
+            roleplay_bundle["postgame_audit_artifact"][
+                "runtime_continuity"
+            ] = continuity_recorder.audit_artifact()
         write_json(out_dir / "roleplay-audit.json", roleplay_bundle["postgame_audit_artifact"])
 
     if outcome.completed:

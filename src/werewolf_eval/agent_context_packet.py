@@ -22,6 +22,7 @@ _RECORD_KINDS = frozenset(
         "ClaimRecord",
         "BeliefRecord",
         "CommitmentRecord",
+        "AbilityHistoryRecord",
         "TeamPlanRecord",
         "StaticPlaybookRecord",
     }
@@ -34,6 +35,7 @@ _SECTIONS = frozenset(
         "public_timeline",
         "episodic_notes",
         "commitments",
+        "ability_history",
         "team_memory",
         "retrieved_playbook",
     }
@@ -58,7 +60,16 @@ _TRUST_CLASSES = frozenset(
 _RENDER_MODES = frozenset(
     {"control", "guidance", "quoted_evidence", "state_summary", "ui_only"}
 )
-_STATUSES = frozenset({"active", "superseded", "retracted"})
+_STATUSES = frozenset(
+    {
+        "active",
+        "weakened",
+        "superseded",
+        "retracted",
+        "satisfied",
+        "expired",
+    }
+)
 _FACT_WRITERS = frozenset({"engine", "runtime"})
 
 
@@ -110,6 +121,18 @@ def validate_memory_record(record: object) -> None:
             "status",
             "summary",
             "supersedes",
+            "owner_seat_id",
+            "target_seat_id",
+            "proposition",
+            "confidence",
+            "evidence_refs",
+            "source_turn",
+            "created_round",
+            "created_phase",
+            "superseded_by",
+            "status_reason",
+            "ability_name",
+            "ability_state",
         },
         where="MemoryRecord",
     )
@@ -132,6 +155,7 @@ def validate_memory_record(record: object) -> None:
         raise AgentContextPacketError("MemoryRecord.summary must be non-empty string")
     if "supersedes" in record:
         _check_str_list(record["supersedes"], where="MemoryRecord.supersedes")
+    _validate_optional_continuity_fields(record)
     _validate_audience_scope(record)
     _validate_source_provenance(record)
     _validate_record_semantics(record)
@@ -164,6 +188,9 @@ def render_record_summary(record: dict[str, Any]) -> dict[str, Any]:
                 f"{status} Belief: this agent previously believed {summary}; "
                 "this is not current engine truth."
             )
+    elif kind == "AbilityHistoryRecord":
+        fact_semantics = "engine_truth"
+        text = f"Role-private ability history: {summary}"
     else:
         fact_semantics = "non_fact"
         text = f"{inactive_prefix}{kind}: {summary}; this is not engine truth."
@@ -174,6 +201,7 @@ def render_record_summary(record: dict[str, Any]) -> dict[str, Any]:
         "trust_class": record["trust_class"],
         "render_mode": record["render_mode"],
         "visibility_scope": record["visibility_scope"],
+        "status": record["status"],
         "source_provenance": copy.deepcopy(record["source_provenance"]),
     }
 
@@ -244,6 +272,18 @@ def _validate_record_semantics(record: dict[str, Any]) -> None:
     elif kind in {"BeliefRecord", "CommitmentRecord", "TeamPlanRecord"}:
         if record["render_mode"] != "state_summary":
             raise AgentContextPacketError(f"{kind}.render_mode must be state_summary")
+    elif kind == "AbilityHistoryRecord":
+        if record["writer"] not in _FACT_WRITERS:
+            raise AgentContextPacketError("AbilityHistoryRecord writer must be runtime or engine")
+        if record["visibility_scope"] != "seat_private":
+            raise AgentContextPacketError("AbilityHistoryRecord must be seat_private")
+        if record["render_mode"] != "state_summary":
+            raise AgentContextPacketError("AbilityHistoryRecord.render_mode must be state_summary")
+        provenance = record["source_provenance"]
+        if not provenance.get("source_event_ids") and not provenance.get("static_source"):
+            raise AgentContextPacketError(
+                "AbilityHistoryRecord requires source_event_ids or static_source"
+            )
     elif kind == "StaticPlaybookRecord":
         if record["render_mode"] != "guidance":
             raise AgentContextPacketError("StaticPlaybookRecord.render_mode must be guidance")
@@ -311,6 +351,33 @@ def _validate_source_provenance(record: dict[str, Any]) -> None:
         raise AgentContextPacketError("MemoryRecord.source_provenance.static_source must be string")
     if not isinstance(provenance.get("generated_by"), str) or not provenance["generated_by"]:
         raise AgentContextPacketError("MemoryRecord.source_provenance.generated_by required")
+
+
+def _validate_optional_continuity_fields(record: dict[str, Any]) -> None:
+    for key in ("owner_seat_id", "target_seat_id"):
+        if key in record:
+            _check_seat_id(record[key], where=f"MemoryRecord.{key}")
+    for key in ("proposition", "source_turn", "created_phase", "superseded_by", "status_reason", "ability_name", "ability_state"):
+        if key in record and (
+            not isinstance(record[key], str) or not record[key].strip()
+        ):
+            raise AgentContextPacketError(f"MemoryRecord.{key} must be non-empty string")
+    if "confidence" in record:
+        confidence = record["confidence"]
+        if (
+            isinstance(confidence, bool)
+            or not isinstance(confidence, (int, float))
+            or not (0.0 <= float(confidence) <= 1.0)
+        ):
+            raise AgentContextPacketError("MemoryRecord.confidence must be 0..1 number")
+    if "evidence_refs" in record:
+        _check_str_list(record["evidence_refs"], where="MemoryRecord.evidence_refs")
+    if "created_round" in record and (
+        isinstance(record["created_round"], bool)
+        or not isinstance(record["created_round"], int)
+        or record["created_round"] < 0
+    ):
+        raise AgentContextPacketError("MemoryRecord.created_round must be non-negative int")
 
 
 def _is_record_visible_to(

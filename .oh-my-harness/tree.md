@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 710
+- Entries: 719
 
 ```text
 ./
@@ -587,6 +587,9 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       ├── attribute_game.py
 │       ├── attribution.py
 │       ├── consensus_log.py
+│       ├── continuity_context.py
+│       ├── continuity_runtime.py
+│       ├── continuity_shadow_arm.py
 │       ├── credential_store.py
 │       ├── decision_log.py
 │       ├── deepseek_launcher.py
@@ -619,6 +622,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       ├── prompt_v3.py
 │       ├── prompt_v4.py
 │       ├── prompt_v5.py
+│       ├── prompt_v6.py
 │       ├── prompt_version.py
 │       ├── provider_agent.py
 │       ├── provider_contract.py
@@ -669,7 +673,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   │   └── diag_A_seer_p3_1/
 │   │   │       ├── game-log.json
 │   │   │       └── provider-turns.json
-│   │   └── emergent_ledger_golden.json
+│   │   ├── emergent_ledger_golden.json
+│   │   └── p3a_day2_role_context_matrix_fixture.py
 │   ├── golden_prompts/
 │   │   ├── prompt_v1/
 │   │   │   ├── action_hunter_day_vote.txt
@@ -712,9 +717,12 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   │   ├── obs_witch_guard_board_no_victim_identity.txt
 │   │   │   ├── obs_witch_guard_board_victim_coord.txt
 │   │   │   └── witch_coord_suffix_injected.txt
-│   │   └── prompt_v5/
-│   │       ├── roleplay_context_card_policy_packet.txt
-│   │       └── roleplay_context_werewolf_with_packet.txt
+│   │   ├── prompt_v5/
+│   │   │   ├── roleplay_context_card_policy_packet.txt
+│   │   │   └── roleplay_context_werewolf_with_packet.txt
+│   │   └── prompt_v6/
+│   │       ├── continuity_context_witch_ability_history.txt
+│   │       └── continuity_context_wolf_with_team_plan.txt
 │   ├── fake_scribe.py
 │   ├── parity_scripts.py
 │   ├── test_ablation_arms.py
@@ -739,6 +747,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── test_c3_negative_scan.py
 │   ├── test_consensus_log.py
 │   ├── test_context_budget.py
+│   ├── test_continuity_context.py
+│   ├── test_continuity_runtime_evidence.py
 │   ├── test_credential_store.py
 │   ├── test_decision_log.py
 │   ├── test_deepseek_consensus_game.py

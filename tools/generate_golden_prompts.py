@@ -23,6 +23,7 @@ from werewolf_eval.prompt_goldens import (
     canonical_prompt_samples_v3,
     canonical_prompt_samples_v4,
     canonical_prompt_samples_v5,
+    canonical_prompt_samples_v6,
 )
 from werewolf_eval.prompt_version import PROMPT_VERSION
 
@@ -45,6 +46,7 @@ def main() -> None:
     all_hashes["prompt_v3"] = _write_dir("prompt_v3", canonical_prompt_samples_v3())
     all_hashes["prompt_v4"] = _write_dir("prompt_v4", canonical_prompt_samples_v4())
     all_hashes["prompt_v5"] = _write_dir("prompt_v5", canonical_prompt_samples_v5())
+    all_hashes["prompt_v6"] = _write_dir("prompt_v6", canonical_prompt_samples_v6())
     print(json.dumps(all_hashes, indent=2, ensure_ascii=False))
 
 

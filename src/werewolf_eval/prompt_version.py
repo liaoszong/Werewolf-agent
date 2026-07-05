@@ -20,10 +20,13 @@ PROMPT_VERSION = "prompt_v1"
 # (l4_guard_witch_coord arm, spec 2026-06-12).
 # prompt_v5 = v4 + P3-A roleplay context blocks (RolePolicy +
 # AgentContextPacket) for an explicit roleplay arm.
+# prompt_v6 = v5 sibling path for P3-A-3 continuity context blocks, selected
+# only by the explicit p3a_continuity_shadow arm.
 KNOWN_PROMPT_VERSIONS = (
     "prompt_v1",
     "prompt_v2",
     "prompt_v3",
     "prompt_v4",
     "prompt_v5",
+    "prompt_v6",
 )

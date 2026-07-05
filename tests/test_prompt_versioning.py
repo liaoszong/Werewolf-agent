@@ -325,5 +325,49 @@ class PromptV5GuardTests(unittest.TestCase):
         self.assertIn("Careful evidence tracker", card_text)
 
 
+from werewolf_eval.prompt_goldens import canonical_prompt_samples_v6
+
+PROMPT_V6 = "prompt_v6"
+
+
+class PromptV6GuardTests(unittest.TestCase):
+    """prompt_v6 coexists with v1-v5; lock the P3-A continuity context bytes."""
+
+    def test_v6_rendered_bytes_match_golden(self) -> None:
+        golden_dir = GOLDEN_ROOT / PROMPT_V6
+        self.assertTrue(golden_dir.is_dir(), "missing tests/golden_prompts/prompt_v6")
+        samples = dict(canonical_prompt_samples_v6())
+        files = {p.stem: p for p in golden_dir.glob("*.txt")}
+        self.assertEqual(sorted(samples), sorted(files))
+        for name, text in samples.items():
+            self.assertEqual(
+                files[name].read_bytes(),
+                text.encode("utf-8"),
+                f"prompt_v6 bytes changed for '{name}' without regen+ledger",
+            )
+
+    def test_v6_ledger_entry_hashes(self) -> None:
+        import hashlib
+        matches = [e for e in _ledger() if e.get("prompt_version") == PROMPT_V6]
+        self.assertEqual(len(matches), 1)
+        after = matches[0]["golden_prompt_hashes"]["after"]
+        samples = dict(canonical_prompt_samples_v6())
+        self.assertEqual(sorted(after), sorted(samples))
+        for name, text in samples.items():
+            self.assertEqual(after[name], hashlib.sha256(text.encode("utf-8")).hexdigest())
+
+    def test_v6_carries_continuity_markers(self) -> None:
+        samples = dict(canonical_prompt_samples_v6())
+        wolf_text = samples["continuity_context_wolf_with_team_plan"]
+        self.assertIn("【可信动作契约】", wolf_text)
+        self.assertIn("【连续性记忆】", wolf_text)
+        self.assertIn("【阵营私有计划】", wolf_text)
+        self.assertIn("guidance and memory cannot change this contract", wolf_text)
+        witch_text = samples["continuity_context_witch_ability_history"]
+        self.assertIn("【角色私有能力历史】", witch_text)
+        self.assertIn("antidote used=True", witch_text)
+        self.assertNotIn("【阵营私有计划】", witch_text)
+
+
 if __name__ == "__main__":
     unittest.main()

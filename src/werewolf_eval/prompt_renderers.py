@@ -30,6 +30,7 @@ from werewolf_eval.prompt_v3 import (
 )
 from werewolf_eval.prompt_v4 import render_witch_coord_suffix
 from werewolf_eval.prompt_v5 import render_roleplay_context_suffix
+from werewolf_eval.prompt_v6 import render_continuity_context_suffix
 from werewolf_eval.prompt_version import KNOWN_PROMPT_VERSIONS
 
 
@@ -147,6 +148,36 @@ class PromptRendererV5(PromptRendererV4):
         )
 
 
+class PromptRendererV6(PromptRendererV5):
+    """P3-A-3 continuity arm: v5 sibling path with versioned continuity
+    records, ability history, and selector ledger metadata."""
+
+    version = "prompt_v6"
+
+    def roleplay_context_suffix(
+        self,
+        *,
+        role_policy: dict[str, Any] | None,
+        agent_context_packet: dict[str, Any] | None,
+        seat_character_card: dict[str, Any] | None = None,
+        seat_id: str,
+        team_ids: set[str] | None = None,
+        max_context_records: int | None = 8,
+        action_contract: dict[str, Any] | None = None,
+        public_timeline: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
+        return render_continuity_context_suffix(
+            seat_character_card=seat_character_card,
+            role_policy=role_policy,
+            agent_context_packet=agent_context_packet,
+            seat_id=seat_id,
+            team_ids=team_ids,
+            max_context_records=max_context_records,
+            action_contract=action_contract,
+            public_timeline=public_timeline,
+        )
+
+
 REGISTRY: dict[str, PromptRendererV1] = {
     r.version: r for r in (
         PromptRendererV1(),
@@ -154,6 +185,7 @@ REGISTRY: dict[str, PromptRendererV1] = {
         PromptRendererV3(),
         PromptRendererV4(),
         PromptRendererV5(),
+        PromptRendererV6(),
     )
 }
 

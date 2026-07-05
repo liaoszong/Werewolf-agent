@@ -232,6 +232,7 @@ class EmergentGameEngine:
         role_policy_pack_id: str | None = None,
         agent_context_packets: dict[str, dict[str, Any]] | None = None,
         roleplay_context_max_records: int | None = 6,
+        continuity_recorder: Any | None = None,
         participant_controller: Any | None = None,
         human_seat_ids: Iterable[str] = (),
         participant_action_timeout_seconds: float = 60.0,
@@ -299,11 +300,16 @@ class EmergentGameEngine:
             _ruleset, {p.player_id: p.role for p in config.players}
         )
         self._role_policy_registry = role_policy_registry
-        if self.prompt_version == "prompt_v5" and self._role_policy_registry is None:
+        if self.prompt_version in {"prompt_v5", "prompt_v6"} and self._role_policy_registry is None:
             self._role_policy_registry = build_default_role_policy_registry()
         self._seat_character_cards = dict(seat_character_cards or {})
         self._role_policy_pack_id = role_policy_pack_id or "standard_six_player_balanced"
-        self._agent_context_packets = dict(agent_context_packets or {})
+        self._continuity_recorder = continuity_recorder
+        self._agent_context_packets = (
+            continuity_recorder.context_packets
+            if continuity_recorder is not None
+            else dict(agent_context_packets or {})
+        )
         self._roleplay_context_max_records = roleplay_context_max_records
         # SYS-B4: the scribe is NOT a player. A scaffold-requiring renderer (v3)
         # REQUIRES it (no silent scaffold-less run); other versions ignore it.
@@ -439,6 +445,8 @@ class EmergentGameEngine:
             "data": {"summary": summary, "visible_info_refs": refs or []},
         }
         self._events.append(evt)
+        if self._continuity_recorder is not None:
+            self._continuity_recorder.on_game_event(evt)
         if self._runtime_events is not None:
             self._runtime_events.emit(
                 "game_event_emitted",
@@ -595,9 +603,21 @@ class EmergentGameEngine:
     def _render_obs(self, obs: AgentObservation) -> RenderedObservation:
         return self._renderer.render_observation(obs, self._events_by_id())
 
-    def _roleplay_context(self, obs: AgentObservation) -> dict[str, Any]:
-        if self.prompt_version != "prompt_v5":
+    def _roleplay_context(
+        self,
+        obs: AgentObservation,
+        *,
+        response_kind: str,
+        action_contract: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        if self.prompt_version not in {"prompt_v5", "prompt_v6"}:
             return {"text": "", "blocks": []}
+        if self._continuity_recorder is not None:
+            self._continuity_recorder.before_provider_request(
+                observation=obs.to_dict(),
+                response_kind=response_kind,
+                action_contract=action_contract,
+            )
         role_policy: dict[str, Any] | None = None
         if self._role_policy_registry is not None:
             pack = self._role_policy_registry.get_pack(self._role_policy_pack_id)
@@ -608,20 +628,55 @@ class EmergentGameEngine:
                     f"RolePolicyPack {self._role_policy_pack_id!r} has no policy for role {obs.role!r}"
                 ) from exc
             role_policy = self._role_policy_registry.resolve_policy_ref(policy_ref)
-        return self._renderer.roleplay_context_suffix(
-            role_policy=role_policy,
-            agent_context_packet=self._agent_context_packets.get(obs.player_id),
-            seat_character_card=self._seat_character_cards.get(obs.player_id),
-            seat_id=obs.player_id,
-            team_ids={obs.team},
-            max_context_records=self._roleplay_context_max_records,
-        )
+        kwargs: dict[str, Any] = {
+            "role_policy": role_policy,
+            "agent_context_packet": self._agent_context_packets.get(obs.player_id),
+            "seat_character_card": self._seat_character_cards.get(obs.player_id),
+            "seat_id": obs.player_id,
+            "team_ids": {obs.team},
+            "max_context_records": self._roleplay_context_max_records,
+        }
+        if self.prompt_version == "prompt_v6":
+            kwargs["action_contract"] = action_contract
+        return self._renderer.roleplay_context_suffix(**kwargs)
 
     def _append_roleplay_context(
-        self, obs_text: str, obs: AgentObservation
+        self,
+        obs_text: str,
+        obs: AgentObservation,
+        *,
+        response_kind: str,
+        action_contract: dict[str, Any] | None = None,
     ) -> tuple[str, list[dict[str, Any]]]:
-        rendered = self._roleplay_context(obs)
+        rendered = self._roleplay_context(
+            obs,
+            response_kind=response_kind,
+            action_contract=action_contract,
+        )
         return obs_text + str(rendered.get("text") or ""), list(rendered.get("blocks") or [])
+
+    def _request_action_contract(
+        self,
+        obs: AgentObservation,
+        *,
+        response_kind: str,
+        allowed_actions: Iterable[str],
+        allowed_targets: Iterable[str],
+    ) -> dict[str, Any]:
+        return {
+            "actor": obs.player_id,
+            "phase": obs.phase,
+            "round": obs.round,
+            "response_kind": response_kind,
+            "allowed_actions": list(allowed_actions),
+            "allowed_targets": list(allowed_targets),
+            "response_format_version": (
+                "free_text_speech"
+                if response_kind == "speech"
+                else "g1d-action-v1"
+            ),
+            "authority": "ProviderRequest fields from engine-created decision window",
+        }
 
     @staticmethod
     def _record_prompt_context_blocks(
@@ -682,7 +737,21 @@ class EmergentGameEngine:
         # Input-side ONLY — the action system prompt / strict-JSON contract is
         # untouched (spec §0). Empty suffix for v1/v2 keeps bytes identical.
         obs_text = rendered.text + self._renderer.action_obs_suffix(phase, self._claim_ledger)
-        obs_text, prompt_context_blocks = self._append_roleplay_context(obs_text, obs)
+        registry_phase = "day_vote" if phase == "day" else phase
+        allowed_actions = self._registry.allowed_actions(obs.role, registry_phase)
+        allowed_targets = list(obs.alive_players)
+        action_contract = self._request_action_contract(
+            obs,
+            response_kind="action",
+            allowed_actions=allowed_actions,
+            allowed_targets=allowed_targets,
+        )
+        obs_text, prompt_context_blocks = self._append_roleplay_context(
+            obs_text,
+            obs,
+            response_kind="action",
+            action_contract=action_contract,
+        )
         # C12-01: day-phase action = vote; append _vote so the request_id never
         # collides with the same actor's night action (which shares the bare
         # f"{game_id}_r{rnd:02d}_{actor}" stem). Witch/speech/hunter/scribe already
@@ -1171,7 +1240,20 @@ class EmergentGameEngine:
         rendered = self._render_obs(obs)
         witch_obs_text = augment_witch_observation(rendered.text, victim)
         witch_obs_text += self._renderer.witch_obs_suffix(self._board_card, victim, save_used)
-        witch_obs_text, prompt_context_blocks = self._append_roleplay_context(witch_obs_text, obs)
+        witch_allowed_actions = list(WITCH_ACTIONS)
+        witch_allowed_targets = sorted(self._alive)
+        action_contract = self._request_action_contract(
+            obs,
+            response_kind="action",
+            allowed_actions=witch_allowed_actions,
+            allowed_targets=witch_allowed_targets,
+        )
+        witch_obs_text, prompt_context_blocks = self._append_roleplay_context(
+            witch_obs_text,
+            obs,
+            response_kind="action",
+            action_contract=action_contract,
+        )
         request = ProviderRequest(
             request_id=f"{self._game_id}_r{rnd:02d}_{witch}_witch",
             game_id=self._game_id,
@@ -1179,8 +1261,8 @@ class EmergentGameEngine:
             phase="night",
             round=rnd,
             observation=obs.to_dict(),
-            allowed_actions=list(WITCH_ACTIONS),
-            allowed_targets=sorted(self._alive),
+            allowed_actions=witch_allowed_actions,
+            allowed_targets=witch_allowed_targets,
             observation_text=witch_obs_text,
             response_kind="action",
             max_output_tokens=ACTION_MAX_OUTPUT_TOKENS,
@@ -1342,7 +1424,18 @@ class EmergentGameEngine:
         # never the comparison program (b1 lesson: don't arm wolf fake-claims).
         # Non-v3 renderers return "" — bytes identical.
         obs_text = rendered.text + self._renderer.speech_obs_suffix(self._claim_ledger)
-        obs_text, prompt_context_blocks = self._append_roleplay_context(obs_text, obs)
+        action_contract = self._request_action_contract(
+            obs,
+            response_kind="speech",
+            allowed_actions=[],
+            allowed_targets=[],
+        )
+        obs_text, prompt_context_blocks = self._append_roleplay_context(
+            obs_text,
+            obs,
+            response_kind="speech",
+            action_contract=action_contract,
+        )
         request = ProviderRequest(
             request_id=f"{self._game_id}_r{rnd:02d}_{player_id}_speech",
             game_id=self._game_id,
@@ -1542,16 +1635,26 @@ class EmergentGameEngine:
         self._budget.charge()
         obs = self._build_obs(hunter, phase, rnd)
         rendered = self._render_obs(obs)
+        hunter_allowed_actions = ["hunter_shoot", "hunter_pass"]
+        hunter_allowed_targets = sorted(self._alive)
+        action_contract = self._request_action_contract(
+            obs,
+            response_kind="action",
+            allowed_actions=hunter_allowed_actions,
+            allowed_targets=hunter_allowed_targets,
+        )
         hunter_obs_text, prompt_context_blocks = self._append_roleplay_context(
             rendered.text + HUNTER_SHOT_OBSERVATION_SUFFIX,
             obs,
+            response_kind="action",
+            action_contract=action_contract,
         )
         request = ProviderRequest(
             request_id=f"{self._game_id}_r{rnd:02d}_{hunter}_shot",
             game_id=self._game_id, actor=hunter, phase=HUNTER_SHOT_REQUEST_PHASE, round=rnd,
             observation=obs.to_dict(),
-            allowed_actions=["hunter_shoot", "hunter_pass"],
-            allowed_targets=sorted(self._alive),
+            allowed_actions=hunter_allowed_actions,
+            allowed_targets=hunter_allowed_targets,
             observation_text=hunter_obs_text,
             response_kind="action", max_output_tokens=ACTION_MAX_OUTPUT_TOKENS,
             prompt_version=self.prompt_version,

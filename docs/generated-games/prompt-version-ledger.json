@@ -214,5 +214,38 @@
       "production_default": "DO_NOT_FLIP (PROMPT_VERSION stays prompt_v1)",
       "next": "P3-B table-talk and richer roleplay interactions"
     }
+  },
+  {
+    "prompt_version": "prompt_v6",
+    "base_version": "prompt_v5",
+    "reason": "P3-A-3 continuity context shadow arm: add explicit CommitmentRecord lifecycle, BeliefRecord lifecycle, role-private AbilityHistoryRecord, ContextSelector ledger metadata, and synthetic matrix compiler coverage without changing prompt_v1 default or prompt_v5 bytes",
+    "expected_change": "prompt_v6 coexists with v1-v5 at runtime (arm-selected); v1-v5 goldens untouched; observation_text gains continuity context blocks only in prompt_v6/p3a_continuity_shadow",
+    "touched_chain": [
+      "prompt_v6.render_continuity_context_suffix",
+      "continuity_context.select_continuity_context",
+      "prompt_renderers.PromptRendererV6.roleplay_context_suffix",
+      "continuity_shadow_arm.build_continuity_shadow_bundle",
+      "emergent_engine._append_roleplay_context"
+    ],
+    "golden_prompt_hashes": {
+      "before": null,
+      "after": {
+        "continuity_context_wolf_with_team_plan": "ec2454c335c787e864916669b921700a13fd737783c006d6803669deeeb790ba",
+        "continuity_context_witch_ability_history": "b60c6c0c11fbf2afe19445fa26860eefcaa4881b00d19e96f04e0b342526f988"
+      }
+    },
+    "behavior_evidence": {
+      "status": "offline_fake_passed",
+      "evidence": "P3-A-3 focused tests and offline continuity audit verify explicit prompt_v6 + p3a_continuity_shadow gating, role-private ability history, commitment continuity, belief lifecycle, TeamPlan isolation, synthetic six-role matrix, and injection-boundary ordering. Real provider pilot was not run."
+    },
+    "blessed_by": "P3-A-3 implementation slice 2026-07-06",
+    "blessed_at": "2026-07-06",
+    "arm_status": "experimental_shadow_arm",
+    "arm_label": "p3a_continuity_shadow",
+    "verdict": {
+      "infrastructure": "PENDING_FULL_VALIDATION",
+      "production_default": "DO_NOT_FLIP (PROMPT_VERSION stays prompt_v1)",
+      "next": "offline memory-authoring design and limited real-model prompt_v1 vs prompt_v6 pilot only after audit review"
+    }
   }
 ]

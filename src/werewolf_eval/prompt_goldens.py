@@ -36,8 +36,10 @@ from werewolf_eval.prompt_v3 import (
 )
 from werewolf_eval.prompt_v4 import render_witch_coord_suffix
 from werewolf_eval.prompt_v5 import render_roleplay_context_suffix
+from werewolf_eval.prompt_v6 import render_continuity_context_suffix
 from werewolf_eval.provider_contract import ProviderRequest
 from werewolf_eval.agent_context_packet import AGENT_CONTEXT_PACKET_SCHEMA_VERSION
+from werewolf_eval.continuity_shadow_arm import build_continuity_shadow_bundle
 from werewolf_eval.role_policy_registry import build_default_role_policy_registry
 from werewolf_eval.roleplay_shadow_arm import build_starter_seat_character_cards
 
@@ -294,6 +296,59 @@ def canonical_prompt_samples_v5() -> list[tuple[str, str]]:
     return [
         ("roleplay_context_werewolf_with_packet", rendered["text"]),
         ("roleplay_context_card_policy_packet", card_rendered["text"]),
+    ]
+
+
+def canonical_prompt_samples_v6() -> list[tuple[str, str]]:
+    """prompt_v6 golden set — continuity selector surface only."""
+    bundle = build_continuity_shadow_bundle(
+        run_id="golden_fixture",
+        seat_roles=_STD_SEATS,
+    )
+    registry = bundle["role_policy_registry"]
+    pack = registry.get_pack("standard_six_player_balanced")
+    wolf_policy = registry.resolve_policy_ref(pack["role_policy_refs"]["werewolf"])
+    witch_policy = registry.resolve_policy_ref(pack["role_policy_refs"]["witch"])
+    public_timeline = [
+        {
+            "event_id": "synthetic_e_day1_claim",
+            "round": 1,
+            "phase": "day",
+            "type": "player_speech",
+            "summary": "p3 claimed a check result on p1.",
+        }
+    ]
+    wolf_rendered = render_continuity_context_suffix(
+        role_policy=wolf_policy,
+        agent_context_packet=bundle["agent_context_packets"]["p1"],
+        seat_character_card=bundle["seat_character_cards"]["p1"],
+        seat_id="p1",
+        team_ids={"werewolf"},
+        action_contract={
+            "phase": "day",
+            "round": 2,
+            "allowed_actions": ["player_vote"],
+            "allowed_targets": ["p1", "p2", "p3", "p4", "p5", "p6"],
+        },
+        public_timeline=public_timeline,
+    )
+    witch_rendered = render_continuity_context_suffix(
+        role_policy=witch_policy,
+        agent_context_packet=bundle["agent_context_packets"]["p4"],
+        seat_character_card=bundle["seat_character_cards"]["p4"],
+        seat_id="p4",
+        team_ids={"villager"},
+        action_contract={
+            "phase": "day",
+            "round": 2,
+            "allowed_actions": ["player_speech"],
+            "allowed_targets": [],
+        },
+        public_timeline=public_timeline,
+    )
+    return [
+        ("continuity_context_wolf_with_team_plan", wolf_rendered["text"]),
+        ("continuity_context_witch_ability_history", witch_rendered["text"]),
     ]
 
 
