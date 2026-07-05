@@ -56,6 +56,19 @@ machine secrets here.
   - Focused Flutter UI tests for speech feed, composer rail, and live room passed
     10 tests.
   - `$env:PYTHONPATH='src'; $env:NO_PROXY='*'; python -m unittest discover -s tests -p "test_*.py"` passed 1431 tests, skipped 2.
+- Pushed commit `33e4061` to `main`; GitHub `tests.yml` run `28728197715`
+  passed.
+- Published Android Internal release `v0.2.1-internal.5+215`:
+  - Workflow run:
+    `https://github.com/liaoszong/Werewolf-agent/actions/runs/28728233220`
+  - Release:
+    `https://github.com/liaoszong/Werewolf-agent/releases/tag/v0.2.1-internal.5%2B215`
+  - Manifest:
+    `https://liaoszong.github.io/Werewolf-agent/updates/internal.json`
+  - Signed APK asset: `werewolf-agent-internal-arm64.apk`
+  - Size: `19386642`
+  - SHA256:
+    `44800db2665e3d0c1c7c12cf14857a60d4b280b5942f2d5f69e21334563f9853`
 - Boundary: no protocol, runtime, provider, validator, generated fixture, or
   backend route behavior was changed.
 
