@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 699
+- Entries: 700
 
 ```text
 ./
@@ -471,7 +471,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   ├── plans/
 │   │   │   ├── 2026-06-19--active-runs-navigation-lifecycle-plan.md
 │   │   │   ├── 2026-06-20-r0-implementation-plan.md
-│   │   │   └── 2026-07-04-p3-e-mobile-first-human-seat-client-plan.md
+│   │   │   ├── 2026-07-04-p3-e-mobile-first-human-seat-client-plan.md
+│   │   │   └── 2026-07-05-p3-a-role-policy-runtime-plan.md
 │   │   └── specs/
 │   │       ├── 2026-06-04-g2d-2-qt-setup-ui-design.md
 │   │       ├── 2026-06-04-g2d-prompt-configuration-design.md
