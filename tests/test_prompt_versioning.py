@@ -320,6 +320,9 @@ class PromptV5GuardTests(unittest.TestCase):
         self.assertIn("【上下文记忆】", text)
         self.assertIn("hide team identity", text)
         self.assertIn("this is not engine truth", text)
+        card_text = samples["roleplay_context_card_policy_packet"]
+        self.assertIn("【座位表现】", card_text)
+        self.assertIn("Careful evidence tracker", card_text)
 
 
 if __name__ == "__main__":

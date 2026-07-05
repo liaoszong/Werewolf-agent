@@ -186,22 +186,24 @@
   {
     "prompt_version": "prompt_v5",
     "base_version": "prompt_v4",
-    "reason": "P3-A-2c roleplay context arm: append seat-private RolePolicy + AgentContextPacket guidance through PromptRendererV5 without changing prompt_v1 default bytes",
-    "expected_change": "prompt_v5 coexists with v1-v4 at runtime (arm-selected); v1-v4 goldens untouched; observation_text gains fixed-order roleplay context blocks only in prompt_v5",
+    "reason": "P3-A roleplay context arm: append seat-private SeatCharacterCard, RolePolicy, and AgentContextPacket guidance through PromptRendererV5 without changing prompt_v1 default bytes",
+    "expected_change": "prompt_v5 coexists with v1-v4 at runtime (arm-selected); v1-v4 goldens untouched; observation_text gains fixed-order roleplay context blocks only in prompt_v5/p3a_roleplay_shadow",
     "touched_chain": [
       "prompt_v5.render_roleplay_context_suffix",
       "prompt_renderers.PromptRendererV5.roleplay_context_suffix",
-      "emergent_engine._append_roleplay_context"
+      "emergent_engine._append_roleplay_context",
+      "roleplay_shadow_arm.build_roleplay_shadow_bundle"
     ],
     "golden_prompt_hashes": {
       "before": null,
       "after": {
-        "roleplay_context_werewolf_with_packet": "ac585c555c19bc09324c1b6513c7abe25e9d2390cdcb89c694bd7ffc772fbdb9"
+        "roleplay_context_werewolf_with_packet": "ac585c555c19bc09324c1b6513c7abe25e9d2390cdcb89c694bd7ffc772fbdb9",
+        "roleplay_context_card_policy_packet": "1dc482e4c0083a863f7f1622f393ad631894bd9ab79928b4fac037ea1eb91660"
       }
     },
     "behavior_evidence": {
-      "status": "not_run",
-      "reason_if_not_run": "P3-A-2c is a schema/runtime wiring slice; no live ablation requested. Focused unit and prompt-versioning tests verify role-scoped rendering, metadata provenance, and legacy prompt isolation."
+      "status": "offline_fake_passed",
+      "evidence": "P3-A-4 focused fake arm tests launch a 6-player p3a_roleplay_shadow game, verify public/private artifact split, baseline-off comparability, wolf-only TeamPlan visibility, provider-turn call accounting, and prompt_v5 golden/ledger guards."
     },
     "blessed_by": "P3-A-2c implementation plan 2026-07-05-p3-a-role-policy-runtime-plan",
     "blessed_at": "2026-07-05",
@@ -210,7 +212,7 @@
     "verdict": {
       "infrastructure": "PENDING_FULL_VALIDATION",
       "production_default": "DO_NOT_FLIP (PROMPT_VERSION stays prompt_v1)",
-      "next": "P3-A-4 first playable roleplay arm"
+      "next": "P3-B table-talk and richer roleplay interactions"
     }
   }
 ]

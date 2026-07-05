@@ -63,6 +63,7 @@ class PromptRendererV1:
         *,
         role_policy: dict[str, Any] | None,
         agent_context_packet: dict[str, Any] | None,
+        seat_character_card: dict[str, Any] | None = None,
         seat_id: str,
         team_ids: set[str] | None = None,
         max_context_records: int | None = 6,
@@ -131,11 +132,13 @@ class PromptRendererV5(PromptRendererV4):
         *,
         role_policy: dict[str, Any] | None,
         agent_context_packet: dict[str, Any] | None,
+        seat_character_card: dict[str, Any] | None = None,
         seat_id: str,
         team_ids: set[str] | None = None,
         max_context_records: int | None = 6,
     ) -> dict[str, Any]:
         return render_roleplay_context_suffix(
+            seat_character_card=seat_character_card,
             role_policy=role_policy,
             agent_context_packet=agent_context_packet,
             seat_id=seat_id,

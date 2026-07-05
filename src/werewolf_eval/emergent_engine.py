@@ -227,6 +227,7 @@ class EmergentGameEngine:
         runtime_events: Any | None = None,
         prompt_version: str = "prompt_v1",
         scaffold_agent: Any | None = None,
+        seat_character_cards: dict[str, dict[str, Any]] | None = None,
         role_policy_registry: Any | None = None,
         role_policy_pack_id: str | None = None,
         agent_context_packets: dict[str, dict[str, Any]] | None = None,
@@ -300,6 +301,7 @@ class EmergentGameEngine:
         self._role_policy_registry = role_policy_registry
         if self.prompt_version == "prompt_v5" and self._role_policy_registry is None:
             self._role_policy_registry = build_default_role_policy_registry()
+        self._seat_character_cards = dict(seat_character_cards or {})
         self._role_policy_pack_id = role_policy_pack_id or "standard_six_player_balanced"
         self._agent_context_packets = dict(agent_context_packets or {})
         self._roleplay_context_max_records = roleplay_context_max_records
@@ -609,6 +611,7 @@ class EmergentGameEngine:
         return self._renderer.roleplay_context_suffix(
             role_policy=role_policy,
             agent_context_packet=self._agent_context_packets.get(obs.player_id),
+            seat_character_card=self._seat_character_cards.get(obs.player_id),
             seat_id=obs.player_id,
             team_ids={obs.team},
             max_context_records=self._roleplay_context_max_records,

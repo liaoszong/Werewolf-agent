@@ -39,6 +39,7 @@ from werewolf_eval.prompt_v5 import render_roleplay_context_suffix
 from werewolf_eval.provider_contract import ProviderRequest
 from werewolf_eval.agent_context_packet import AGENT_CONTEXT_PACKET_SCHEMA_VERSION
 from werewolf_eval.role_policy_registry import build_default_role_policy_registry
+from werewolf_eval.roleplay_shadow_arm import build_starter_seat_character_cards
 
 _ALIVE = ["p1", "p2", "p3", "p4", "p5", "p6"]
 
@@ -283,8 +284,16 @@ def canonical_prompt_samples_v5() -> list[tuple[str, str]]:
         seat_id="p1",
         team_ids={"werewolf"},
     )
+    card_rendered = render_roleplay_context_suffix(
+        role_policy=policy,
+        agent_context_packet=_roleplay_packet(),
+        seat_character_card=build_starter_seat_character_cards()["calm_logician"],
+        seat_id="p1",
+        team_ids={"werewolf"},
+    )
     return [
         ("roleplay_context_werewolf_with_packet", rendered["text"]),
+        ("roleplay_context_card_policy_packet", card_rendered["text"]),
     ]
 
 

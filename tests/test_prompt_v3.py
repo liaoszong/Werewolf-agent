@@ -148,7 +148,7 @@ def test_system_for_routes_scaffold_speech_v3_and_vote_unchanged():
 
 
 # ------------------------------------------------------------------ Task 4 tests
-from fake_scribe import _FakeScribeProvider
+from tests.fake_scribe import _FakeScribeProvider
 
 from werewolf_eval.emergent_engine import EmergentBudget, EmergentGameEngine, build_emergent_config
 from werewolf_eval.emergent_fake_script import build_emergent_fake_agents, build_villager_win_script

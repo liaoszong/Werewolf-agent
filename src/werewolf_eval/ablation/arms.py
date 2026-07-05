@@ -18,6 +18,7 @@ class Arm:
     model: str = "deepseek-v4-flash"
     base_url: str = "https://api.deepseek.com"
     multiset: tuple[str, ...] = CANONICAL_MULTISET  # per-arm board (l4_guard swaps a villager for the guard)
+    roleplay_arm: str | None = None  # explicit P3-A roleplay shadow arm id; None keeps baseline off
 
     def seed_for(self, index: int) -> int:
         return self.seed_base + index

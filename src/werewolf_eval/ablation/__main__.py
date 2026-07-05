@@ -15,7 +15,8 @@ def _run(a):
     if not api_key:
         print(f"missing {a.api_key_env}", file=sys.stderr); return 1
     arm = Arm(label=a.label, prompt_version=a.prompt_version, n_games=a.n,
-              seed_base=a.seed_base, model=a.model, multiset=_BOARDS[a.board])
+              seed_base=a.seed_base, model=a.model, multiset=_BOARDS[a.board],
+              roleplay_arm=a.roleplay_arm)
     res = run_arm(arm, out_root=Path(a.out_root), api_key=api_key)
     print(json.dumps(res["metrics"], ensure_ascii=False, indent=1))
     return 0
@@ -41,6 +42,7 @@ def main(argv=None):
     r.add_argument("--model", default="deepseek-v4-flash"); r.add_argument("--out-root", dest="out_root", default=".runs/ablation")
     r.add_argument("--api-key-env", dest="api_key_env", default="DEEPSEEK_API_KEY")
     r.add_argument("--board", choices=sorted(_BOARDS), default="standard")
+    r.add_argument("--roleplay-arm", dest="roleplay_arm", default=None)
     c = sub.add_parser("compare"); c.set_defaults(fn=_compare)
     c.add_argument("arm_a"); c.add_argument("arm_b")
     a = p.parse_args(argv)

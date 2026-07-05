@@ -33,6 +33,10 @@ from werewolf_eval.provider_contract import (
 )
 from werewolf_eval.evaluation_versions import SCORING_VERSION, evaluation_bucket
 from werewolf_eval.runtime_events import RuntimeEventWriter, build_prompt_manifest, redact_secret_values
+from werewolf_eval.roleplay_shadow_arm import (
+    ROLEPLAY_SHADOW_ARM_ID,
+    build_roleplay_shadow_bundle,
+)
 
 ProviderFactory = Callable[[str], ProviderAgent]
 PLAYER_IDS = ["p1", "p2", "p3", "p4", "p5", "p6"]
@@ -107,7 +111,11 @@ def _collect_trace(
     )
 
 
-def _provider_turns_summary(turns: list[dict]) -> dict:
+def _provider_turns_summary(
+    turns: list[dict],
+    *,
+    response_latency_ms: dict[str, int] | None = None,
+) -> dict:
     by_kind: dict[str, int] = {}
     # B5 closeout (B34-03): honest token naming. Each turn's token_usage carries
     # prompt_tokens, completion_tokens, total_tokens. We sum them separately so
@@ -156,7 +164,54 @@ def _provider_turns_summary(turns: list[dict]) -> dict:
         "player_requests": live_requested,
         "scaffold_requests": sum(1 for t in turns if t.get("response_kind") == "scaffold"),
         "turns": turns,
+        "call_accounting": _call_accounting_from_turns(
+            turns,
+            response_latency_ms=response_latency_ms or {},
+        ),
     }
+
+
+def _call_accounting_from_turns(
+    turns: list[dict],
+    *,
+    response_latency_ms: dict[str, int],
+) -> list[dict]:
+    rows: list[dict] = []
+    for turn in turns:
+        kind = str(turn.get("kind") or "")
+        fallback_reason = turn.get("fallback_reason")
+        if turn.get("actor") == "scribe":
+            owner = "scaffold:scribe"
+            visibility_scope = "internal"
+        elif str(turn.get("actor", "")).startswith("p"):
+            owner = f"seat:{turn['actor']}"
+            visibility_scope = "seat_private"
+        else:
+            owner = f"system:{turn.get('actor', 'unknown')}"
+            visibility_scope = "internal"
+        blocks = turn.get("prompt_context_blocks") or []
+        rows.append(
+            {
+                "request_id": turn.get("request_id"),
+                "owner": owner,
+                "visibility_scope": visibility_scope,
+                "response_kind": turn.get("response_kind"),
+                "provider_result_kind": turn.get("kind"),
+                "token_usage": turn.get("token_usage") or {},
+                "latency_ms": response_latency_ms.get(str(turn.get("request_id"))),
+                "context_block_hashes": [
+                    block["content_hash"]
+                    for block in blocks
+                    if isinstance(block, dict) and block.get("content_hash")
+                ],
+                "fallback_result": (
+                    {"kind": kind, "reason": fallback_reason}
+                    if fallback_reason or "fallback" in kind
+                    else None
+                ),
+            }
+        )
+    return rows
 
 
 def run_emergent_deepseek_game(
@@ -174,6 +229,7 @@ def run_emergent_deepseek_game(
     scaffold_provider_factory=None,
     participant_controller: object | None = None,
     human_seat_ids: set[str] | frozenset[str] | tuple[str, ...] = (),
+    roleplay_arm: str | None = None,
 ) -> int:
     # Fail-loud before any side effects (writer/engine construction).
     renderer = get_renderer(prompt_version)
@@ -191,6 +247,16 @@ def run_emergent_deepseek_game(
         if scaffold_provider_factory is None:
             raise ValueError(f"{prompt_version} requires scaffold_provider_factory (scribe provider)")
         scaffold_agent = scaffold_provider_factory()
+    roleplay_bundle = None
+    if roleplay_arm is not None:
+        if roleplay_arm != ROLEPLAY_SHADOW_ARM_ID:
+            raise ValueError(f"unknown roleplay_arm {roleplay_arm!r}")
+        if prompt_version != "prompt_v5":
+            raise ValueError("roleplay_arm requires prompt_version='prompt_v5'")
+        roleplay_bundle = build_roleplay_shadow_bundle(
+            run_id=game_id,
+            seat_roles={p.player_id: p.role for p in config.players},
+        )
     writer = RuntimeEventWriter(run_id=game_id, out_dir=out_dir)
     human_ids = set(human_seat_ids)
     agents = {pid: provider_factory(pid) for pid in PLAYER_IDS if pid not in human_ids}
@@ -207,6 +273,18 @@ def run_emergent_deepseek_game(
         runtime_events=writer,
         prompt_version=prompt_version,
         scaffold_agent=scaffold_agent,
+        seat_character_cards=(
+            roleplay_bundle["seat_character_cards"] if roleplay_bundle else None
+        ),
+        role_policy_registry=(
+            roleplay_bundle["role_policy_registry"] if roleplay_bundle else None
+        ),
+        role_policy_pack_id=(
+            roleplay_bundle["role_policy_pack_id"] if roleplay_bundle else None
+        ),
+        agent_context_packets=(
+            roleplay_bundle["agent_context_packets"] if roleplay_bundle else None
+        ),
         participant_controller=participant_controller,
         human_seat_ids=human_ids,
     )
@@ -216,13 +294,25 @@ def run_emergent_deepseek_game(
     # Include scribe agent in trace collection so actor="scribe" rows are captured;
     # _provider_identity keeps using the original player-only agents (identity unaffected).
     trace_agents = {**agents, "scribe": scaffold_agent} if scaffold_agent is not None else agents
+    trace_doc = redact_secret_values(
+        _collect_trace(game_id, trace_agents, provider_name=provider_name, source_label=effective_label)
+    )
     write_json(
         out_dir / "provider-trace.json",
-        redact_secret_values(
-            _collect_trace(game_id, trace_agents, provider_name=provider_name, source_label=effective_label)
-        ),
+        trace_doc,
     )
-    write_json(out_dir / "provider-turns.json", _provider_turns_summary(outcome.provider_turns))
+    response_latency_ms = {
+        str(response["request_id"]): response.get("latency_ms")
+        for response in trace_doc.get("responses", [])
+        if isinstance(response, dict)
+    }
+    turns_summary = _provider_turns_summary(
+        outcome.provider_turns,
+        response_latency_ms=response_latency_ms,
+    )
+    if roleplay_bundle is not None:
+        turns_summary["roleplay_arm"] = roleplay_arm
+    write_json(out_dir / "provider-turns.json", turns_summary)
 
     # MANDATORY spine: prompt-manifest with the REAL per-seat provider/model/persona.
     providers = [a.provider for a in agents.values()]
@@ -245,7 +335,11 @@ def run_emergent_deepseek_game(
     manifest["secrets_redacted"] = True
     if scaffold_agent is not None:
         manifest["scaffold_model"] = getattr(scaffold_agent.provider, "model", None)
+    if roleplay_bundle is not None:
+        manifest["roleplay_public_manifest"] = roleplay_bundle["public_run_manifest"]
     writer.write_prompt_manifest(manifest)
+    if roleplay_bundle is not None:
+        write_json(out_dir / "roleplay-audit.json", roleplay_bundle["postgame_audit_artifact"])
 
     if outcome.completed:
         write_json(out_dir / "game-log.json", outcome.game_log)
@@ -297,7 +391,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-requests-per-game", type=int, default=64)
     parser.add_argument("--max-day-rounds", type=int, default=3)
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--prompt-version", default="prompt_v1")
     parser.add_argument("--allow-live-api", action="store_true", default=False)
+    parser.add_argument("--roleplay-arm", default=None)
     args = parser.parse_args(argv)
 
     if not args.allow_live_api:
@@ -320,6 +416,8 @@ def main(argv: list[str] | None = None) -> int:
         game_id=args.game_id, out_dir=Path(args.out_dir), provider_factory=factory,
         model=args.model, seed=args.seed,
         max_requests_per_game=args.max_requests_per_game, max_day_rounds=args.max_day_rounds,
+        prompt_version=args.prompt_version,
+        roleplay_arm=args.roleplay_arm,
     )
 
 

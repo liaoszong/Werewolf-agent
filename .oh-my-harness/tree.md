@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 707
+- Entries: 710
 
 ```text
 ./
@@ -628,6 +628,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       ├── render_provider_replay.py
 │       ├── role_policy_registry.py
 │       ├── role_visibility.py
+│       ├── roleplay_shadow_arm.py
 │       ├── run_deepseek_consensus_game.py
 │       ├── run_deepseek_provider_game.py
 │       ├── run_emergent_deepseek_game.py
@@ -712,6 +713,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   │   ├── obs_witch_guard_board_victim_coord.txt
 │   │   │   └── witch_coord_suffix_injected.txt
 │   │   └── prompt_v5/
+│   │       ├── roleplay_context_card_policy_packet.txt
 │   │       └── roleplay_context_werewolf_with_packet.txt
 │   ├── fake_scribe.py
 │   ├── parity_scripts.py
@@ -819,6 +821,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── test_role_shuffle.py
 │   ├── test_role_single_source.py
 │   ├── test_role_visibility.py
+│   ├── test_roleplay_shadow_arm.py
 │   ├── test_rule_rulings.py
 │   ├── test_rules_v1_2.py
 │   ├── test_run_emergent_deepseek_game.py

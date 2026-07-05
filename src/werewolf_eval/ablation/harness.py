@@ -99,6 +99,8 @@ def run_arm(arm: Arm, out_root: Path, api_key: str | None = None, factory_builde
         seat_roles = layout_for(arm, i)
         seed = arm.seed_for(i)
         rec = {"game_id": gid, "seed": seed, "seat_roles": seat_roles, "prompt_version": arm.prompt_version}
+        if arm.roleplay_arm is not None:
+            rec["roleplay_arm"] = arm.roleplay_arm
         t0 = time.time()
         for attempt in range(4):
             try:
@@ -108,6 +110,7 @@ def run_arm(arm: Arm, out_root: Path, api_key: str | None = None, factory_builde
                     model=arm.model, seed=seed,
                     max_requests_per_game=MAX_REQUESTS_PER_GAME, max_day_rounds=3,
                     seat_roles=seat_roles, prompt_version=arm.prompt_version,
+                    roleplay_arm=arm.roleplay_arm,
                     scaffold_provider_factory=(
                         scaffold_factory_builder(arm, api_key)
                         if requires_scaffold else None),
@@ -180,5 +183,7 @@ def run_arm(arm: Arm, out_root: Path, api_key: str | None = None, factory_builde
                       "checker_error_games": arm_inv_checker_error_games,
                   },
               }}
+    if arm.roleplay_arm is not None:
+        result["roleplay_arm"] = arm.roleplay_arm
     (arm_dir / "_metrics.json").write_text(json.dumps(result, ensure_ascii=False, indent=1), encoding="utf-8")
     return result

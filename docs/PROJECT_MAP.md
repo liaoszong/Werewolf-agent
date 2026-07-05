@@ -107,7 +107,7 @@
 
 | 模块 | 交付物(轮廓) | 状态 |
 |---|---|---|
-| **P3-A Agent Runtime Contract + Memory Spine** | 先锁四层 ownership:SeatCharacterCard / RolePolicy / RuntimeAgentState / ProviderProfile;再建单局 scoped memory、私有笔记、怀疑图、承诺/矛盾记录。所有记忆注入带 provenance、真相层级、status 与 visibility guard。 | 🚧 当前模块 |
+| **P3-A Agent Runtime Contract + Memory Spine** | 先锁四层 ownership:SeatCharacterCard / RolePolicy / RuntimeAgentState / ProviderProfile;再建单局 scoped memory、私有笔记、怀疑图、承诺/矛盾记录。所有记忆注入带 provenance、真相层级、status 与 visibility guard。P3-A-1/2/3/4 已完成最小 schema、编辑器、memory packet、runtime prompt consumption 与 first playable shadow arm。 | ✅ 完成 |
 | **P3-B 博弈脚手架与桌面发言** | 先建 P3-B0 Structured SpeechAct Contract,再把白天讨论从"顺序发言+投票"升级为可回应、可追问、可对跳、可转票的 table-talk;狼人私密频道、发言-投票一致性、轻量计划器进入 ActionEnvelope 上游。 | ⏳ 下一模块 |
 | **P3-C 真人座位实时参与** | 首版后端支持本地单真人 seat,由 profile 的 seat provider=`human` 选择,可映射当前基础板任意 seat/角色;被选中的 seat 不构造 AI provider,所有真人动作由 server action_window 控制。多真人、账号/房间、完整玩家端 UX 仍后续。 | 🚧 当前切片 |
 | **P3-D 趣味性复盘入口** | 结算先回答"这局哪里好看/哪里蠢/谁骗过了谁",再接评测指标;把 P4 的评测能力挂到玩家能理解的戏剧节点上。 | ⏳ 后续模块 |
@@ -123,7 +123,7 @@
 | **P3-A-1 Agent asset ownership/schema** | 定义 SeatCharacterCard(角色无关人格)、RolePolicy(按真实身份加载)、RuntimeSeatState/RuntimeTeamState(每局新建)、ProviderProfile(模型/温度/预算)和 ExecutionContract(提示/动作/工具/解析契约)的最小 schema-first bridge。已落地纯 schema/validation/audience artifact 和 legacy profile projection,不改 prompt/provider/runtime 行为。 | ✅ 完成 |
 | **P3-A-2 Mobile RolePolicy editor** | 移动端角色页改为 RolePolicyPack 作用域的身份策略入口:两列角色卡、全屏详情、策略预设、战术偏好、角色行动偏好、证据/context 偏好和只读运行时组合说明。不得把 RolePolicy 重新绑定到 SeatCharacterCard、ProviderProfile、ExecutionContract 或 RuntimeState。P3-A-2a Flutter 本地草稿 UI、P3-A-2b 最小 RolePolicyPack/RolePolicy 资产仓库、P3-A-2c `prompt_v5` runtime 消费已完成;默认 `PROMPT_VERSION` 仍是 `prompt_v1`,roleplay context 只在显式 arm 下进入 provider observation。 | ✅ 完成 |
 | **P3-A-3 Agent memory packet** | 在现有 observation_text 之上建立 `AgentContextPacket`:Fact/Claim/Belief/Commitment/TeamPlan/StaticPlaybook 分层,包含 source ids、audience_scope、status、supersedes、render metadata 与 context budget。已完成纯 schema/helper 切片:`validate_agent_context_packet`、`validate_memory_record`、`render_record_summary`、`select_visible_packet`;不改 runtime/provider/prompt 行为。 | ✅ 完成 |
-| **P3-A-4 First playable roleplay arm(shadow-safe)** | 先做 6 人基础板的最小 Agent 化闭环:卡片差异可见、记忆引用可追溯、belief 与 fact 不混淆、狼人共享计划不泄漏、旧 baseline 在 shadow mode 下保持可比、调用成本可审计。追问/转票/戏剧节点归 P3-B/P3-D。 | ⏳ 待 plan |
+| **P3-A-4 First playable roleplay arm(shadow-safe)** | 已落地显式 `p3a_roleplay_shadow` arm:6 人基础板 fake deterministic game 可运行;SeatCharacterCard 通过 `prompt_v5` renderer block 可见且 role-agnostic;RolePolicy 仍按 engine true role 选择;AgentContextPacket belief/team-plan 带 provenance 与 non-fact rendering;狼人 TeamPlan 只给授权狼席;public roleplay manifest 不含隐藏身份/RolePolicy refs;provider-turns 记录 owner、visibility、token、latency、context hashes 与 fallback。追问/转票/戏剧节点仍归 P3-B/P3-D。 | ✅ 完成 |
 
 ### P3-C 工作任务(真人参与通道,细化到工作任务粒度)
 
@@ -192,11 +192,11 @@
 
 | ID | 系统 | 业界专业名称 | 代码落点 | 现状与已知债务 |
 |---|---|---|---|---|
-| **SYS-B1** | 记忆与上下文构建 | **Agent Memory / Context Engineering**;分层:工作记忆 → 情景记忆(episodic)→ 语义记忆(semantic) | `render_observation_text` + `augment_witch_observation`(每轮 prompt 组装);P3-A roleplay context = `prompt_v5` suffix | 🌱 baseline 仍是工作记忆层的最小实现(每轮由可见事件重建上下文)。`AgentContextPacket` 已有 schema/helper,并在 `prompt_v5` 显式 arm 下通过单一 PromptRenderer path 注入非事实/事实分层摘要;**任何记忆注入必须带 source ids 过 I4b 可见性检查**。**prompt 版本化机制已落地**:`PROMPT_VERSION=prompt_v1`,新增 `prompt_v5` 共存 golden + ledger,默认不翻转 |
+| **SYS-B1** | 记忆与上下文构建 | **Agent Memory / Context Engineering**;分层:工作记忆 → 情景记忆(episodic)→ 语义记忆(semantic) | `render_observation_text` + `augment_witch_observation`(每轮 prompt 组装);P3-A roleplay context = `prompt_v5` suffix + `p3a_roleplay_shadow` arm | 🌱 baseline 仍是工作记忆层的最小实现(每轮由可见事件重建上下文)。`AgentContextPacket` 已有 schema/helper,并在 `prompt_v5` 显式 arm 下通过单一 PromptRenderer path 注入非事实/事实分层摘要;P3-A-4 首个 shadow arm 已能写 public/private audit artifacts 与 call accounting。**任何记忆注入必须带 source ids 过 I4b 可见性检查**。**prompt 版本化机制已落地**:`PROMPT_VERSION=prompt_v1`,新增 `prompt_v5` 共存 golden + ledger,默认不翻转 |
 | **SYS-B2** | 决策协议 | Action Protocol / Structured Output | `action_runtime/envelope.py`(ActionEnvelope)+ strict-JSON;tool-calling 仅作消融轴 | ✅ baseline 统一 strict-JSON 已锁定(评测公平性不变量) |
 | **SYS-B3** | 模型接入网关 | Model Gateway / LLM Provider Abstraction | provider registry + BYO-key + 9 家 OpenAI 兼容预设 | ✅ 主体完成;剩 B5 收尾(per-seat token/成本汇总、退役 deepseek-only env 兜底) |
-| **SYS-B4** | 增强脚手架 | **Agent Scaffolding / Agent Harness**(计划、反思、工具、hooks、狼频道、发言-投票一致性) | 现有接缝 = 渲染器 `requires_scaffold` 标志 + `scaffold_model`(scribe provider);`prompt_v5` roleplay context blocks | 🚧 P3 核心方向。边界已锁:脚手架在 ActionEnvelope 上游,baseline 永远裁判;不得把中间推理混入 action JSON。默认一玩家行动一次模型调用,额外 team/scaffold 调用必须单独记账。 |
-| **SYS-B5** | 角色卡与剧本资产 | Character Card / Persona Card / Playbook Library | 现有 `profile_config` 的 role prompt + seat persona;P3-A-1 `agent_assets.py`;P3-A-2b `role_policy_registry.py`;P3-A-2c `prompt_v5` consumption | 🌱 P3-A-1/2 已建 schema/validation/audience artifact 层并完成 RolePolicy runtime shadow consumption。对标 SillyTavern 的 Character Card/World Info,但 runtime 仍拆成 SeatCharacterCard / RolePolicy / RuntimeSeatState/RuntimeTeamState / ProviderProfile / ExecutionContract;本局状态永不回写角色卡本体。 |
+| **SYS-B4** | 增强脚手架 | **Agent Scaffolding / Agent Harness**(计划、反思、工具、hooks、狼频道、发言-投票一致性) | 现有接缝 = 渲染器 `requires_scaffold` 标志 + `scaffold_model`(scribe provider);`prompt_v5` roleplay context blocks;P3-A-4 `call_accounting` | 🚧 P3 核心方向。边界已锁:脚手架在 ActionEnvelope 上游,baseline 永远裁判;不得把中间推理混入 action JSON。默认一玩家行动一次模型调用,额外 team/scaffold 调用必须单独记账;P3-A-4 已把 seat/scaffold owner、visibility、token/latency、context hashes、fallback result 写入 provider-turns summary。 |
+| **SYS-B5** | 角色卡与剧本资产 | Character Card / Persona Card / Playbook Library | 现有 `profile_config` 的 role prompt + seat persona;P3-A-1 `agent_assets.py`;P3-A-2b `role_policy_registry.py`;P3-A-2c `prompt_v5` consumption;P3-A-4 `roleplay_shadow_arm.py` | 🌱 P3-A 已建 schema/validation/audience artifact 层、完成 RolePolicy runtime shadow consumption,并落地首个 `p3a_roleplay_shadow` starter arm。对标 SillyTavern 的 Character Card/World Info,但 runtime 仍拆成 SeatCharacterCard / RolePolicy / RuntimeSeatState/RuntimeTeamState / ProviderProfile / ExecutionContract;本局状态永不回写角色卡本体。 |
 
 ### C 组 · 平台与质量面(Platform & Quality)
 

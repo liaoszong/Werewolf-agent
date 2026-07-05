@@ -13,20 +13,25 @@ import hashlib
 import json
 from typing import Any
 
-from werewolf_eval.agent_assets import validate_role_policy
+from werewolf_eval.agent_assets import validate_role_policy, validate_seat_character_card
 from werewolf_eval.agent_context_packet import (
     render_record_summary,
     select_visible_packet,
 )
 
 ROLEPLAY_CONTEXT_SCHEMA_VERSION = "prompt_v5.roleplay_context.v1"
-ROLEPLAY_CONTEXT_BLOCK_ORDER = ("role_policy", "agent_context")
+ROLEPLAY_CONTEXT_BLOCK_ORDER = (
+    "seat_character_card",
+    "role_policy",
+    "agent_context",
+)
 
 
 def render_roleplay_context_suffix(
     *,
     role_policy: dict[str, Any] | None,
     agent_context_packet: dict[str, Any] | None,
+    seat_character_card: dict[str, Any] | None = None,
     seat_id: str,
     team_ids: set[str] | None = None,
     max_context_records: int | None = 6,
@@ -39,6 +44,25 @@ def render_roleplay_context_suffix(
     """
     blocks: list[dict[str, Any]] = []
     text_blocks: list[str] = []
+
+    if seat_character_card is not None:
+        card_text = _render_seat_character_card(seat_character_card)
+        text_blocks.append(card_text)
+        blocks.append(
+            _block(
+                block_name="seat_character_card",
+                text=card_text,
+                trust_class=str(
+                    seat_character_card["asset_certification"]["status"]
+                ),
+                render_mode="guidance",
+                visibility_scope="seat_private",
+                source_provenance={
+                    "asset_hashes": [f"sha256:{_sha256_json(seat_character_card)}"],
+                    "generated_by": "SeatCharacterCardRegistry",
+                },
+            )
+        )
 
     if role_policy is not None:
         policy_text = _render_role_policy(role_policy)
@@ -104,6 +128,16 @@ def _render_role_policy(policy: dict[str, Any]) -> str:
     _append_mapping(lines, "欺骗边界", policy.get("deception_policy", {}))
     _append_mapping(lines, "协作倾向", policy.get("team_policy", {}))
     _append_list(lines, "禁止行为", policy.get("forbidden_behavior", []))
+    return "\n".join(lines)
+
+
+def _render_seat_character_card(card: dict[str, Any]) -> str:
+    validate_seat_character_card(card)
+    lines = ["【座位表现】"]
+    lines.append(f"- 风格摘要: {card['summary']}")
+    _append_list(lines, "人格", card.get("personality", []))
+    _append_list(lines, "发言习惯", card.get("speech_style", []))
+    _append_list(lines, "社交倾向", card.get("social_tendencies", []))
     return "\n".join(lines)
 
 

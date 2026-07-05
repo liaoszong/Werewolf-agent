@@ -32,6 +32,42 @@ machine secrets here.
 
 ## Entries
 
+### 2026-07-05 - P3-A-4 First Playable Roleplay Shadow Arm
+
+- Completed P3-A-4 as an explicit `p3a_roleplay_shadow` arm, not a default
+  prompt flip or release.
+- Scope delivered:
+  - Added `src/werewolf_eval/roleplay_shadow_arm.py` with starter
+    role-agnostic `SeatCharacterCard` assets, run-scoped RuntimeSeatState and
+    RuntimeTeamState snapshots, starter AgentContextPacket records, public
+    manifest projection, and postgame-only audit artifact.
+  - Extended `prompt_v5` through the existing PromptRenderer path to accept an
+    optional SeatCharacterCard guidance block before RolePolicy and
+    AgentContextPacket. `PROMPT_VERSION` remains `prompt_v1`.
+  - Added an explicit `roleplay_arm` field to ablation `Arm`, ablation CLI, and
+    `run_emergent_deepseek_game`; only `roleplay_arm="p3a_roleplay_shadow"`
+    with `prompt_version="prompt_v5"` is accepted.
+  - Runner writes `roleplay_public_manifest` into `prompt-manifest.json` and a
+    private `roleplay-audit.json`. The public projection includes only
+    role-agnostic card summaries/hashes and omits true roles, team ids, and raw
+    RolePolicy refs.
+  - `provider-turns.json` now includes `call_accounting` rows with owner,
+    visibility scope, token usage, latency joined from provider trace when
+    available, context block hashes, and fallback result. Engine outcome
+    `provider_turns` shape stays golden-compatible.
+  - Baseline arms with `roleplay_arm=None` do not initialize roleplay assets,
+    do not write roleplay public manifests, and do not emit roleplay context
+    blocks.
+- Verification:
+  - `$env:PYTHONPATH='src'; $env:NO_PROXY='*'; python -m unittest tests.test_prompt_roleplay tests.test_prompt_renderers tests.test_prompt_versioning tests.test_ablation_harness_fake tests.test_roleplay_shadow_arm -v` passed 41 tests, skipped 1.
+  - `$env:PYTHONPATH='src'; $env:NO_PROXY='*'; python -m pytest tests/test_prompt_v2.py tests/test_prompt_v3.py -q` passed 36 tests.
+  - `$env:PYTHONPATH='src'; $env:NO_PROXY='*'; python -m unittest discover -s tests -p "test_*.py"` passed 1476 tests, skipped 2.
+- Boundary: no provider transport, action validator, observer protocol,
+  generated game fixture, workflow, release, or Flutter UI behavior was changed.
+  `provider-trace.json` remains an internal/postgame diagnostic artifact with
+  full private observation text; the new live/public roleplay projection is
+  `roleplay_public_manifest`.
+
 ### 2026-07-05 - P3-A-2c Runtime RolePolicy Consumption
 
 - Completed P3-A-2c as an explicit roleplay prompt arm, not a default prompt
