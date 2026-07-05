@@ -1,4 +1,5 @@
 import json
+import copy
 import tempfile
 import unittest
 from pathlib import Path
@@ -265,6 +266,48 @@ class RolePolicyRegistryTests(unittest.TestCase):
                 "seer"
             ],
             f"{first_policy['policy_id']}@{first_policy['version']}",
+        )
+
+    def test_publish_shared_pack_ref_creates_new_version(self):
+        registry = build_default_role_policy_registry()
+        data = registry.export()
+        data["packs"]["experimental_pack"] = copy.deepcopy(
+            data["packs"]["standard_six_player_balanced"]
+        )
+        data["packs"]["experimental_pack"]["pack_id"] = "experimental_pack"
+        registry = RolePolicyRegistry(
+            packs=data["packs"],
+            policies=data["policies"],
+            drafts=data["drafts"],
+        )
+        old_ref = registry.get_pack("standard_six_player_balanced")[
+            "role_policy_refs"
+        ]["seer"]
+        old_goals = registry.resolve_policy_ref(old_ref)["goals"]
+        draft = registry.create_draft(
+            pack_id="standard_six_player_balanced",
+            role="seer",
+            changes={"goals": ["local pack seer branch"]},
+        )
+
+        published = registry.publish_draft(
+            draft["draft_id"],
+            referenced_policy_refs=set(),
+        )
+
+        new_ref = registry.get_pack("standard_six_player_balanced")[
+            "role_policy_refs"
+        ]["seer"]
+        self.assertNotEqual(new_ref, old_ref)
+        self.assertEqual(new_ref, f"{published['policy_id']}@1.0.1")
+        self.assertEqual(
+            registry.get_pack("experimental_pack")["role_policy_refs"]["seer"],
+            old_ref,
+        )
+        self.assertEqual(registry.resolve_policy_ref(old_ref)["goals"], old_goals)
+        self.assertEqual(
+            registry.resolve_policy_ref(new_ref)["goals"],
+            ["local pack seer branch"],
         )
 
     def test_load_rejects_pack_role_ref_mismatch(self):

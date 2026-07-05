@@ -166,18 +166,30 @@ class RolePolicyRegistry:
         pack = self._packs[pack_id]
         base_ref = draft["base_policy_ref"]
         current_ref = pack["role_policy_refs"][role]
+        registry_referenced_refs = self._policy_refs_used_outside(
+            pack_id=pack_id,
+            role=role,
+        )
         if current_ref != base_ref and current_ref not in referenced_policy_refs:
             raise RolePolicyRegistryError(
                 f"RolePolicy draft {draft_id!r} is stale for role {role!r}"
             )
         policy = copy.deepcopy(draft["policy"])
-        if base_ref in referenced_policy_refs or current_ref != base_ref:
+        if (
+            base_ref in referenced_policy_refs
+            or base_ref in registry_referenced_refs
+            or current_ref != base_ref
+        ):
             base_policy_id, base_version = _split_policy_ref(base_ref)
             policy["policy_id"] = base_policy_id
             policy["version"] = _next_unused_patch_version(
                 policy_id=base_policy_id,
                 base_version=base_version,
-                existing_refs=set(self._policies) | referenced_policy_refs,
+                existing_refs=(
+                    set(self._policies)
+                    | referenced_policy_refs
+                    | registry_referenced_refs
+                ),
             )
         _validate_policy(policy)
         policy_ref = _policy_ref(policy)
@@ -198,6 +210,15 @@ class RolePolicyRegistry:
             "policies": copy.deepcopy(self._policies),
             "drafts": copy.deepcopy(self._drafts),
         }
+
+    def _policy_refs_used_outside(self, *, pack_id: str, role: str) -> set[str]:
+        refs: set[str] = set()
+        for other_pack_id, pack in self._packs.items():
+            for other_role, policy_ref in pack["role_policy_refs"].items():
+                if other_pack_id == pack_id and other_role == role:
+                    continue
+                refs.add(policy_ref)
+        return refs
 
     def save(self, path: str | Path) -> None:
         data = self.export()
