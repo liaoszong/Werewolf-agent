@@ -35,7 +35,10 @@ from werewolf_eval.prompt_v3 import (
     render_vote_scaffold,
 )
 from werewolf_eval.prompt_v4 import render_witch_coord_suffix
+from werewolf_eval.prompt_v5 import render_roleplay_context_suffix
 from werewolf_eval.provider_contract import ProviderRequest
+from werewolf_eval.agent_context_packet import AGENT_CONTEXT_PACKET_SCHEMA_VERSION
+from werewolf_eval.role_policy_registry import build_default_role_policy_registry
 
 _ALIVE = ["p1", "p2", "p3", "p4", "p5", "p6"]
 
@@ -214,6 +217,74 @@ def canonical_prompt_samples_v4() -> list[tuple[str, str]]:
         ("obs_witch_guard_board_no_victim_identity",
          augment_witch_observation(witch_text, None)
          + render_witch_coord_suffix(guard_card, None, False)),
+    ]
+
+
+def _roleplay_packet() -> dict:
+    return {
+        "schema_version": AGENT_CONTEXT_PACKET_SCHEMA_VERSION,
+        "run_id": "golden_fixture",
+        "seat_id": "p1",
+        "decision_id": "golden_day1_speech_p1",
+        "records": [
+            {
+                "record_id": "claim_1",
+                "kind": "ClaimRecord",
+                "section": "public_timeline",
+                "writer": "public_event",
+                "visibility_scope": "public",
+                "audience_scope": {"seat_ids": []},
+                "trust_class": "run_derived",
+                "render_mode": "quoted_evidence",
+                "source_provenance": {
+                    "source_event_ids": ["evt_claim_1"],
+                    "generated_by": "golden_fixture",
+                },
+                "status": "active",
+                "summary": "p3 claimed seer",
+            },
+            {
+                "record_id": "belief_1",
+                "kind": "BeliefRecord",
+                "section": "episodic_notes",
+                "writer": "seat_agent",
+                "visibility_scope": "seat_private",
+                "audience_scope": {"seat_ids": ["p1"]},
+                "trust_class": "run_derived",
+                "render_mode": "state_summary",
+                "source_provenance": {
+                    "source_event_ids": ["evt_vote_1"],
+                    "generated_by": "golden_fixture",
+                },
+                "status": "active",
+                "summary": "p1 suspects p3 based on vote pressure",
+            },
+        ],
+        "context_budget": {
+            "included_blocks": [],
+            "compacted_blocks": [],
+            "dropped_blocks": [],
+        },
+    }
+
+
+def canonical_prompt_samples_v5() -> list[tuple[str, str]]:
+    """prompt_v5 golden set — the new P3-A roleplay-context surface only.
+
+    Existing v1-v4 samples stay owned by their prior versions; this locks the
+    model-visible RolePolicy + AgentContextPacket suffix introduced by P3-A-2c.
+    """
+    registry = build_default_role_policy_registry()
+    pack = registry.get_pack("standard_six_player_balanced")
+    policy = registry.resolve_policy_ref(pack["role_policy_refs"]["werewolf"])
+    rendered = render_roleplay_context_suffix(
+        role_policy=policy,
+        agent_context_packet=_roleplay_packet(),
+        seat_id="p1",
+        team_ids={"werewolf"},
+    )
+    return [
+        ("roleplay_context_werewolf_with_packet", rendered["text"]),
     ]
 
 

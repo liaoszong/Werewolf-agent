@@ -32,6 +32,39 @@ machine secrets here.
 
 ## Entries
 
+### 2026-07-05 - P3-A-2c Runtime RolePolicy Consumption
+
+- Completed P3-A-2c as an explicit roleplay prompt arm, not a default prompt
+  flip.
+- Scope delivered:
+  - Added `src/werewolf_eval/prompt_v5.py`.
+  - Added `tests/test_prompt_roleplay.py`.
+  - Added `tests/golden_prompts/prompt_v5/` and a `prompt_v5` ledger entry in
+    `docs/generated-games/prompt-version-ledger.json`.
+  - Extended `PromptRenderer` with `PromptRendererV5`, which inherits the
+    existing v4 chain and appends fixed-order RolePolicy + AgentContextPacket
+    blocks only under `prompt_v5`.
+  - Kept `PROMPT_VERSION = "prompt_v1"`; `prompt_v5` is runtime-selected and
+    coexists with v1-v4.
+  - `EmergentGameEngine` now accepts an optional RolePolicy registry,
+    RolePolicyPack id, and seat-scoped AgentContextPacket mapping. In
+    `prompt_v5`, it selects RolePolicy by the engine's true role and appends
+    visible context to provider `observation_text`; v1-v4 ignore these assets.
+  - Provider turns record `prompt_context_blocks` with block name, trust class,
+    render mode, visibility scope, content hash, and source provenance. The
+    block metadata does not render policy ids, policy versions, role fields, or
+    team ids.
+  - AgentContextPacket records are filtered through `select_visible_packet()`,
+    so faction-private TeamPlan records require authorized seat + team scope.
+- Verification:
+  - `$env:PYTHONPATH='src'; $env:NO_PROXY='*'; python -m unittest tests.test_prompt_roleplay tests.test_prompt_renderers tests.test_prompt_versioning tests.test_role_policy_registry tests.test_agent_context_packet tests.test_agent_assets -v` passed 70 tests, skipped 1.
+  - `$env:PYTHONPATH='src'; $env:NO_PROXY='*'; python -m unittest discover -s tests -p "test_*.py"` passed 1472 tests, skipped 2.
+  - `git diff --exit-code -- tests/golden_prompts/prompt_v1 tests/golden_prompts/prompt_v2 tests/golden_prompts/prompt_v3 tests/golden_prompts/prompt_v4` passed, confirming old prompt golden dirs were unchanged.
+- Boundary: no provider transport, action schema, validator, observer protocol,
+  generated game fixtures, workflow, or Flutter UI behavior was changed. P3-A-4
+  remains the first playable roleplay arm and should decide how to expose or
+  hide roleplay run artifacts from observer/public surfaces.
+
 ### 2026-07-05 - P3-A-3 AgentContextPacket Memory Schema
 
 - Completed P3-A-3 as a pure schema/helper slice with no runtime, provider, or

@@ -285,5 +285,42 @@ class PromptV4GuardTests(unittest.TestCase):
                          samples["obs_witch_guard_board_no_victim_identity"])
 
 
+from werewolf_eval.prompt_goldens import canonical_prompt_samples_v5
+
+PROMPT_V5 = "prompt_v5"
+
+
+class PromptV5GuardTests(unittest.TestCase):
+    """prompt_v5 coexists with v1-v4; lock the P3-A roleplay context bytes."""
+
+    def test_v5_rendered_bytes_match_golden(self) -> None:
+        golden_dir = GOLDEN_ROOT / PROMPT_V5
+        self.assertTrue(golden_dir.is_dir(), "missing tests/golden_prompts/prompt_v5")
+        samples = dict(canonical_prompt_samples_v5())
+        files = {p.stem: p for p in golden_dir.glob("*.txt")}
+        self.assertEqual(sorted(samples), sorted(files))
+        for name, text in samples.items():
+            self.assertEqual(files[name].read_bytes(), text.encode("utf-8"),
+                             f"prompt_v5 bytes changed for '{name}' without regen+ledger")
+
+    def test_v5_ledger_entry_hashes(self) -> None:
+        import hashlib
+        matches = [e for e in _ledger() if e.get("prompt_version") == PROMPT_V5]
+        self.assertEqual(len(matches), 1)
+        after = matches[0]["golden_prompt_hashes"]["after"]
+        samples = dict(canonical_prompt_samples_v5())
+        self.assertEqual(sorted(after), sorted(samples))
+        for name, text in samples.items():
+            self.assertEqual(after[name], hashlib.sha256(text.encode("utf-8")).hexdigest())
+
+    def test_v5_carries_roleplay_markers(self) -> None:
+        samples = dict(canonical_prompt_samples_v5())
+        text = samples["roleplay_context_werewolf_with_packet"]
+        self.assertIn("【角色策略】", text)
+        self.assertIn("【上下文记忆】", text)
+        self.assertIn("hide team identity", text)
+        self.assertIn("this is not engine truth", text)
+
+
 if __name__ == "__main__":
     unittest.main()

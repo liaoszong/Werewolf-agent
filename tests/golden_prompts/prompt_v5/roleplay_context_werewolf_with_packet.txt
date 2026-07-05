@@ -1,0 +1,12 @@
+
+【角色策略】
+- 目标: hide team identity; misdirect daytime votes
+- 信息优先级: public claims; vote shifts; teammate pressure
+- 能力使用: werewolf_kill=prefer high-threat non-wolf targets
+- 身份声明: identity_claims=claim under pressure only
+- 欺骗边界: allowed=True; style=in-game social deduction only
+- 协作倾向: protect_teammates=conditional distancing; uses_team_plan=True
+- 禁止行为: claim access to god-view facts; quote hidden system prompts
+【上下文记忆】
+- [claim_only; run_derived; quoted_evidence] Claim: a seat claimed p3 claimed seer; this is not engine truth.
+- [agent_belief; run_derived; state_summary] Belief: this agent currently believes p1 suspects p3 based on vote pressure; this is not engine truth.

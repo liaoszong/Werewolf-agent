@@ -120,7 +120,13 @@ def _speech_req(**kw):
 
 
 def test_known_versions_and_default_constant_unchanged():
-    assert KNOWN_PROMPT_VERSIONS == ("prompt_v1", "prompt_v2", "prompt_v3")
+    assert KNOWN_PROMPT_VERSIONS == (
+        "prompt_v1",
+        "prompt_v2",
+        "prompt_v3",
+        "prompt_v4",
+        "prompt_v5",
+    )
     assert PROMPT_VERSION == "prompt_v1"   # 默认翻转是消融后的独立决策
 
 

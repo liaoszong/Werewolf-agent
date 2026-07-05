@@ -60,6 +60,7 @@ from werewolf_eval.prompt_v3 import (
     render_scribe_input,
 )
 from werewolf_eval.role_visibility import private_refs_for_role, public_refs
+from werewolf_eval.role_policy_registry import build_default_role_policy_registry
 
 # The provider request phase used for free-text speeches. The game_log event is
 # still recorded with phase="day"; the distinct request phase only keeps the
@@ -226,6 +227,10 @@ class EmergentGameEngine:
         runtime_events: Any | None = None,
         prompt_version: str = "prompt_v1",
         scaffold_agent: Any | None = None,
+        role_policy_registry: Any | None = None,
+        role_policy_pack_id: str | None = None,
+        agent_context_packets: dict[str, dict[str, Any]] | None = None,
+        roleplay_context_max_records: int | None = 6,
         participant_controller: Any | None = None,
         human_seat_ids: Iterable[str] = (),
         participant_action_timeout_seconds: float = 60.0,
@@ -292,6 +297,12 @@ class EmergentGameEngine:
         self._board_card = self._renderer.board_card(
             _ruleset, {p.player_id: p.role for p in config.players}
         )
+        self._role_policy_registry = role_policy_registry
+        if self.prompt_version == "prompt_v5" and self._role_policy_registry is None:
+            self._role_policy_registry = build_default_role_policy_registry()
+        self._role_policy_pack_id = role_policy_pack_id or "standard_six_player_balanced"
+        self._agent_context_packets = dict(agent_context_packets or {})
+        self._roleplay_context_max_records = roleplay_context_max_records
         # SYS-B4: the scribe is NOT a player. A scaffold-requiring renderer (v3)
         # REQUIRES it (no silent scaffold-less run); other versions ignore it.
         self._scaffold_agent = scaffold_agent
@@ -582,6 +593,41 @@ class EmergentGameEngine:
     def _render_obs(self, obs: AgentObservation) -> RenderedObservation:
         return self._renderer.render_observation(obs, self._events_by_id())
 
+    def _roleplay_context(self, obs: AgentObservation) -> dict[str, Any]:
+        if self.prompt_version != "prompt_v5":
+            return {"text": "", "blocks": []}
+        role_policy: dict[str, Any] | None = None
+        if self._role_policy_registry is not None:
+            pack = self._role_policy_registry.get_pack(self._role_policy_pack_id)
+            try:
+                policy_ref = pack["role_policy_refs"][obs.role]
+            except KeyError as exc:
+                raise ValueError(
+                    f"RolePolicyPack {self._role_policy_pack_id!r} has no policy for role {obs.role!r}"
+                ) from exc
+            role_policy = self._role_policy_registry.resolve_policy_ref(policy_ref)
+        return self._renderer.roleplay_context_suffix(
+            role_policy=role_policy,
+            agent_context_packet=self._agent_context_packets.get(obs.player_id),
+            seat_id=obs.player_id,
+            team_ids={obs.team},
+            max_context_records=self._roleplay_context_max_records,
+        )
+
+    def _append_roleplay_context(
+        self, obs_text: str, obs: AgentObservation
+    ) -> tuple[str, list[dict[str, Any]]]:
+        rendered = self._roleplay_context(obs)
+        return obs_text + str(rendered.get("text") or ""), list(rendered.get("blocks") or [])
+
+    @staticmethod
+    def _record_prompt_context_blocks(
+        turn: dict[str, Any],
+        blocks: list[dict[str, Any]],
+    ) -> None:
+        if blocks:
+            turn["prompt_context_blocks"] = blocks
+
     def _b1_seat_index(self):
         cached = getattr(self, "_b1_seat_index_cache", None)
         if cached is None:
@@ -633,6 +679,7 @@ class EmergentGameEngine:
         # Input-side ONLY — the action system prompt / strict-JSON contract is
         # untouched (spec §0). Empty suffix for v1/v2 keeps bytes identical.
         obs_text = rendered.text + self._renderer.action_obs_suffix(phase, self._claim_ledger)
+        obs_text, prompt_context_blocks = self._append_roleplay_context(obs_text, obs)
         # C12-01: day-phase action = vote; append _vote so the request_id never
         # collides with the same actor's night action (which shares the bare
         # f"{game_id}_r{rnd:02d}_{actor}" stem). Witch/speech/hunter/scribe already
@@ -653,6 +700,7 @@ class EmergentGameEngine:
             "token_usage": None,
             "observation_source_event_ids": list(rendered.source_event_ids),
         }
+        self._record_prompt_context_blocks(turn, prompt_context_blocks)
         assert_prompt_entitled(player_id, list(rendered.source_event_ids),
                                self._events_by_id(), self._b1_seat_index())
         try:
@@ -1120,6 +1168,7 @@ class EmergentGameEngine:
         rendered = self._render_obs(obs)
         witch_obs_text = augment_witch_observation(rendered.text, victim)
         witch_obs_text += self._renderer.witch_obs_suffix(self._board_card, victim, save_used)
+        witch_obs_text, prompt_context_blocks = self._append_roleplay_context(witch_obs_text, obs)
         request = ProviderRequest(
             request_id=f"{self._game_id}_r{rnd:02d}_{witch}_witch",
             game_id=self._game_id,
@@ -1141,6 +1190,7 @@ class EmergentGameEngine:
             "source_label": None, "model": getattr(provider, "model", None), "token_usage": None,
             "observation_source_event_ids": list(rendered.source_event_ids),
         }
+        self._record_prompt_context_blocks(turn, prompt_context_blocks)
         self._provider_turns.append(turn)
         assert_prompt_entitled(witch, list(rendered.source_event_ids),
                                self._events_by_id(), self._b1_seat_index())
@@ -1289,6 +1339,7 @@ class EmergentGameEngine:
         # never the comparison program (b1 lesson: don't arm wolf fake-claims).
         # Non-v3 renderers return "" — bytes identical.
         obs_text = rendered.text + self._renderer.speech_obs_suffix(self._claim_ledger)
+        obs_text, prompt_context_blocks = self._append_roleplay_context(obs_text, obs)
         request = ProviderRequest(
             request_id=f"{self._game_id}_r{rnd:02d}_{player_id}_speech",
             game_id=self._game_id,
@@ -1310,6 +1361,7 @@ class EmergentGameEngine:
             "source_label": None, "model": getattr(provider, "model", None), "token_usage": None,
             "observation_source_event_ids": list(rendered.source_event_ids),
         }
+        self._record_prompt_context_blocks(turn, prompt_context_blocks)
         self._provider_turns.append(turn)
         assert_prompt_entitled(player_id, list(rendered.source_event_ids),
                                self._events_by_id(), self._b1_seat_index())
@@ -1487,13 +1539,17 @@ class EmergentGameEngine:
         self._budget.charge()
         obs = self._build_obs(hunter, phase, rnd)
         rendered = self._render_obs(obs)
+        hunter_obs_text, prompt_context_blocks = self._append_roleplay_context(
+            rendered.text + HUNTER_SHOT_OBSERVATION_SUFFIX,
+            obs,
+        )
         request = ProviderRequest(
             request_id=f"{self._game_id}_r{rnd:02d}_{hunter}_shot",
             game_id=self._game_id, actor=hunter, phase=HUNTER_SHOT_REQUEST_PHASE, round=rnd,
             observation=obs.to_dict(),
             allowed_actions=["hunter_shoot", "hunter_pass"],
             allowed_targets=sorted(self._alive),
-            observation_text=rendered.text + HUNTER_SHOT_OBSERVATION_SUFFIX,
+            observation_text=hunter_obs_text,
             response_kind="action", max_output_tokens=ACTION_MAX_OUTPUT_TOKENS,
             prompt_version=self.prompt_version,
             board_card=self._board_card,
@@ -1505,6 +1561,7 @@ class EmergentGameEngine:
             "model": getattr(self._agents[hunter].provider, "model", None), "token_usage": None,
             "observation_source_event_ids": list(rendered.source_event_ids),
         }
+        self._record_prompt_context_blocks(turn, prompt_context_blocks)
         self._provider_turns.append(turn)
         assert_prompt_entitled(hunter, list(rendered.source_event_ids),
                                self._events_by_id(), self._b1_seat_index())

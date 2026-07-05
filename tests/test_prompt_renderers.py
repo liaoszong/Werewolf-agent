@@ -74,6 +74,7 @@ class RegistrySentinelTest(unittest.TestCase):
         self.assertFalse(REGISTRY["prompt_v2"].requires_scaffold)
         self.assertTrue(REGISTRY["prompt_v3"].requires_scaffold)
         self.assertTrue(REGISTRY["prompt_v4"].requires_scaffold)
+        self.assertTrue(REGISTRY["prompt_v5"].requires_scaffold)
 
 
 class AdapterByteEquivalenceTest(unittest.TestCase):

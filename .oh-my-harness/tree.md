@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 704
+- Entries: 707
 
 ```text
 ./
@@ -618,6 +618,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       ├── prompt_v2.py
 │       ├── prompt_v3.py
 │       ├── prompt_v4.py
+│       ├── prompt_v5.py
 │       ├── prompt_version.py
 │       ├── provider_agent.py
 │       ├── provider_contract.py
@@ -706,10 +707,12 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   │   ├── speech_villager_v3.txt
 │   │   │   ├── vote_scaffold_empty_ledger.txt
 │   │   │   └── vote_scaffold_with_claims.txt
-│   │   └── prompt_v4/
-│   │       ├── obs_witch_guard_board_no_victim_identity.txt
-│   │       ├── obs_witch_guard_board_victim_coord.txt
-│   │       └── witch_coord_suffix_injected.txt
+│   │   ├── prompt_v4/
+│   │   │   ├── obs_witch_guard_board_no_victim_identity.txt
+│   │   │   ├── obs_witch_guard_board_victim_coord.txt
+│   │   │   └── witch_coord_suffix_injected.txt
+│   │   └── prompt_v5/
+│   │       └── roleplay_context_werewolf_with_packet.txt
 │   ├── fake_scribe.py
 │   ├── parity_scripts.py
 │   ├── test_ablation_arms.py
@@ -794,6 +797,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── test_participant_routes.py
 │   ├── test_profile_config.py
 │   ├── test_prompt_renderers.py
+│   ├── test_prompt_roleplay.py
 │   ├── test_prompt_v2_invariants.py
 │   ├── test_prompt_v2.py
 │   ├── test_prompt_v3_invariants.py

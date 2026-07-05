@@ -106,7 +106,13 @@ def _req(actor="p5", phase="day", allowed_actions=None, allowed_targets=None, **
 
 
 def test_known_versions_has_v3():
-    assert KNOWN_PROMPT_VERSIONS == ("prompt_v1", "prompt_v2", "prompt_v3")
+    assert KNOWN_PROMPT_VERSIONS == (
+        "prompt_v1",
+        "prompt_v2",
+        "prompt_v3",
+        "prompt_v4",
+        "prompt_v5",
+    )
 
 
 def test_scribe_system_prompt_extraction_not_judgment():

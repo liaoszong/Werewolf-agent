@@ -18,4 +18,12 @@ PROMPT_VERSION = "prompt_v1"
 # prompt_v3 = SYS-B4 claim-ledger/vote-scaffold chain (scribe + restrained speech).
 # prompt_v4 = v3 + witch antidote-coordination guidance on guard boards
 # (l4_guard_witch_coord arm, spec 2026-06-12).
-KNOWN_PROMPT_VERSIONS = ("prompt_v1", "prompt_v2", "prompt_v3", "prompt_v4")
+# prompt_v5 = v4 + P3-A roleplay context blocks (RolePolicy +
+# AgentContextPacket) for an explicit roleplay arm.
+KNOWN_PROMPT_VERSIONS = (
+    "prompt_v1",
+    "prompt_v2",
+    "prompt_v3",
+    "prompt_v4",
+    "prompt_v5",
+)

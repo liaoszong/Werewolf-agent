@@ -29,6 +29,7 @@ from werewolf_eval.prompt_v3 import (
     render_vote_scaffold,
 )
 from werewolf_eval.prompt_v4 import render_witch_coord_suffix
+from werewolf_eval.prompt_v5 import render_roleplay_context_suffix
 from werewolf_eval.prompt_version import KNOWN_PROMPT_VERSIONS
 
 
@@ -56,6 +57,17 @@ class PromptRendererV1:
 
     def witch_obs_suffix(self, board_card: str | None, victim: str | None, save_used: bool) -> str:
         return ""
+
+    def roleplay_context_suffix(
+        self,
+        *,
+        role_policy: dict[str, Any] | None,
+        agent_context_packet: dict[str, Any] | None,
+        seat_id: str,
+        team_ids: set[str] | None = None,
+        max_context_records: int | None = 6,
+    ) -> dict[str, Any]:
+        return {"text": "", "blocks": []}
 
 
 class PromptRendererV2(PromptRendererV1):
@@ -108,8 +120,38 @@ class PromptRendererV4(PromptRendererV3):
         return render_witch_coord_suffix(board_card, victim, save_used)
 
 
+class PromptRendererV5(PromptRendererV4):
+    """P3-A-2c roleplay arm: v4 chain plus a single, fixed-order
+    RolePolicy/AgentContextPacket observation-side context path."""
+
+    version = "prompt_v5"
+
+    def roleplay_context_suffix(
+        self,
+        *,
+        role_policy: dict[str, Any] | None,
+        agent_context_packet: dict[str, Any] | None,
+        seat_id: str,
+        team_ids: set[str] | None = None,
+        max_context_records: int | None = 6,
+    ) -> dict[str, Any]:
+        return render_roleplay_context_suffix(
+            role_policy=role_policy,
+            agent_context_packet=agent_context_packet,
+            seat_id=seat_id,
+            team_ids=team_ids,
+            max_context_records=max_context_records,
+        )
+
+
 REGISTRY: dict[str, PromptRendererV1] = {
-    r.version: r for r in (PromptRendererV1(), PromptRendererV2(), PromptRendererV3(), PromptRendererV4())
+    r.version: r for r in (
+        PromptRendererV1(),
+        PromptRendererV2(),
+        PromptRendererV3(),
+        PromptRendererV4(),
+        PromptRendererV5(),
+    )
 }
 
 
