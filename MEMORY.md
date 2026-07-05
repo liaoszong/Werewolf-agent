@@ -32,6 +32,36 @@ machine secrets here.
 
 ## Entries
 
+### 2026-07-05 - P3-E-2 Mobile-first Live Room Closeout
+
+- Completed P3-E-2 as a Flutter-only mobile live-room slice.
+- Scope delivered:
+  - Mobile Home-owned match flow, consistent floating back affordance, day/night
+    appearance styles, role library shell, history grouping shell, Settings
+    provider/update/server controls.
+  - Real participant projection parsing for `game_event_emitted`,
+    `data.summary`, projected players/proof/snapshots, event-derived phase and
+    round, and visible alive candidate seats.
+  - Live room information structure: centered status island, connection dot,
+    phase/private/seat panels, role-safe speech feed, and in-room identity
+    reminder dialog with visible werewolf teammates derived only from
+    `projection.players`.
+  - Composer Rail supports multiple structured actions, visible candidate
+    target selection, pass, deadline/default-timeout display, submitting state,
+    and server rejection feedback.
+- Removed the separate Flutter identity-confirm page from the current flow;
+  `ConnectScreen` and Home match join now go straight to `LiveRoomScreen`, where
+  the role reminder appears after participant state arrives.
+- Android Studio / Flutter run note: use `--flavor internal`; running without a
+  flavor can produce flavored APKs while Flutter looks for `app-debug.apk`.
+- Verification:
+  - `flutter analyze` passed.
+  - `flutter test` passed 58 tests.
+  - `flutter build apk --debug --flavor internal` built
+    `clients/flutter_app/build/app/outputs/flutter-apk/app-internal-debug.apk`.
+- Boundary: no backend protocol, runtime, provider, validator, generated
+  fixture, or workflow behavior was changed.
+
 ### 2026-07-05 - CI Stability + Live Room Usability Slice
 
 - Fixed the ordinary GitHub `tests.yml` red workflow on `main`:

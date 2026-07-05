@@ -141,7 +141,7 @@
 |---|---|---|
 | **P3-E-0 客户端迁移路线 spec** | 正式记录 Flutter-first client rewrite、Qt legacy until parity、backend protocol retained;同步废弃 storybook/parchment/童话桌游 UI 方向。 | ✅ 文档中 |
 | **P3-E-1 Flutter protocol spike** | 新 Flutter 客户端连接现有 observer/participant server:配置 base URL、join/resume profile-bound single human seat、读取 participant state、渲染 role-safe live room 与底部 Composer Rail,并提交 speech/final_words + vote/角色结构化动作;不读本地 artifact,不碰 provider。 | ✅ 完成 |
-| **P3-E-2 Mobile-first live room slice** | 以手机竖屏为主布局,完成可替代 Qt 基础观战的实时对局房间;桌面端是响应式扩展而非另一个产品。当前已开始移动端入口/导航、角色库、历史壳与设置供应商入口切片。 | 🚧 in_progress |
+| **P3-E-2 Mobile-first live room slice** | 以手机竖屏为主布局,完成可替代 Qt 基础观战的实时对局房间:移动端入口/导航、昼夜外观、角色库与历史壳、role-safe projection 解析、发言流、座位/阶段/私有信息结构、房间身份提醒弹窗、行动窗口截止/提交/服务器拒绝反馈、候选目标选择与多动作 Composer。桌面端保留响应式扩展口径。 | ✅ 完成 |
 | **P3-E-3 Human seat client slice** | 接 P3-C 的 single human seat 后端:合法视野、发言、角色动作、投票、遗言、超时、重连,全部由 server action_window 控制。前置:P3-C-0 protocol + P3-C-1b profile-driven backend。 | ⏳ 待 plan |
 | **P3-E-4 Desktop parity / Qt retirement gate** | 先达 player parity(启动/接入、观战、常用配置、真人入座、结算回看);Qt 归档/移除还要求 developer parity(证据/推理轨迹/provider/发行更新等工具链)或另行决策。 | ⏳ 后续 |
 

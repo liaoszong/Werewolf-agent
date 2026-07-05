@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../app/app_strings.dart';
@@ -12,13 +14,17 @@ class ComposerRail extends StatefulWidget {
   const ComposerRail({
     super.key,
     required this.window,
+    this.targetCandidateSeatIds = const [],
     this.errorMessage,
+    this.isSubmitting = false,
     required this.onSubmitSpeech,
     required this.onSubmitStructuredAction,
   });
 
   final ActionWindow? window;
+  final List<String> targetCandidateSeatIds;
   final String? errorMessage;
+  final bool isSubmitting;
   final SpeechSubmit onSubmitSpeech;
   final StructuredSubmit onSubmitStructuredAction;
 
@@ -29,6 +35,7 @@ class ComposerRail extends StatefulWidget {
 class _ComposerRailState extends State<ComposerRail> {
   final _text = TextEditingController();
   String? _selectedTarget;
+  String? _selectedAction;
   bool _collapsed = false;
 
   @override
@@ -37,6 +44,7 @@ class _ComposerRailState extends State<ComposerRail> {
     if (oldWidget.window?.id != widget.window?.id) {
       _collapsed = false;
       _selectedTarget = null;
+      _selectedAction = null;
       _text.clear();
     }
   }
@@ -59,30 +67,43 @@ class _ComposerRailState extends State<ComposerRail> {
     }
     if (window.allowsTextInput) {
       return _TextComposer(
+        window: window,
         controller: _text,
         label: _textActionLabel(window),
         errorMessage: widget.errorMessage,
+        isSubmitting: widget.isSubmitting,
         onCollapse: () => setState(() => _collapsed = true),
         onSend: () async {
           final text = _text.text.trim();
-          if (text.isEmpty) return;
+          if (text.isEmpty || widget.isSubmitting) return;
           await widget.onSubmitSpeech(text);
           _text.clear();
         },
       );
     }
+    final structuredActions = _structuredActions(window.allowedActions);
+    final actionType = _selectedStructuredAction(structuredActions);
     return _StructuredComposer(
       window: window,
-      actionType: _primaryStructuredAction(window.allowedActions),
+      actionTypes: structuredActions,
+      actionType: actionType,
+      targetCandidateSeatIds: _targetCandidateSeatIds(),
       selectedTarget: _selectedTarget,
       errorMessage: widget.errorMessage,
+      isSubmitting: widget.isSubmitting,
       onTargetSelected: (target) => setState(() => _selectedTarget = target),
+      onActionSelected: (action) => setState(() {
+        _selectedAction = action;
+        _selectedTarget = null;
+      }),
       onPass: () {
+        if (widget.isSubmitting) return;
         widget.onSubmitStructuredAction('pass', const {});
       },
       onCollapse: () => setState(() => _collapsed = true),
       onConfirm: () async {
-        final action = _primaryStructuredAction(window.allowedActions);
+        final action = _selectedStructuredAction(structuredActions);
+        if (widget.isSubmitting) return;
         if (action == 'pass') {
           await widget.onSubmitStructuredAction('pass', const {});
           return;
@@ -94,11 +115,30 @@ class _ComposerRailState extends State<ComposerRail> {
     );
   }
 
-  String _primaryStructuredAction(List<String> actions) {
-    for (final action in actions) {
-      if (action != 'pass') return action;
-    }
+  List<String> _structuredActions(List<String> actions) {
+    return actions.where((action) => action != 'pass').toList(growable: false);
+  }
+
+  String _selectedStructuredAction(List<String> actions) {
+    final selected = _selectedAction;
+    if (selected != null && actions.contains(selected)) return selected;
+    if (actions.isNotEmpty) return actions.first;
     return 'pass';
+  }
+
+  List<String> _targetCandidateSeatIds() {
+    final seen = <String>{};
+    final result = <String>[];
+    final source = widget.targetCandidateSeatIds.isEmpty
+        ? const ['p1', 'p2', 'p3', 'p4', 'p5', 'p6']
+        : widget.targetCandidateSeatIds;
+    for (final seat in source) {
+      final normalized = seat.trim().toLowerCase();
+      if (normalized.isEmpty || seen.contains(normalized)) continue;
+      seen.add(normalized);
+      result.add(normalized);
+    }
+    return result;
   }
 
   String _textActionLabel(ActionWindow window) {
@@ -154,16 +194,20 @@ class _CollapsedHandle extends StatelessWidget {
 
 class _TextComposer extends StatelessWidget {
   const _TextComposer({
+    required this.window,
     required this.controller,
     required this.label,
     required this.errorMessage,
+    required this.isSubmitting,
     required this.onCollapse,
     required this.onSend,
   });
 
+  final ActionWindow window;
   final TextEditingController controller;
   final String label;
   final String? errorMessage;
+  final bool isSubmitting;
   final VoidCallback onCollapse;
   final VoidCallback onSend;
 
@@ -179,6 +223,7 @@ class _TextComposer extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (errorMessage != null) _ComposerError(message: errorMessage!),
+            _ComposerMetaLine(window: window, isSubmitting: isSubmitting),
             ConstrainedBox(
               key: const Key('composer-input-shell'),
               constraints: const BoxConstraints(minHeight: 54, maxHeight: 64),
@@ -250,8 +295,10 @@ class _TextComposer extends StatelessWidget {
                         height: 44,
                         child: IconButton.filled(
                           key: const Key('composer-send-button'),
-                          tooltip: strings.send,
-                          onPressed: onSend,
+                          tooltip: isSubmitting
+                              ? strings.submittingAction
+                              : strings.send,
+                          onPressed: isSubmitting ? null : onSend,
                           style: IconButton.styleFrom(
                             backgroundColor: palette.textPrimary,
                             foregroundColor: palette.background,
@@ -274,20 +321,28 @@ class _TextComposer extends StatelessWidget {
 class _StructuredComposer extends StatelessWidget {
   const _StructuredComposer({
     required this.window,
+    required this.actionTypes,
     required this.actionType,
+    required this.targetCandidateSeatIds,
     required this.selectedTarget,
     required this.errorMessage,
+    required this.isSubmitting,
     required this.onTargetSelected,
+    required this.onActionSelected,
     required this.onPass,
     required this.onCollapse,
     required this.onConfirm,
   });
 
   final ActionWindow window;
+  final List<String> actionTypes;
   final String actionType;
+  final List<String> targetCandidateSeatIds;
   final String? selectedTarget;
   final String? errorMessage;
+  final bool isSubmitting;
   final ValueChanged<String> onTargetSelected;
+  final ValueChanged<String> onActionSelected;
   final VoidCallback onPass;
   final VoidCallback onCollapse;
   final VoidCallback onConfirm;
@@ -306,6 +361,7 @@ class _StructuredComposer extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (errorMessage != null) _ComposerError(message: errorMessage!),
+            _ComposerMetaLine(window: window, isSubmitting: isSubmitting),
             DecoratedBox(
               key: const Key('structured-composer-shell'),
               decoration: BoxDecoration(
@@ -382,11 +438,48 @@ class _StructuredComposer extends StatelessWidget {
                         ),
                         if (canPass)
                           TextButton(
-                            onPressed: onPass,
-                            child: Text(strings.pass),
+                            onPressed: isSubmitting ? null : onPass,
+                            child: Text(
+                              isSubmitting
+                                  ? strings.submittingAction
+                                  : strings.pass,
+                            ),
                           ),
                       ],
                     ),
+                    if (actionTypes.length > 1) ...[
+                      const SizedBox(height: 10),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        child: Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            for (final action in actionTypes)
+                              ChoiceChip(
+                                key: Key('structured-action-choice-$action'),
+                                label: Text(strings.actionLabel(action)),
+                                selected: actionType == action,
+                                selectedColor: palette.accent.withValues(
+                                  alpha: palette.isDay ? 0.24 : 0.20,
+                                ),
+                                backgroundColor: palette.control,
+                                side: BorderSide(
+                                  color: actionType == action
+                                      ? palette.accent.withValues(alpha: 0.64)
+                                      : palette.border,
+                                ),
+                                labelStyle: TextStyle(
+                                  color: palette.textPrimary,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                                showCheckmark: false,
+                                onSelected: (_) => onActionSelected(action),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
                     if (needsTarget) ...[
                       const SizedBox(height: 10),
                       Padding(
@@ -403,14 +496,7 @@ class _StructuredComposer extends StatelessWidget {
                           spacing: 8,
                           runSpacing: 8,
                           children: [
-                            for (final seat in const [
-                              'p1',
-                              'p2',
-                              'p3',
-                              'p4',
-                              'p5',
-                              'p6',
-                            ])
+                            for (final seat in targetCandidateSeatIds)
                               ChoiceChip(
                                 label: Text(seat.toUpperCase()),
                                 selected: selectedTarget == seat,
@@ -442,7 +528,9 @@ class _StructuredComposer extends StatelessWidget {
                         child: FilledButton.icon(
                           key: const Key('composer-confirm-button'),
                           onPressed:
-                              actionType == 'pass' || selectedTarget != null
+                              !isSubmitting &&
+                                  (actionType == 'pass' ||
+                                      selectedTarget != null)
                               ? onConfirm
                               : null,
                           icon: const Icon(Icons.arrow_upward_rounded),
@@ -452,6 +540,144 @@ class _StructuredComposer extends StatelessWidget {
                     ),
                   ],
                 ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ComposerMetaLine extends StatelessWidget {
+  const _ComposerMetaLine({required this.window, required this.isSubmitting});
+
+  final ActionWindow window;
+  final bool isSubmitting;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = AppLanguageScope.of(context);
+    final palette = WerewolfAppTheme.colors(context);
+    final hasDeadline =
+        window.deadlineAt != null || window.defaultOnTimeout != null;
+    if (!hasDeadline && !isSubmitting) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(6, 0, 6, 8),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 6,
+        children: [
+          if (hasDeadline) _ActionDeadlineChip(window: window),
+          if (isSubmitting)
+            _InlineStatusChip(
+              label: strings.submittingAction,
+              icon: Icons.hourglass_top_rounded,
+              color: palette.accent,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ActionDeadlineChip extends StatefulWidget {
+  const _ActionDeadlineChip({required this.window});
+
+  final ActionWindow window;
+
+  @override
+  State<_ActionDeadlineChip> createState() => _ActionDeadlineChipState();
+}
+
+class _ActionDeadlineChipState extends State<_ActionDeadlineChip> {
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.window.deadlineAt != null) {
+      _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (mounted) setState(() {});
+      });
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _ActionDeadlineChip oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.window.deadlineAt != widget.window.deadlineAt) {
+      _timer?.cancel();
+      _timer = null;
+      if (widget.window.deadlineAt != null) {
+        _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+          if (mounted) setState(() {});
+        });
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = AppLanguageScope.of(context);
+    final palette = WerewolfAppTheme.colors(context);
+    final deadline = widget.window.deadlineAt;
+    final parts = <String>[];
+    if (deadline != null) {
+      parts.add(
+        strings.timeRemainingLabel(deadline.difference(DateTime.now().toUtc())),
+      );
+    }
+    final timeout = widget.window.defaultOnTimeout;
+    if (timeout != null) {
+      parts.add('${strings.timeoutDefault} ${strings.actionLabel(timeout)}');
+    }
+    return _InlineStatusChip(
+      label: parts.join(' · '),
+      icon: Icons.timer_outlined,
+      color: palette.textMuted,
+    );
+  }
+}
+
+class _InlineStatusChip extends StatelessWidget {
+  const _InlineStatusChip({
+    required this.label,
+    required this.icon,
+    required this.color,
+  });
+
+  final String label;
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = WerewolfAppTheme.colors(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: palette.isDay ? 0.10 : 0.14),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.28)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 13, color: color),
+            const SizedBox(width: 5),
+            Text(
+              label,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: palette.textPrimary,
+                fontWeight: FontWeight.w800,
               ),
             ),
           ],

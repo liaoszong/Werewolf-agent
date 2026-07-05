@@ -19,9 +19,10 @@ class FakeObserverApiClient extends ObserverApiClient {
 }
 
 class FakeParticipantApiClient extends ParticipantApiClient {
-  FakeParticipantApiClient()
+  FakeParticipantApiClient({this.joinGate})
     : super(baseUri: Uri.parse('http://127.0.0.1:8765'));
 
+  final Completer<void>? joinGate;
   String? joinedRunId;
   final sseController = StreamController<ParticipantSseEvent>.broadcast();
 
@@ -32,6 +33,7 @@ class FakeParticipantApiClient extends ParticipantApiClient {
     required String joinCode,
   }) async {
     joinedRunId = runId;
+    await joinGate?.future;
     return ParticipantSession(
       runId: runId,
       seatId: seatId,
@@ -52,7 +54,24 @@ class FakeParticipantApiClient extends ParticipantApiClient {
       'seat_id': 'p3',
       'perspective': 'role:p3',
       'run_status': 'running',
-      'projection': {'events': []},
+      'projection': {
+        'players': [
+          {
+            'player_id': 'p3',
+            'display_role': 'seer',
+            'display_team': 'villager',
+            'alive': true,
+            'visibility': 'self',
+          },
+        ],
+        'proof': {
+          'source': 'snapshots',
+          'self_player_id': 'p3',
+          'self_role': 'seer',
+          'self_team': 'villager',
+        },
+        'events': [],
+      },
       'open_action_window': null,
       'reconnect_cursor': 'event:1',
     });
@@ -197,16 +216,73 @@ void main() {
     expect(find.byKey(const Key('flow-back-button')), findsOneWidget);
     expect(find.text('run_1'), findsOneWidget);
     expect(find.text('进行中'), findsOneWidget);
+    final matchBackTopLeft = tester.getTopLeft(
+      find.byKey(const Key('flow-back-button')),
+    );
+    final matchBackRight = tester
+        .getTopRight(find.byKey(const Key('flow-back-button')))
+        .dx;
+    final matchTitleLeft = tester.getTopLeft(find.text('选择对局')).dx;
+    expect(matchTitleLeft - matchBackRight, greaterThanOrEqualTo(12));
 
     await tester.tap(find.text('加入此局'));
     await tester.pump();
     await tester.pump();
 
     expect(participant.joinedRunId, 'run_1');
-    expect(find.text('你的席位是 P3'), findsOneWidget);
+    expect(find.byKey(const Key('role-notice-dialog')), findsOneWidget);
+    expect(find.textContaining('你的身份'), findsWidgets);
+    expect(find.text('预言家'), findsWidgets);
     expect(find.text('首页'), findsNothing);
     expect(find.byKey(const Key('flow-back-button')), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.byKey(const Key('flow-back-button'))),
+      matchBackTopLeft,
+    );
 
+    await tester.tap(find.text('进入房间'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('flow-back-button')), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.byKey(const Key('flow-back-button'))),
+      matchBackTopLeft,
+    );
+    await participant.sseController.close();
+  });
+
+  testWidgets('join enters room before participant API completes', (
+    tester,
+  ) async {
+    final joinGate = Completer<void>();
+    final participant = FakeParticipantApiClient(joinGate: joinGate);
+    await tester.pumpWidget(
+      WerewolfApp(
+        observerClientFactory: (_) => FakeObserverApiClient(
+          runs: const [RunSummary(runId: 'run_1', status: 'running')],
+        ),
+        sessionControllerFactory: (_) =>
+            SessionController(participantApi: participant),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    await tester.tap(find.text('继续进入'));
+    await tester.pump();
+    await tester.tap(find.text('加入此局'));
+    await tester.pump();
+
+    expect(participant.joinedRunId, 'run_1');
+    expect(find.byKey(const Key('room-status-island')), findsOneWidget);
+    expect(find.byKey(const Key('role-notice-dialog')), findsNothing);
+    expect(find.text('加入中...'), findsNothing);
+
+    joinGate.complete();
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.byKey(const Key('role-notice-dialog')), findsOneWidget);
+    expect(find.text('预言家'), findsWidgets);
     await participant.sseController.close();
   });
 

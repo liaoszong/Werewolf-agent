@@ -59,4 +59,33 @@ void main() {
     expect(find.textContaining('第 2 轮'), findsOneWidget);
     expect(find.textContaining('P1', findRichText: true), findsOneWidget);
   });
+
+  testWidgets('renders enriched game event speech from data summary', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: SpeechFeed(
+            currentSeatId: 'p3',
+            events: [
+              {
+                'kind': 'game_event_emitted',
+                'actor': 'p2',
+                'round': 2,
+                'phase': 'day',
+                'payload': {'event_id': 'g_e01', 'type': 'player_speech'},
+                'data': {'summary': 'P2: 我觉得 P1 有狼人面。'},
+              },
+            ],
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byKey(const Key('speech-event-bubble')), findsOneWidget);
+    expect(find.textContaining('P2', findRichText: true), findsWidgets);
+    expect(find.textContaining('P1', findRichText: true), findsOneWidget);
+    expect(find.byKey(const Key('speech-timeline-notice')), findsNothing);
+  });
 }

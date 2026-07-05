@@ -48,8 +48,15 @@ Then run the Flutter app:
 
 ```powershell
 Set-Location clients/flutter_app
-flutter run
+flutter run --flavor internal -t lib/main.dart
 ```
+
+In Android Studio, open this directory as the project and set the Flutter run
+configuration's Build flavor to `internal`. If the UI does not expose a Build
+flavor field, add `--flavor internal` to Additional run args. Running without a
+flavor can build `app-internal-debug.apk` successfully while the Flutter tool
+looks for a non-flavored `app-debug.apk`, producing a misleading "failed to
+produce an .apk file" message.
 
 Default fields:
 
@@ -62,21 +69,22 @@ development. On a physical Android device, `127.0.0.1` points at the phone, not
 the computer; use the computer LAN address for a local server.
 
 The client joins the profile-bound human seat selected by the backend profile.
-Future multi-human seat picking should be inserted before identity confirmation,
-without weakening the participant protocol boundary.
+Future multi-human seat picking should be inserted before the room flow, without
+weakening the participant protocol boundary. The current single-human flow shows
+the role reminder as an in-room dialog after participant state arrives.
 
 ## Android APK
 
 Build a local release APK from this directory:
 
 ```powershell
-flutter build apk
+flutter build apk --release --flavor internal
 ```
 
 Default output:
 
 ```text
-clients/flutter_app/build/app/outputs/flutter-apk/app-release.apk
+clients/flutter_app/build/app/outputs/flutter-apk/app-internal-release.apk
 ```
 
 The generated APK is a build artifact and is not tracked by git. If you need to

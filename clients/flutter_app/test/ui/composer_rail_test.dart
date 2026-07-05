@@ -3,22 +3,23 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:werewolf_app/src/protocol/participant_models.dart';
 import 'package:werewolf_app/src/ui/composer_rail.dart';
 
-ActionWindow _window(List<String> actions) => ActionWindow.fromJson({
-  'schema_version': 'p3c.action_window.v1',
-  'action_window_id': 'aw_1',
-  'run_id': 'run_1',
-  'seat_id': 'p3',
-  'phase': 'day',
-  'round': 1,
-  'game_revision': 1,
-  'opened_at_event_id': 'evt_1',
-  'deadline_at': null,
-  'allowed_actions': actions,
-  'required': true,
-  'default_on_timeout': 'pass',
-  'status': 'open',
-  'reconnect_cursor': 'event:1',
-});
+ActionWindow _window(List<String> actions, {DateTime? deadlineAt}) =>
+    ActionWindow.fromJson({
+      'schema_version': 'p3c.action_window.v1',
+      'action_window_id': 'aw_1',
+      'run_id': 'run_1',
+      'seat_id': 'p3',
+      'phase': 'day',
+      'round': 1,
+      'game_revision': 1,
+      'opened_at_event_id': 'evt_1',
+      'deadline_at': deadlineAt?.toUtc().toIso8601String(),
+      'allowed_actions': actions,
+      'required': true,
+      'default_on_timeout': 'pass',
+      'status': 'open',
+      'reconnect_cursor': 'event:1',
+    });
 
 void main() {
   testWidgets('speech window submits text', (tester) async {
@@ -92,6 +93,39 @@ void main() {
     expect(find.byKey(const Key('action-window-chip')), findsWidgets);
   });
 
+  testWidgets('multi-action window submits selected witch action', (
+    tester,
+  ) async {
+    String? action;
+    Map<String, dynamic>? payload;
+    await tester.pumpWidget(
+      TestHarness(
+        child: ComposerRail(
+          window: _window(['witch_save', 'witch_poison', 'pass']),
+          targetCandidateSeatIds: const ['p1', 'p2'],
+          onSubmitSpeech: (_) async {},
+          onSubmitStructuredAction: (type, body) async {
+            action = type;
+            payload = body;
+          },
+        ),
+      ),
+    );
+
+    await tester.tap(
+      find.byKey(const Key('structured-action-choice-witch_poison')),
+    );
+    await tester.pump();
+    await tester.tap(find.text('P2'));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('composer-confirm-button')));
+    await tester.pump();
+
+    expect(action, 'witch_poison');
+    expect(payload, {'target': 'p2'});
+    expect(find.text('P3'), findsNothing);
+  });
+
   testWidgets('pass button submits pass action instead of pass target', (
     tester,
   ) async {
@@ -163,6 +197,31 @@ void main() {
     );
 
     expect(find.text('目标不合法'), findsOneWidget);
+  });
+
+  testWidgets('composer shows deadline and disables submit while submitting', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      TestHarness(
+        child: ComposerRail(
+          window: _window(
+            ['speech'],
+            deadlineAt: DateTime.now().toUtc().add(const Duration(minutes: 2)),
+          ),
+          isSubmitting: true,
+          onSubmitSpeech: (_) async {},
+          onSubmitStructuredAction: (actionType, payload) async {},
+        ),
+      ),
+    );
+
+    expect(find.textContaining('剩余'), findsOneWidget);
+    expect(find.text('提交中'), findsOneWidget);
+    final sendButton = tester.widget<IconButton>(
+      find.byKey(const Key('composer-send-button')),
+    );
+    expect(sendButton.onPressed, isNull);
   });
 }
 

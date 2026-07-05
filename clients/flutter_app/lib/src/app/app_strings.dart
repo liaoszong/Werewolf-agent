@@ -92,6 +92,7 @@ class AppStrings {
     '你只会看到当前席位合法可见的信息。夜间他人行动会显示为等待状态。',
     'You only see information legal for this seat. Hidden night actions stay as waiting state.',
   );
+  String get confirmingSeat => _t('正在确认席位...', 'Confirming seat...');
   String get enterRoom => _t('进入房间', 'Enter Room');
   String get languageLabel => _t('语言', 'Language');
   String get connection => _t('连接', 'Connection');
@@ -146,10 +147,35 @@ class AppStrings {
   String get finalWords => _t('留下遗言', 'Final words');
   String get pass => _t('跳过', 'Pass');
   String get confirm => _t('确认', 'Confirm');
+  String get submittingAction => _t('提交中', 'Submitting');
+  String get actionExpired => _t('已超时', 'Expired');
+  String get timeoutDefault => _t('超时默认', 'Timeout default');
   String get candidateTargets =>
       _t('候选目标，服务器会确认是否合法', 'Candidate targets; server confirms legality');
+  String get roleNoticeTitle => _t('身份提醒', 'Role reminder');
+  String get roleNoticeBody => _t(
+    '进入房间前再次确认你的当前席位信息。这里仍只展示服务器投影允许你看到的内容。',
+    'Confirm your current seat before entering the room. This only shows information allowed by the server projection.',
+  );
+  String get werewolfTeammates => _t('狼人同伴', 'Werewolf teammates');
+  String get noVisibleWerewolfTeammates =>
+      _t('当前视野没有显示其他狼人', 'No other werewolves are visible in this view');
+  String get roleSkill => _t('技能提示', 'Skill tip');
   String get vote => _t('投票', 'Vote');
   String get chooseAction => _t('选择行动', 'Choose action');
+  String get seats => _t('座位区', 'Seats');
+  String get phaseStatus => _t('阶段状态', 'Phase status');
+  String get privateInfo => _t('当前席位私有信息', 'Private seat info');
+  String get yourRole => _t('你的身份', 'Your role');
+  String get yourTeam => _t('你的阵营', 'Your team');
+  String get visibilityProof => _t('视野证明', 'Visibility proof');
+  String get hiddenEvents => _t('隐藏事件', 'Hidden events');
+  String get hiddenSnapshots => _t('隐藏快照', 'Hidden snapshots');
+  String get visibleSnapshot => _t('可见快照', 'Visible snapshot');
+  String get you => _t('你', 'You');
+  String get alive => _t('存活', 'Alive');
+  String get dead => _t('出局', 'Out');
+  String get statusUnknown => _t('状态未知', 'Unknown state');
 
   String seatIdentity(String seat) {
     return appLanguage == AppLanguage.zh ? '你的席位是 $seat' : 'Your seat is $seat';
@@ -182,18 +208,97 @@ class AppStrings {
 
   String phaseLabel(String? phase) {
     return switch (phase) {
-      'night' => nightInProgress,
-      'day' => discussion,
-      'vote' || 'voting' => voting,
+      'night' ||
+      'night_werewolf' ||
+      'night_witch' ||
+      'night_seer' ||
+      'night_guard' => nightInProgress,
+      'day' || 'day_speech' => discussion,
+      'vote' || 'voting' || 'day_vote' => voting,
       'completed' || 'finished' || 'game_over' => gameOver,
       'running' => roomSyncing,
       _ => roomSyncing,
     };
   }
 
+  String roleLabel(String? role) {
+    return switch (role) {
+      'werewolf' => _t('狼人', 'Werewolf'),
+      'seer' => _t('预言家', 'Seer'),
+      'witch' => _t('女巫', 'Witch'),
+      'hunter' => _t('猎人', 'Hunter'),
+      'guard' => _t('守卫', 'Guard'),
+      'villager' => _t('村民', 'Villager'),
+      'unknown' || null => unknown,
+      _ => role,
+    };
+  }
+
+  String teamLabel(String? team) {
+    return switch (team) {
+      'werewolf' => _t('狼人阵营', 'Werewolf team'),
+      'villager' => _t('好人阵营', 'Village team'),
+      'unknown' || null => unknown,
+      _ => team,
+    };
+  }
+
+  String roleSkillIntro(String? role) {
+    return switch (role) {
+      'werewolf' => _t(
+        '夜晚与狼人同伴选择击杀目标；白天需要隐藏阵营并影响投票。',
+        'At night, choose a kill target with your teammates. By day, hide your team and influence the vote.',
+      ),
+      'seer' => _t(
+        '夜晚可查验一名玩家的阵营；白天用发言引导好人阵营。',
+        'At night, check one player. By day, guide the village through speech.',
+      ),
+      'witch' => _t(
+        '拥有解药和毒药；具体可用行动以后端行动窗口为准。',
+        'You have save and poison powers. Available actions still follow the server action window.',
+      ),
+      'hunter' => _t(
+        '出局时通常可以开枪带走一名玩家；是否可用以后端行动窗口为准。',
+        'When eliminated, you may be able to shoot one player. Availability follows the server action window.',
+      ),
+      'guard' => _t(
+        '夜晚可守护一名玩家；具体目标以后端行动窗口确认为准。',
+        'At night, protect one player. The server action window confirms the available target.',
+      ),
+      'villager' => _t(
+        '没有夜间技能，依靠发言、投票和推理找出狼人。',
+        'No night power. Use speech, voting, and logic to find werewolves.',
+      ),
+      _ => _t(
+        '技能会在后续行动窗口中按服务器开放。',
+        'Your actions will appear later through server-owned action windows.',
+      ),
+    };
+  }
+
+  String aliveLabel(bool? isAlive) {
+    return switch (isAlive) {
+      true => alive,
+      false => dead,
+      null => statusUnknown,
+    };
+  }
+
   String roundLabel(int? round) {
     if (round == null || round <= 0) return currentRound;
     return appLanguage == AppLanguage.zh ? '第 $round 轮' : 'Round $round';
+  }
+
+  String timeRemainingLabel(Duration remaining) {
+    if (remaining.isNegative || remaining.inSeconds <= 0) return actionExpired;
+    final minutes = remaining.inMinutes;
+    final seconds = remaining.inSeconds
+        .remainder(60)
+        .toString()
+        .padLeft(2, '0');
+    return appLanguage == AppLanguage.zh
+        ? '剩余 $minutes:$seconds'
+        : '$minutes:$seconds left';
   }
 
   String eventKindLabel(String kind) {

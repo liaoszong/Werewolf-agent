@@ -4,7 +4,7 @@ import '../app/app_settings.dart';
 import '../app/session_controller.dart';
 import '../protocol/participant_api_client.dart';
 import '../ui/app_theme.dart';
-import 'identity_confirm_screen.dart';
+import 'live_room_screen.dart';
 
 typedef SessionControllerFactory = SessionController Function(Uri baseUri);
 
@@ -129,7 +129,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
     if (controller.connectionStatus == ConnectionStatus.connected) {
       await Navigator.of(context).push(
         MaterialPageRoute<void>(
-          builder: (_) => IdentityConfirmScreen(controller: controller),
+          builder: (_) => LiveRoomScreen(controller: controller),
         ),
       );
       if (mounted) {

@@ -34,7 +34,24 @@ class ImmediateApiClient extends ParticipantApiClient {
       'seat_id': 'p3',
       'perspective': 'role:p3',
       'run_status': 'running',
-      'projection': {'events': []},
+      'projection': {
+        'players': [
+          {
+            'player_id': 'p3',
+            'display_role': 'seer',
+            'display_team': 'villager',
+            'alive': true,
+            'visibility': 'self',
+          },
+        ],
+        'proof': {
+          'source': 'snapshots',
+          'self_player_id': 'p3',
+          'self_role': 'seer',
+          'self_team': 'villager',
+        },
+        'events': [],
+      },
       'open_action_window': null,
       'reconnect_cursor': 'event:1',
     });
@@ -51,15 +68,17 @@ class ImmediateApiClient extends ParticipantApiClient {
 }
 
 void main() {
-  testWidgets('join shows identity confirmation before live room',
-      (tester) async {
-    await tester.pumpWidget(MaterialApp(
-      home: ConnectScreen(
-        controllerFactory: (_) => SessionController(
-          participantApi: ImmediateApiClient(),
+  testWidgets('join enters live room and shows role notice dialog', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ConnectScreen(
+          controllerFactory: (_) =>
+              SessionController(participantApi: ImmediateApiClient()),
         ),
       ),
-    ));
+    );
 
     await tester.enterText(
       find.byKey(const Key('base-url-input')),
@@ -74,7 +93,9 @@ void main() {
     await tester.tap(find.text('加入席位'));
     await tester.pumpAndSettle();
 
-    expect(find.text('你的席位是 P3'), findsOneWidget);
-    expect(find.text('参与者视角，不是上帝视角'), findsOneWidget);
+    expect(find.byKey(const Key('role-notice-dialog')), findsOneWidget);
+    expect(find.byKey(const Key('room-status-island')), findsOneWidget);
+    expect(find.textContaining('你的身份'), findsWidgets);
+    expect(find.text('预言家'), findsWidgets);
   });
 }

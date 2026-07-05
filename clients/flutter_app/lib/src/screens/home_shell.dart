@@ -39,7 +39,6 @@ class _HomeShellState extends State<HomeShell> {
   Uri? _loadedBaseUri;
   bool _loadingRuns = false;
   bool _joining = false;
-  bool _needsIdentityConfirm = false;
   String? _runsError;
   String? _joinError;
   List<RunSummary> _runs = const [];
@@ -146,12 +145,8 @@ class _HomeShellState extends State<HomeShell> {
       ),
       _HomeFlow.liveRoom => _RoomPage(
         controller: _sessionController,
-        needsIdentityConfirm: _needsIdentityConfirm,
         onBackToMatches: () =>
             setState(() => _homeFlow = _HomeFlow.matchPicker),
-        onEnterRoom: () {
-          setState(() => _needsIdentityConfirm = false);
-        },
       ),
     };
   }
@@ -180,11 +175,15 @@ class _HomeShellState extends State<HomeShell> {
   }
 
   Future<void> _joinRun(String runId) async {
+    final controller = widget.sessionControllerFactory(_settings.baseUri);
+    _sessionController?.dispose();
     setState(() {
+      _sessionController = controller;
       _joining = true;
       _joinError = null;
+      _selectedIndex = 0;
+      _homeFlow = _HomeFlow.liveRoom;
     });
-    final controller = widget.sessionControllerFactory(_settings.baseUri);
     await controller.joinAndLoad(
       runId: runId,
       seatId: _settings.seatId,
@@ -192,17 +191,11 @@ class _HomeShellState extends State<HomeShell> {
     );
     if (!mounted) return;
     if (controller.connectionStatus == ConnectionStatus.connected) {
-      _sessionController?.dispose();
       setState(() {
-        _sessionController = controller;
         _joining = false;
-        _needsIdentityConfirm = true;
-        _selectedIndex = 0;
-        _homeFlow = _HomeFlow.liveRoom;
       });
       return;
     }
-    controller.dispose();
     setState(() {
       _joining = false;
       _joinError = controller.lastError ?? 'join failed';
@@ -352,12 +345,13 @@ class _MatchesPage extends StatelessWidget {
     final strings = AppLanguageScope.of(context);
     final palette = WerewolfAppTheme.colors(context);
     return ListView(
-      padding: const EdgeInsets.fromLTRB(18, 18, 18, 24),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
       children: [
         Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _FloatingBackButton(onPressed: onBack),
-            const SizedBox(width: 4),
+            const SizedBox(width: 12),
             Expanded(
               child: Text(
                 strings.chooseMatch,
@@ -932,17 +926,10 @@ const _roleTemplates = [
 ];
 
 class _RoomPage extends StatelessWidget {
-  const _RoomPage({
-    required this.controller,
-    required this.needsIdentityConfirm,
-    required this.onBackToMatches,
-    required this.onEnterRoom,
-  });
+  const _RoomPage({required this.controller, required this.onBackToMatches});
 
   final SessionController? controller;
-  final bool needsIdentityConfirm;
   final VoidCallback onBackToMatches;
-  final VoidCallback onEnterRoom;
 
   @override
   Widget build(BuildContext context) {
@@ -972,73 +959,7 @@ class _RoomPage extends StatelessWidget {
         ),
       );
     }
-    if (needsIdentityConfirm) {
-      return _IdentityConfirmPane(
-        controller: active,
-        onBackToMatches: onBackToMatches,
-        onEnterRoom: onEnterRoom,
-      );
-    }
     return LiveRoomScreen(controller: active, onBack: onBackToMatches);
-  }
-}
-
-class _IdentityConfirmPane extends StatelessWidget {
-  const _IdentityConfirmPane({
-    required this.controller,
-    required this.onBackToMatches,
-    required this.onEnterRoom,
-  });
-
-  final SessionController controller;
-  final VoidCallback onBackToMatches;
-  final VoidCallback onEnterRoom;
-
-  @override
-  Widget build(BuildContext context) {
-    final strings = AppLanguageScope.of(context);
-    final palette = WerewolfAppTheme.colors(context);
-    final session = controller.session;
-    final seat = session?.seatId.toUpperCase() ?? 'UNKNOWN';
-    final perspective = session?.perspective ?? 'role-safe';
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Align(
-            alignment: Alignment.centerLeft,
-            child: _FloatingBackButton(onPressed: onBackToMatches),
-          ),
-          const Spacer(),
-          Text(
-            strings.seatIdentity(seat),
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              color: palette.textPrimary,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(strings.participantPerspective),
-          const SizedBox(height: 8),
-          Text(
-            'Perspective: $perspective',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          const SizedBox(height: 18),
-          _Panel(child: Text(strings.legalInfoOnly)),
-          const Spacer(),
-          SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: FilledButton(
-              onPressed: onEnterRoom,
-              child: Text(strings.enterRoom),
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }
 
@@ -1398,6 +1319,7 @@ class _FloatingBackButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = WerewolfAppTheme.colors(context);
     return SizedBox(
+      key: const Key('flow-back-button'),
       width: 44,
       height: 44,
       child: DecoratedBox(
@@ -1414,7 +1336,6 @@ class _FloatingBackButton extends StatelessWidget {
           ],
         ),
         child: IconButton(
-          key: const Key('flow-back-button'),
           tooltip: MaterialLocalizations.of(context).backButtonTooltip,
           onPressed: onPressed,
           icon: Icon(

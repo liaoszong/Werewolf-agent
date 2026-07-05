@@ -6,10 +6,13 @@ import 'package:werewolf_app/src/protocol/participant_api_client.dart';
 import 'package:werewolf_app/src/protocol/participant_models.dart';
 
 class FakeParticipantApiClient extends ParticipantApiClient {
-  FakeParticipantApiClient({this.allowedActions = const ['speech']})
-      : super(baseUri: Uri.parse('http://127.0.0.1:8765'));
+  FakeParticipantApiClient({
+    this.allowedActions = const ['speech'],
+    this.submitGate,
+  }) : super(baseUri: Uri.parse('http://127.0.0.1:8765'));
 
   final List<String> allowedActions;
+  final Completer<void>? submitGate;
   int stateCalls = 0;
   Map<String, dynamic>? lastSubmit;
   final sseController = StreamController<ParticipantSseEvent>.broadcast();
@@ -69,6 +72,7 @@ class FakeParticipantApiClient extends ParticipantApiClient {
     required Map<String, dynamic> payload,
   }) async {
     lastSubmit = payload;
+    await submitGate?.future;
     return const ParticipantActionResult(
       status: 'accepted',
       actionWindowId: 'aw_1',
@@ -104,24 +108,27 @@ void main() {
     expect(controller.state?.openActionWindow?.id, 'aw_1');
   });
 
-  test('submitSpeech uses current window identity and refreshes state', () async {
-    final api = FakeParticipantApiClient();
-    final controller = SessionController(participantApi: api);
-    await controller.joinAndLoad(
-      runId: 'run_1',
-      seatId: 'p3',
-      joinCode: 'local-dev-code',
-    );
+  test(
+    'submitSpeech uses current window identity and refreshes state',
+    () async {
+      final api = FakeParticipantApiClient();
+      final controller = SessionController(participantApi: api);
+      await controller.joinAndLoad(
+        runId: 'run_1',
+        seatId: 'p3',
+        joinCode: 'local-dev-code',
+      );
 
-    await controller.submitSpeech('I want to hear from P2.');
+      await controller.submitSpeech('I want to hear from P2.');
 
-    expect(api.lastSubmit?['action_window_id'], 'aw_1');
-    expect(api.lastSubmit?['game_revision'], 7);
-    expect(api.lastSubmit?['action_type'], 'speech');
-    expect(api.lastSubmit?['payload'], {'text': 'I want to hear from P2.'});
-    expect(api.lastSubmit?['idempotency_key'], isA<String>());
-    expect(api.stateCalls, 2);
-  });
+      expect(api.lastSubmit?['action_window_id'], 'aw_1');
+      expect(api.lastSubmit?['game_revision'], 7);
+      expect(api.lastSubmit?['action_type'], 'speech');
+      expect(api.lastSubmit?['payload'], {'text': 'I want to hear from P2.'});
+      expect(api.lastSubmit?['idempotency_key'], isA<String>());
+      expect(api.stateCalls, 2);
+    },
+  );
 
   test('submitSpeech uses final_words when that is the text window', () async {
     final api = FakeParticipantApiClient(allowedActions: const ['final_words']);
@@ -136,6 +143,27 @@ void main() {
 
     expect(api.lastSubmit?['action_type'], 'final_words');
     expect(api.lastSubmit?['payload'], {'text': '最后说一句。'});
+  });
+
+  test('submitSpeech exposes in-flight action state', () async {
+    final gate = Completer<void>();
+    final api = FakeParticipantApiClient(submitGate: gate);
+    final controller = SessionController(participantApi: api);
+    await controller.joinAndLoad(
+      runId: 'run_1',
+      seatId: 'p3',
+      joinCode: 'local-dev-code',
+    );
+
+    final submit = controller.submitSpeech('我先说。');
+    await Future<void>.delayed(Duration.zero);
+
+    expect(controller.isSubmittingAction, isTrue);
+
+    gate.complete();
+    await submit;
+
+    expect(controller.isSubmittingAction, isFalse);
   });
 
   test('recoverAfterDisconnect reloads participant state', () async {
@@ -153,23 +181,27 @@ void main() {
     expect(api.stateCalls, 2);
   });
 
-  test('join starts participant SSE and refreshes state on room events',
-      () async {
-    final api = FakeParticipantApiClient();
-    final controller = SessionController(participantApi: api);
-    await controller.joinAndLoad(
-      runId: 'run_1',
-      seatId: 'p3',
-      joinCode: 'local-dev-code',
-    );
+  test(
+    'join starts participant SSE and refreshes state on room events',
+    () async {
+      final api = FakeParticipantApiClient();
+      final controller = SessionController(participantApi: api);
+      await controller.joinAndLoad(
+        runId: 'run_1',
+        seatId: 'p3',
+        joinCode: 'local-dev-code',
+      );
 
-    api.sseController.add(const ParticipantSseEvent(
-      name: 'action_window_opened',
-      data: {'action_window_id': 'aw_2'},
-    ));
-    await Future<void>.delayed(Duration.zero);
+      api.sseController.add(
+        const ParticipantSseEvent(
+          name: 'action_window_opened',
+          data: {'action_window_id': 'aw_2'},
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
 
-    expect(api.stateCalls, 2);
-    await api.sseController.close();
-  });
+      expect(api.stateCalls, 2);
+      await api.sseController.close();
+    },
+  );
 }

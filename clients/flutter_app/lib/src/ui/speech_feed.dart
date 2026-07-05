@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../app/app_strings.dart';
+import '../protocol/participant_models.dart';
 import 'app_theme.dart';
 
 class SpeechFeed extends StatelessWidget {
@@ -17,11 +18,10 @@ class SpeechFeed extends StatelessWidget {
       itemCount: events.length,
       separatorBuilder: (context, index) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
-        final event = events[index];
-        final kind =
-            event['kind'] as String? ?? event['type'] as String? ?? 'event';
-        final actor = event['actor'] as String? ?? 'system';
-        final text = _extractText(event, kind);
+        final event = ProjectedEvent.fromJson(events[index]);
+        final kind = event.displayKind;
+        final actor = event.actor;
+        final text = event.text;
         if (_isPublicRuleEvent(kind)) {
           return _RuleEventPill(kind: kind, label: text);
         }
@@ -30,24 +30,14 @@ class SpeechFeed extends StatelessWidget {
             actor: actor.toUpperCase(),
             text: text,
             kind: kind,
-            phase: event['phase'] as String?,
-            round: event['round'] as int?,
+            phase: event.phase,
+            round: event.round,
             isMine: actor.toLowerCase() == currentSeatId?.toLowerCase(),
           );
         }
         return _TimelineNotice(kind: kind, label: text);
       },
     );
-  }
-
-  static String _extractText(Map<String, dynamic> event, String fallback) {
-    final payload = event['payload'] ?? event['data'];
-    if (payload is Map<String, dynamic>) {
-      final message =
-          payload['message'] ?? payload['summary'] ?? payload['text'];
-      if (message is String && message.isNotEmpty) return message;
-    }
-    return fallback;
   }
 
   static bool _isPublicRuleEvent(String kind) {

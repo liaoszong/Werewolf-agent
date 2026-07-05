@@ -17,7 +17,7 @@ enum ConnectionStatus {
 
 class SessionController extends ChangeNotifier {
   SessionController({required ParticipantApiClient participantApi})
-      : _participantApi = participantApi;
+    : _participantApi = participantApi;
 
   final ParticipantApiClient _participantApi;
   final Random _random = Random();
@@ -27,6 +27,7 @@ class SessionController extends ChangeNotifier {
   ParticipantState? state;
   ConnectionStatus connectionStatus = ConnectionStatus.idle;
   String? lastError;
+  bool isSubmittingAction = false;
 
   Future<void> joinAndLoad({
     required String runId,
@@ -88,8 +89,8 @@ class SessionController extends ChangeNotifier {
     final actions = state?.openActionWindow?.allowedActions ?? const [];
     final actionType =
         actions.contains('final_words') && !actions.contains('speech')
-            ? 'final_words'
-            : 'speech';
+        ? 'final_words'
+        : 'speech';
     return _submitCurrentWindow(actionType, {'text': text});
   }
 
@@ -106,7 +107,10 @@ class SessionController extends ChangeNotifier {
   ) async {
     final active = session;
     final window = state?.openActionWindow;
-    if (active == null || window == null) return;
+    if (active == null || window == null || isSubmittingAction) return;
+    isSubmittingAction = true;
+    lastError = null;
+    notifyListeners();
     try {
       await _participantApi.submitAction(
         runId: active.runId,
@@ -127,6 +131,9 @@ class SessionController extends ChangeNotifier {
         await recoverAfterDisconnect();
       }
       notifyListeners();
+    } finally {
+      isSubmittingAction = false;
+      notifyListeners();
     }
   }
 
@@ -144,18 +151,18 @@ class SessionController extends ChangeNotifier {
     _eventSubscription = _participantApi
         .events(runId: active.runId, token: active.token, cursor: cursor)
         .listen(
-      (event) async {
-        if (_shouldRefreshForEvent(event.name)) {
-          await refreshState();
-        }
-      },
-      onError: (Object error) {
-        connectionStatus = ConnectionStatus.reconnecting;
-        lastError = error.toString();
-        notifyListeners();
-        unawaited(recoverAfterDisconnect());
-      },
-    );
+          (event) async {
+            if (_shouldRefreshForEvent(event.name)) {
+              await refreshState();
+            }
+          },
+          onError: (Object error) {
+            connectionStatus = ConnectionStatus.reconnecting;
+            lastError = error.toString();
+            notifyListeners();
+            unawaited(recoverAfterDisconnect());
+          },
+        );
   }
 
   bool _shouldRefreshForEvent(String eventName) {
