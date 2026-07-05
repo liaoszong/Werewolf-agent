@@ -32,6 +32,29 @@ machine secrets here.
 
 ## Entries
 
+### 2026-07-05 - P3-A-2b RolePolicy Asset Registry
+
+- Completed P3-A-2b as a backend asset-registry slice with no runtime
+  consumption.
+- Scope delivered:
+  - Added `src/werewolf_eval/role_policy_registry.py`.
+  - Added built-in `standard_six_player_balanced` RolePolicyPack covering
+    Werewolf, Seer, Witch, Villager, Guard, and Hunter.
+  - Added draft creation, publish, referenced-policy version bumping, and JSON
+    save/load helpers.
+  - Registry rejects RolePolicy payloads that try to persist
+    `seat_character_card_ref`, provider/execution/runtime refs, team plans,
+    extra-call budgets, visibility entitlement, or legal action windows.
+  - Registry rejects secret-like keys/values and delegates policy schema checks
+    through `validate_role_policy()`.
+- Verification:
+  - `$env:PYTHONPATH='src'; $env:NO_PROXY='*'; python -m unittest tests.test_role_policy_registry tests.test_agent_assets -v` passed 12 tests.
+  - `$env:PYTHONPATH='src'; $env:NO_PROXY='*'; python -m unittest discover -s tests -p "test_*.py"` passed 1443 tests, skipped 2.
+- Boundary: no runtime, provider, prompt byte, observer/participant protocol,
+  validator, generated fixture, Flutter UI, or workflow behavior was changed.
+  P3-A-2c remains the first runtime-consumption slice and must follow prompt
+  byte/version rules if model-visible text changes.
+
 ### 2026-07-05 - P3-A-2a Flutter Local RolePolicy Draft Editor
 
 - Completed P3-A-2a as a Flutter-only local draft UI slice.

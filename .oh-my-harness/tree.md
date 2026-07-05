@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 700
+- Entries: 702
 
 ```text
 ./
@@ -624,6 +624,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │       ├── release_metadata.py
 │       ├── render_demo.py
 │       ├── render_provider_replay.py
+│       ├── role_policy_registry.py
 │       ├── role_visibility.py
 │       ├── run_deepseek_consensus_game.py
 │       ├── run_deepseek_provider_game.py
@@ -808,6 +809,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   ├── test_render_demo.py
 │   ├── test_render_provider_replay.py
 │   ├── test_rng_draw_order.py
+│   ├── test_role_policy_registry.py
 │   ├── test_role_shuffle.py
 │   ├── test_role_single_source.py
 │   ├── test_role_visibility.py
