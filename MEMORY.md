@@ -47,9 +47,12 @@ machine secrets here.
     remain superseded/retracted rather than overwritten.
   - Enforced TeamPlan faction-private authorized audience and context budget
     reporting for included, compacted, and dropped blocks.
+  - Review fixes: invisible record ids are not leaked through selected packet
+    budget, over-budget visible records are removed from selected records, and
+    superseded/retracted beliefs no longer render as current belief.
 - Verification:
-  - `$env:PYTHONPATH='src'; $env:NO_PROXY='*'; python -m unittest tests.test_agent_context_packet tests.test_agent_assets tests.test_role_policy_registry -v` passed 31 tests.
-  - `$env:PYTHONPATH='src'; $env:NO_PROXY='*'; python -m unittest discover -s tests -p "test_*.py"` passed 1462 tests, skipped 2.
+  - `$env:PYTHONPATH='src'; $env:NO_PROXY='*'; python -m unittest tests.test_agent_context_packet tests.test_agent_assets tests.test_role_policy_registry -v` passed 33 tests.
+  - `$env:PYTHONPATH='src'; $env:NO_PROXY='*'; python -m unittest discover -s tests -p "test_*.py"` passed 1464 tests, skipped 2.
 - Boundary: no runtime, provider, prompt byte, observer/participant protocol,
   validator, generated fixture, Flutter UI, or workflow behavior was changed.
   P3-A-2c remains the first runtime-consumption slice and must follow prompt

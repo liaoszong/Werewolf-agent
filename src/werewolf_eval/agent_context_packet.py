@@ -141,18 +141,32 @@ def render_record_summary(record: dict[str, Any]) -> dict[str, Any]:
     validate_memory_record(record)
     kind = record["kind"]
     summary = record["summary"]
+    status = record["status"]
+    inactive_prefix = "" if status == "active" else f"{status} "
     if kind == "FactRecord":
         fact_semantics = "engine_fact"
-        text = f"Fact: {summary}"
+        text = f"{inactive_prefix}Fact: {summary}"
     elif kind == "ClaimRecord":
         fact_semantics = "claim_only"
-        text = f"Claim: a seat claimed {summary}; this is not engine truth."
+        text = (
+            f"{inactive_prefix}Claim: a seat claimed {summary}; "
+            "this is not engine truth."
+        )
     elif kind == "BeliefRecord":
         fact_semantics = "agent_belief"
-        text = f"Belief: this agent currently believes {summary}; this is not engine truth."
+        if status == "active":
+            text = (
+                f"Belief: this agent currently believes {summary}; "
+                "this is not engine truth."
+            )
+        else:
+            text = (
+                f"{status} Belief: this agent previously believed {summary}; "
+                "this is not current engine truth."
+            )
     else:
         fact_semantics = "non_fact"
-        text = f"{kind}: {summary}; this is not engine truth."
+        text = f"{inactive_prefix}{kind}: {summary}; this is not engine truth."
     return {
         "block_id": record["record_id"],
         "text": text,
@@ -184,8 +198,6 @@ def select_visible_packet(
     for record in records:
         if _is_record_visible_to(record, seat_id=seat_id, team_ids=team_ids):
             visible_records.append(copy.deepcopy(record))
-        else:
-            dropped_blocks.append(record["record_id"])
 
     included_blocks: list[str] = []
     compacted_blocks: list[str] = []
@@ -193,13 +205,14 @@ def select_visible_packet(
     included_count = 0
     for record in visible_records:
         record_id = record["record_id"]
-        selected_records.append(record)
         if record_id in compacted_record_ids:
+            selected_records.append(record)
             compacted_blocks.append(record_id)
             continue
         if max_records is not None and included_count >= max_records:
             dropped_blocks.append(record_id)
             continue
+        selected_records.append(record)
         included_blocks.append(record_id)
         included_count += 1
 

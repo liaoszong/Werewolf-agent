@@ -175,6 +175,24 @@ class AgentContextPacketTests(unittest.TestCase):
         self.assertEqual(render_record_summary(belief)["fact_semantics"], "agent_belief")
         self.assertIn("currently believes", render_record_summary(belief)["text"])
 
+    def test_inactive_belief_does_not_render_as_current_state(self):
+        belief = _record(
+            "belief_old",
+            kind="BeliefRecord",
+            section="episodic_notes",
+            writer="seat_agent",
+            visibility_scope="seat_private",
+            summary="p1 suspects p4",
+            render_mode="state_summary",
+            status="superseded",
+        )
+
+        rendered = render_record_summary(belief)
+
+        self.assertEqual(rendered["fact_semantics"], "agent_belief")
+        self.assertIn("superseded", rendered["text"])
+        self.assertNotIn("currently believes", rendered["text"])
+
     def test_commitment_and_team_plan_are_non_fact_records(self):
         commitment = _record(
             "commitment_1",
@@ -311,7 +329,31 @@ class AgentContextPacketTests(unittest.TestCase):
         )
         self.assertEqual(selected["context_budget"]["included_blocks"], ["public_1", "private_1"])
         self.assertEqual(selected["context_budget"]["compacted_blocks"], ["compact_1"])
-        self.assertEqual(selected["context_budget"]["dropped_blocks"], ["other_private"])
+        self.assertEqual(selected["context_budget"]["dropped_blocks"], [])
+
+    def test_select_visible_packet_drops_over_budget_records_from_records(self):
+        records = [
+            _record(
+                f"claim_{index}",
+                kind="ClaimRecord",
+                section="public_timeline",
+                writer="public_event",
+                visibility_scope="public",
+                audience_scope={"seat_ids": []},
+                summary=f"p{index} claimed villager",
+                render_mode="quoted_evidence",
+            )
+            for index in range(1, 4)
+        ]
+
+        selected = select_visible_packet(_packet(records), seat_id="p1", max_records=2)
+
+        self.assertEqual(
+            [record["record_id"] for record in selected["records"]],
+            ["claim_1", "claim_2"],
+        )
+        self.assertEqual(selected["context_budget"]["included_blocks"], ["claim_1", "claim_2"])
+        self.assertEqual(selected["context_budget"]["dropped_blocks"], ["claim_3"])
 
 
 if __name__ == "__main__":
