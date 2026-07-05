@@ -128,6 +128,14 @@ class RolePolicyRegistryTests(unittest.TestCase):
             {"ability_use_policy": {"tool_rounds": 2}},
             {"team_policy": {"timeout_budget_seconds": 90}},
             {"claim_policy": {"provider_profile_id": "deepseek_default"}},
+            {"team_policy": {"Team_Plan": "runtime_team_state_1"}},
+            {"team_policy": {"TEAM_PLAN_REF": "runtime_team_state_1"}},
+            {"claim_policy": {"providerProfileId": "deepseek_default"}},
+            {"ability_use_policy": {"modelCallBudget": 2}},
+            {"ability_use_policy": {"toolRounds": 2}},
+            {"team_policy": {"timeoutBudgetSeconds": 90}},
+            {"ability_use_policy": {"legalActionWindow": "night:any"}},
+            {"claim_policy": {"visibilityEntitlement": "god_view"}},
         ]
         for changes in nested_payloads:
             with self.subTest(changes=changes):
@@ -205,6 +213,58 @@ class RolePolicyRegistryTests(unittest.TestCase):
         self.assertEqual(
             registry.resolve_policy_ref(second_ref)["goals"],
             ["publish second branch"],
+        )
+
+    def test_publish_rejects_existing_policy_ref_collision(self):
+        registry = build_default_role_policy_registry()
+        draft = registry.create_draft(
+            pack_id="standard_six_player_balanced",
+            role="seer",
+            changes={"policy_id": "standard_werewolf_balanced"},
+        )
+
+        with self.assertRaises(RolePolicyRegistryError):
+            registry.publish_draft(
+                draft["draft_id"],
+                referenced_policy_refs=set(),
+            )
+
+    def test_publish_rejects_stale_draft_without_current_ref(self):
+        registry = build_default_role_policy_registry()
+        old_ref = registry.get_pack("standard_six_player_balanced")[
+            "role_policy_refs"
+        ]["seer"]
+        first = registry.create_draft(
+            pack_id="standard_six_player_balanced",
+            role="seer",
+            changes={"policy_id": "local_seer_first"},
+        )
+        second = registry.create_draft(
+            pack_id="standard_six_player_balanced",
+            role="seer",
+            changes={"goals": ["stale branch"]},
+        )
+        first_policy = registry.publish_draft(
+            first["draft_id"],
+            referenced_policy_refs=set(),
+        )
+        self.assertNotEqual(
+            registry.get_pack("standard_six_player_balanced")["role_policy_refs"][
+                "seer"
+            ],
+            old_ref,
+        )
+
+        with self.assertRaises(RolePolicyRegistryError):
+            registry.publish_draft(
+                second["draft_id"],
+                referenced_policy_refs={old_ref},
+            )
+        self.assertEqual(
+            registry.get_pack("standard_six_player_balanced")["role_policy_refs"][
+                "seer"
+            ],
+            f"{first_policy['policy_id']}@{first_policy['version']}",
         )
 
     def test_load_rejects_pack_role_ref_mismatch(self):

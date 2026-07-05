@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import copy
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -40,16 +41,21 @@ _FORBIDDEN_POLICY_FIELDS = frozenset(
     }
 )
 _FORBIDDEN_POLICY_KEY_FRAGMENTS = (
-    "provider_profile",
-    "execution_contract",
-    "runtime_state",
-    "model_call",
-    "tool_round",
-    "call_budget",
-    "token_budget",
-    "timeout_budget",
-    "visibility_entitlement",
-    "legal_action_window",
+    "providerprofile",
+    "executioncontract",
+    "runtimestate",
+    "teamplan",
+    "modelcall",
+    "toolround",
+    "callbudget",
+    "tokenbudget",
+    "timeoutbudget",
+    "visibilityentitlement",
+    "legalactionwindow",
+)
+_ALLOWED_NORMALIZED_POLICY_KEYS = frozenset({"usesteamplan"})
+_NORMALIZED_FORBIDDEN_POLICY_FIELDS = frozenset(
+    re.sub(r"[^a-z0-9]", "", field.lower()) for field in _FORBIDDEN_POLICY_FIELDS
 )
 _SECRET_KEY_FRAGMENTS = (
     "api_key",
@@ -159,8 +165,13 @@ class RolePolicyRegistry:
         role = draft["role"]
         pack = self._packs[pack_id]
         base_ref = draft["base_policy_ref"]
+        current_ref = pack["role_policy_refs"][role]
+        if current_ref != base_ref and current_ref not in referenced_policy_refs:
+            raise RolePolicyRegistryError(
+                f"RolePolicy draft {draft_id!r} is stale for role {role!r}"
+            )
         policy = copy.deepcopy(draft["policy"])
-        if base_ref in referenced_policy_refs:
+        if base_ref in referenced_policy_refs or current_ref != base_ref:
             base_policy_id, base_version = _split_policy_ref(base_ref)
             policy["policy_id"] = base_policy_id
             policy["version"] = _next_unused_patch_version(
@@ -170,6 +181,10 @@ class RolePolicyRegistry:
             )
         _validate_policy(policy)
         policy_ref = _policy_ref(policy)
+        if policy_ref in self._policies and policy_ref != base_ref:
+            raise RolePolicyRegistryError(
+                f"RolePolicy ref collision would overwrite {policy_ref!r}"
+            )
         self._policies[policy_ref] = copy.deepcopy(policy)
         pack["role_policy_refs"][role] = policy_ref
         draft["status"] = "published"
@@ -380,9 +395,13 @@ def _check_no_forbidden_policy_fields(obj: Any, path: str = "") -> None:
     if isinstance(obj, dict):
         for key, value in obj.items():
             key_text = str(key)
-            key_lower = key_text.lower()
-            if key_text in _FORBIDDEN_POLICY_FIELDS or any(
-                fragment in key_lower for fragment in _FORBIDDEN_POLICY_KEY_FRAGMENTS
+            normalized_key = _normalize_policy_key(key_text)
+            if normalized_key not in _ALLOWED_NORMALIZED_POLICY_KEYS and (
+                normalized_key in _NORMALIZED_FORBIDDEN_POLICY_FIELDS
+                or any(
+                    fragment in normalized_key
+                    for fragment in _FORBIDDEN_POLICY_KEY_FRAGMENTS
+                )
             ):
                 raise RolePolicyRegistryError(
                     f"RolePolicy contains forbidden field: {path}{key_text}"
@@ -413,6 +432,10 @@ def _check_no_secret(obj: Any, path: str = "") -> None:
 
 def _policy_ref(policy: dict[str, Any]) -> str:
     return f"{policy['policy_id']}@{policy['version']}"
+
+
+def _normalize_policy_key(key: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", key.lower())
 
 
 def _split_policy_ref(policy_ref: str) -> tuple[str, str]:
