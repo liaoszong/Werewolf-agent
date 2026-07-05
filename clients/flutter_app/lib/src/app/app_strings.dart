@@ -85,9 +85,10 @@ class AppStrings {
   String get evidenceContext => _t('证据与上下文', 'Evidence and context');
   String get runtimeComposition => _t('运行时组合', 'Runtime composition');
   String get localPreviewOnly => _t(
-    '本页只是本地预览。保存、版本、冻结和历史对局关系要等资产仓库切片。',
-    'This page is local preview only. Persistence, versions, frozen state, and run references require the asset registry slice.',
+    '本页只是本地预览。真正保存和历史绑定要等资产仓库切片。',
+    'This page is local preview only. Persistence and run history require the asset registry slice.',
   );
+  String get localPreviewAction => _t('仅本地预览', 'Local preview only');
   String get engineAuthority => _t(
     '引擎决定行动窗口、合法动作、信息权限、状态转移和胜负；策略只影响发言、判断和行动提案。',
     'The engine owns decision windows, legal actions, information entitlement, state transitions, and victory. Policy only guides speech, judgment, and action proposals.',

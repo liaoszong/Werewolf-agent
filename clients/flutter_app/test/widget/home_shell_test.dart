@@ -331,6 +331,49 @@ void main() {
     expect(find.textContaining('历史对局引用'), findsNothing);
   });
 
+  testWidgets('role policy setting-only edits persist in local draft', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      WerewolfApp(
+        observerClientFactory: (_) => FakeObserverApiClient(),
+        sessionControllerFactory: (_) =>
+            SessionController(participantApi: FakeParticipantApiClient()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('角色'));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('女巫'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('女巫'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('药品风险姿态'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ListTile, '主动'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('草稿未保存'), findsOneWidget);
+    expect(find.text('主动'), findsOneWidget);
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('role-policy-grid')), findsOneWidget);
+    expect(find.text('本地草稿'), findsAtLeastNWidgets(1));
+
+    await tester.ensureVisible(find.text('女巫'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('女巫'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('草稿未保存'), findsOneWidget);
+    expect(find.text('主动'), findsOneWidget);
+  });
+
   testWidgets('history tab groups previous runs by status', (tester) async {
     await tester.pumpWidget(
       WerewolfApp(

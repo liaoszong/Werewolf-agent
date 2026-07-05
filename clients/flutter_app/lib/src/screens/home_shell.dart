@@ -410,18 +410,34 @@ class _RolesPageState extends State<_RolesPage> {
   late final Map<String, String> _selectedPresetByRole = {
     for (final role in _roleTemplates) role.roleId: role.defaultPresetId,
   };
+  final Map<String, Map<String, _LocalizedText>> _settingSelectionsByRole = {};
 
   String _selectedPresetId(_AgentRoleTemplate role) {
     return _selectedPresetByRole[role.roleId] ?? role.defaultPresetId;
   }
 
   bool _isDirty(_AgentRoleTemplate role) {
-    return _selectedPresetId(role) != role.defaultPresetId;
+    return _selectedPresetId(role) != role.defaultPresetId ||
+        (_settingSelectionsByRole[role.roleId]?.isNotEmpty ?? false);
   }
 
   void _selectPreset(_AgentRoleTemplate role, String presetId) {
     setState(() {
       _selectedPresetByRole[role.roleId] = presetId;
+    });
+  }
+
+  void _selectSetting(
+    _AgentRoleTemplate role,
+    String settingId,
+    _LocalizedText value,
+  ) {
+    setState(() {
+      final settings = _settingSelectionsByRole.putIfAbsent(
+        role.roleId,
+        () => {},
+      );
+      settings[settingId] = value;
     });
   }
 
@@ -431,7 +447,13 @@ class _RolesPageState extends State<_RolesPage> {
         builder: (context) => _RolePolicyDetailPage(
           role: role,
           selectedPresetId: _selectedPresetId(role),
+          selectedSettings: Map.unmodifiable(
+            _settingSelectionsByRole[role.roleId] ??
+                const <String, _LocalizedText>{},
+          ),
           onPresetChanged: (presetId) => _selectPreset(role, presetId),
+          onSettingChanged: (settingId, value) =>
+              _selectSetting(role, settingId, value),
         ),
       ),
     );
@@ -597,12 +619,16 @@ class _RolePolicyDetailPage extends StatefulWidget {
   const _RolePolicyDetailPage({
     required this.role,
     required this.selectedPresetId,
+    required this.selectedSettings,
     required this.onPresetChanged,
+    required this.onSettingChanged,
   });
 
   final _AgentRoleTemplate role;
   final String selectedPresetId;
+  final Map<String, _LocalizedText> selectedSettings;
   final ValueChanged<String> onPresetChanged;
+  final void Function(String settingId, _LocalizedText value) onSettingChanged;
 
   @override
   State<_RolePolicyDetailPage> createState() => _RolePolicyDetailPageState();
@@ -610,7 +636,9 @@ class _RolePolicyDetailPage extends StatefulWidget {
 
 class _RolePolicyDetailPageState extends State<_RolePolicyDetailPage> {
   late String _selectedPresetId = widget.selectedPresetId;
-  final Map<String, _LocalizedText> _settingSelections = {};
+  late final Map<String, _LocalizedText> _settingSelections = Map.of(
+    widget.selectedSettings,
+  );
 
   _AgentRoleTemplate get role => widget.role;
 
@@ -636,6 +664,7 @@ class _RolePolicyDetailPageState extends State<_RolePolicyDetailPage> {
     setState(() {
       _settingSelections[setting.id] = choice;
     });
+    widget.onSettingChanged(setting.id, choice);
   }
 
   @override
@@ -806,7 +835,7 @@ class _RolePolicyDetailPageState extends State<_RolePolicyDetailPage> {
                 child: FilledButton.icon(
                   onPressed: null,
                   icon: const Icon(Icons.visibility_rounded),
-                  label: Text(strings.localPreviewOnly),
+                  label: Text(strings.localPreviewAction),
                   style: FilledButton.styleFrom(
                     disabledBackgroundColor: palette.control,
                     disabledForegroundColor: palette.textMuted,
