@@ -58,17 +58,22 @@ Relevant concepts:
 - Tools are capability-scoped and return structured results to the loop.
 - The model proposes actions; the harness validates, executes, records, and
   returns outcomes.
+- Continuity is a harness property, not a permanently running model instance:
+  event history, tool results, environment state, RuntimeState, and compacted
+  context are reassembled for each model request.
 
 Translation to Werewolf-agent:
 
 | Codex harness concept | Werewolf-agent translation |
 |---|---|
-| Thread | One seat's run-scoped decision history. |
+| Thread | One seat's run-scoped `AgentSession` and decision history. |
 | Turn | One engine-created decision window. |
 | Tool | Role-safe deterministic query or action capability. |
 | Tool permission | Role / team / phase / visibility entitlement. |
 | Approval request | Human-seat action window or explicit moderator intervention. |
 | Thread persistence | RuntimeSeatState / RuntimeTeamState snapshots. |
+| Context compaction | RuntimeState summaries plus selected evidence, never unbounded transcript stuffing. |
+| Tool result | Visibility-filtered evidence packet returned to the seat session. |
 | Event stream | Observer events, audit records, replay timeline. |
 | Client | Qt/QML spectator UI and Flutter participant UI. |
 | Execution result | RuleEngine adjudication result. |
@@ -78,6 +83,8 @@ Hard boundary:
 The engine, not the model, determines decision timing, information entitlement,
 legal action space, state transitions, and victory adjudication. The model may
 only propose speech, strategy, and actions through declared capabilities.
+The provider call may be stateless; the seat's logical `AgentSession` must not
+be stateless.
 
 ### 2.1 Primary reference: learn-claude-code as an explanatory harness model
 
@@ -173,6 +180,9 @@ protocol, action runtime, visibility oracle, prompt goldens, or event sourcing.
    character assets, but no provider-backed player model call.
 6. Make prompt injection boundaries explicit before memory/playbook retrieval
    enters model-visible context.
+7. Preserve agent continuity through harness-owned RuntimeState, selected
+   evidence, and bounded tool results, not through provider conversation
+   persistence or full transcript stuffing.
 
 ---
 
@@ -186,6 +196,11 @@ protocol, action runtime, visibility oracle, prompt goldens, or event sourcing.
 - No cross-run self-learning or automatic writeback into reusable cards.
 - No generic LangGraph/CrewAI-style workflow runtime.
 - No attempt to fully implement `AgentContextPacket`; P3-A-2 owns that.
+- No permanently live model process or mandatory provider conversation/thread
+  per seat.
+- No default strategy of passing every historical speech into every model call.
+- No implementation of context tools or bounded loops in P3-A-1; this design
+  defines the ownership and contract only.
 
 ---
 
@@ -385,11 +400,15 @@ Minimal seat-scoped schema:
     "provider_profile_id": "deepseek_flash_default"
   },
   "status": "active",
+  "seen_event_cursor": null,
+  "public_speech_summary": null,
   "memory_records": [],
   "suspicion_graph": {},
   "commitments": [],
   "active_intent": null,
   "private_notes": [],
+  "decision_history": [],
+  "last_decision_result": null,
   "context_budget": {
     "last_prompt_blocks": [],
     "dropped_blocks": []
@@ -412,6 +431,8 @@ Minimal team-scoped schema:
     "source_event_ids": [],
     "revision": 2
   },
+  "teammate_public_risk": {},
+  "night_target_candidates": [],
   "shared_commitments": [],
   "team_message_history": [],
   "revision_history": [
@@ -430,12 +451,18 @@ record taxonomy and `AgentContextPacket` content selection.
 Hard constraints:
 
 - Run state is not an asset library.
+- Run state is the continuity carrier for AI seats. Provider requests may be
+  stateless, but `RuntimeSeatState` and `RuntimeTeamState` must preserve the
+  seat's logical session continuity.
 - Beliefs, claims, commitments, and team plans are not engine facts.
 - Team plans belong to `RuntimeTeamState`, not to one player's
   `RuntimeSeatState`.
 - `RuntimeTeamState` is authoritative for shared faction plans, authorized seat
   list, and plan revision history.
 - Old records are superseded or retracted, not silently overwritten.
+- Model outputs may propose `memory_updates`, commitment changes, or plan
+  revisions, but the harness validates and records them. The model never writes
+  RuntimeState directly.
 - Any future prompt injection from this state must carry source/provenance and
   pass visibility entitlement or a documented injection-channel exemption.
 
@@ -508,6 +535,8 @@ Minimal schema:
   "prompt_template_version": "prompt_v1",
   "prompt_renderer_version": "prompt_renderer_v1",
   "action_schema_version": "g1d-action-v1",
+  "agent_session_version": "agent_session_v1",
+  "decision_loop_policy_version": "single_call_default_v1",
   "tool_capability_manifest_version": "none",
   "context_selector_version": "legacy_visible_events_v1",
   "response_parser_version": "provider_agent_json_v1",
@@ -522,8 +551,87 @@ Hard constraints:
 - It may be referenced by public artifacts only as a non-secret execution
   summary. If a future contract name itself reveals hidden role policy choices,
   the reference must move to a private/postgame artifact.
+- It owns the selected agent-loop policy, context selector, tool manifest, and
+  parser version. ProviderProfile owns only provider execution knobs.
 - Changing any model-visible prompt template still follows prompt
   version/golden/ledger rules.
+
+### 5.6 AgentSession continuity contract
+
+Purpose: name the persistent logical seat session that ties API calls together
+without requiring a permanently live model instance or vendor conversation
+thread.
+
+An `AgentSession` is owned by the Werewolf-agent harness. It is materialized
+from:
+
+- Engine truth filtered through the visibility oracle.
+- `RuntimeSeatState` for the acting seat.
+- `RuntimeTeamState` when the seat is entitled to faction-private state.
+- Recent visible events and selected historical evidence.
+- Structured results from permitted read-only context tools.
+- The active `ExecutionContract`.
+
+It is not:
+
+- A provider-managed conversation that must exist across vendors.
+- A client-side chat log.
+- A shortcut around the engine's decision windows or legal action space.
+- A place where model beliefs become engine facts.
+
+P3-A-1 does not define the full `AgentContextPacket` schema. It does define the
+minimum conceptual packet shape that later slices must preserve:
+
+```text
+AgentContextPacket
+  -> fixed constraints
+  -> SeatCharacterCard
+  -> RolePolicy, only after entitlement passes
+  -> Structured Board State
+  -> Relevant Evidence
+  -> Private Session State
+  -> Output Contract
+```
+
+`Relevant Evidence` is selected evidence, not "all speeches plus my speeches".
+It may include the recent raw speech window, referenced historical speeches,
+claim/vote summaries, and tool-returned excerpts. Every item must carry source
+ids and visibility metadata.
+
+Default ordinary table speech may remain one model call:
+
+```text
+decision window opens
+  -> PromptRenderer builds AgentContextPacket
+  -> provider returns speech/action proposal
+  -> harness validates output shape
+  -> RuleEngine adjudicates legal actions
+  -> event log and RuntimeState are updated
+```
+
+High-stakes decisions may later opt into a bounded loop through
+`ExecutionContract`:
+
+```text
+decision window opens
+  -> model may request permitted read-only context tools
+  -> harness returns structured, visibility-filtered results
+  -> model emits final ActionEnvelope
+  -> RuleEngine validates and executes
+  -> at most one repair attempt for invalid format/action
+```
+
+Future read-only context tools are capability-scoped. Examples:
+
+- `get_claim_ledger()`
+- `get_vote_history()`
+- `get_public_transcript(player_id, phase_range)`
+- `get_own_commitments()`
+- `get_team_plan()` for faction-authorized seats only
+
+Tool results are observations returned to the loop. They do not change game
+state, do not reveal unauthorized information, and do not let the model invent
+new legal actions.
 
 ---
 
@@ -567,6 +675,7 @@ Target resolution flow:
 profile / preset / legacy fields
   -> validate asset schemas
   -> resolve per-seat and per-team private asset snapshots
+  -> bind RuntimeSeatState / RuntimeTeamState refs for AgentSession continuity
   -> write audience-scoped manifests/snapshots
   -> current runtime behavior unchanged in P3-A-1
   -> P3-A-2/P3-B later consume bundle to build AgentContextPacket
@@ -801,21 +910,37 @@ Fixed block order:
    - included only when role entitlement passes
    - strategy guidance, never legality
 
-5. Role-safe observation block
-   - visible events
-   - public claims
+5. Structured board state block
+   - current living/dead state as visible to the seat
+   - public claims and vote history
+   - current action window
+
+6. Relevant evidence block
+   - recent bounded raw speech window
+   - selected historical speeches or events
+   - read-only tool results
+   - all untrusted content quoted with source ids
+
+7. Private session state block
    - private role information
+   - ability usage visible to this seat
+   - own commitments, suspicion graph, active intent
    - allowed team information
 
-6. Retrieved memory / playbook block
+8. Retrieved memory / playbook block
    - quoted as evidence or advisory data
    - source ids and provenance
    - never rendered as engine fact
 
-7. Final action request
+9. Final action request
    - strict JSON schema
+   - evidence_refs and optional memory_updates
    - action legality checked outside the model
 ```
+
+The renderer must not default to a full transcript dump. It selects a bounded
+recent window plus relevant historical evidence and records what was included,
+compacted, or dropped in the context budget report.
 
 Every renderable block carries:
 
@@ -845,11 +970,15 @@ Allowed `render_mode` values:
 - `guidance`: cards and policies that intentionally influence style or strategy.
 - `quoted_evidence`: player speech, AI speech, claim records, memory summaries,
   retrieved lore, and other untrusted game data.
+- `state_summary`: RuntimeState-derived beliefs, commitments, active intent,
+  and team plans. These are agent beliefs or plans, not engine facts.
 - `ui_only`: visible to client UI but never rendered to the model.
 
 RolePolicy is rendered as `guidance` only after entitlement passes. Speech,
 chat logs, memory summaries, and claim records are rendered as
 `quoted_evidence`, never as system rules or engine facts.
+RuntimeState summaries are rendered as `state_summary` and remain subordinate
+to engine truth, action contracts, and visibility policy.
 
 ---
 
@@ -906,6 +1035,26 @@ Prompt safety tests:
 - Rendered block order is fixed.
 - Each block carries `trust_class`, `render_mode`, `visibility_scope`, and
   source provenance.
+
+AgentSession and bounded-loop tests:
+
+- A seat's commitment, suspicion, and active intent carry from one decision
+  window to the next through `RuntimeSeatState`, even when older raw transcript
+  text is omitted from the next prompt.
+- Ordinary table speech remains a single-call path when
+  `decision_loop_policy_version` selects the default policy.
+- Bounded-loop decisions enforce `max_tool_rounds`, declared read-only tool
+  capabilities, role/phase/visibility permissions, and at most one repair
+  attempt after invalid model output.
+- Read-only context tools return structured results with source ids and
+  visibility metadata; they never mutate game state.
+- `get_team_plan()` and faction-private state are denied for non-authorized
+  seats and for public observer/client paths.
+- `AgentContextPacket` selection uses a bounded recent speech window plus
+  relevant historical evidence. It must not default to full unbounded
+  transcript stuffing.
+- Model-proposed `memory_updates` are validated by the harness before changing
+  RuntimeState and are never treated as engine facts.
 
 Hidden-information negative scans:
 
@@ -984,6 +1133,16 @@ For this design:
   SillyTavern are explicit.
 - Secondary agent frameworks are acknowledged but do not drive the architecture.
 - Runtime/provider/prompt/validator/generated-fixture boundaries remain closed.
+- Agent continuity is defined as a harness-owned logical `AgentSession` backed
+  by RuntimeState, event history, selected evidence, and tool results, not as a
+  permanently running model or mandatory provider conversation.
+- Ordinary table speech may remain one model call; high-stakes decisions may
+  later use a bounded loop only through an explicit `ExecutionContract`.
+- AgentContextPacket construction uses structured board state plus selected
+  evidence. Full unbounded transcript stuffing is not an acceptable default.
+- Context tools are read-only, capability-scoped, and visibility-filtered. The
+  RuleEngine remains the only adjudicator of legal actions and state
+  transitions.
 - Live public artifacts and public observer payloads must not contain unrevealed
   role, team, RolePolicy id, faction state ref, private memory ref, or
   joinable hash/reference that can infer hidden identity.
@@ -1012,6 +1171,8 @@ For the follow-up implementation plan:
 - Project authority: `docs/PROJECT_MAP.md`
 - Injection registry: `docs/specs/text-injection-channels.md`
 - learn-claude-code: https://github.com/shareAI-lab/learn-claude-code
+- OpenAI Codex agent loop: https://openai.com/index/unrolling-the-codex-agent-loop/
+- Claude Code Agent SDK overview: https://docs.anthropic.com/en/docs/claude-code/sdk
 - SillyTavern: https://github.com/SillyTavern/SillyTavern
 - SillyTavern Character Design: https://docs.sillytavern.app/usage/core-concepts/characterdesign/
 - SillyTavern World Info: https://docs.sillytavern.app/usage/core-concepts/worldinfo/
