@@ -21,7 +21,9 @@ class RoleSafeStatusBar extends StatelessWidget {
     final palette = WerewolfAppTheme.colors(context);
     final seat = state?.seatId.toUpperCase() ?? '--';
     final phase = _phase(state);
-    final waiting = state?.openActionWindow != null;
+    final waiting =
+        connectionStatus == ConnectionStatus.connected &&
+        state?.openActionWindow != null;
     final statusText = waiting
         ? strings.waitingForYou
         : '${strings.phaseLabel(phase)} · ${strings.yourPerspective} $seat';

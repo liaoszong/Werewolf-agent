@@ -55,6 +55,7 @@ class ActionWindow {
 
   bool get allowsTextInput {
     return allowedActions.contains('speech') ||
+        allowedActions.contains('response') ||
         allowedActions.contains('final_words');
   }
 

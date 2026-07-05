@@ -45,6 +45,28 @@ void main() {
     expect(window.defaultOnTimeout, 'pass');
   });
 
+  test('response action window is a text input window', () {
+    final window = ActionWindow.fromJson(const {
+      'schema_version': 'p3c.action_window.v1',
+      'action_window_id': 'aw_response',
+      'run_id': 'run_1',
+      'seat_id': 'p3',
+      'phase': 'day_response',
+      'round': 1,
+      'game_revision': 9,
+      'opened_at_event_id': 'evt_2',
+      'deadline_at': null,
+      'allowed_actions': ['response', 'pass'],
+      'required': false,
+      'default_on_timeout': 'pass',
+      'status': 'open',
+      'reconnect_cursor': 'event:10',
+    });
+
+    expect(window.allowsTextInput, isTrue);
+    expect(window.allowsStructuredChoice, isFalse);
+  });
+
   test('parses participant state with null action window', () {
     final state = ParticipantState.fromJson(const {
       'schema_version': 'p3c.participant_state.v1',

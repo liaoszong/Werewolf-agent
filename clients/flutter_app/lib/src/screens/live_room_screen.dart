@@ -29,6 +29,10 @@ class _LiveRoomScreenState extends State<LiveRoomScreen> {
     return AnimatedBuilder(
       animation: widget.controller,
       builder: (context, _) {
+        final activeWindow =
+            widget.controller.connectionStatus == ConnectionStatus.connected
+            ? widget.controller.state?.openActionWindow
+            : null;
         _scheduleRoleNotice(context, widget.controller.state);
         return Scaffold(
           body: SafeArea(
@@ -54,10 +58,11 @@ class _LiveRoomScreenState extends State<LiveRoomScreen> {
                   ),
                 ),
                 ComposerRail(
-                  window: widget.controller.state?.openActionWindow,
-                  targetCandidateSeatIds:
-                      widget.controller.state?.targetCandidateSeatIds ??
-                      const [],
+                  window: activeWindow,
+                  targetCandidateSeatIds: activeWindow == null
+                      ? const []
+                      : widget.controller.state?.targetCandidateSeatIds ??
+                            const [],
                   errorMessage: widget.controller.lastError,
                   isSubmitting: widget.controller.isSubmittingAction,
                   onSubmitSpeech: widget.controller.submitSpeech,

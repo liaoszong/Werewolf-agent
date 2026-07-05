@@ -147,6 +147,10 @@ class _ComposerRailState extends State<ComposerRail> {
         !window.allowedActions.contains('speech')) {
       return strings.finalWords;
     }
+    if (window.allowedActions.contains('response') &&
+        !window.allowedActions.contains('speech')) {
+      return strings.response;
+    }
     return strings.speech;
   }
 }

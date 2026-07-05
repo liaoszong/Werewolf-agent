@@ -9,10 +9,12 @@ class FakeParticipantApiClient extends ParticipantApiClient {
   FakeParticipantApiClient({
     this.allowedActions = const ['speech'],
     this.submitGate,
+    this.submitError,
   }) : super(baseUri: Uri.parse('http://127.0.0.1:8765'));
 
   final List<String> allowedActions;
   final Completer<void>? submitGate;
+  final ParticipantApiError? submitError;
   int stateCalls = 0;
   Map<String, dynamic>? lastSubmit;
   final sseController = StreamController<ParticipantSseEvent>.broadcast();
@@ -73,6 +75,8 @@ class FakeParticipantApiClient extends ParticipantApiClient {
   }) async {
     lastSubmit = payload;
     await submitGate?.future;
+    final error = submitError;
+    if (error != null) throw error;
     return const ParticipantActionResult(
       status: 'accepted',
       actionWindowId: 'aw_1',
@@ -145,6 +149,21 @@ void main() {
     expect(api.lastSubmit?['payload'], {'text': '最后说一句。'});
   });
 
+  test('submitSpeech uses response when that is the text window', () async {
+    final api = FakeParticipantApiClient(allowedActions: const ['response']);
+    final controller = SessionController(participantApi: api);
+    await controller.joinAndLoad(
+      runId: 'run_1',
+      seatId: 'p3',
+      joinCode: 'local-dev-code',
+    );
+
+    await controller.submitSpeech('我回应 P2。');
+
+    expect(api.lastSubmit?['action_type'], 'response');
+    expect(api.lastSubmit?['payload'], {'text': '我回应 P2。'});
+  });
+
   test('submitSpeech exposes in-flight action state', () async {
     final gate = Completer<void>();
     final api = FakeParticipantApiClient(submitGate: gate);
@@ -164,6 +183,53 @@ void main() {
     await submit;
 
     expect(controller.isSubmittingAction, isFalse);
+  });
+
+  test('submit rejection refreshes state and preserves server message', () async {
+    final api = FakeParticipantApiClient(
+      submitError: ParticipantApiError(
+        statusCode: 422,
+        errorCode: 'illegal_action',
+        message: 'Target is not legal for this action window.',
+        reconnectCursor: 'event:9',
+      ),
+    );
+    final controller = SessionController(participantApi: api);
+    await controller.joinAndLoad(
+      runId: 'run_1',
+      seatId: 'p3',
+      joinCode: 'local-dev-code',
+    );
+
+    await controller.submitStructuredAction(
+      actionType: 'vote',
+      payload: const {'target': 'p1'},
+    );
+
+    expect(api.stateCalls, 2);
+    expect(controller.connectionStatus, ConnectionStatus.connected);
+    expect(controller.lastError, 'Target is not legal for this action window.');
+  });
+
+  test('submit missing session marks session expired', () async {
+    final api = FakeParticipantApiClient(
+      submitError: ParticipantApiError(
+        statusCode: 401,
+        errorCode: 'missing_or_invalid_session',
+        message: 'Missing or invalid participant session',
+      ),
+    );
+    final controller = SessionController(participantApi: api);
+    await controller.joinAndLoad(
+      runId: 'run_1',
+      seatId: 'p3',
+      joinCode: 'local-dev-code',
+    );
+
+    await controller.submitSpeech('still here?');
+
+    expect(controller.connectionStatus, ConnectionStatus.sessionExpired);
+    expect(controller.lastError, 'Missing or invalid participant session');
   });
 
   test('recoverAfterDisconnect reloads participant state', () async {
@@ -204,4 +270,53 @@ void main() {
       await api.sseController.close();
     },
   );
+
+  test(
+    'participant SSE state-change events refresh current state',
+    () async {
+      final api = FakeParticipantApiClient();
+      final controller = SessionController(participantApi: api);
+      await controller.joinAndLoad(
+        runId: 'run_1',
+        seatId: 'p3',
+        joinCode: 'local-dev-code',
+      );
+
+      const eventNames = [
+        'participant_projection_updated',
+        'action_accepted',
+        'action_rejected',
+        'action_window_timed_out',
+      ];
+      for (final name in eventNames) {
+        api.sseController.add(ParticipantSseEvent(name: name, data: const {}));
+        await Future<void>.delayed(Duration.zero);
+      }
+
+      expect(api.stateCalls, 1 + eventNames.length);
+      await api.sseController.close();
+    },
+  );
+
+  test('participant SSE action rejection exposes server message', () async {
+    final api = FakeParticipantApiClient();
+    final controller = SessionController(participantApi: api);
+    await controller.joinAndLoad(
+      runId: 'run_1',
+      seatId: 'p3',
+      joinCode: 'local-dev-code',
+    );
+
+    api.sseController.add(
+      const ParticipantSseEvent(
+        name: 'action_rejected',
+        data: {'message': 'Server rejected this target.'},
+      ),
+    );
+    await Future<void>.delayed(Duration.zero);
+
+    expect(api.stateCalls, 2);
+    expect(controller.lastError, 'Server rejected this target.');
+    await api.sseController.close();
+  });
 }

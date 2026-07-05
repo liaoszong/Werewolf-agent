@@ -68,13 +68,13 @@ class SessionController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> recoverAfterDisconnect() async {
+  Future<void> recoverAfterDisconnect({bool clearLastError = true}) async {
     connectionStatus = ConnectionStatus.reconnecting;
     notifyListeners();
     try {
       await refreshState();
       connectionStatus = ConnectionStatus.connected;
-      lastError = null;
+      if (clearLastError) lastError = null;
       _startEventStream();
     } on ParticipantApiError catch (error) {
       connectionStatus = error.errorCode == 'missing_or_invalid_session'
@@ -87,11 +87,14 @@ class SessionController extends ChangeNotifier {
 
   Future<void> submitSpeech(String text) {
     final actions = state?.openActionWindow?.allowedActions ?? const [];
-    final actionType =
-        actions.contains('final_words') && !actions.contains('speech')
-        ? 'final_words'
-        : 'speech';
-    return _submitCurrentWindow(actionType, {'text': text});
+    return _submitCurrentWindow(_textActionType(actions), {'text': text});
+  }
+
+  String _textActionType(List<String> actions) {
+    if (actions.contains('speech')) return 'speech';
+    if (actions.contains('response')) return 'response';
+    if (actions.contains('final_words')) return 'final_words';
+    return 'speech';
   }
 
   Future<void> submitStructuredAction({
@@ -127,8 +130,11 @@ class SessionController extends ChangeNotifier {
       await refreshState();
     } on ParticipantApiError catch (error) {
       lastError = error.message;
-      if (error.reconnectCursor != null) {
-        await recoverAfterDisconnect();
+      if (error.errorCode == 'missing_or_invalid_session') {
+        connectionStatus = ConnectionStatus.sessionExpired;
+      } else if (error.reconnectCursor != null) {
+        await recoverAfterDisconnect(clearLastError: false);
+        lastError = error.message;
       }
       notifyListeners();
     } finally {
@@ -152,6 +158,7 @@ class SessionController extends ChangeNotifier {
         .events(runId: active.runId, token: active.token, cursor: cursor)
         .listen(
           (event) async {
+            _applyEventSideEffects(event);
             if (_shouldRefreshForEvent(event.name)) {
               await refreshState();
             }
@@ -165,12 +172,28 @@ class SessionController extends ChangeNotifier {
         );
   }
 
+  void _applyEventSideEffects(ParticipantSseEvent event) {
+    if (event.name == 'action_rejected') {
+      final message = event.data['message'];
+      if (message is String && message.isNotEmpty) {
+        lastError = message;
+        notifyListeners();
+      }
+    } else if (event.name == 'action_accepted' && lastError != null) {
+      lastError = null;
+      notifyListeners();
+    }
+  }
+
   bool _shouldRefreshForEvent(String eventName) {
     return eventName == 'run_status' ||
+        eventName == 'participant_projection_updated' ||
         eventName == 'action_window_opened' ||
         eventName == 'action_window_updated' ||
         eventName == 'action_window_closed' ||
         eventName == 'action_window_timed_out' ||
+        eventName == 'action_accepted' ||
+        eventName == 'action_rejected' ||
         eventName == 'runtime_event';
   }
 

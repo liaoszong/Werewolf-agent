@@ -32,6 +32,34 @@ machine secrets here.
 
 ## Entries
 
+### 2026-07-05 - P3-E-3 Human Seat Client Slice Closeout
+
+- Completed P3-E-3 as a Flutter-only human-seat client hardening slice.
+- Scope delivered:
+  - `SessionController` now refreshes participant state for P3-C state-changing
+    SSE events: `participant_projection_updated`, `action_accepted`,
+    `action_rejected`, `action_window_timed_out`, plus existing window/status
+    events.
+  - `action_rejected` SSE and submit rejections preserve the server message for
+    user feedback; submit `missing_or_invalid_session` moves the room into
+    `sessionExpired`.
+  - `response` action windows are treated as text input and submit
+    `action_type=response`; `speech` and `final_words` behavior is preserved.
+  - Live room no longer exposes a stale local action window while reconnecting,
+    failed, or session-expired; it waits for server state before allowing new
+    submissions.
+  - Candidate targets remain Flutter-only visible/alive candidates derived from
+    `projection.players`; no `target_options` / `legal_targets` protocol fields
+    were added.
+- Verification:
+  - `flutter analyze` passed.
+  - `flutter test` passed 65 tests.
+  - `flutter build apk --debug --flavor internal` built
+    `clients/flutter_app/build/app/outputs/flutter-apk/app-internal-debug.apk`.
+  - `$env:NO_PROXY='*'; $env:PYTHONPATH='src'; python -m unittest tests.test_participant_protocol tests.test_participant_routes tests.test_participant_game_loop tests.test_observer_routes -v` passed 39 tests.
+- Boundary: no backend protocol, runtime, provider, validator, generated
+  fixture, or workflow behavior was changed.
+
 ### 2026-07-05 - P3-E-2 Mobile-first Live Room Closeout
 
 - Completed P3-E-2 as a Flutter-only mobile live-room slice.

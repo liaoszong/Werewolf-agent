@@ -144,6 +144,7 @@ class AppStrings {
   String get noAction => _t('暂无行动', 'No action');
   String get send => _t('发送', 'Send');
   String get speech => _t('发言', 'Speak');
+  String get response => _t('回应', 'Respond');
   String get finalWords => _t('留下遗言', 'Final words');
   String get pass => _t('跳过', 'Pass');
   String get confirm => _t('确认', 'Confirm');
@@ -195,6 +196,7 @@ class AppStrings {
   String actionLabel(String actionType) {
     return switch (actionType) {
       'vote' => vote,
+      'response' => response,
       'werewolf_kill' => _t('选择击杀目标', 'Choose kill target'),
       'seer_check' => _t('选择查验目标', 'Choose check target'),
       'witch_save' => _t('选择解药目标', 'Choose save target'),

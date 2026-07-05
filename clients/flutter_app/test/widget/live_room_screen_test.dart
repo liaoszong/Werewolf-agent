@@ -154,6 +154,48 @@ void main() {
     expect((islandCenterX - screenCenterX).abs(), lessThanOrEqualTo(2));
   });
 
+  testWidgets('live room disables stale action window when session expired', (
+    tester,
+  ) async {
+    final controller = SessionController(participantApi: NeverCalledApi())
+      ..connectionStatus = ConnectionStatus.sessionExpired
+      ..lastError = 'Missing or invalid participant session'
+      ..state = ParticipantState.fromJson(const {
+        'schema_version': 'p3c.participant_state.v1',
+        'run_id': 'run_1',
+        'seat_id': 'p3',
+        'perspective': 'role:p3',
+        'run_status': 'running',
+        'projection': {'events': []},
+        'open_action_window': {
+          'schema_version': 'p3c.action_window.v1',
+          'action_window_id': 'aw_1',
+          'run_id': 'run_1',
+          'seat_id': 'p3',
+          'phase': 'day_speech',
+          'round': 2,
+          'game_revision': 7,
+          'opened_at_event_id': 'evt_1',
+          'deadline_at': '2026-07-04T00:00:00Z',
+          'allowed_actions': ['speech', 'pass'],
+          'required': true,
+          'default_on_timeout': 'pass',
+          'status': 'open',
+          'reconnect_cursor': 'event:4',
+        },
+        'reconnect_cursor': 'event:4',
+      });
+
+    await tester.pumpWidget(
+      TestApp(child: LiveRoomScreen(controller: controller)),
+    );
+
+    expect(find.byKey(const Key('composer-text-input')), findsNothing);
+    expect(find.byKey(const Key('composer-collapsed-handle')), findsOneWidget);
+    expect(find.text('Missing or invalid participant session'), findsOneWidget);
+    expect(find.text('等待你操作'), findsNothing);
+  });
+
   testWidgets('live room opens role notice dialog with werewolf teammates', (
     tester,
   ) async {
