@@ -67,10 +67,30 @@ class AppStrings {
     '从 observer server 读取对局列表；可使用 PaleInk 云服务器或本机开发服务。',
     'Runs are loaded from the observer server. Use PaleInk Cloud or a local dev server.',
   );
-  String get roleLibraryTitle => _t('全部角色', 'All Roles');
+  String get roleLibraryTitle => _t('角色策略', 'Role Policies');
   String get roleLibraryIntro => _t(
-    '这里展示移动端可见的角色 Agent 设计说明。当前先只读预览允许编辑范围，不改后端协议。',
-    'This shows the mobile-visible role agent design. This slice previews allowed edits without changing the backend protocol.',
+    '按身份调整本地 RolePolicy 草稿；当前不保存到后端，也不改变对局规则、提示词或模型调用。',
+    'Tune local RolePolicy drafts by identity. This does not persist to the backend or change rules, prompts, or model calls.',
+  );
+  String get rolePolicyPackLabel => _t('当前策略包', 'Current policy pack');
+  String get rolePolicyPackDraft =>
+      _t('标准六人局 · 本地草稿', 'Standard six-player · Local draft');
+  String get localDraftBadge => _t('本地草稿', 'Local draft');
+  String get defaultDraftBadge => _t('默认草稿', 'Default draft');
+  String get unsavedDraft => _t('草稿未保存', 'Draft not saved');
+  String get roleBoundary => _t('身份边界', 'Role boundary');
+  String get strategyOverview => _t('策略总览', 'Strategy overview');
+  String get decisionTendencies => _t('决策倾向', 'Decision tendencies');
+  String get actionStrategy => _t('行动策略', 'Action strategy');
+  String get evidenceContext => _t('证据与上下文', 'Evidence and context');
+  String get runtimeComposition => _t('运行时组合', 'Runtime composition');
+  String get localPreviewOnly => _t(
+    '本页只是本地预览。保存、版本、冻结和历史对局关系要等资产仓库切片。',
+    'This page is local preview only. Persistence, versions, frozen state, and run references require the asset registry slice.',
+  );
+  String get engineAuthority => _t(
+    '引擎决定行动窗口、合法动作、信息权限、状态转移和胜负；策略只影响发言、判断和行动提案。',
+    'The engine owns decision windows, legal actions, information entitlement, state transitions, and victory. Policy only guides speech, judgment, and action proposals.',
   );
   String get agentHarness => _t('Agent harness', 'Agent harness');
   String get memory => _t('记忆', 'Memory');

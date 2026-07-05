@@ -286,7 +286,9 @@ void main() {
     await participant.sseController.close();
   });
 
-  testWidgets('roles tab exposes agent harness detail', (tester) async {
+  testWidgets('roles tab exposes local role policy editor draft', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       WerewolfApp(
         observerClientFactory: (_) => FakeObserverApiClient(),
@@ -299,17 +301,34 @@ void main() {
     await tester.tap(find.text('角色'));
     await tester.pumpAndSettle();
 
-    expect(find.text('全部角色'), findsOneWidget);
-    expect(find.text('预言家'), findsOneWidget);
-    expect(find.text('狼人'), findsOneWidget);
+    expect(find.text('角色策略'), findsOneWidget);
+    expect(find.text('标准六人局 · 本地草稿'), findsOneWidget);
+    expect(find.byKey(const Key('role-policy-grid')), findsOneWidget);
+    for (final roleName in ['狼人', '预言家', '女巫', '村民', '守卫', '猎人']) {
+      expect(find.text(roleName), findsOneWidget);
+    }
 
     await tester.tap(find.text('预言家'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Agent harness'), findsOneWidget);
-    expect(find.text('记忆'), findsOneWidget);
-    expect(find.text('提示词'), findsOneWidget);
-    expect(find.text('可编辑'), findsWidgets);
+    expect(find.byKey(const Key('role-policy-detail-page')), findsOneWidget);
+    expect(find.text('身份边界'), findsOneWidget);
+    expect(find.text('策略总览'), findsOneWidget);
+    expect(find.text('决策倾向'), findsOneWidget);
+    expect(find.text('行动策略'), findsOneWidget);
+    expect(find.text('证据与上下文'), findsOneWidget);
+    expect(find.text('运行时组合'), findsOneWidget);
+    expect(find.text('提示词'), findsNothing);
+
+    await tester.tap(find.text('强势带队'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('草稿未保存'), findsOneWidget);
+    expect(find.text('当前策略：强势带队'), findsOneWidget);
+    expect(find.text('已保存'), findsNothing);
+    expect(find.text('本局已冻结'), findsNothing);
+    expect(find.text('v1.3'), findsNothing);
+    expect(find.textContaining('历史对局引用'), findsNothing);
   });
 
   testWidgets('history tab groups previous runs by status', (tester) async {

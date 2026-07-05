@@ -32,6 +32,29 @@ machine secrets here.
 
 ## Entries
 
+### 2026-07-05 - P3-A-2a Flutter Local RolePolicy Draft Editor
+
+- Completed P3-A-2a as a Flutter-only local draft UI slice.
+- Scope delivered:
+  - Replaced the mobile Roles page documentation list with a RolePolicyPack
+    scoped role strategy entry page.
+  - Added a two-column role policy grid for Werewolf, Seer, Witch, Villager,
+    Guard, and Hunter.
+  - Added full-screen role detail pages with read-only role boundary, strategy
+    overview, decision tendencies, role-specific action strategy,
+    evidence/context preferences, and runtime composition preview.
+  - Added local-only preset and setting draft state with "local draft" /
+    "draft not saved" wording.
+  - Removed the old prompt/harness/memory documentation sheet from the mobile
+    role path; the UI does not expose raw prompt editing.
+- Verification:
+  - `flutter test test/widget/home_shell_test.dart` passed 8 tests.
+  - `flutter analyze` passed with no issues.
+  - `flutter test` passed 65 tests.
+- Boundary: no backend persistence, observer/participant protocol, runtime,
+  provider, prompt byte, validator, generated fixture, or workflow behavior was
+  changed. Real save/version/frozen/reference semantics remain P3-A-2b.
+
 ### 2026-07-05 - P3-A-1 Agent Asset Ownership Schema Bridge
 
 - Completed P3-A-1 as a schema-first, runtime-neutral bridge.
