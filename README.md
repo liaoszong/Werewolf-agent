@@ -17,7 +17,7 @@ Matches can run fully offline (deterministic fake provider, the default) or live
 ## Highlights
 
 - **Emergent game engine** — 6 players (2 werewolves, 1 seer, 1 witch, 2 villagers): night kills with wolf consensus, seer checks, witch save/poison, day speeches, votes, executions, win adjudication. Dynamic rounds, no scripts. A hunter role variant ships in the action runtime (`rules_v1_1`).
-- **Bring your own AI** — per-seat provider/model/prompt/temperature configuration. Built-in presets: DeepSeek, OpenAI, Anthropic, plus 9 OpenAI-compatible vendors (Zhipu GLM, Moonshot, Qwen, MiniMax, SiliconFlow, xAI, Gemini, ModelScope, OpenRouter) and fully custom endpoints. API keys stay on your machine; only the local Python server ever calls a provider.
+- **Bring your own AI** — per-seat provider/model/prompt/temperature configuration. Built-in presets: DeepSeek, OpenAI, Anthropic, plus an expanded OpenAI-compatible vendor catalog (Zhipu GLM, Moonshot/Kimi, Qwen, MiniMax, SiliconFlow, xAI, Gemini, ModelScope, OpenRouter, and coding-plan compatible providers) and fully custom endpoints. API keys stay on your machine; only the local Python server ever calls a provider.
 - **Current Qt theater client** — live god-view spectating (seat ring, speech theater, evidence console, playback controls), match setup sandbox, in-theater settlement overlay with a scrolling battle report, and a history view for replaying or managing past runs. It remains the legacy desktop client until the Flutter-first cross-platform client reaches parity.
 - **Flutter-first player client** — the mobile-first Flutter client can join profile-bound human seats through the observer/participant protocol, submit speech/votes/role actions, and use Android Internal/Production update channels. It defaults to the PaleInk public observer for early mobile smoke testing and still supports local development servers.
 - **Honest by construction** — event-sourced logs (`events.jsonl`, snapshots, prompt manifest, provider traces, failure audits), executed-truth HUD (`LIVE_API` vs `SIMULATION`), visibility projections (God / Public / per-Role), and runtime invariants that fail loudly on information leaks or rule violations.
@@ -33,7 +33,7 @@ YAML run profile (seat controllers / AI profiles / prompts / role shuffle)
         ▼
 Python game engine + agent/provider loop          src/werewolf_eval/
   · emergent engine, action runtime (ability system)
-  · provider registry (DeepSeek / OpenAI / Anthropic / 9 presets / custom)
+  · provider registry (DeepSeek / OpenAI / Anthropic / OpenAI-compatible presets / custom)
   · invariant safety net, deterministic fake mode
         │  event sourcing: events.jsonl · snapshots · prompt manifest · provider trace
         ▼

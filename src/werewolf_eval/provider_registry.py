@@ -35,6 +35,30 @@ from werewolf_eval.provider_contract import (
     OPENAI_PROVIDER_SOURCE_LABEL,
 )
 
+WIRE_OPENAI_CHAT_COMPLETIONS = "openai_chat_completions"
+WIRE_ANTHROPIC_MESSAGES = "anthropic_messages"
+CHAT_PROVIDER_CONFIG_DEFAULT_TIMEOUT_SECONDS = ChatProviderConfig.__dataclass_fields__[
+    "timeout_seconds"
+].default
+OPENAI_CHAT_CAPABILITIES = (
+    "chat_completions",
+    "json_object_response",
+    "model_list",
+    "bearer_auth",
+)
+DEEPSEEK_CHAT_CAPABILITIES = (
+    "chat_completions",
+    "json_object_response",
+    "disable_thinking",
+    "model_list",
+    "bearer_auth",
+)
+ANTHROPIC_MESSAGES_CAPABILITIES = (
+    "messages",
+    "model_list",
+    "x_api_key_auth",
+)
+
 
 @dataclass(frozen=True)
 class ProviderSpec:
@@ -55,6 +79,30 @@ class ProviderSpec:
     # "no pricing available, show token totals only". Prices can be populated by
     # external configuration or a future pricing registry.
     pricing: dict[str, object] | None = None
+    # Non-secret live-call contract metadata for UI/pilot planning. Adapter code
+    # still owns the actual HTTP dialect; these fields describe it for callers.
+    wire_protocol: str = WIRE_OPENAI_CHAT_COMPLETIONS
+    capabilities: tuple[str, ...] = ()
+    default_timeout_seconds: int = 30
+
+
+def _openai_compatible_spec(
+    provider_id: str,
+    label: str,
+    default_base_url: str,
+    default_models: tuple[str, ...],
+) -> ProviderSpec:
+    return ProviderSpec(
+        provider_id=provider_id,
+        label=label,
+        provider_cls=OpenAIProvider,
+        default_base_url=default_base_url,
+        models_path="/models",
+        source_label=OPENAI_COMPATIBLE_PROVIDER_SOURCE_LABEL,
+        default_models=default_models,
+        wire_protocol=WIRE_OPENAI_CHAT_COMPLETIONS,
+        capabilities=OPENAI_CHAT_CAPABILITIES,
+    )
 
 
 PROVIDER_REGISTRY: dict[str, ProviderSpec] = {
@@ -67,7 +115,9 @@ PROVIDER_REGISTRY: dict[str, ProviderSpec] = {
         source_label=DEEPSEEK_PROVIDER_SOURCE_LABEL,
         # Offline UI fallback so a deepseek seat has a VALID model before a live
         # fetch (these are DeepSeek's real chat models).
-        default_models=("deepseek-chat", "deepseek-reasoner"),
+        default_models=("deepseek-chat", "deepseek-reasoner", "deepseek-v4-flash", "deepseek-v4-pro"),
+        wire_protocol=WIRE_OPENAI_CHAT_COMPLETIONS,
+        capabilities=DEEPSEEK_CHAT_CAPABILITIES,
     ),
     "openai": ProviderSpec(
         provider_id="openai",
@@ -77,6 +127,8 @@ PROVIDER_REGISTRY: dict[str, ProviderSpec] = {
         models_path="/models",
         source_label=OPENAI_PROVIDER_SOURCE_LABEL,
         default_models=("gpt-4o", "gpt-4o-mini"),
+        wire_protocol=WIRE_OPENAI_CHAT_COMPLETIONS,
+        capabilities=OPENAI_CHAT_CAPABILITIES,
     ),
     "anthropic": ProviderSpec(
         provider_id="anthropic",
@@ -86,6 +138,8 @@ PROVIDER_REGISTRY: dict[str, ProviderSpec] = {
         models_path="/v1/models",
         source_label=ANTHROPIC_PROVIDER_SOURCE_LABEL,
         default_models=("claude-sonnet-4-6", "claude-haiku-4-5-20251001"),
+        wire_protocol=WIRE_ANTHROPIC_MESSAGES,
+        capabilities=ANTHROPIC_MESSAGES_CAPABILITIES,
     ),
     "openai_compatible": ProviderSpec(
         provider_id="openai_compatible",
@@ -95,93 +149,178 @@ PROVIDER_REGISTRY: dict[str, ProviderSpec] = {
         models_path="/models",
         source_label=OPENAI_COMPATIBLE_PROVIDER_SOURCE_LABEL,
         requires_base_url=True,
+        wire_protocol=WIRE_OPENAI_CHAT_COMPLETIONS,
+        capabilities=OPENAI_CHAT_CAPABILITIES,
     ),
-    "zhipu": ProviderSpec(
-        provider_id="zhipu",
-        label="Zhipu GLM",
-        provider_cls=OpenAIProvider,
-        default_base_url="https://api.z.ai/api/paas/v4",
-        models_path="/models",
-        source_label=OPENAI_COMPATIBLE_PROVIDER_SOURCE_LABEL,
-        default_models=("glm-4.7", "glm-4.6", "glm-4.5-air"),
+    "zhipu": _openai_compatible_spec(
+        "zhipu",
+        "Zhipu GLM",
+        "https://api.z.ai/api/paas/v4",
+        ("glm-4.7", "glm-4.6", "glm-4.5-air"),
     ),
-    "moonshot": ProviderSpec(
-        provider_id="moonshot",
-        label="Moonshot Kimi",
-        provider_cls=OpenAIProvider,
-        default_base_url="https://api.moonshot.ai/v1",
-        models_path="/models",
-        source_label=OPENAI_COMPATIBLE_PROVIDER_SOURCE_LABEL,
-        default_models=("kimi-k2.6", "moonshot-v1-8k"),
+    "moonshot": _openai_compatible_spec(
+        "moonshot",
+        "Moonshot Kimi",
+        "https://api.moonshot.ai/v1",
+        ("kimi-k2.6", "moonshot-v1-8k"),
     ),
-    "qwen": ProviderSpec(
-        provider_id="qwen",
-        label="Alibaba Qwen",
-        provider_cls=OpenAIProvider,
-        default_base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
-        models_path="/models",
-        source_label=OPENAI_COMPATIBLE_PROVIDER_SOURCE_LABEL,
-        default_models=("qwen3-max", "qwen-plus", "qwen-flash"),
+    "qwen": _openai_compatible_spec(
+        "qwen",
+        "Alibaba Qwen",
+        "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        ("qwen3-max", "qwen-plus", "qwen-flash", "qwen3-coder-plus"),
     ),
-    "minimax": ProviderSpec(
-        provider_id="minimax",
-        label="MiniMax",
-        provider_cls=OpenAIProvider,
-        default_base_url="https://api.minimax.io/v1",
-        models_path="/models",
-        source_label=OPENAI_COMPATIBLE_PROVIDER_SOURCE_LABEL,
-        default_models=("MiniMax-M3", "MiniMax-Text-01"),
+    "minimax": _openai_compatible_spec(
+        "minimax",
+        "MiniMax",
+        "https://api.minimax.io/v1",
+        ("MiniMax-M3", "MiniMax-Text-01"),
     ),
-    "siliconflow": ProviderSpec(
-        provider_id="siliconflow",
-        label="SiliconFlow",
-        provider_cls=OpenAIProvider,
-        default_base_url="https://api.siliconflow.cn/v1",
-        models_path="/models",
-        source_label=OPENAI_COMPATIBLE_PROVIDER_SOURCE_LABEL,
-        default_models=("deepseek-ai/DeepSeek-V3", "Qwen/Qwen2.5-72B-Instruct"),
+    "siliconflow": _openai_compatible_spec(
+        "siliconflow",
+        "SiliconFlow",
+        "https://api.siliconflow.cn/v1",
+        ("deepseek-ai/DeepSeek-V3", "Qwen/Qwen2.5-72B-Instruct", "Pro/MiniMaxAI/MiniMax-M2.7"),
     ),
-    "xai": ProviderSpec(
-        provider_id="xai",
-        label="xAI Grok",
-        provider_cls=OpenAIProvider,
-        default_base_url="https://api.x.ai/v1",
-        models_path="/models",
-        source_label=OPENAI_COMPATIBLE_PROVIDER_SOURCE_LABEL,
-        default_models=("grok-4.3", "grok-4"),
+    "xai": _openai_compatible_spec(
+        "xai",
+        "xAI Grok",
+        "https://api.x.ai/v1",
+        ("grok-4.3", "grok-4"),
     ),
-    "gemini": ProviderSpec(
-        provider_id="gemini",
-        label="Google Gemini",
-        provider_cls=OpenAIProvider,
-        default_base_url="https://generativelanguage.googleapis.com/v1beta/openai",
-        models_path="/models",
-        source_label=OPENAI_COMPATIBLE_PROVIDER_SOURCE_LABEL,
-        default_models=("gemini-3.5-flash", "gemini-2.5-flash", "gemini-2.5-pro"),
+    "gemini": _openai_compatible_spec(
+        "gemini",
+        "Google Gemini",
+        "https://generativelanguage.googleapis.com/v1beta/openai",
+        ("gemini-3.5-flash", "gemini-2.5-flash", "gemini-2.5-pro"),
     ),
-    "modelscope": ProviderSpec(
-        provider_id="modelscope",
-        label="ModelScope",
-        provider_cls=OpenAIProvider,
-        default_base_url="https://api-inference.modelscope.cn/v1",
-        models_path="/models",
-        source_label=OPENAI_COMPATIBLE_PROVIDER_SOURCE_LABEL,
-        default_models=("Qwen/Qwen2.5-72B-Instruct", "deepseek-ai/DeepSeek-V3"),
+    "modelscope": _openai_compatible_spec(
+        "modelscope",
+        "ModelScope",
+        "https://api-inference.modelscope.cn/v1",
+        ("Qwen/Qwen2.5-72B-Instruct", "deepseek-ai/DeepSeek-V3", "ZhipuAI/GLM-5.1"),
     ),
-    "openrouter": ProviderSpec(
-        provider_id="openrouter",
-        label="OpenRouter",
-        provider_cls=OpenAIProvider,
-        default_base_url="https://openrouter.ai/api/v1",
-        models_path="/models",
-        source_label=OPENAI_COMPATIBLE_PROVIDER_SOURCE_LABEL,
-        default_models=("~openai/gpt-latest", "~anthropic/claude-sonnet-latest", "openrouter/auto"),
+    "openrouter": _openai_compatible_spec(
+        "openrouter",
+        "OpenRouter",
+        "https://openrouter.ai/api/v1",
+        ("~openai/gpt-latest", "~anthropic/claude-sonnet-latest", "openrouter/auto"),
+    ),
+    # cc-switch e606adf Codex presets explicitly marked apiFormat="openai_chat".
+    # Responses-only, Anthropic, Gemini-native, OAuth, and subscription-routing
+    # presets are intentionally not enabled until matching adapters exist here.
+    "volcengine_ark": _openai_compatible_spec(
+        "volcengine_ark",
+        "Volcengine Ark Agent Plan",
+        "https://ark.cn-beijing.volces.com/api/coding/v3",
+        ("ark-code-latest",),
+    ),
+    "byteplus_ark": _openai_compatible_spec(
+        "byteplus_ark",
+        "BytePlus ModelArk",
+        "https://ark.ap-southeast.bytepluses.com/api/coding/v3",
+        ("ark-code-latest",),
+    ),
+    "zhipu_coding": _openai_compatible_spec(
+        "zhipu_coding",
+        "Zhipu GLM Coding",
+        "https://open.bigmodel.cn/api/coding/paas/v4",
+        ("glm-5.2",),
+    ),
+    "zhipu_global_coding": _openai_compatible_spec(
+        "zhipu_global_coding",
+        "Zhipu GLM Global Coding",
+        "https://api.z.ai/api/coding/paas/v4",
+        ("glm-5.2",),
+    ),
+    "qianfan_coding": _openai_compatible_spec(
+        "qianfan_coding",
+        "Baidu Qianfan Coding Plan",
+        "https://qianfan.baidubce.com/v2/coding",
+        ("qianfan-code-latest",),
+    ),
+    "moonshot_cn": _openai_compatible_spec(
+        "moonshot_cn",
+        "Moonshot Kimi China",
+        "https://api.moonshot.cn/v1",
+        ("kimi-k2.7-code",),
+    ),
+    "kimi_coding": _openai_compatible_spec(
+        "kimi_coding",
+        "Kimi For Coding",
+        "https://api.kimi.com/coding/v1",
+        ("kimi-for-coding",),
+    ),
+    "stepfun": _openai_compatible_spec(
+        "stepfun",
+        "StepFun",
+        "https://api.stepfun.com/step_plan/v1",
+        ("step-3.7-flash", "step-3.5-flash-2603", "step-3.5-flash"),
+    ),
+    "stepfun_global": _openai_compatible_spec(
+        "stepfun_global",
+        "StepFun Global",
+        "https://api.stepfun.ai/step_plan/v1",
+        ("step-3.7-flash", "step-3.5-flash-2603", "step-3.5-flash"),
+    ),
+    "bailing": _openai_compatible_spec(
+        "bailing",
+        "BaiLing",
+        "https://api.tbox.cn/api/llm/v1",
+        ("Ling-2.6-1T",),
+    ),
+    "siliconflow_global": _openai_compatible_spec(
+        "siliconflow_global",
+        "SiliconFlow Global",
+        "https://api.siliconflow.com/v1",
+        ("MiniMaxAI/MiniMax-M2.7",),
+    ),
+    "novita": _openai_compatible_spec(
+        "novita",
+        "Novita AI",
+        "https://api.novita.ai/openai/v1",
+        ("zai-org/glm-5.1",),
+    ),
+    "nvidia_nim": _openai_compatible_spec(
+        "nvidia_nim",
+        "NVIDIA NIM",
+        "https://integrate.api.nvidia.com/v1",
+        ("moonshotai/kimi-k2.5",),
+    ),
+    "opencode_go": _openai_compatible_spec(
+        "opencode_go",
+        "OpenCode Go",
+        "https://opencode.ai/zen/go/v1",
+        ("glm-5.2", "glm-5.1", "kimi-k2.7-code", "deepseek-v4-pro", "deepseek-v4-flash", "mimo-v2.5-pro"),
+    ),
+    "atlascloud": _openai_compatible_spec(
+        "atlascloud",
+        "AtlasCloud",
+        "https://api.atlascloud.ai/v1",
+        ("zai-org/glm-5.1",),
     ),
 }
 
 
 def _effective_base_url(spec: ProviderSpec, base_url: str) -> str:
     return (base_url or spec.default_base_url).rstrip("/")
+
+
+def _config_with_registry_defaults(
+    spec: ProviderSpec,
+    config: ChatProviderConfig,
+) -> ChatProviderConfig:
+    base_url = config.base_url or spec.default_base_url
+    timeout_seconds = config.timeout_seconds
+    if timeout_seconds == CHAT_PROVIDER_CONFIG_DEFAULT_TIMEOUT_SECONDS:
+        timeout_seconds = spec.default_timeout_seconds
+    if base_url == config.base_url and timeout_seconds == config.timeout_seconds:
+        return config
+    return dataclasses.replace(
+        config,
+        base_url=base_url,
+        timeout_seconds=timeout_seconds,
+    )
 
 
 def model_list_url(provider_id: str, base_url: str) -> str:
@@ -202,8 +341,7 @@ def build_provider(
     effective_base_url = config.base_url or spec.default_base_url
     if spec.requires_base_url and not effective_base_url:
         raise ValueError(f"provider {provider_id!r} requires a base_url")
-    if not config.base_url:
-        config = dataclasses.replace(config, base_url=spec.default_base_url)
+    config = _config_with_registry_defaults(spec, config)
     provider = spec.provider_cls(config, transport=transport)
     # Stamp the registry identity so per-seat artifacts (manifest, provider trace,
     # ProviderResponse.provider_name/source_label) name the REAL vendor, not the
@@ -237,6 +375,7 @@ def list_models(
     ``{"data":[{"id":...}]}``). Reuses the provider's own auth headers so the
     BYO-key handling is single-sourced. Never leaks the key on error."""
     spec = PROVIDER_REGISTRY[provider_id]
+    config = _config_with_registry_defaults(spec, config)
     url = model_list_url(provider_id, config.base_url)  # applies default fallback
     # Reuse the provider's exact auth header builder (single source of truth).
     # This instantiates the class directly (NOT via build_provider) on purpose:
@@ -261,8 +400,12 @@ def provider_specs_payload() -> list[dict[str, object]]:
             "id": spec.provider_id,
             "label": spec.label,
             "default_base_url": spec.default_base_url,
+            "models_path": spec.models_path,
             "requires_base_url": spec.requires_base_url,
             "default_models": list(spec.default_models),
+            "wire_protocol": spec.wire_protocol,
+            "capabilities": list(spec.capabilities),
+            "default_timeout_seconds": spec.default_timeout_seconds,
         }
         for spec in PROVIDER_REGISTRY.values()
     ]

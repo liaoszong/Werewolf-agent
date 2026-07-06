@@ -31,6 +31,11 @@ class ProviderRegistryTests(unittest.TestCase):
                 "deepseek", "openai", "anthropic", "openai_compatible",
                 "zhipu", "moonshot", "qwen", "minimax", "siliconflow",
                 "xai", "gemini", "modelscope", "openrouter",
+                "volcengine_ark", "byteplus_ark", "zhipu_coding",
+                "zhipu_global_coding", "qianfan_coding", "moonshot_cn",
+                "kimi_coding", "stepfun", "stepfun_global", "bailing",
+                "siliconflow_global", "novita", "nvidia_nim",
+                "opencode_go", "atlascloud",
             },
         )
 
@@ -56,6 +61,36 @@ class ProviderRegistryTests(unittest.TestCase):
             self.assertEqual(spec.source_label, OPENAI_COMPATIBLE_PROVIDER_SOURCE_LABEL, pid)
             self.assertFalse(spec.requires_base_url, pid)
             self.assertTrue(len(spec.default_models) >= 1, pid)
+
+    def test_cc_switch_openai_chat_presets_are_registered_as_compatible(self) -> None:
+        # Derived from farion1231/cc-switch e606adf Codex presets with
+        # apiFormat="openai_chat". Entries marked openai_responses/Anthropic/Gemini
+        # stay out of this Chat Completions registry until an adapter exists.
+        presets = {
+            "volcengine_ark": ("https://ark.cn-beijing.volces.com/api/coding/v3", "ark-code-latest"),
+            "byteplus_ark": ("https://ark.ap-southeast.bytepluses.com/api/coding/v3", "ark-code-latest"),
+            "zhipu_coding": ("https://open.bigmodel.cn/api/coding/paas/v4", "glm-5.2"),
+            "zhipu_global_coding": ("https://api.z.ai/api/coding/paas/v4", "glm-5.2"),
+            "qianfan_coding": ("https://qianfan.baidubce.com/v2/coding", "qianfan-code-latest"),
+            "moonshot_cn": ("https://api.moonshot.cn/v1", "kimi-k2.7-code"),
+            "kimi_coding": ("https://api.kimi.com/coding/v1", "kimi-for-coding"),
+            "stepfun": ("https://api.stepfun.com/step_plan/v1", "step-3.7-flash"),
+            "stepfun_global": ("https://api.stepfun.ai/step_plan/v1", "step-3.7-flash"),
+            "bailing": ("https://api.tbox.cn/api/llm/v1", "Ling-2.6-1T"),
+            "siliconflow_global": ("https://api.siliconflow.com/v1", "MiniMaxAI/MiniMax-M2.7"),
+            "novita": ("https://api.novita.ai/openai/v1", "zai-org/glm-5.1"),
+            "nvidia_nim": ("https://integrate.api.nvidia.com/v1", "moonshotai/kimi-k2.5"),
+            "opencode_go": ("https://opencode.ai/zen/go/v1", "glm-5.2"),
+            "atlascloud": ("https://api.atlascloud.ai/v1", "zai-org/glm-5.1"),
+        }
+        for pid, (base, model) in presets.items():
+            spec = PROVIDER_REGISTRY[pid]
+            self.assertIs(spec.provider_cls, OpenAIProvider, pid)
+            self.assertEqual(spec.default_base_url, base, pid)
+            self.assertEqual(spec.wire_protocol, "openai_chat_completions", pid)
+            self.assertIn("chat_completions", spec.capabilities, pid)
+            self.assertIn("json_object_response", spec.capabilities, pid)
+            self.assertIn(model, spec.default_models, pid)
 
     def test_trailing_slash_base_url_does_not_double_slash(self) -> None:
         # model-list URL
@@ -98,6 +133,8 @@ class ProviderRegistryTests(unittest.TestCase):
         self.assertEqual(an.default_base_url, "https://api.anthropic.com")
         self.assertEqual(an.models_path, "/v1/models")
         self.assertEqual(an.source_label, ANTHROPIC_PROVIDER_SOURCE_LABEL)
+        self.assertEqual(an.wire_protocol, "anthropic_messages")
+        self.assertIn("messages", an.capabilities)
 
         cu = PROVIDER_REGISTRY["openai_compatible"]
         self.assertIs(cu.provider_cls, OpenAICompatibleCustomProvider)
@@ -140,6 +177,24 @@ class ProviderRegistryTests(unittest.TestCase):
         provider = build_provider("deepseek", ChatProviderConfig(api_key="k"))
         self.assertEqual(provider._config.base_url, "https://api.deepseek.com")
 
+    def test_build_provider_applies_registry_default_timeout(self) -> None:
+        from werewolf_eval.provider_registry import ProviderSpec
+
+        PROVIDER_REGISTRY["timeout_probe"] = ProviderSpec(
+            provider_id="timeout_probe",
+            label="Timeout Probe",
+            provider_cls=OpenAIProvider,
+            default_base_url="https://example.test/v1",
+            models_path="/models",
+            source_label=OPENAI_COMPATIBLE_PROVIDER_SOURCE_LABEL,
+            default_timeout_seconds=17,
+        )
+        try:
+            provider = build_provider("timeout_probe", ChatProviderConfig(api_key="k"))
+            self.assertEqual(provider._config.timeout_seconds, 17)
+        finally:
+            del PROVIDER_REGISTRY["timeout_probe"]
+
     def test_build_provider_keeps_explicit_base_url(self) -> None:
         provider = build_provider(
             "openai_compatible",
@@ -157,6 +212,9 @@ class ProviderRegistryTests(unittest.TestCase):
             source_label="[OpenAI-compatible API output]",
         )
         self.assertEqual(spec.default_models, ())
+        self.assertEqual(spec.wire_protocol, "openai_chat_completions")
+        self.assertEqual(spec.capabilities, ())
+        self.assertEqual(spec.default_timeout_seconds, 30)
 
     def test_build_provider_rejects_unknown_provider(self) -> None:
         with self.assertRaises(KeyError):
@@ -196,6 +254,35 @@ class ProviderRegistryTests(unittest.TestCase):
         )
         self.assertEqual(models, ["m1", "123"])
 
+    def test_list_models_applies_registry_default_timeout(self) -> None:
+        from werewolf_eval.provider_registry import ProviderSpec
+
+        seen: dict[str, int] = {}
+
+        def transport(url, headers, timeout):
+            seen["timeout"] = timeout
+            return {"data": [{"id": "m1"}]}
+
+        PROVIDER_REGISTRY["timeout_probe"] = ProviderSpec(
+            provider_id="timeout_probe",
+            label="Timeout Probe",
+            provider_cls=OpenAIProvider,
+            default_base_url="https://example.test/v1",
+            models_path="/models",
+            source_label=OPENAI_COMPATIBLE_PROVIDER_SOURCE_LABEL,
+            default_timeout_seconds=17,
+        )
+        try:
+            models = list_models(
+                "timeout_probe",
+                ChatProviderConfig(api_key="k"),
+                transport=transport,
+            )
+            self.assertEqual(models, ["m1"])
+            self.assertEqual(seen["timeout"], 17)
+        finally:
+            del PROVIDER_REGISTRY["timeout_probe"]
+
     def test_provider_specs_payload_shape(self) -> None:
         from werewolf_eval.provider_registry import provider_specs_payload
         payload = provider_specs_payload()
@@ -204,12 +291,18 @@ class ProviderRegistryTests(unittest.TestCase):
         moon = next(r for r in payload if r["id"] == "moonshot")
         self.assertEqual(
             set(moon),
-            {"id", "label", "default_base_url", "requires_base_url", "default_models"},
+            {
+                "id", "label", "default_base_url", "models_path",
+                "requires_base_url", "default_models", "wire_protocol",
+                "capabilities", "default_timeout_seconds",
+            },
         )
         self.assertEqual(moon["label"], "Moonshot Kimi")
         self.assertEqual(moon["default_base_url"], "https://api.moonshot.ai/v1")
         self.assertFalse(moon["requires_base_url"])
         self.assertIn("kimi-k2.6", moon["default_models"])
+        self.assertEqual(moon["wire_protocol"], "openai_chat_completions")
+        self.assertIn("model_list", moon["capabilities"])
         self.assertIsInstance(moon["default_models"], list)  # JSON-serializable
 
     def test_list_models_sanitizes_transport_error(self) -> None:

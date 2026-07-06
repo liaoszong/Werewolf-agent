@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+import time
 from typing import Any
 
 from werewolf_eval.llm_providers import ChatProviderConfig, OpenAIProvider
@@ -94,6 +95,20 @@ class OpenAIProviderTests(unittest.TestCase):
         self.assertEqual(response.provider_name, "openai")
         self.assertEqual(response.source_label, "[OpenAI API output]")
         self.assertEqual(response.token_usage["total_tokens"], 33)
+
+    def test_response_carries_elapsed_latency(self) -> None:
+        def slow_transport(
+            url: str,
+            headers: dict[str, str],
+            payload: dict[str, Any],
+            timeout_seconds: int,
+        ) -> dict[str, Any]:
+            time.sleep(0.01)
+            return _ok_transport(url, headers, payload, timeout_seconds)
+
+        provider = OpenAIProvider(self._config(), transport=slow_transport)
+        response = provider.respond(self._request())
+        self.assertGreaterEqual(response.latency_ms, 1)
 
     def test_persona_is_prepended_but_contract_is_preserved(self) -> None:
         # The per-seat persona must appear BEFORE the machine contract, and the

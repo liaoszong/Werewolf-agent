@@ -17,7 +17,7 @@ Werewolf-agent 是一个 **client-agnostic 的狼人杀 Agent Theater**。Python
 ## 核心特性
 
 - **涌现式对局引擎** — 6 人局(2 狼人、1 预言家、1 女巫、2 村民):狼人共识刀人、预言家查验、女巫救/毒、白天发言、投票、处决、胜负裁决。动态回合、无剧本。猎人角色变体已在 action runtime 中实现(`rules_v1_1`)。
-- **自带 AI(BYO-key)** — 按座位配置 provider/模型/prompt/温度。内置预设:DeepSeek、OpenAI、Anthropic,以及 9 家 OpenAI 兼容厂商(智谱 GLM、Moonshot、通义千问、MiniMax、SiliconFlow、xAI、Gemini、ModelScope、OpenRouter),并支持完全自定义端点。API key 始终留在本机;只有本地 Python server 会调用供应商接口。
+- **自带 AI(BYO-key)** — 按座位配置 provider/模型/prompt/温度。内置预设:DeepSeek、OpenAI、Anthropic,以及扩展 OpenAI 兼容厂商目录(智谱 GLM、Moonshot/Kimi、通义千问、MiniMax、SiliconFlow、xAI、Gemini、ModelScope、OpenRouter 和 coding-plan 兼容供应商),并支持完全自定义端点。API key 始终留在本机;只有本地 Python server 会调用供应商接口。
 - **当前 Qt 剧场客户端** — 上帝视角实时观战(座位环、发言剧场、证据控制台、播放控制)、对局配置沙盘、剧场内结算覆盖层与滚动战报、历史对局回看与管理。它保留为 legacy 桌面客户端,直到 Flutter-first 跨平台客户端达到基本 parity。
 - **Flutter-first 玩家客户端** — 移动优先的 Flutter 客户端已经可以通过 observer/participant 协议加入 profile 绑定的真人座位,提交发言、投票和角色动作,并接入 Android Internal/Production 更新通道。当前默认连接 PaleInk 公网 observer 方便早期真机冒烟,也支持切回本机开发服务。
 - **诚实链路** — 事件溯源日志(`events.jsonl`、快照、prompt manifest、provider 调用链、故障审计)、执行真相 HUD(`LIVE_API` vs `SIMULATION`)、可见性投影(上帝/公开/各角色视角),以及在信息泄漏或规则违例时立刻报错的运行时不变量。
@@ -33,7 +33,7 @@ YAML 运行 profile(座位控制器 / AI profile / prompt / 角色洗牌)
         ▼
 Python 对局引擎 + agent/provider 循环              src/werewolf_eval/
   · 涌现引擎、action runtime(能力系统)
-  · provider 注册表(DeepSeek / OpenAI / Anthropic / 9 家预设 / 自定义)
+  · provider 注册表(DeepSeek / OpenAI / Anthropic / OpenAI 兼容预设 / 自定义)
   · 不变量安全网、确定性 fake 模式
         │  事件溯源:events.jsonl · 快照 · prompt manifest · provider 调用链
         ▼

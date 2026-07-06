@@ -23,6 +23,7 @@ registry of all providers lives in ``provider_registry``.
 from __future__ import annotations
 
 import json
+import time
 import urllib.request
 from dataclasses import dataclass, field
 from typing import Any, Callable
@@ -243,10 +244,12 @@ class BaseChatProvider:
 
         self._request_history.append(request)
 
+        started = time.perf_counter()
         try:
             raw = self._transport(url, headers, payload, self._config.timeout_seconds)
         except Exception as exc:
             raise_sanitized_transport_error(self.PROVIDER_NAME, exc)
+        latency_ms = int((time.perf_counter() - started) * 1000)
 
         raw_content = self._extract_content(raw)
         token_usage = self._extract_usage(raw)
@@ -256,7 +259,7 @@ class BaseChatProvider:
             provider_name=self.PROVIDER_NAME,
             source_label=self.SOURCE_LABEL,
             raw_content=raw_content,
-            latency_ms=0,
+            latency_ms=latency_ms,
             token_usage=token_usage,
         )
 

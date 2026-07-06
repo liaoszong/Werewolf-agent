@@ -386,7 +386,12 @@ class ProfileSchemaTests(unittest.TestCase):
             {
                 "fake_deterministic", "deepseek", "openai", "anthropic", "openai_compatible",
                 "zhipu", "moonshot", "qwen", "minimax", "siliconflow",
-                "xai", "gemini", "modelscope", "openrouter", "human",
+                "xai", "gemini", "modelscope", "openrouter",
+                "volcengine_ark", "byteplus_ark", "zhipu_coding",
+                "zhipu_global_coding", "qianfan_coding", "moonshot_cn",
+                "kimi_coding", "stepfun", "stepfun_global", "bailing",
+                "siliconflow_global", "novita", "nvidia_nim",
+                "opencode_go", "atlascloud", "human",
             },
         )
         self.assertEqual(s["models"]["deepseek"], ["deepseek-chat", "deepseek-reasoner"])

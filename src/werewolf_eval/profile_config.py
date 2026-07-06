@@ -31,6 +31,14 @@ ALLOWED_PROVIDERS: frozenset[str] = frozenset(
         # stays registry-free; test_allowed_providers_superset_of_registry guards it.
         "zhipu", "moonshot", "qwen", "minimax", "siliconflow",
         "xai", "gemini", "modelscope", "openrouter",
+        # Provider migration slice: cc-switch e606adf Codex presets that are
+        # explicitly openai_chat-compatible. Responses/Anthropic/Gemini-native
+        # presets stay out until matching adapters exist in this backend.
+        "volcengine_ark", "byteplus_ark", "zhipu_coding",
+        "zhipu_global_coding", "qianfan_coding", "moonshot_cn",
+        "kimi_coding", "stepfun", "stepfun_global", "bailing",
+        "siliconflow_global", "novita", "nvidia_nim",
+        "opencode_go", "atlascloud",
         # P3-C-1b: local participant controller, not a model gateway provider.
         "human",
     }

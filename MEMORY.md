@@ -32,6 +32,39 @@ machine secrets here.
 
 ## Entries
 
+### 2026-07-06 - Provider Capability/Profile Migration Slice
+
+- Completed a narrow provider migration slice before any real-model smoke
+  pilot. No real API call, release, push, prompt default flip, prompt byte
+  change, Flutter/UI change, GitHub workflow change, or generated fixture
+  change was made.
+- Scope delivered:
+  - Added non-secret `ProviderSpec` live-call metadata:
+    `wire_protocol`, `capabilities`, and `default_timeout_seconds`, and exposed
+    those fields through `provider_specs_payload()` for profile/UI/pilot
+    planning.
+  - Added adapter-level latency measurement in `BaseChatProvider.respond()`, so
+    OpenAI-compatible, DeepSeek, and Anthropic responses can carry elapsed
+    `latency_ms` into provider trace/call-accounting without changing prompt
+    text or runtime action contracts.
+  - Added cc-switch `e606adf` Codex presets that are explicitly
+    `apiFormat="openai_chat"` as OpenAI Chat Completions-compatible registry
+    entries, including Volcengine Ark, BytePlus Ark, Zhipu coding/global
+    coding, Baidu Qianfan coding, Moonshot China, Kimi coding, StepFun/global,
+    BaiLing, SiliconFlow Global, Novita, NVIDIA NIM, OpenCode Go, and
+    AtlasCloud.
+  - Deliberately did not migrate cc-switch presets that require
+    `openai_responses`, Anthropic-native, Gemini-native, OAuth/subscription
+    routing, proxy behavior, or provider-specific usage/model mapping adapters.
+  - Updated README/PROJECT_MAP wording from a fixed "9 presets" count to an
+    expanded OpenAI-compatible provider catalog.
+- Verification:
+  - `$env:PYTHONPATH='src'; $env:NO_PROXY='*'; python -m unittest tests.test_provider_registry tests.test_provider_contract tests.test_openai_provider tests.test_deepseek_provider tests.test_anthropic_provider tests.test_profile_config tests.test_seat_agents tests.test_multi_provider_launcher tests.test_observer_models_endpoint -v` passed 168 tests.
+  - `$env:PYTHONPATH='src'; $env:NO_PROXY='*'; python -m unittest discover -s tests -p "test_*.py"` passed 1492 tests, skipped 2.
+- Boundary: `PROMPT_VERSION` remains `prompt_v1`; no prompt golden/ledger work
+  was needed. API keys remain env/profile runtime inputs only and were not
+  written to docs, memory, artifacts, or logs.
+
 ### 2026-07-06 - P3-A-3b Runtime Evidence Closure for Continuity Shadow
 
 - Completed P3-A-3b as a strict validation/runtime-evidence closure for the
