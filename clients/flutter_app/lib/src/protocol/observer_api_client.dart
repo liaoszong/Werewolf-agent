@@ -94,6 +94,23 @@ class ObserverApiClient {
         .toList(growable: false);
   }
 
+  Future<String> createParticipantRun({required String seatId}) async {
+    final response = await _http.post(
+      baseUri.resolve('/api/runs'),
+      headers: _headers(contentTypeJson: true),
+      body: jsonEncode({
+        'participant': {'seat_id': seatId},
+      }),
+    );
+    final decoded = _decodeObject(response);
+    if (response.statusCode >= 400) {
+      throw _error('createParticipantRun', response.statusCode, decoded);
+    }
+    final runId = decoded['run_id'];
+    if (runId is String && runId.isNotEmpty) return runId;
+    throw const ObserverApiError('createParticipantRun', 500, 'missing_run_id');
+  }
+
   Future<void> saveProviderCredential({
     required String provider,
     required String apiKey,

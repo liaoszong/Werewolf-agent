@@ -67,6 +67,28 @@ class AppStrings {
     '从 observer server 读取对局列表；可使用 PaleInk 云服务器或本机开发服务。',
     'Runs are loaded from the observer server. Use PaleInk Cloud or a local dev server.',
   );
+  String get startTestMatch => _t('新建测试局', 'New Test Match');
+  String get startingTestMatch => _t('创建中...', 'Creating...');
+  String get startTestMatchHint => _t(
+    '创建一局假 AI + 真人席位的测试对局，用来验证手机房间流程；不会调用真实模型。',
+    'Create a fake-AI match with your human seat to test the mobile room flow. This does not call a live model.',
+  );
+  String launchRunFailed(String code) {
+    if (code == 'owner_token_required') {
+      return _t(
+        '请输入当前 observer 的 owner token 后再新建测试局。',
+        'Enter this observer owner token before creating a test match.',
+      );
+    }
+    if (code == 'missing_run_id') {
+      return _t(
+        'observer 创建了响应但没有返回 run id。',
+        'The observer response did not include a run id.',
+      );
+    }
+    return _t('新建测试局失败：$code', 'Failed to create test match: $code');
+  }
+
   String get roleLibraryTitle => _t('角色策略', 'Role Policies');
   String get roleLibraryIntro => _t(
     '按身份调整本地 RolePolicy 草稿；当前不保存到后端，也不改变对局规则、提示词或模型调用。',
@@ -167,6 +189,11 @@ class AppStrings {
   );
   String get visibleEventsWaiting =>
       _t('等待可见房间事件...', 'Waiting for visible room events...');
+  String get roomNotReadyTitle => _t('房间尚未准备好', 'Room is not ready');
+  String get roomNotReadyBody => _t(
+    '当前席位还没有拿到角色投影。请等待服务器启动对局，或返回新建一局测试局。',
+    'This seat has not received a role projection yet. Wait for the server to start the match, or go back and create a test match.',
+  );
   String get waitingForYou => _t('等待你操作', 'Waiting for you');
   String get nightInProgress => _t('夜间行动中', 'Night actions');
   String get voting => _t('投票中', 'Voting');

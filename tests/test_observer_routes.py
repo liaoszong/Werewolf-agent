@@ -151,8 +151,8 @@ class PostDeleteTableTests(unittest.TestCase):
 
         m = _match(POST_ROUTES, ["api", "runs"])
         self.assertEqual(m[0].handler_name, "_route_runs_post")
-        self.assertIsNone(m[0].loopback_message)  # cross-origin ONLY — asymmetric
-        self.assertFalse(m[0].owner_token_auth)
+        self.assertEqual(m[0].loopback_message, "runs launch is loopback-only")
+        self.assertTrue(m[0].owner_token_auth)
         self.assertTrue(m[0].same_origin)
 
         m = _match(POST_ROUTES, ["api", "runs", "r1", "participants", "join"])

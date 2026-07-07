@@ -254,6 +254,7 @@ class CredentialOwnerTokenDispatchTests(unittest.TestCase):
         loopback: bool = False,
         owner_token: str = "owner-secret",
         credential_store: CredentialStore | None = None,
+        runs_dir: str | Path | None = None,
     ):
         import io
 
@@ -261,7 +262,7 @@ class CredentialOwnerTokenDispatchTests(unittest.TestCase):
 
         cs = credential_store or CredentialStore()
         state = ObserverServerState(
-            runs_dir=Path("/tmp"),
+            runs_dir=Path(runs_dir) if runs_dir is not None else Path("/tmp"),
             launcher=lambda r, d: 0,
             credential_store=cs,
             owner_token=owner_token,
@@ -270,12 +271,16 @@ class CredentialOwnerTokenDispatchTests(unittest.TestCase):
         class _FakeHandler(ObserverRequestHandler):
             def __init__(self):  # noqa: D107
                 self.responses: list[tuple[int, object]] = []
+                self.launched: list[str] = []
 
             def _send_error_json(self, status, code, message):
                 self.responses.append((status, {"code": code, "message": message}))
 
             def _send_json(self, status, payload):
                 self.responses.append((status, payload))
+
+            def _launch_run_async(self, run_id, run_dir, launcher):
+                self.launched.append(run_id)
 
             def _is_loopback(self):
                 return loopback
@@ -346,6 +351,41 @@ class CredentialOwnerTokenDispatchTests(unittest.TestCase):
 
         self.assertEqual(h.responses[0][0], 403)
         self.assertEqual(h.responses[0][1]["code"], "missing_api_key")  # type: ignore[index]
+
+    def test_remote_run_launch_requires_owner_token(self) -> None:
+        raw = b'{"participant":{"seat_id":"p3"}}'
+        with TemporaryDirectory() as tmp:
+            h, _ = self._handler(path="/api/runs", method_body=raw, runs_dir=tmp)
+
+            h.do_POST()
+
+            self.assertEqual(h.responses[0][0], 403)
+            self.assertEqual(h.responses[0][1]["code"], "owner_token_required")  # type: ignore[index]
+            self.assertEqual(h.launched, [])
+
+    def test_remote_run_launch_accepts_owner_token_for_human_seat(self) -> None:
+        raw = b'{"participant":{"seat_id":"p3"}}'
+        with TemporaryDirectory() as tmp:
+            h, _ = self._handler(
+                path="/api/runs",
+                method_body=raw,
+                headers={"Authorization": "Bearer owner-secret"},
+                runs_dir=tmp,
+            )
+
+            h.do_POST()
+
+            self.assertEqual(h.responses[0][0], 202)
+            payload = h.responses[0][1]
+            run_id = payload["run_id"]  # type: ignore[index]
+            self.assertEqual(payload["participant"], {"seat_id": "p3"})  # type: ignore[index]
+            self.assertEqual(h.launched, [run_id])
+            self.assertTrue(Path(tmp, str(run_id)).is_dir())
+            self.assertTrue(
+                h._get_state().participant_controller.is_human_seat(
+                    str(run_id), "p3"
+                )
+            )
 
     def test_remote_health_does_not_expose_owner_token(self) -> None:
         h, _ = self._handler(path="/health")

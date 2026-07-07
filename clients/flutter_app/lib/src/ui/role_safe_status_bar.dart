@@ -10,10 +10,12 @@ class RoleSafeStatusBar extends StatelessWidget {
     super.key,
     required this.connectionStatus,
     required this.state,
+    this.canAct,
   });
 
   final ConnectionStatus connectionStatus;
   final ParticipantState? state;
+  final bool? canAct;
 
   @override
   Widget build(BuildContext context) {
@@ -22,8 +24,9 @@ class RoleSafeStatusBar extends StatelessWidget {
     final seat = state?.seatId.toUpperCase() ?? '--';
     final phase = _phase(state);
     final waiting =
-        connectionStatus == ConnectionStatus.connected &&
-        state?.openActionWindow != null;
+        canAct ??
+        (connectionStatus == ConnectionStatus.connected &&
+            state?.openActionWindow != null);
     final statusText = waiting
         ? strings.waitingForYou
         : '${strings.phaseLabel(phase)} · ${strings.yourPerspective} $seat';

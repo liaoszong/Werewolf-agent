@@ -100,6 +100,34 @@ void main() {
     },
   );
 
+  test('createParticipantRun posts human seat with owner token', () async {
+    late http.Request captured;
+    final client = ObserverApiClient(
+      baseUri: Uri.parse('http://127.0.0.1:8765'),
+      ownerToken: 'owner-secret',
+      httpClient: MockClient((request) async {
+        captured = request;
+        return http.Response(
+          jsonEncode({
+            'run_id': 'fake_run_123',
+            'participant': {'seat_id': 'p3'},
+          }),
+          202,
+        );
+      }),
+    );
+
+    final runId = await client.createParticipantRun(seatId: 'p3');
+
+    expect(runId, 'fake_run_123');
+    expect(captured.method, 'POST');
+    expect(captured.url.path, '/api/runs');
+    expect(captured.headers['Authorization'], 'Bearer owner-secret');
+    expect(jsonDecode(captured.body), {
+      'participant': {'seat_id': 'p3'},
+    });
+  });
+
   test('fetchProviderModels returns model ids', () async {
     final client = ObserverApiClient(
       baseUri: Uri.parse('http://127.0.0.1:8765'),

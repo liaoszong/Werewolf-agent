@@ -8,9 +8,9 @@ methods. Table declaration order IS the historical if-chain order: first match
 wins (e.g. ``api/profiles/schema`` is declared before ``api/profiles/{name}``).
 
 The guard matrix is ASYMMETRIC by design — do not "normalize" it:
-credential writes and provider model discovery allow loopback OR explicit owner
-token auth; DELETE runs stays loopback + cross-origin; POST /api/runs checks
-cross-origin only; all other GETs are unguarded.
+credential writes, provider model discovery, and run launch allow loopback OR
+explicit owner token auth; DELETE runs stays loopback + cross-origin; all other
+GETs are unguarded.
 """
 
 from __future__ import annotations
@@ -107,7 +107,13 @@ POST_ROUTES: tuple[Route, ...] = (
         owner_token_auth=True,
         same_origin=True,
     ),
-    Route(("api", "runs"), "_route_runs_post", same_origin=True),
+    Route(
+        ("api", "runs"),
+        "_route_runs_post",
+        loopback_message="runs launch is loopback-only",
+        owner_token_auth=True,
+        same_origin=True,
+    ),
     Route(
         ("api", "runs", "{run_id}", "interrupt"),
         "_route_runs_interrupt",

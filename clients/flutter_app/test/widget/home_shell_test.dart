@@ -15,16 +15,22 @@ class FakeObserverApiClient extends ObserverApiClient {
     this.providerSpecs = _defaultProviderSpecs,
     this.providerModels = const ['deepseek-chat', 'deepseek-v4-flash'],
     this.providerSaveError,
+    this.createRunError,
+    this.createdRunId = 'created_run',
   }) : super(baseUri: Uri.parse('http://127.0.0.1:8765'));
 
   final List<RunSummary> runs;
   final List<ProviderSpecSummary> providerSpecs;
   final List<String> providerModels;
   final ObserverApiError? providerSaveError;
+  final ObserverApiError? createRunError;
+  final String createdRunId;
   String? savedProvider;
   String? savedApiKey;
   String? savedBaseUrl;
   String? clearedProvider;
+  String? createdSeatId;
+  String? ownerTokenAtCreate;
 
   static const _defaultProviderSpecs = [
     ProviderSpecSummary(
@@ -45,6 +51,15 @@ class FakeObserverApiClient extends ObserverApiClient {
 
   @override
   Future<List<RunSummary>> listRuns() async => runs;
+
+  @override
+  Future<String> createParticipantRun({required String seatId}) async {
+    final error = createRunError;
+    if (error != null) throw error;
+    createdSeatId = seatId;
+    ownerTokenAtCreate = ownerToken;
+    return createdRunId;
+  }
 
   @override
   Future<List<ProviderSpecSummary>> listProviderSpecs() async => providerSpecs;
@@ -469,6 +484,35 @@ void main() {
       tester.getTopLeft(find.byKey(const Key('flow-back-button'))),
       matchBackTopLeft,
     );
+    await participant.sseController.close();
+  });
+
+  testWidgets('home can create a test match with owner token and join it', (
+    tester,
+  ) async {
+    final observer = FakeObserverApiClient();
+    final participant = FakeParticipantApiClient();
+    final store = MemoryProviderCredentialStore();
+    await store.writeOwnerToken('http://api.paleink.cc:8765', 'owner-secret');
+    await tester.pumpWidget(
+      WerewolfApp(
+        observerClientFactory: (_) => observer,
+        sessionControllerFactory: (_) =>
+            SessionController(participantApi: participant),
+        providerCredentialStore: store,
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    await tester.tap(find.text('新建测试局'));
+    await tester.pump();
+    await tester.pump();
+
+    expect(observer.createdSeatId, 'p3');
+    expect(observer.ownerTokenAtCreate, 'owner-secret');
+    expect(participant.joinedRunId, 'created_run');
+    expect(find.byKey(const Key('role-notice-dialog')), findsOneWidget);
     await participant.sseController.close();
   });
 

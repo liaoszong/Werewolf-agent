@@ -5,14 +5,25 @@ import '../protocol/participant_models.dart';
 import 'app_theme.dart';
 
 class SpeechFeed extends StatelessWidget {
-  const SpeechFeed({super.key, required this.events, this.currentSeatId});
+  const SpeechFeed({
+    super.key,
+    required this.events,
+    this.currentSeatId,
+    this.roomReady = true,
+    this.hideEmptyState = false,
+  });
 
   final List<Map<String, dynamic>> events;
   final String? currentSeatId;
+  final bool roomReady;
+  final bool hideEmptyState;
 
   @override
   Widget build(BuildContext context) {
-    if (events.isEmpty) return const _EmptyFeedState();
+    if (events.isEmpty) {
+      if (hideEmptyState) return const SizedBox.shrink();
+      return _EmptyFeedState(roomReady: roomReady);
+    }
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(14, 10, 14, 104),
       itemCount: events.length,
@@ -56,7 +67,9 @@ class SpeechFeed extends StatelessWidget {
 }
 
 class _EmptyFeedState extends StatelessWidget {
-  const _EmptyFeedState();
+  const _EmptyFeedState({required this.roomReady});
+
+  final bool roomReady;
 
   @override
   Widget build(BuildContext context) {
@@ -85,7 +98,9 @@ class _EmptyFeedState extends StatelessWidget {
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  strings.visibleEventsWaiting,
+                  roomReady
+                      ? strings.visibleEventsWaiting
+                      : strings.roomNotReadyTitle,
                   textAlign: TextAlign.center,
                   style: Theme.of(
                     context,
@@ -93,7 +108,7 @@ class _EmptyFeedState extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  strings.legalInfoOnly,
+                  roomReady ? strings.legalInfoOnly : strings.roomNotReadyBody,
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.bodySmall,
                 ),

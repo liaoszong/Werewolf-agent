@@ -118,7 +118,24 @@ void main() {
         'seat_id': 'p3',
         'perspective': 'role:p3',
         'run_status': 'running',
-        'projection': {'events': []},
+        'projection': {
+          'players': [
+            {
+              'player_id': 'p3',
+              'display_role': 'seer',
+              'display_team': 'villager',
+              'alive': true,
+              'visibility': 'self',
+            },
+          ],
+          'proof': {
+            'source': 'snapshots',
+            'self_player_id': 'p3',
+            'self_role': 'seer',
+            'self_team': 'villager',
+          },
+          'events': [],
+        },
         'open_action_window': {
           'schema_version': 'p3c.action_window.v1',
           'action_window_id': 'aw_1',
@@ -152,6 +169,123 @@ void main() {
         .getCenter(find.byKey(const Key('room-status-island')))
         .dx;
     expect((islandCenterX - screenCenterX).abs(), lessThanOrEqualTo(2));
+  });
+
+  testWidgets('stub action window without role projection is not actionable', (
+    tester,
+  ) async {
+    final controller = SessionController(participantApi: NeverCalledApi())
+      ..connectionStatus = ConnectionStatus.connected
+      ..state = ParticipantState.fromJson(const {
+        'schema_version': 'p3c.participant_state.v1',
+        'run_id': 'run_1',
+        'seat_id': 'p3',
+        'perspective': 'role:p3',
+        'run_status': 'running',
+        'projection': {
+          'players': [
+            {
+              'player_id': 'p1',
+              'display_role': 'unknown',
+              'display_team': 'unknown',
+              'alive': true,
+              'visibility': 'hidden',
+            },
+            {
+              'player_id': 'p3',
+              'display_role': 'unknown',
+              'display_team': 'unknown',
+              'alive': true,
+              'visibility': 'hidden',
+            },
+          ],
+          'events': [],
+        },
+        'open_action_window': {
+          'schema_version': 'p3c.action_window.v1',
+          'action_window_id': 'aw_stub',
+          'run_id': 'run_1',
+          'seat_id': 'p3',
+          'phase': 'day_speech',
+          'round': 1,
+          'game_revision': 0,
+          'opened_at_event_id': 'event:0',
+          'deadline_at': '2026-07-04T00:00:00Z',
+          'allowed_actions': ['speech', 'pass'],
+          'required': true,
+          'default_on_timeout': 'pass',
+          'status': 'open',
+          'reconnect_cursor': 'event:0',
+        },
+        'reconnect_cursor': 'event:0',
+      });
+
+    await tester.pumpWidget(
+      TestApp(child: LiveRoomScreen(controller: controller)),
+    );
+
+    expect(find.text('房间尚未准备好'), findsOneWidget);
+    expect(find.text('等待你操作'), findsNothing);
+    expect(find.byKey(const Key('composer-text-input')), findsNothing);
+    expect(find.byKey(const Key('composer-collapsed-handle')), findsOneWidget);
+  });
+
+  testWidgets('empty feed placeholder hides while keyboard is open', (
+    tester,
+  ) async {
+    tester.view.viewInsets = const FakeViewPadding(bottom: 320);
+    addTearDown(tester.view.resetViewInsets);
+    final controller = SessionController(participantApi: NeverCalledApi())
+      ..connectionStatus = ConnectionStatus.connected
+      ..state = ParticipantState.fromJson(const {
+        'schema_version': 'p3c.participant_state.v1',
+        'run_id': 'run_1',
+        'seat_id': 'p3',
+        'perspective': 'role:p3',
+        'run_status': 'running',
+        'projection': {
+          'players': [
+            {
+              'player_id': 'p3',
+              'display_role': 'seer',
+              'display_team': 'villager',
+              'alive': true,
+              'visibility': 'self',
+            },
+          ],
+          'proof': {
+            'source': 'snapshots',
+            'self_player_id': 'p3',
+            'self_role': 'seer',
+            'self_team': 'villager',
+          },
+          'events': [],
+        },
+        'open_action_window': {
+          'schema_version': 'p3c.action_window.v1',
+          'action_window_id': 'aw_1',
+          'run_id': 'run_1',
+          'seat_id': 'p3',
+          'phase': 'day_speech',
+          'round': 1,
+          'game_revision': 1,
+          'opened_at_event_id': 'evt_1',
+          'deadline_at': '2026-07-04T00:00:00Z',
+          'allowed_actions': ['speech', 'pass'],
+          'required': true,
+          'default_on_timeout': 'pass',
+          'status': 'open',
+          'reconnect_cursor': 'event:1',
+        },
+        'reconnect_cursor': 'event:1',
+      });
+
+    await tester.pumpWidget(
+      TestApp(child: LiveRoomScreen(controller: controller)),
+    );
+
+    expect(find.byKey(const Key('composer-text-input')), findsOneWidget);
+    expect(find.textContaining('等待可见房间事件'), findsNothing);
   });
 
   testWidgets('live room disables stale action window when session expired', (

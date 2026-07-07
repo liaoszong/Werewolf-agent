@@ -42,6 +42,7 @@ class _HomeShellState extends State<HomeShell> {
   Uri? _loadedBaseUri;
   bool _loadingRuns = false;
   bool _joining = false;
+  bool _startingTestRun = false;
   String? _runsError;
   String? _joinError;
   List<RunSummary> _runs = const [];
@@ -135,17 +136,21 @@ class _HomeShellState extends State<HomeShell> {
       _HomeFlow.dashboard => _HomePage(
         runs: _runs,
         loadingRuns: _loadingRuns,
+        startingTestRun: _startingTestRun,
         runsError: _runsError,
         onChooseMatch: () => setState(() => _homeFlow = _HomeFlow.matchPicker),
         onRefresh: _loadRuns,
+        onStartTestRun: _startTestRun,
       ),
       _HomeFlow.matchPicker => _MatchesPage(
         runs: _runs,
         loadingRuns: _loadingRuns,
         joining: _joining,
+        startingTestRun: _startingTestRun,
         error: _runsError ?? _joinError,
         onBack: () => setState(() => _homeFlow = _HomeFlow.dashboard),
         onRefresh: _loadRuns,
+        onStartTestRun: _startTestRun,
         onJoin: _joinRun,
       ),
       _HomeFlow.liveRoom => _RoomPage(
@@ -207,6 +212,46 @@ class _HomeShellState extends State<HomeShell> {
     });
   }
 
+  Future<void> _startTestRun() async {
+    if (_startingTestRun || _joining) return;
+    setState(() {
+      _startingTestRun = true;
+      _joinError = null;
+      _runsError = null;
+    });
+    try {
+      final observer = widget.observerClientFactory(_settings.baseUri);
+      observer.ownerToken = await widget.providerCredentialStore.readOwnerToken(
+        _settings.baseUri.toString(),
+      );
+      final runId = await observer.createParticipantRun(
+        seatId: _settings.seatId,
+      );
+      if (!mounted) return;
+      setState(() {
+        _startingTestRun = false;
+      });
+      await _loadRuns();
+      if (!mounted) return;
+      await _joinRun(runId);
+    } on ObserverApiError catch (error) {
+      if (!mounted) return;
+      final strings = AppLanguageScope.of(context);
+      setState(() {
+        _startingTestRun = false;
+        _joinError = strings.launchRunFailed(error.code);
+        _homeFlow = _HomeFlow.matchPicker;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _startingTestRun = false;
+        _joinError = error.toString();
+        _homeFlow = _HomeFlow.matchPicker;
+      });
+    }
+  }
+
   void _handleSettingsChanged() {
     if (_loadedBaseUri != _settings.baseUri) {
       _loadRuns();
@@ -220,16 +265,20 @@ class _HomePage extends StatelessWidget {
   const _HomePage({
     required this.runs,
     required this.loadingRuns,
+    required this.startingTestRun,
     required this.runsError,
     required this.onChooseMatch,
     required this.onRefresh,
+    required this.onStartTestRun,
   });
 
   final List<RunSummary> runs;
   final bool loadingRuns;
+  final bool startingTestRun;
   final String? runsError;
   final VoidCallback onChooseMatch;
   final Future<void> Function() onRefresh;
+  final Future<void> Function() onStartTestRun;
 
   @override
   Widget build(BuildContext context) {
@@ -318,6 +367,27 @@ class _HomePage extends StatelessWidget {
                   ),
                 ),
               ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                height: 44,
+                child: OutlinedButton.icon(
+                  onPressed: startingTestRun ? null : onStartTestRun,
+                  icon: const Icon(Icons.add_circle_outline_rounded),
+                  label: Text(
+                    startingTestRun
+                        ? strings.startingTestMatch
+                        : strings.startTestMatch,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                strings.startTestMatchHint,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: palette.textMuted),
+              ),
             ],
           ),
         ),
@@ -331,18 +401,22 @@ class _MatchesPage extends StatelessWidget {
     required this.runs,
     required this.loadingRuns,
     required this.joining,
+    required this.startingTestRun,
     required this.error,
     required this.onBack,
     required this.onRefresh,
+    required this.onStartTestRun,
     required this.onJoin,
   });
 
   final List<RunSummary> runs;
   final bool loadingRuns;
   final bool joining;
+  final bool startingTestRun;
   final String? error;
   final VoidCallback onBack;
   final Future<void> Function() onRefresh;
+  final Future<void> Function() onStartTestRun;
   final ValueChanged<String> onJoin;
 
   @override
@@ -379,6 +453,27 @@ class _MatchesPage extends StatelessWidget {
           const SizedBox(height: 12),
           Text(error!, style: TextStyle(color: palette.danger)),
         ],
+        const SizedBox(height: 16),
+        SizedBox(
+          width: double.infinity,
+          height: 46,
+          child: FilledButton.icon(
+            onPressed: startingTestRun ? null : onStartTestRun,
+            icon: const Icon(Icons.add_circle_outline_rounded),
+            label: Text(
+              startingTestRun
+                  ? strings.startingTestMatch
+                  : strings.startTestMatch,
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          strings.startTestMatchHint,
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: palette.textMuted),
+        ),
         const SizedBox(height: 16),
         if (loadingRuns)
           const Center(child: CircularProgressIndicator())

@@ -29,11 +29,15 @@ class _LiveRoomScreenState extends State<LiveRoomScreen> {
     return AnimatedBuilder(
       animation: widget.controller,
       builder: (context, _) {
+        final state = widget.controller.state;
+        final roomReady = _roomReadyForAction(state);
+        final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
         final activeWindow =
-            widget.controller.connectionStatus == ConnectionStatus.connected
-            ? widget.controller.state?.openActionWindow
+            widget.controller.connectionStatus == ConnectionStatus.connected &&
+                roomReady
+            ? state?.openActionWindow
             : null;
-        _scheduleRoleNotice(context, widget.controller.state);
+        _scheduleRoleNotice(context, roomReady ? state : null);
         return Scaffold(
           body: SafeArea(
             child: Column(
@@ -41,28 +45,30 @@ class _LiveRoomScreenState extends State<LiveRoomScreen> {
                 if (widget.onBack != null)
                   _LiveRoomHeader(
                     connectionStatus: widget.controller.connectionStatus,
-                    state: widget.controller.state,
+                    state: state,
+                    canAct: activeWindow != null,
                     onBack: widget.onBack!,
                   )
                 else
                   RoleSafeStatusBar(
                     connectionStatus: widget.controller.connectionStatus,
-                    state: widget.controller.state,
+                    state: state,
+                    canAct: activeWindow != null,
                   ),
-                if (widget.controller.state case final state?)
-                  _RoomInfoPanels(state: state),
+                if (state != null) _RoomInfoPanels(state: state),
                 Expanded(
                   child: SpeechFeed(
-                    events: widget.controller.state?.visibleEvents ?? const [],
-                    currentSeatId: widget.controller.state?.seatId,
+                    events: state?.visibleEvents ?? const [],
+                    currentSeatId: state?.seatId,
+                    roomReady: state == null || roomReady,
+                    hideEmptyState: keyboardOpen,
                   ),
                 ),
                 ComposerRail(
                   window: activeWindow,
                   targetCandidateSeatIds: activeWindow == null
                       ? const []
-                      : widget.controller.state?.targetCandidateSeatIds ??
-                            const [],
+                      : state?.targetCandidateSeatIds ?? const [],
                   errorMessage: widget.controller.lastError,
                   isSubmitting: widget.controller.isSubmittingAction,
                   onSubmitSpeech: widget.controller.submitSpeech,
@@ -79,6 +85,14 @@ class _LiveRoomScreenState extends State<LiveRoomScreen> {
         );
       },
     );
+  }
+
+  bool _roomReadyForAction(ParticipantState? state) {
+    if (state == null) return false;
+    final projection = state.projectionEnvelope;
+    return projection.selfRole != 'unknown' ||
+        projection.selfTeam != 'unknown' ||
+        projection.selfPlayer?.visibility == 'self';
   }
 
   void _scheduleRoleNotice(BuildContext context, ParticipantState? state) {
@@ -637,11 +651,13 @@ class _LiveRoomHeader extends StatelessWidget {
   const _LiveRoomHeader({
     required this.connectionStatus,
     required this.state,
+    required this.canAct,
     required this.onBack,
   });
 
   final ConnectionStatus connectionStatus;
   final ParticipantState? state;
+  final bool canAct;
   final VoidCallback onBack;
 
   @override
@@ -657,6 +673,7 @@ class _LiveRoomHeader extends StatelessWidget {
               child: RoleSafeStatusBar(
                 connectionStatus: connectionStatus,
                 state: state,
+                canAct: canAct,
               ),
             ),
             Align(
