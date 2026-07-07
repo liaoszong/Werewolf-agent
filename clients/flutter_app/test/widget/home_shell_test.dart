@@ -7,15 +7,66 @@ import 'package:werewolf_app/src/app/werewolf_app.dart';
 import 'package:werewolf_app/src/protocol/observer_api_client.dart';
 import 'package:werewolf_app/src/protocol/participant_api_client.dart';
 import 'package:werewolf_app/src/protocol/participant_models.dart';
+import 'package:werewolf_app/src/providers/provider_credential_store.dart';
 
 class FakeObserverApiClient extends ObserverApiClient {
-  FakeObserverApiClient({this.runs = const []})
-    : super(baseUri: Uri.parse('http://127.0.0.1:8765'));
+  FakeObserverApiClient({
+    this.runs = const [],
+    this.providerSpecs = _defaultProviderSpecs,
+    this.providerModels = const ['deepseek-chat', 'deepseek-v4-flash'],
+  }) : super(baseUri: Uri.parse('http://127.0.0.1:8765'));
 
   final List<RunSummary> runs;
+  final List<ProviderSpecSummary> providerSpecs;
+  final List<String> providerModels;
+  String? savedProvider;
+  String? savedApiKey;
+  String? savedBaseUrl;
+  String? clearedProvider;
+
+  static const _defaultProviderSpecs = [
+    ProviderSpecSummary(
+      id: 'deepseek',
+      label: 'DeepSeek',
+      defaultBaseUrl: 'https://api.deepseek.com',
+      requiresBaseUrl: false,
+      defaultModels: ['deepseek-chat'],
+    ),
+    ProviderSpecSummary(
+      id: 'openai_compatible',
+      label: 'OpenAI Compatible',
+      defaultBaseUrl: '',
+      requiresBaseUrl: true,
+      defaultModels: [],
+    ),
+  ];
 
   @override
   Future<List<RunSummary>> listRuns() async => runs;
+
+  @override
+  Future<List<ProviderSpecSummary>> listProviderSpecs() async => providerSpecs;
+
+  @override
+  Future<void> saveProviderCredential({
+    required String provider,
+    required String apiKey,
+    String baseUrl = '',
+  }) async {
+    savedProvider = provider;
+    savedApiKey = apiKey;
+    savedBaseUrl = baseUrl;
+  }
+
+  @override
+  Future<List<String>> fetchProviderModels(String provider) async {
+    return providerModels;
+  }
+
+  @override
+  Future<void> clearProviderCredential(String provider) async {
+    clearedProvider = provider;
+  }
 }
 
 class FakeParticipantApiClient extends ParticipantApiClient {
@@ -96,6 +147,7 @@ void main() {
         observerClientFactory: (_) => FakeObserverApiClient(),
         sessionControllerFactory: (_) =>
             SessionController(participantApi: FakeParticipantApiClient()),
+        providerCredentialStore: MemoryProviderCredentialStore(),
       ),
     );
     await tester.pumpAndSettle();
@@ -119,6 +171,7 @@ void main() {
           observerClientFactory: (_) => FakeObserverApiClient(),
           sessionControllerFactory: (_) =>
               SessionController(participantApi: FakeParticipantApiClient()),
+          providerCredentialStore: MemoryProviderCredentialStore(),
         ),
       );
       await tester.pumpAndSettle();
@@ -149,6 +202,7 @@ void main() {
         observerClientFactory: (_) => FakeObserverApiClient(),
         sessionControllerFactory: (_) =>
             SessionController(participantApi: FakeParticipantApiClient()),
+        providerCredentialStore: MemoryProviderCredentialStore(),
       ),
     );
     await tester.pumpAndSettle();
@@ -170,6 +224,7 @@ void main() {
         observerClientFactory: (_) => FakeObserverApiClient(),
         sessionControllerFactory: (_) =>
             SessionController(participantApi: FakeParticipantApiClient()),
+        providerCredentialStore: MemoryProviderCredentialStore(),
       ),
     );
     await tester.pumpAndSettle();
@@ -190,6 +245,59 @@ void main() {
     expect(find.text('http://127.0.0.1:8765'), findsOneWidget);
   });
 
+  testWidgets('provider settings save key, sync, and fetch models', (
+    tester,
+  ) async {
+    final observer = FakeObserverApiClient();
+    final store = MemoryProviderCredentialStore();
+    await tester.pumpWidget(
+      WerewolfApp(
+        observerClientFactory: (_) => observer,
+        sessionControllerFactory: (_) =>
+            SessionController(participantApi: FakeParticipantApiClient()),
+        providerCredentialStore: store,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('设置'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('provider-api-key-field')),
+      500,
+      scrollable: find.byWidgetPredicate(
+        (widget) =>
+            widget is Scrollable && widget.axisDirection == AxisDirection.down,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('provider-api-key-field')),
+      'sk-mobile-secret',
+    );
+    await tester.tap(find.byKey(const Key('provider-sync-button')));
+    await tester.pumpAndSettle();
+
+    expect(observer.savedProvider, 'deepseek');
+    expect(observer.savedApiKey, 'sk-mobile-secret');
+    expect(await store.readApiKey('deepseek'), 'sk-mobile-secret');
+    expect(find.text('sk-mobile-secret'), findsNothing);
+    expect(find.text('已同步到当前 observer server'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('provider-models-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('已拉取 2 个模型'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('provider-clear-button')));
+    await tester.pumpAndSettle();
+
+    expect(observer.clearedProvider, 'deepseek');
+    expect(await store.readApiKey('deepseek'), isNull);
+    expect(find.text('已清除本机 key'), findsOneWidget);
+  });
+
   testWidgets('home choose match flow lists observer runs and can join one', (
     tester,
   ) async {
@@ -201,6 +309,7 @@ void main() {
         ),
         sessionControllerFactory: (_) =>
             SessionController(participantApi: participant),
+        providerCredentialStore: MemoryProviderCredentialStore(),
       ),
     );
     await tester.pump();
@@ -262,6 +371,7 @@ void main() {
         ),
         sessionControllerFactory: (_) =>
             SessionController(participantApi: participant),
+        providerCredentialStore: MemoryProviderCredentialStore(),
       ),
     );
     await tester.pump();
@@ -294,6 +404,7 @@ void main() {
         observerClientFactory: (_) => FakeObserverApiClient(),
         sessionControllerFactory: (_) =>
             SessionController(participantApi: FakeParticipantApiClient()),
+        providerCredentialStore: MemoryProviderCredentialStore(),
       ),
     );
     await tester.pumpAndSettle();
@@ -339,6 +450,7 @@ void main() {
         observerClientFactory: (_) => FakeObserverApiClient(),
         sessionControllerFactory: (_) =>
             SessionController(participantApi: FakeParticipantApiClient()),
+        providerCredentialStore: MemoryProviderCredentialStore(),
       ),
     );
     await tester.pumpAndSettle();
@@ -386,6 +498,7 @@ void main() {
         ),
         sessionControllerFactory: (_) =>
             SessionController(participantApi: FakeParticipantApiClient()),
+        providerCredentialStore: MemoryProviderCredentialStore(),
       ),
     );
     await tester.pump();

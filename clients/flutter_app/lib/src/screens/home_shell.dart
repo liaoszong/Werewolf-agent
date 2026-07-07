@@ -5,6 +5,7 @@ import '../app/app_strings.dart';
 import '../app/build_info.dart';
 import '../app/session_controller.dart';
 import '../protocol/observer_api_client.dart';
+import '../providers/provider_credential_store.dart';
 import '../ui/app_theme.dart';
 import '../update/update_models.dart';
 import '../update/update_repository.dart';
@@ -22,12 +23,14 @@ class HomeShell extends StatefulWidget {
     required this.updateRepository,
     required this.observerClientFactory,
     required this.sessionControllerFactory,
+    required this.providerCredentialStore,
   });
 
   final AppSettingsController settingsController;
   final UpdateRepository updateRepository;
   final ObserverClientFactory observerClientFactory;
   final SessionControllerFactory sessionControllerFactory;
+  final ProviderCredentialStore providerCredentialStore;
 
   @override
   State<HomeShell> createState() => _HomeShellState();
@@ -81,6 +84,8 @@ class _HomeShellState extends State<HomeShell> {
             _SettingsPage(
               settingsController: _settings,
               updateRepository: widget.updateRepository,
+              observerClientFactory: widget.observerClientFactory,
+              providerCredentialStore: widget.providerCredentialStore,
             ),
           ],
         ),
@@ -2104,10 +2109,14 @@ class _SettingsPage extends StatefulWidget {
   const _SettingsPage({
     required this.settingsController,
     required this.updateRepository,
+    required this.observerClientFactory,
+    required this.providerCredentialStore,
   });
 
   final AppSettingsController settingsController;
   final UpdateRepository updateRepository;
+  final ObserverClientFactory observerClientFactory;
+  final ProviderCredentialStore providerCredentialStore;
 
   @override
   State<_SettingsPage> createState() => _SettingsPageState();
@@ -2117,10 +2126,22 @@ class _SettingsPageState extends State<_SettingsPage> {
   late final TextEditingController _baseUrl;
   late final TextEditingController _seatId;
   late final TextEditingController _joinCode;
+  late final TextEditingController _providerApiKey;
+  late final TextEditingController _providerBaseUrl;
   String? _error;
+  String _selectedProvider = 'deepseek';
+  String? _selectedModel;
+  List<ProviderSpecSummary> _providerSpecs = const [];
+  List<String> _providerModels = const [];
+  bool _providerLoading = false;
+  bool _providerBusy = false;
+  bool _providerHasKey = false;
+  String? _providerMessage;
+  String? _providerError;
 
   AppSettingsController get _settings => widget.settingsController;
   UpdateRepository get _updates => widget.updateRepository;
+  ProviderCredentialStore get _providerStore => widget.providerCredentialStore;
 
   @override
   void initState() {
@@ -2128,7 +2149,10 @@ class _SettingsPageState extends State<_SettingsPage> {
     _baseUrl = TextEditingController(text: _settings.baseUri.toString());
     _seatId = TextEditingController(text: _settings.seatId);
     _joinCode = TextEditingController(text: _settings.joinCode);
+    _providerApiKey = TextEditingController();
+    _providerBaseUrl = TextEditingController();
     _updates.addListener(_handleUpdateChanged);
+    _loadProviderSettings();
   }
 
   @override
@@ -2137,6 +2161,8 @@ class _SettingsPageState extends State<_SettingsPage> {
     _baseUrl.dispose();
     _seatId.dispose();
     _joinCode.dispose();
+    _providerApiKey.dispose();
+    _providerBaseUrl.dispose();
     super.dispose();
   }
 
@@ -2145,6 +2171,7 @@ class _SettingsPageState extends State<_SettingsPage> {
     final strings = AppLanguageScope.of(context);
     final palette = WerewolfAppTheme.colors(context);
     return ListView(
+      key: const Key('settings-scroll-view'),
       padding: const EdgeInsets.fromLTRB(20, 22, 20, 24),
       children: [
         Text(
@@ -2333,6 +2360,13 @@ class _SettingsPageState extends State<_SettingsPage> {
 
   Widget _buildProviderPanel(BuildContext context, AppStrings strings) {
     final palette = WerewolfAppTheme.colors(context);
+    final spec = _selectedProviderSpec;
+    final models = _providerModels.isNotEmpty
+        ? _providerModels
+        : spec.defaultModels;
+    final modelValue = _selectedModel != null && models.contains(_selectedModel)
+        ? _selectedModel
+        : (models.isNotEmpty ? models.first : null);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -2347,8 +2381,10 @@ class _SettingsPageState extends State<_SettingsPage> {
               ),
             ),
             _RoleBadge(
-              label: strings.providerSettingsPending,
-              color: palette.textMuted,
+              label: _providerHasKey
+                  ? strings.providerSettingsStored
+                  : strings.providerSettingsNotStored,
+              color: _providerHasKey ? palette.accent : palette.textMuted,
             ),
           ],
         ),
@@ -2357,8 +2393,352 @@ class _SettingsPageState extends State<_SettingsPage> {
           strings.providerSettingsBody,
           style: Theme.of(context).textTheme.bodySmall,
         ),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<String>(
+          key: Key('provider-select-$_selectedProvider'),
+          initialValue: _selectedProvider,
+          decoration: InputDecoration(labelText: strings.provider),
+          items: [
+            for (final provider in _providerSpecs)
+              DropdownMenuItem(value: provider.id, child: Text(provider.label)),
+          ],
+          onChanged: _providerBusy || _providerLoading
+              ? null
+              : (value) {
+                  if (value != null) {
+                    _selectProvider(value);
+                  }
+                },
+        ),
+        const SizedBox(height: 10),
+        TextField(
+          key: const Key('provider-base-url-field'),
+          controller: _providerBaseUrl,
+          keyboardType: TextInputType.url,
+          decoration: InputDecoration(labelText: strings.providerBaseUrl),
+        ),
+        const SizedBox(height: 10),
+        TextField(
+          key: const Key('provider-api-key-field'),
+          controller: _providerApiKey,
+          obscureText: true,
+          enableSuggestions: false,
+          autocorrect: false,
+          decoration: InputDecoration(
+            labelText: strings.providerApiKey,
+            helperText: _providerHasKey ? strings.providerApiKeyStored : null,
+          ),
+        ),
+        const SizedBox(height: 10),
+        DropdownButtonFormField<String>(
+          key: Key(
+            'provider-model-select-$_selectedProvider-${modelValue ?? 'none'}',
+          ),
+          initialValue: modelValue,
+          decoration: InputDecoration(labelText: strings.providerModel),
+          items: [
+            for (final model in models)
+              DropdownMenuItem(value: model, child: Text(model)),
+          ],
+          onChanged: models.isEmpty || _providerBusy
+              ? null
+              : (value) {
+                  if (value == null) return;
+                  setState(() => _selectedModel = value);
+                  _providerStore.writeSelectedModel(_selectedProvider, value);
+                },
+        ),
+        if (_providerError != null) ...[
+          const SizedBox(height: 10),
+          Text(_providerError!, style: TextStyle(color: palette.danger)),
+        ],
+        if (_providerMessage != null) ...[
+          const SizedBox(height: 10),
+          Text(
+            _providerMessage!,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: palette.textMuted),
+          ),
+        ],
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: FilledButton.icon(
+                key: const Key('provider-sync-button'),
+                onPressed: _providerBusy ? null : _syncProviderCredential,
+                icon: const Icon(Icons.lock_rounded),
+                label: Text(strings.syncProviderCredential),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: OutlinedButton.icon(
+                key: const Key('provider-models-button'),
+                onPressed: _providerBusy ? null : _fetchProviderModels,
+                icon: const Icon(Icons.cloud_sync_rounded),
+                label: Text(strings.fetchProviderModels),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            key: const Key('provider-clear-button'),
+            onPressed: _providerBusy || !_providerHasKey
+                ? null
+                : _clearProviderCredential,
+            icon: const Icon(Icons.delete_outline_rounded),
+            label: Text(strings.clearProviderCredential),
+          ),
+        ),
       ],
     );
+  }
+
+  static const List<ProviderSpecSummary> _fallbackProviderSpecs = [
+    ProviderSpecSummary(
+      id: 'deepseek',
+      label: 'DeepSeek',
+      defaultBaseUrl: 'https://api.deepseek.com',
+      requiresBaseUrl: false,
+      defaultModels: ['deepseek-chat', 'deepseek-reasoner'],
+    ),
+    ProviderSpecSummary(
+      id: 'openai',
+      label: 'OpenAI',
+      defaultBaseUrl: 'https://api.openai.com/v1',
+      requiresBaseUrl: false,
+      defaultModels: ['gpt-4o', 'gpt-4o-mini'],
+    ),
+    ProviderSpecSummary(
+      id: 'anthropic',
+      label: 'Anthropic',
+      defaultBaseUrl: 'https://api.anthropic.com',
+      requiresBaseUrl: false,
+      defaultModels: ['claude-sonnet-4-6', 'claude-haiku-4-5-20251001'],
+    ),
+    ProviderSpecSummary(
+      id: 'openai_compatible',
+      label: 'OpenAI Compatible',
+      defaultBaseUrl: '',
+      requiresBaseUrl: true,
+      defaultModels: [],
+    ),
+  ];
+
+  ProviderSpecSummary get _selectedProviderSpec {
+    final specs = _providerSpecs.isEmpty
+        ? _fallbackProviderSpecs
+        : _providerSpecs;
+    return specs.firstWhere(
+      (spec) => spec.id == _selectedProvider,
+      orElse: () => specs.first,
+    );
+  }
+
+  Future<void> _loadProviderSettings() async {
+    setState(() {
+      _providerLoading = true;
+      _providerError = null;
+    });
+    var specs = _fallbackProviderSpecs;
+    try {
+      final liveSpecs = await widget
+          .observerClientFactory(_settings.baseUri)
+          .listProviderSpecs();
+      if (liveSpecs.isNotEmpty) {
+        specs = liveSpecs;
+      }
+    } catch (_) {
+      // Keep the local fallback list. The next sync/fetch surfaces live errors.
+    }
+    final active = await _providerStore.readActiveProvider();
+    final selected = specs.any((spec) => spec.id == active)
+        ? active
+        : specs.first.id;
+    final local = await _providerStore.read(selected);
+    if (!mounted) return;
+    setState(() {
+      _providerSpecs = specs;
+      _selectedProvider = selected;
+      _providerHasKey = local.hasApiKey;
+      _providerBaseUrl.text = local.baseUrl.isNotEmpty
+          ? local.baseUrl
+          : _selectedProviderSpec.defaultBaseUrl;
+      _providerModels = _selectedProviderSpec.defaultModels;
+      _selectedModel = local.selectedModel.isNotEmpty
+          ? local.selectedModel
+          : (_providerModels.isNotEmpty ? _providerModels.first : null);
+      _providerLoading = false;
+    });
+  }
+
+  Future<void> _selectProvider(String provider) async {
+    await _providerStore.writeActiveProvider(provider);
+    final local = await _providerStore.read(provider);
+    if (!mounted) return;
+    setState(() {
+      _selectedProvider = provider;
+      _providerHasKey = local.hasApiKey;
+      _providerError = null;
+      _providerMessage = null;
+      _providerApiKey.clear();
+      _providerBaseUrl.text = local.baseUrl.isNotEmpty
+          ? local.baseUrl
+          : _selectedProviderSpec.defaultBaseUrl;
+      _providerModels = _selectedProviderSpec.defaultModels;
+      _selectedModel = local.selectedModel.isNotEmpty
+          ? local.selectedModel
+          : (_providerModels.isNotEmpty ? _providerModels.first : null);
+    });
+  }
+
+  Future<bool> _syncProviderCredential() async {
+    final strings = AppLanguageScope.of(context);
+    final spec = _selectedProviderSpec;
+    final baseUrl = _providerBaseUrl.text.trim();
+    if (spec.requiresBaseUrl && baseUrl.isEmpty) {
+      setState(() => _providerError = strings.providerMissingBaseUrl);
+      return false;
+    }
+    setState(() {
+      _providerBusy = true;
+      _providerError = null;
+      _providerMessage = null;
+    });
+    try {
+      final enteredKey = _providerApiKey.text.trim();
+      final apiKey = enteredKey.isNotEmpty
+          ? enteredKey
+          : await _providerStore.readApiKey(_selectedProvider);
+      if (apiKey == null || apiKey.isEmpty) {
+        setState(() {
+          _providerBusy = false;
+          _providerError = strings.providerMissingApiKey;
+        });
+        return false;
+      }
+      await _providerStore.writeActiveProvider(_selectedProvider);
+      await _providerStore.writeBaseUrl(_selectedProvider, baseUrl);
+      if (_selectedModel != null) {
+        await _providerStore.writeSelectedModel(
+          _selectedProvider,
+          _selectedModel!,
+        );
+      }
+      if (enteredKey.isNotEmpty) {
+        await _providerStore.writeApiKey(_selectedProvider, enteredKey);
+      }
+      await widget
+          .observerClientFactory(_settings.baseUri)
+          .saveProviderCredential(
+            provider: _selectedProvider,
+            apiKey: apiKey,
+            baseUrl: baseUrl,
+          );
+      if (!mounted) return true;
+      setState(() {
+        _providerBusy = false;
+        _providerHasKey = true;
+        _providerApiKey.clear();
+        _providerMessage = strings.providerCredentialSynced;
+      });
+      return true;
+    } on ObserverApiError catch (error) {
+      if (!mounted) return false;
+      setState(() {
+        _providerBusy = false;
+        _providerError = strings.providerOperationFailed(error.code);
+      });
+      return false;
+    } catch (_) {
+      if (!mounted) return false;
+      setState(() {
+        _providerBusy = false;
+        _providerError = strings.providerOperationFailed('unreachable');
+      });
+      return false;
+    }
+  }
+
+  Future<void> _fetchProviderModels() async {
+    final strings = AppLanguageScope.of(context);
+    final synced = await _syncProviderCredential();
+    if (!synced || !mounted) return;
+    setState(() {
+      _providerBusy = true;
+      _providerError = null;
+    });
+    try {
+      final models = await widget
+          .observerClientFactory(_settings.baseUri)
+          .fetchProviderModels(_selectedProvider);
+      final selected = models.contains(_selectedModel)
+          ? _selectedModel
+          : (models.isNotEmpty ? models.first : null);
+      if (selected != null) {
+        await _providerStore.writeSelectedModel(_selectedProvider, selected);
+      }
+      if (!mounted) return;
+      setState(() {
+        _providerBusy = false;
+        _providerModels = models;
+        _selectedModel = selected;
+        _providerMessage = strings.providerModelsLoaded(models.length);
+      });
+    } on ObserverApiError catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _providerBusy = false;
+        _providerError = strings.providerOperationFailed(error.code);
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _providerBusy = false;
+        _providerError = strings.providerOperationFailed('unreachable');
+      });
+    }
+  }
+
+  Future<void> _clearProviderCredential() async {
+    final strings = AppLanguageScope.of(context);
+    setState(() {
+      _providerBusy = true;
+      _providerError = null;
+      _providerMessage = null;
+    });
+    await _providerStore.deleteApiKey(_selectedProvider);
+    try {
+      await widget
+          .observerClientFactory(_settings.baseUri)
+          .clearProviderCredential(_selectedProvider);
+      if (!mounted) return;
+      setState(() {
+        _providerBusy = false;
+        _providerHasKey = false;
+        _providerApiKey.clear();
+        _providerMessage = strings.providerCredentialCleared;
+      });
+    } on ObserverApiError catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _providerBusy = false;
+        _providerHasKey = false;
+        _providerError = strings.providerOperationFailed(error.code);
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _providerBusy = false;
+        _providerHasKey = false;
+        _providerError = strings.providerOperationFailed('unreachable');
+      });
+    }
   }
 
   void _save() {

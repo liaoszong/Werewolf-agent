@@ -38,6 +38,15 @@ class ProviderModelsEndpointTests(unittest.TestCase):
         self.assertEqual(payload["provider"], "deepseek")
         self.assertEqual(payload["models"], ["deepseek-v4-flash", "deepseek-v4-pro"])
 
+    def test_deepseek_anthropic_base_still_uses_root_models_url(self) -> None:
+        cs = CredentialStore()
+        cs.set("deepseek", "sk-secret-models", "https://api.deepseek.com/anthropic")
+        status, payload = _provider_models_result(cs, "deepseek", transport=_ok_models_transport)
+        self.assertEqual(status, 200)
+        seen = _ok_models_transport.seen  # type: ignore[attr-defined]
+        self.assertEqual(seen["url"], "https://api.deepseek.com/models")
+        self.assertNotIn("sk-secret-models", str(payload))
+
     def test_uses_stored_base_url_and_auth_without_echoing_key(self) -> None:
         cs = CredentialStore()
         cs.set("openai_compatible", "sk-secret-models", "https://my.proxy/v1")

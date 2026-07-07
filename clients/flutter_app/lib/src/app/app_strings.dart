@@ -131,10 +131,26 @@ class AppStrings {
   String get downloadInstall => _t('下载并安装', 'Download & Install');
   String get providerSettings => _t('供应商', 'Providers');
   String get providerSettingsBody => _t(
-    '后续迁移桌面客户端的 BYO-key、Base URL、模型和启用状态。当前移动端先不保存密钥。',
-    'Next we will migrate the desktop client provider settings: BYO key, base URL, model, and enabled state. The mobile app does not store secrets yet.',
+    'API key 保存在本机安全存储，只同步到当前 observer server。',
+    'API keys stay in secure local storage and sync only to the current observer server.',
   );
-  String get providerSettingsPending => _t('待接入', 'Pending');
+  String get providerSettingsStored => _t('已本地保存', 'Stored');
+  String get providerSettingsNotStored => _t('未保存', 'Not stored');
+  String get provider => _t('供应商', 'Provider');
+  String get providerBaseUrl => _t('Provider Base URL', 'Provider Base URL');
+  String get providerApiKey => _t('API key', 'API key');
+  String get providerApiKeyStored =>
+      _t('已保存；留空会继续使用本机已保存 key', 'Saved; leave blank to reuse the local key');
+  String get providerModel => _t('模型', 'Model');
+  String get syncProviderCredential => _t('保存并同步', 'Save & Sync');
+  String get fetchProviderModels => _t('拉取模型', 'Fetch Models');
+  String get clearProviderCredential => _t('清除本机 key', 'Clear local key');
+  String get providerMissingApiKey => _t('请输入 API key', 'Enter an API key');
+  String get providerMissingBaseUrl =>
+      _t('这个供应商需要 Base URL', 'This provider requires a Base URL');
+  String get providerCredentialSynced =>
+      _t('已同步到当前 observer server', 'Synced to the current observer server');
+  String get providerCredentialCleared => _t('已清除本机 key', 'Local key cleared');
   String get phoneLanHint => _t(
     '默认连接 PaleInk 云服务器；本机开发时，Android 真机不能使用 127.0.0.1，需要电脑局域网地址。',
     'Defaults to PaleInk Cloud. For local development on Android, use the computer LAN address instead of 127.0.0.1.',
@@ -344,6 +360,18 @@ class AppStrings {
       ObserverServerPreset.paleInkCloud => _t('PaleInk 云服务器', 'PaleInk Cloud'),
       ObserverServerPreset.localDev => _t('本机开发', 'Local Dev'),
     };
+  }
+
+  String providerModelsLoaded(int count) {
+    return appLanguage == AppLanguage.zh
+        ? '已拉取 $count 个模型'
+        : 'Fetched $count models';
+  }
+
+  String providerOperationFailed(String code) {
+    return appLanguage == AppLanguage.zh
+        ? '供应商操作失败：$code'
+        : 'Provider operation failed: $code';
   }
 
   String _t(String zh, String en) => appLanguage == AppLanguage.zh ? zh : en;

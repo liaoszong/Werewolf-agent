@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../protocol/observer_api_client.dart';
 import '../protocol/participant_api_client.dart';
+import '../providers/provider_credential_store.dart';
 import '../screens/home_shell.dart';
 import '../ui/app_theme.dart';
 import '../update/update_android.dart';
@@ -20,12 +21,14 @@ class WerewolfApp extends StatefulWidget {
     this.updateRepository,
     this.observerClientFactory,
     this.sessionControllerFactory,
+    this.providerCredentialStore,
   });
 
   final AppSettingsController? settingsController;
   final UpdateRepository? updateRepository;
   final ObserverClientFactory? observerClientFactory;
   final SessionControllerFactory? sessionControllerFactory;
+  final ProviderCredentialStore? providerCredentialStore;
 
   @override
   State<WerewolfApp> createState() => _WerewolfAppState();
@@ -34,12 +37,15 @@ class WerewolfApp extends StatefulWidget {
 class _WerewolfAppState extends State<WerewolfApp> {
   late final AppSettingsController _settingsController;
   late final UpdateRepository _updateRepository;
+  late final ProviderCredentialStore _providerCredentialStore;
 
   @override
   void initState() {
     super.initState();
     _settingsController = widget.settingsController ?? AppSettingsController();
     _updateRepository = widget.updateRepository ?? _defaultUpdateRepository();
+    _providerCredentialStore =
+        widget.providerCredentialStore ?? SecureProviderCredentialStore();
   }
 
   @override
@@ -73,6 +79,7 @@ class _WerewolfAppState extends State<WerewolfApp> {
               sessionControllerFactory:
                   widget.sessionControllerFactory ??
                   _defaultSessionControllerFactory,
+              providerCredentialStore: _providerCredentialStore,
             ),
           ),
         );

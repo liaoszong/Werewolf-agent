@@ -119,6 +119,7 @@ class ProviderRegistryTests(unittest.TestCase):
         self.assertIs(ds.provider_cls, DeepSeekProvider)
         self.assertEqual(ds.default_base_url, "https://api.deepseek.com")
         self.assertEqual(ds.models_path, "/models")
+        self.assertEqual(ds.models_url, "https://api.deepseek.com/models")
         self.assertEqual(ds.source_label, DEEPSEEK_PROVIDER_SOURCE_LABEL)
         self.assertFalse(ds.requires_base_url)
 
@@ -159,6 +160,14 @@ class ProviderRegistryTests(unittest.TestCase):
     def test_model_list_url_uses_default_base_when_blank(self) -> None:
         self.assertEqual(
             model_list_url("deepseek", ""),
+            "https://api.deepseek.com/models",
+        )
+
+    def test_deepseek_models_url_ignores_anthropic_base_path(self) -> None:
+        # cc-switch b3e5e32 marks DeepSeek's Claude-compatible endpoint as
+        # /anthropic while keeping model discovery at the API root.
+        self.assertEqual(
+            model_list_url("deepseek", "https://api.deepseek.com/anthropic"),
             "https://api.deepseek.com/models",
         )
 
@@ -293,8 +302,8 @@ class ProviderRegistryTests(unittest.TestCase):
             set(moon),
             {
                 "id", "label", "default_base_url", "models_path",
-                "requires_base_url", "default_models", "wire_protocol",
-                "capabilities", "default_timeout_seconds",
+                "models_url", "requires_base_url", "default_models",
+                "wire_protocol", "capabilities", "default_timeout_seconds",
             },
         )
         self.assertEqual(moon["label"], "Moonshot Kimi")

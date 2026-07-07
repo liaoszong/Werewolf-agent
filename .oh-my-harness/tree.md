@@ -3,7 +3,7 @@
 Use this file for navigation only. Verify implementation details by reading source files directly.
 
 - Source: `git ls-files --cached --others --exclude-standard`
-- Entries: 719
+- Entries: 721
 
 ```text
 ./
@@ -167,6 +167,8 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   │   │   │   ├── observer_api_client.dart
 │   │   │   │   │   ├── participant_api_client.dart
 │   │   │   │   │   └── participant_models.dart
+│   │   │   │   ├── providers/
+│   │   │   │   │   └── provider_credential_store.dart
 │   │   │   │   ├── screens/
 │   │   │   │   │   ├── connect_screen.dart
 │   │   │   │   │   ├── home_shell.dart
@@ -245,6 +247,7 @@ Use this file for navigation only. Verify implementation details by reading sour
 │   │   │   │   ├── android_manifest_test.dart
 │   │   │   │   └── android_release_config_test.dart
 │   │   │   ├── protocol/
+│   │   │   │   ├── observer_api_client_test.dart
 │   │   │   │   ├── participant_api_client_test.dart
 │   │   │   │   └── participant_models_test.dart
 │   │   │   ├── ui/

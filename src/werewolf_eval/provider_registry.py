@@ -68,6 +68,9 @@ class ProviderSpec:
     default_base_url: str
     models_path: str
     source_label: str
+    # Optional exact model-list URL for vendors whose chat/messages base URL
+    # lives under a compatibility subpath while /models remains at the root.
+    models_url: str | None = None
     requires_base_url: bool = False
     # Offline UI fallback model ids (live fetch overrides). NOT a validation
     # allowlist — live providers trust the fetched/typed model id.
@@ -112,6 +115,7 @@ PROVIDER_REGISTRY: dict[str, ProviderSpec] = {
         provider_cls=DeepSeekProvider,
         default_base_url="https://api.deepseek.com",
         models_path="/models",
+        models_url="https://api.deepseek.com/models",
         source_label=DEEPSEEK_PROVIDER_SOURCE_LABEL,
         # Offline UI fallback so a deepseek seat has a VALID model before a live
         # fetch (these are DeepSeek's real chat models).
@@ -327,6 +331,8 @@ def model_list_url(provider_id: str, base_url: str) -> str:
     """The GET URL for a provider's model list. Empty ``base_url`` falls back to the
     spec default (custom providers have no default and must supply one)."""
     spec = PROVIDER_REGISTRY[provider_id]
+    if spec.models_url:
+        return spec.models_url
     return f"{_effective_base_url(spec, base_url)}{spec.models_path}"
 
 
@@ -401,6 +407,7 @@ def provider_specs_payload() -> list[dict[str, object]]:
             "label": spec.label,
             "default_base_url": spec.default_base_url,
             "models_path": spec.models_path,
+            "models_url": spec.models_url,
             "requires_base_url": spec.requires_base_url,
             "default_models": list(spec.default_models),
             "wire_protocol": spec.wire_protocol,
