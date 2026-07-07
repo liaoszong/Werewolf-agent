@@ -2,14 +2,14 @@
   "schemaVersion": 1,
   "channel": "internal",
   "applicationId": "io.werewolfagent.werewolf_app.internal",
-  "versionName": "0.2.1-internal.7",
-  "versionCode": 217,
-  "releaseTag": "v0.2.1-internal.7+217",
-  "gitCommit": "95723a8e99e1db3163148d5f9a14014baa07e5bc",
+  "versionName": "0.2.1-internal.8",
+  "versionCode": 218,
+  "releaseTag": "v0.2.1-internal.8+218",
+  "gitCommit": "3307fee7d8ec4cb6b226bf1d6b9961d7e2483832",
   "signingCertificateSha256": "6aecb1c9680abbeef2731a90529e985e6a36bb130c1539ade7951fa9f3f3cca9",
-  "apkUrl": "https://github.com/liaoszong/Werewolf-agent/releases/download/v0.2.1-internal.7+217/werewolf-agent-internal-arm64.apk",
-  "sha256": "6a2e885261618b8db546c43de15227c49f876d0dcd687b46769fcbb48f1a29b6",
-  "sizeBytes": 21056134,
-  "releaseNotes": "Mobile provider sync now supports owner-token access for remote observer testing, with cleaned settings fields and secret visibility toggles.",
-  "publishedAt": "2026-07-07T06:21:19Z"
+  "apkUrl": "https://github.com/liaoszong/Werewolf-agent/releases/download/v0.2.1-internal.8+218/werewolf-agent-internal-arm64.apk",
+  "sha256": "02bc7d908d6df860562ce449324509aa403be3b46cee6bb7d3a7e5349ba6b431",
+  "sizeBytes": 21056194,
+  "releaseNotes": "Mobile can create owner-token gated fake test rooms, suppresses unready stub action windows, and keeps empty room placeholders out of the keyboard path.",
+  "publishedAt": "2026-07-07T07:27:44Z"
 }
