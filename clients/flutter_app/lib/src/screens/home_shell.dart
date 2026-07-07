@@ -915,6 +915,64 @@ class _RolePolicyDetailPageState extends State<_RolePolicyDetailPage> {
   }
 }
 
+class _SelectionOption<T> {
+  const _SelectionOption({
+    required this.value,
+    required this.label,
+    required this.key,
+  });
+
+  final T value;
+  final String label;
+  final Key key;
+}
+
+class _SelectionField extends StatelessWidget {
+  const _SelectionField({
+    super.key,
+    required this.label,
+    required this.value,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  final String label;
+  final String value;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = WerewolfAppTheme.colors(context);
+    final effectiveColor = enabled ? palette.textPrimary : palette.textMuted;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: enabled ? onTap : null,
+        child: InputDecorator(
+          decoration: InputDecoration(
+            labelText: label,
+            enabled: enabled,
+            suffixIcon: Icon(
+              Icons.keyboard_arrow_down_rounded,
+              color: effectiveColor,
+            ),
+          ),
+          child: Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(
+              context,
+            ).textTheme.bodyLarge?.copyWith(color: effectiveColor),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _RoleDetailSection extends StatelessWidget {
   const _RoleDetailSection({required this.title, required this.child});
 
@@ -2394,21 +2452,12 @@ class _SettingsPageState extends State<_SettingsPage> {
           style: Theme.of(context).textTheme.bodySmall,
         ),
         const SizedBox(height: 12),
-        DropdownButtonFormField<String>(
-          key: Key('provider-select-$_selectedProvider'),
-          initialValue: _selectedProvider,
-          decoration: InputDecoration(labelText: strings.provider),
-          items: [
-            for (final provider in _providerSpecs)
-              DropdownMenuItem(value: provider.id, child: Text(provider.label)),
-          ],
-          onChanged: _providerBusy || _providerLoading
-              ? null
-              : (value) {
-                  if (value != null) {
-                    _selectProvider(value);
-                  }
-                },
+        _SelectionField(
+          key: const Key('provider-select-button'),
+          label: strings.provider,
+          value: spec.label,
+          enabled: !_providerBusy && !_providerLoading,
+          onTap: () => _showProviderPicker(strings),
         ),
         const SizedBox(height: 10),
         TextField(
@@ -2430,23 +2479,12 @@ class _SettingsPageState extends State<_SettingsPage> {
           ),
         ),
         const SizedBox(height: 10),
-        DropdownButtonFormField<String>(
-          key: Key(
-            'provider-model-select-$_selectedProvider-${modelValue ?? 'none'}',
-          ),
-          initialValue: modelValue,
-          decoration: InputDecoration(labelText: strings.providerModel),
-          items: [
-            for (final model in models)
-              DropdownMenuItem(value: model, child: Text(model)),
-          ],
-          onChanged: models.isEmpty || _providerBusy
-              ? null
-              : (value) {
-                  if (value == null) return;
-                  setState(() => _selectedModel = value);
-                  _providerStore.writeSelectedModel(_selectedProvider, value);
-                },
+        _SelectionField(
+          key: const Key('provider-model-select-button'),
+          label: strings.providerModel,
+          value: modelValue ?? '-',
+          enabled: models.isNotEmpty && !_providerBusy,
+          onTap: () => _showModelPicker(strings, models, modelValue),
         ),
         if (_providerError != null) ...[
           const SizedBox(height: 10),
@@ -2537,6 +2575,119 @@ class _SettingsPageState extends State<_SettingsPage> {
     return specs.firstWhere(
       (spec) => spec.id == _selectedProvider,
       orElse: () => specs.first,
+    );
+  }
+
+  Future<void> _showProviderPicker(AppStrings strings) async {
+    if (_providerBusy || _providerLoading) return;
+    final specs = _providerSpecs.isEmpty
+        ? _fallbackProviderSpecs
+        : _providerSpecs;
+    final selected = await _showSelectionSheet<String>(
+      context: context,
+      sheetKey: const Key('provider-picker-sheet'),
+      title: strings.provider,
+      selectedValue: _selectedProvider,
+      options: [
+        for (final spec in specs)
+          _SelectionOption(
+            value: spec.id,
+            label: spec.label,
+            key: Key('provider-option-${spec.id}'),
+          ),
+      ],
+    );
+    if (selected != null && selected != _selectedProvider) {
+      await _selectProvider(selected);
+    }
+  }
+
+  Future<void> _showModelPicker(
+    AppStrings strings,
+    List<String> models,
+    String? modelValue,
+  ) async {
+    if (models.isEmpty || _providerBusy) return;
+    final selected = await _showSelectionSheet<String>(
+      context: context,
+      sheetKey: const Key('provider-model-picker-sheet'),
+      title: strings.providerModel,
+      selectedValue: modelValue,
+      options: [
+        for (final model in models)
+          _SelectionOption(
+            value: model,
+            label: model,
+            key: Key('provider-model-option-$model'),
+          ),
+      ],
+    );
+    if (selected == null) return;
+    setState(() => _selectedModel = selected);
+    await _providerStore.writeSelectedModel(_selectedProvider, selected);
+  }
+
+  Future<T?> _showSelectionSheet<T>({
+    required BuildContext context,
+    required Key sheetKey,
+    required String title,
+    required T? selectedValue,
+    required List<_SelectionOption<T>> options,
+  }) {
+    final palette = WerewolfAppTheme.colors(context);
+    return showModalBottomSheet<T>(
+      context: context,
+      backgroundColor: palette.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 520),
+            child: Padding(
+              key: sheetKey,
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 12),
+                  Flexible(
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: options.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 2),
+                      itemBuilder: (context, index) {
+                        final option = options[index];
+                        final selected = option.value == selectedValue;
+                        return ListTile(
+                          key: option.key,
+                          contentPadding: EdgeInsets.zero,
+                          leading: Icon(
+                            selected
+                                ? Icons.check_circle_rounded
+                                : Icons.circle_outlined,
+                            color: selected
+                                ? palette.accent
+                                : palette.textMuted,
+                          ),
+                          title: Text(
+                            option.label,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          onTap: () => Navigator.of(context).pop(option.value),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 

@@ -272,6 +272,23 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    await tester.ensureVisible(find.byKey(const Key('provider-select-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('provider-select-button')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('provider-picker-sheet')), findsOneWidget);
+    await tester.tap(
+      find.byKey(const Key('provider-option-openai_compatible')),
+    );
+    await tester.pumpAndSettle();
+    expect(await store.readActiveProvider(), 'openai_compatible');
+
+    await tester.tap(find.byKey(const Key('provider-select-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('provider-option-deepseek')));
+    await tester.pumpAndSettle();
+    expect(await store.readActiveProvider(), 'deepseek');
+
     await tester.enterText(
       find.byKey(const Key('provider-api-key-field')),
       'sk-mobile-secret',
@@ -289,6 +306,17 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('已拉取 2 个模型'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('provider-model-select-button')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('provider-model-picker-sheet')),
+      findsOneWidget,
+    );
+    await tester.tap(
+      find.byKey(const Key('provider-model-option-deepseek-v4-flash')),
+    );
+    await tester.pumpAndSettle();
+    expect((await store.read('deepseek')).selectedModel, 'deepseek-v4-flash');
 
     await tester.tap(find.byKey(const Key('provider-clear-button')));
     await tester.pumpAndSettle();
