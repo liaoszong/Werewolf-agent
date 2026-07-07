@@ -26,6 +26,7 @@ class DeployContractTests(unittest.TestCase):
         )
 
         self.assertIn("werewolf-observer", compose)
+        self.assertIn("WEREWOLF_OBSERVER_OWNER_TOKEN", compose)
         self.assertIn("8765:8765", compose)
         self.assertIn("werewolf_runs:/data/runs", compose)
         self.assertIn("unless-stopped", compose)
@@ -34,5 +35,6 @@ class DeployContractTests(unittest.TestCase):
         readme = (ROOT / "deploy" / "README.md").read_text(encoding="utf-8")
 
         self.assertIn("api.paleink.cc", readme)
+        self.assertIn("WEREWOLF_OBSERVER_OWNER_TOKEN", readme)
         self.assertIn("docker compose up -d", readme)
         self.assertIn("curl http://api.paleink.cc:8765/health", readme)

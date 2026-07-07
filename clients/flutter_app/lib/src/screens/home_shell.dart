@@ -945,30 +945,60 @@ class _SelectionField extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = WerewolfAppTheme.colors(context);
     final effectiveColor = enabled ? palette.textPrimary : palette.textMuted;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: enabled ? onTap : null,
-        child: InputDecorator(
-          decoration: InputDecoration(
-            labelText: label,
-            enabled: enabled,
-            suffixIcon: Icon(
-              Icons.keyboard_arrow_down_rounded,
-              color: effectiveColor,
+    return _FieldShell(
+      label: label,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: enabled ? onTap : null,
+          child: InputDecorator(
+            decoration: InputDecoration(
+              enabled: enabled,
+              suffixIcon: Icon(
+                Icons.keyboard_arrow_down_rounded,
+                color: effectiveColor,
+              ),
             ),
-          ),
-          child: Text(
-            value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(
-              context,
-            ).textTheme.bodyLarge?.copyWith(color: effectiveColor),
+            child: Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(
+                context,
+              ).textTheme.bodyLarge?.copyWith(color: effectiveColor),
+            ),
           ),
         ),
       ),
+    );
+  }
+}
+
+class _FieldShell extends StatelessWidget {
+  const _FieldShell({required this.label, required this.child});
+
+  final String label;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = WerewolfAppTheme.colors(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 2),
+          child: Text(
+            label,
+            style: Theme.of(
+              context,
+            ).textTheme.labelMedium?.copyWith(color: palette.textMuted),
+          ),
+        ),
+        const SizedBox(height: 6),
+        child,
+      ],
     );
   }
 }
@@ -2186,6 +2216,7 @@ class _SettingsPageState extends State<_SettingsPage> {
   late final TextEditingController _joinCode;
   late final TextEditingController _providerApiKey;
   late final TextEditingController _providerBaseUrl;
+  late final TextEditingController _providerOwnerToken;
   String? _error;
   String _selectedProvider = 'deepseek';
   String? _selectedModel;
@@ -2194,6 +2225,9 @@ class _SettingsPageState extends State<_SettingsPage> {
   bool _providerLoading = false;
   bool _providerBusy = false;
   bool _providerHasKey = false;
+  bool _providerApiKeyVisible = false;
+  bool _providerHasOwnerToken = false;
+  bool _providerOwnerTokenVisible = false;
   String? _providerMessage;
   String? _providerError;
 
@@ -2209,6 +2243,7 @@ class _SettingsPageState extends State<_SettingsPage> {
     _joinCode = TextEditingController(text: _settings.joinCode);
     _providerApiKey = TextEditingController();
     _providerBaseUrl = TextEditingController();
+    _providerOwnerToken = TextEditingController();
     _updates.addListener(_handleUpdateChanged);
     _loadProviderSettings();
   }
@@ -2221,6 +2256,7 @@ class _SettingsPageState extends State<_SettingsPage> {
     _joinCode.dispose();
     _providerApiKey.dispose();
     _providerBaseUrl.dispose();
+    _providerOwnerToken.dispose();
     super.dispose();
   }
 
@@ -2277,10 +2313,13 @@ class _SettingsPageState extends State<_SettingsPage> {
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: 12),
-              TextField(
-                controller: _baseUrl,
-                keyboardType: TextInputType.url,
-                decoration: InputDecoration(labelText: strings.baseUrl),
+              _FieldShell(
+                label: strings.baseUrl,
+                child: TextField(
+                  controller: _baseUrl,
+                  keyboardType: TextInputType.url,
+                  decoration: const InputDecoration(),
+                ),
               ),
               const SizedBox(height: 10),
               Text(
@@ -2290,15 +2329,21 @@ class _SettingsPageState extends State<_SettingsPage> {
               const SizedBox(height: 8),
               _buildServerPresetChips(strings),
               const SizedBox(height: 10),
-              TextField(
-                controller: _seatId,
-                textCapitalization: TextCapitalization.characters,
-                decoration: InputDecoration(labelText: strings.seatId),
+              _FieldShell(
+                label: strings.seatId,
+                child: TextField(
+                  controller: _seatId,
+                  textCapitalization: TextCapitalization.characters,
+                  decoration: const InputDecoration(),
+                ),
               ),
               const SizedBox(height: 10),
-              TextField(
-                controller: _joinCode,
-                decoration: InputDecoration(labelText: strings.joinCode),
+              _FieldShell(
+                label: strings.joinCode,
+                child: TextField(
+                  controller: _joinCode,
+                  decoration: const InputDecoration(),
+                ),
               ),
               if (_error != null) ...[
                 const SizedBox(height: 10),
@@ -2460,22 +2505,75 @@ class _SettingsPageState extends State<_SettingsPage> {
           onTap: () => _showProviderPicker(strings),
         ),
         const SizedBox(height: 10),
-        TextField(
-          key: const Key('provider-base-url-field'),
-          controller: _providerBaseUrl,
-          keyboardType: TextInputType.url,
-          decoration: InputDecoration(labelText: strings.providerBaseUrl),
+        _FieldShell(
+          label: strings.providerBaseUrl,
+          child: TextField(
+            key: const Key('provider-base-url-field'),
+            controller: _providerBaseUrl,
+            keyboardType: TextInputType.url,
+            decoration: const InputDecoration(),
+          ),
         ),
         const SizedBox(height: 10),
-        TextField(
-          key: const Key('provider-api-key-field'),
-          controller: _providerApiKey,
-          obscureText: true,
-          enableSuggestions: false,
-          autocorrect: false,
-          decoration: InputDecoration(
-            labelText: strings.providerApiKey,
-            helperText: _providerHasKey ? strings.providerApiKeyStored : null,
+        _FieldShell(
+          label: strings.providerApiKey,
+          child: TextField(
+            key: const Key('provider-api-key-field'),
+            controller: _providerApiKey,
+            obscureText: !_providerApiKeyVisible,
+            enableSuggestions: false,
+            autocorrect: false,
+            decoration: InputDecoration(
+              helperText: _providerHasKey ? strings.providerApiKeyStored : null,
+              suffixIcon: IconButton(
+                key: const Key('provider-api-key-visibility-button'),
+                tooltip: _providerApiKeyVisible
+                    ? strings.providerHideApiKey
+                    : strings.providerShowApiKey,
+                onPressed: () {
+                  setState(() {
+                    _providerApiKeyVisible = !_providerApiKeyVisible;
+                  });
+                },
+                icon: Icon(
+                  _providerApiKeyVisible
+                      ? Icons.visibility_off_rounded
+                      : Icons.visibility_rounded,
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        _FieldShell(
+          label: strings.providerOwnerToken,
+          child: TextField(
+            key: const Key('provider-owner-token-field'),
+            controller: _providerOwnerToken,
+            obscureText: !_providerOwnerTokenVisible,
+            enableSuggestions: false,
+            autocorrect: false,
+            decoration: InputDecoration(
+              helperText: _providerHasOwnerToken
+                  ? strings.providerOwnerTokenStored
+                  : null,
+              suffixIcon: IconButton(
+                key: const Key('provider-owner-token-visibility-button'),
+                tooltip: _providerOwnerTokenVisible
+                    ? strings.providerHideOwnerToken
+                    : strings.providerShowOwnerToken,
+                onPressed: () {
+                  setState(() {
+                    _providerOwnerTokenVisible = !_providerOwnerTokenVisible;
+                  });
+                },
+                icon: Icon(
+                  _providerOwnerTokenVisible
+                      ? Icons.visibility_off_rounded
+                      : Icons.visibility_rounded,
+                ),
+              ),
+            ),
           ),
         ),
         const SizedBox(height: 10),
@@ -2576,6 +2674,14 @@ class _SettingsPageState extends State<_SettingsPage> {
       (spec) => spec.id == _selectedProvider,
       orElse: () => specs.first,
     );
+  }
+
+  String get _observerCredentialScope => _settings.baseUri.toString();
+
+  ObserverApiClient _providerObserverClient(String? ownerToken) {
+    final client = widget.observerClientFactory(_settings.baseUri);
+    client.ownerToken = ownerToken;
+    return client;
   }
 
   Future<void> _showProviderPicker(AppStrings strings) async {
@@ -2712,11 +2818,17 @@ class _SettingsPageState extends State<_SettingsPage> {
         ? active
         : specs.first.id;
     final local = await _providerStore.read(selected);
+    final ownerToken = await _providerStore.readOwnerToken(
+      _observerCredentialScope,
+    );
     if (!mounted) return;
     setState(() {
       _providerSpecs = specs;
       _selectedProvider = selected;
       _providerHasKey = local.hasApiKey;
+      _providerHasOwnerToken = ownerToken != null && ownerToken.isNotEmpty;
+      _providerOwnerToken.clear();
+      _providerOwnerTokenVisible = false;
       _providerBaseUrl.text = local.baseUrl.isNotEmpty
           ? local.baseUrl
           : _selectedProviderSpec.defaultBaseUrl;
@@ -2738,6 +2850,7 @@ class _SettingsPageState extends State<_SettingsPage> {
       _providerError = null;
       _providerMessage = null;
       _providerApiKey.clear();
+      _providerApiKeyVisible = false;
       _providerBaseUrl.text = local.baseUrl.isNotEmpty
           ? local.baseUrl
           : _selectedProviderSpec.defaultBaseUrl;
@@ -2763,9 +2876,13 @@ class _SettingsPageState extends State<_SettingsPage> {
     });
     try {
       final enteredKey = _providerApiKey.text.trim();
+      final enteredOwnerToken = _providerOwnerToken.text.trim();
       final apiKey = enteredKey.isNotEmpty
           ? enteredKey
           : await _providerStore.readApiKey(_selectedProvider);
+      final ownerToken = enteredOwnerToken.isNotEmpty
+          ? enteredOwnerToken
+          : await _providerStore.readOwnerToken(_observerCredentialScope);
       if (apiKey == null || apiKey.isEmpty) {
         setState(() {
           _providerBusy = false;
@@ -2784,18 +2901,26 @@ class _SettingsPageState extends State<_SettingsPage> {
       if (enteredKey.isNotEmpty) {
         await _providerStore.writeApiKey(_selectedProvider, enteredKey);
       }
-      await widget
-          .observerClientFactory(_settings.baseUri)
-          .saveProviderCredential(
-            provider: _selectedProvider,
-            apiKey: apiKey,
-            baseUrl: baseUrl,
-          );
+      if (enteredOwnerToken.isNotEmpty) {
+        await _providerStore.writeOwnerToken(
+          _observerCredentialScope,
+          enteredOwnerToken,
+        );
+      }
+      await _providerObserverClient(ownerToken).saveProviderCredential(
+        provider: _selectedProvider,
+        apiKey: apiKey,
+        baseUrl: baseUrl,
+      );
       if (!mounted) return true;
       setState(() {
         _providerBusy = false;
         _providerHasKey = true;
+        _providerHasOwnerToken = ownerToken != null && ownerToken.isNotEmpty;
         _providerApiKey.clear();
+        _providerApiKeyVisible = false;
+        _providerOwnerToken.clear();
+        _providerOwnerTokenVisible = false;
         _providerMessage = strings.providerCredentialSynced;
       });
       return true;
@@ -2825,9 +2950,12 @@ class _SettingsPageState extends State<_SettingsPage> {
       _providerError = null;
     });
     try {
-      final models = await widget
-          .observerClientFactory(_settings.baseUri)
-          .fetchProviderModels(_selectedProvider);
+      final ownerToken = await _providerStore.readOwnerToken(
+        _observerCredentialScope,
+      );
+      final models = await _providerObserverClient(
+        ownerToken,
+      ).fetchProviderModels(_selectedProvider);
       final selected = models.contains(_selectedModel)
           ? _selectedModel
           : (models.isNotEmpty ? models.first : null);
@@ -2865,14 +2993,18 @@ class _SettingsPageState extends State<_SettingsPage> {
     });
     await _providerStore.deleteApiKey(_selectedProvider);
     try {
-      await widget
-          .observerClientFactory(_settings.baseUri)
-          .clearProviderCredential(_selectedProvider);
+      final ownerToken = await _providerStore.readOwnerToken(
+        _observerCredentialScope,
+      );
+      await _providerObserverClient(
+        ownerToken,
+      ).clearProviderCredential(_selectedProvider);
       if (!mounted) return;
       setState(() {
         _providerBusy = false;
         _providerHasKey = false;
         _providerApiKey.clear();
+        _providerApiKeyVisible = false;
         _providerMessage = strings.providerCredentialCleared;
       });
     } on ObserverApiError catch (error) {
@@ -2904,6 +3036,7 @@ class _SettingsPageState extends State<_SettingsPage> {
       ..setSeatId(_seatId.text)
       ..setJoinCode(_joinCode.text);
     setState(() => _error = null);
+    _loadProviderSettings();
   }
 
   Widget _buildServerPresetChips(AppStrings strings) {
@@ -2928,6 +3061,7 @@ class _SettingsPageState extends State<_SettingsPage> {
       _error = null;
     });
     _settings.setBaseUri(baseUri);
+    _loadProviderSettings();
   }
 
   void _handleUpdateChanged() {

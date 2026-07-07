@@ -23,6 +23,7 @@ from werewolf_eval.run_emergent_fake_runtime import default_emergent_fake_launch
 # Fixed per-request token cap for live runs (matches the existing CLI runners).
 # Not a server flag this slice — timeout/budget are the tunable guardrails.
 _LIVE_MAX_TOKENS = 256
+_OWNER_TOKEN_ENV = "WEREWOLF_OBSERVER_OWNER_TOKEN"
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -104,9 +105,11 @@ def main() -> int:
         profiles_dir=Path(args.profiles_dir) if args.profiles_dir else None,
         configs_dir=Path(args.configs_dir) if args.configs_dir else None,
     )
-    # Finding 1: propagate CLI overrides to server state so /health reflects them.
-    if args.release_owner_token:
-        server.state.owner_token = args.release_owner_token
+    # Owner token is optional and never printed. It may come from the release
+    # host CLI flag or from deploy-time environment injection.
+    owner_token = args.release_owner_token or os.environ.get(_OWNER_TOKEN_ENV, "")
+    if owner_token:
+        server.state.owner_token = owner_token
     if args.release_version:
         server.state.release_version = args.release_version
 
@@ -129,7 +132,7 @@ def main() -> int:
             "instance_id": server.state.instance_id,
             "pid": os.getpid(),
             "port": port,
-            "owner_token": getattr(args, "release_owner_token", "") or "",
+            "owner_token": owner_token,
             "release_version": getattr(args, "release_version", None) or read_release_metadata()["release_version"],
             "observer_protocol_version": 1,
             "data_root": str(Path(args.runs_dir).parent) if args.runs_dir else "",

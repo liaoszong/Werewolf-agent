@@ -16,7 +16,7 @@ http://api.paleink.cc:8765
 ```
 
 Use this only for early testing. Before submitting real provider keys over the
-network, put the service behind HTTPS and an access-control layer.
+network, set an observer owner token and prefer HTTPS.
 
 ## First Deploy
 
@@ -38,6 +38,19 @@ If your server user can access Docker without `sudo`, this also works:
 ```bash
 docker compose up -d --build
 ```
+
+To allow a mobile client outside the server machine to sync provider
+credentials for testing, set an owner token outside the repository before
+starting the service:
+
+```bash
+export WEREWOLF_OBSERVER_OWNER_TOKEN='<generate-a-long-random-token>'
+sudo docker compose up -d --build
+```
+
+Enter the same value in the Flutter settings page as `Observer owner token`.
+Do not commit this value, paste it into logs, or reuse it for long-term
+multi-user testing.
 
 ## Verify
 

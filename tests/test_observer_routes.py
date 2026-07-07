@@ -104,10 +104,11 @@ class GetTableTests(unittest.TestCase):
             self.assertEqual(m[0].handler_name, "_route_run_scoped", segs)
             self.assertEqual(m[1], {"run_id": "r1"}, segs)
 
-    def test_providers_models_is_loopback_only_without_same_origin(self) -> None:
+    def test_providers_models_allows_owner_token_without_same_origin(self) -> None:
         # Guard matrix is ASYMMETRIC by design — do not "fix" it.
         m = _match(GET_ROUTES, ["api", "providers", "deepseek", "models"])
         self.assertEqual(m[0].loopback_message, "providers endpoint is loopback-only")
+        self.assertTrue(m[0].owner_token_auth)
         self.assertFalse(m[0].same_origin)
 
 
@@ -145,11 +146,13 @@ class PostDeleteTableTests(unittest.TestCase):
         m = _match(POST_ROUTES, ["api", "credentials"])
         self.assertEqual(m[0].handler_name, "_route_credentials_post")
         self.assertEqual(m[0].loopback_message, "credentials endpoint is loopback-only")
+        self.assertTrue(m[0].owner_token_auth)
         self.assertTrue(m[0].same_origin)
 
         m = _match(POST_ROUTES, ["api", "runs"])
         self.assertEqual(m[0].handler_name, "_route_runs_post")
         self.assertIsNone(m[0].loopback_message)  # cross-origin ONLY — asymmetric
+        self.assertFalse(m[0].owner_token_auth)
         self.assertTrue(m[0].same_origin)
 
         m = _match(POST_ROUTES, ["api", "runs", "r1", "participants", "join"])
@@ -171,12 +174,14 @@ class PostDeleteTableTests(unittest.TestCase):
         m = _match(DELETE_ROUTES, ["api", "credentials", "deepseek"])
         self.assertEqual(m[0].handler_name, "_route_credentials_delete")
         self.assertEqual(m[0].loopback_message, "credentials endpoint is loopback-only")
+        self.assertTrue(m[0].owner_token_auth)
         self.assertTrue(m[0].same_origin)
 
         m = _match(DELETE_ROUTES, ["api", "runs", "r1"])
         self.assertEqual(m[0].handler_name, "_route_runs_delete")
         # "runs delete is loopback-only" — verbatim, no word "endpoint"
         self.assertEqual(m[0].loopback_message, "runs delete is loopback-only")
+        self.assertFalse(m[0].owner_token_auth)
         self.assertTrue(m[0].same_origin)
 
 

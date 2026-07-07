@@ -8,9 +8,9 @@ methods. Table declaration order IS the historical if-chain order: first match
 wins (e.g. ``api/profiles/schema`` is declared before ``api/profiles/{name}``).
 
 The guard matrix is ASYMMETRIC by design — do not "normalize" it:
-POST/DELETE credentials and DELETE runs check loopback + cross-origin;
-POST /api/runs checks cross-origin only; GET providers/models checks loopback
-only; all other GETs are unguarded.
+credential writes and provider model discovery allow loopback OR explicit owner
+token auth; DELETE runs stays loopback + cross-origin; POST /api/runs checks
+cross-origin only; all other GETs are unguarded.
 """
 
 from __future__ import annotations
@@ -23,6 +23,7 @@ class Route:
     pattern: tuple[str, ...]  # literal segments; "{name}" captures one segment
     handler_name: str  # method name on ObserverRequestHandler
     loopback_message: str | None = None  # non-None = loopback gate w/ this 403 text
+    owner_token_auth: bool = False  # remote access allowed with owner bearer token
     same_origin: bool = False  # Host/Origin (DNS-rebind / CSRF) guard
     allow_trailing: bool = False  # extra trailing segments are ignored
 
@@ -60,6 +61,7 @@ GET_ROUTES: tuple[Route, ...] = (
         ("api", "providers", "{provider}", "models"),
         "_route_provider_models",
         loopback_message="providers endpoint is loopback-only",
+        owner_token_auth=True,
     ),
     Route(("api", "configs"), "_route_configs_list"),
     Route(("api", "configs", "{config_id}", "export"), "_route_config_export"),
@@ -102,6 +104,7 @@ POST_ROUTES: tuple[Route, ...] = (
         ("api", "credentials"),
         "_route_credentials_post",
         loopback_message="credentials endpoint is loopback-only",
+        owner_token_auth=True,
         same_origin=True,
     ),
     Route(("api", "runs"), "_route_runs_post", same_origin=True),
@@ -133,6 +136,7 @@ DELETE_ROUTES: tuple[Route, ...] = (
         ("api", "credentials", "{provider}"),
         "_route_credentials_delete",
         loopback_message="credentials endpoint is loopback-only",
+        owner_token_auth=True,
         same_origin=True,
     ),
     Route(

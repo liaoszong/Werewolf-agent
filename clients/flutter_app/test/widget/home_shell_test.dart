@@ -14,11 +14,13 @@ class FakeObserverApiClient extends ObserverApiClient {
     this.runs = const [],
     this.providerSpecs = _defaultProviderSpecs,
     this.providerModels = const ['deepseek-chat', 'deepseek-v4-flash'],
+    this.providerSaveError,
   }) : super(baseUri: Uri.parse('http://127.0.0.1:8765'));
 
   final List<RunSummary> runs;
   final List<ProviderSpecSummary> providerSpecs;
   final List<String> providerModels;
+  final ObserverApiError? providerSaveError;
   String? savedProvider;
   String? savedApiKey;
   String? savedBaseUrl;
@@ -53,6 +55,8 @@ class FakeObserverApiClient extends ObserverApiClient {
     required String apiKey,
     String baseUrl = '',
   }) async {
+    final error = providerSaveError;
+    if (error != null) throw error;
     savedProvider = provider;
     savedApiKey = apiKey;
     savedBaseUrl = baseUrl;
@@ -293,13 +297,49 @@ void main() {
       find.byKey(const Key('provider-api-key-field')),
       'sk-mobile-secret',
     );
+    EditableText apiKeyEditableText() {
+      return tester.widget<EditableText>(
+        find.descendant(
+          of: find.byKey(const Key('provider-api-key-field')),
+          matching: find.byType(EditableText),
+        ),
+      );
+    }
+
+    expect(apiKeyEditableText().obscureText, isTrue);
+    await tester.tap(
+      find.byKey(const Key('provider-api-key-visibility-button')),
+    );
+    await tester.pumpAndSettle();
+    expect(apiKeyEditableText().obscureText, isFalse);
+    await tester.tap(
+      find.byKey(const Key('provider-api-key-visibility-button')),
+    );
+    await tester.pumpAndSettle();
+    expect(apiKeyEditableText().obscureText, isTrue);
+    await tester.ensureVisible(
+      find.byKey(const Key('provider-owner-token-field')),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('provider-owner-token-field')),
+      'owner-secret',
+    );
+    await tester.ensureVisible(find.byKey(const Key('provider-sync-button')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('provider-sync-button')));
     await tester.pumpAndSettle();
 
     expect(observer.savedProvider, 'deepseek');
     expect(observer.savedApiKey, 'sk-mobile-secret');
+    expect(observer.ownerToken, 'owner-secret');
     expect(await store.readApiKey('deepseek'), 'sk-mobile-secret');
+    expect(
+      await store.readOwnerToken('http://api.paleink.cc:8765'),
+      'owner-secret',
+    );
     expect(find.text('sk-mobile-secret'), findsNothing);
+    expect(find.text('owner-secret'), findsNothing);
     expect(find.text('已同步到当前 observer server'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('provider-models-button')));
@@ -324,6 +364,51 @@ void main() {
     expect(observer.clearedProvider, 'deepseek');
     expect(await store.readApiKey('deepseek'), isNull);
     expect(find.text('已清除本机 key'), findsOneWidget);
+  });
+
+  testWidgets('provider settings explains forbidden remote credential sync', (
+    tester,
+  ) async {
+    final observer = FakeObserverApiClient(
+      providerSaveError: const ObserverApiError(
+        'saveProviderCredential',
+        403,
+        'owner_token_required',
+      ),
+    );
+    await tester.pumpWidget(
+      WerewolfApp(
+        observerClientFactory: (_) => observer,
+        sessionControllerFactory: (_) =>
+            SessionController(participantApi: FakeParticipantApiClient()),
+        providerCredentialStore: MemoryProviderCredentialStore(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('设置'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('provider-api-key-field')),
+      500,
+      scrollable: find.byWidgetPredicate(
+        (widget) =>
+            widget is Scrollable && widget.axisDirection == AxisDirection.down,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('provider-api-key-field')),
+      'sk-mobile-secret',
+    );
+    await tester.ensureVisible(find.byKey(const Key('provider-sync-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('provider-sync-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('请输入当前 observer 的 owner token'), findsOneWidget);
+    expect(find.text('供应商操作失败：owner_token_required'), findsNothing);
   });
 
   testWidgets('home choose match flow lists observer runs and can join one', (

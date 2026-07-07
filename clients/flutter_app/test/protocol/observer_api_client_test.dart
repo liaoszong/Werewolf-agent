@@ -67,6 +67,39 @@ void main() {
     });
   });
 
+  test(
+    'provider endpoints send owner token without leaking provider key',
+    () async {
+      final seen = <String, String>{};
+      final client = ObserverApiClient(
+        baseUri: Uri.parse('http://127.0.0.1:8765'),
+        ownerToken: 'owner-secret',
+        httpClient: MockClient((request) async {
+          seen['${request.method} ${request.url.path}'] =
+              request.headers['Authorization'] ?? '';
+          return http.Response(
+            request.url.path.endsWith('/models')
+                ? jsonEncode({'provider': 'deepseek', 'models': <String>[]})
+                : jsonEncode({'ok': true}),
+            200,
+          );
+        }),
+      );
+
+      await client.saveProviderCredential(
+        provider: 'deepseek',
+        apiKey: 'sk-test-secret',
+      );
+      await client.fetchProviderModels('deepseek');
+      await client.clearProviderCredential('deepseek');
+
+      expect(seen['POST /api/credentials'], 'Bearer owner-secret');
+      expect(seen['GET /api/providers/deepseek/models'], 'Bearer owner-secret');
+      expect(seen['DELETE /api/credentials/deepseek'], 'Bearer owner-secret');
+      expect(seen.toString(), isNot(contains('sk-test-secret')));
+    },
+  );
+
   test('fetchProviderModels returns model ids', () async {
     final client = ObserverApiClient(
       baseUri: Uri.parse('http://127.0.0.1:8765'),

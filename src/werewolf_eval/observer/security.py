@@ -9,11 +9,13 @@ functions are the implementation host.
 
 from __future__ import annotations
 
+import hmac
 from typing import Mapping
 
 _LOOPBACK_HOSTNAMES = frozenset({"localhost", "127.0.0.1", "::1"})
 
 CROSS_ORIGIN_MESSAGE = "cross-origin or non-loopback Host rejected"
+OWNER_TOKEN_REQUIRED_MESSAGE = "owner token required for remote provider credential access"
 
 
 def _hostname_of(value: str) -> str:
@@ -55,6 +57,28 @@ def is_same_origin_local(headers: Mapping[str, str] | None) -> bool:
     if origin and not _is_loopback_hostname(origin):
         return False
     return True
+
+
+def owner_token_authorized(
+    headers: Mapping[str, str] | None,
+    configured_owner_token: str,
+) -> bool:
+    """True when a remote client presents the configured owner bearer token.
+
+    Empty server tokens never authorize remote writes; this keeps public deploys
+    closed until the operator explicitly configures an owner token out-of-band.
+    """
+    expected = configured_owner_token.strip()
+    if not expected:
+        return False
+    auth = headers.get("Authorization", "") if headers else ""
+    prefix = "Bearer "
+    if not auth.startswith(prefix):
+        return False
+    supplied = auth[len(prefix) :].strip()
+    if not supplied:
+        return False
+    return hmac.compare_digest(supplied, expected)
 
 
 def evaluate_request_guards(

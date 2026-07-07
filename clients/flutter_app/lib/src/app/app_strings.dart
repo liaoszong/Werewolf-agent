@@ -139,8 +139,18 @@ class AppStrings {
   String get provider => _t('供应商', 'Provider');
   String get providerBaseUrl => _t('Provider Base URL', 'Provider Base URL');
   String get providerApiKey => _t('API key', 'API key');
+  String get providerShowApiKey => _t('显示 API key', 'Show API key');
+  String get providerHideApiKey => _t('隐藏 API key', 'Hide API key');
   String get providerApiKeyStored =>
       _t('已保存；留空会继续使用本机已保存 key', 'Saved; leave blank to reuse the local key');
+  String get providerOwnerToken =>
+      _t('Observer owner token', 'Observer owner token');
+  String get providerOwnerTokenStored => _t(
+    '已保存；留空继续使用当前服务器 token',
+    'Saved; leave blank to reuse this server token',
+  );
+  String get providerShowOwnerToken => _t('显示 owner token', 'Show owner token');
+  String get providerHideOwnerToken => _t('隐藏 owner token', 'Hide owner token');
   String get providerModel => _t('模型', 'Model');
   String get syncProviderCredential => _t('保存并同步', 'Save & Sync');
   String get fetchProviderModels => _t('拉取模型', 'Fetch Models');
@@ -369,6 +379,18 @@ class AppStrings {
   }
 
   String providerOperationFailed(String code) {
+    if (code == 'owner_token_required') {
+      return _t(
+        '请输入当前 observer 的 owner token 后再同步。',
+        'Enter this observer owner token before syncing.',
+      );
+    }
+    if (code == 'forbidden') {
+      return _t(
+        '当前 observer 未启用远程 owner-token 凭据同步；请更新服务器并配置 owner token。',
+        'This observer has not enabled remote owner-token credential sync. Update the server and configure an owner token.',
+      );
+    }
     return appLanguage == AppLanguage.zh
         ? '供应商操作失败：$code'
         : 'Provider operation failed: $code';

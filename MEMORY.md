@@ -32,6 +32,34 @@ machine secrets here.
 
 ## Entries
 
+### 2026-07-07 - Mobile Provider Sync Owner-Token Gate
+
+- Fixed the mobile provider settings path that returned `403 forbidden` when a
+  phone tried to save/sync provider credentials or fetch provider models from a
+  non-loopback observer server.
+- Scope delivered:
+  - Observer provider credential writes and provider model discovery now allow
+    either loopback access or an explicit owner bearer token. Other loopback-only
+    operations such as run delete/interrupt/config writes remain loopback-only.
+  - Public `/health` no longer exposes `owner_token` to non-loopback clients;
+    loopback health keeps it for release-host ownership checks.
+  - Docker Compose passes `WEREWOLF_OBSERVER_OWNER_TOKEN` from the deployment
+    environment without storing any value in the repository.
+  - Flutter settings added an `Observer owner token` field, secure per-observer
+    local storage, owner-token Authorization headers for provider credential
+    endpoints, modal picker label cleanup, and show/hide buttons for secret
+    text fields.
+- Verification:
+  - `flutter analyze` passed.
+  - `flutter test` passed 74 tests.
+  - `$env:PYTHONPATH='src'; $env:NO_PROXY='*'; python -m unittest discover -s
+    tests -p "test_*.py"` passed 1503 tests, skipped 2.
+  - `flutter build apk --debug --flavor internal` succeeded.
+- Caveat: the hosted observer must be redeployed from this code with
+  `WEREWOLF_OBSERVER_OWNER_TOKEN` set before phones can sync credentials
+  against it. This is a short-term single-owner testing gate, not the long-term
+  multi-user credential/session design.
+
 ### 2026-07-06 - Provider Capability/Profile Migration Slice
 
 - Completed a narrow provider migration slice before any real-model smoke

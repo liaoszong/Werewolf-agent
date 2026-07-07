@@ -6,6 +6,8 @@ services:
     image: werewolf-observer:local
     container_name: werewolf-observer
     restart: unless-stopped
+    environment:
+      WEREWOLF_OBSERVER_OWNER_TOKEN: ${WEREWOLF_OBSERVER_OWNER_TOKEN:-}
     ports:
       - "8765:8765"
     volumes:

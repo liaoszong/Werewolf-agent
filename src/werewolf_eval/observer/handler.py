@@ -50,7 +50,12 @@ from werewolf_eval.observer.run_manager import (
     _read_events_jsonl_safe,
     _schema_payload,
 )
-from werewolf_eval.observer.security import is_loopback_client, is_same_origin_local
+from werewolf_eval.observer.security import (
+    OWNER_TOKEN_REQUIRED_MESSAGE,
+    is_loopback_client,
+    is_same_origin_local,
+    owner_token_authorized,
+)
 from werewolf_eval.observer.sse import stream_run_events
 from werewolf_eval.observer.state import ObserverServerState, RunLauncher
 from werewolf_eval.observer_protocol import (
@@ -172,6 +177,9 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
         loopback-or-absent Origin) — see ``observer.security.is_same_origin_local``."""
         return is_same_origin_local(self.headers)
 
+    def _is_owner_authorized(self) -> bool:
+        return owner_token_authorized(self.headers, self._get_state().owner_token)
+
     def _reject_cross_origin(self) -> bool:
         """Guard for state-changing endpoints (credential writes, run launches).
         Sends a 403 and returns True when the request must be rejected for a
@@ -259,10 +267,21 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
             self._send_error_json(404, "not_found", fallback_message)
             return
         route, params = matched
+        remote_owner_authorized = False
         if route.loopback_message is not None and not self._is_loopback():
-            self._send_error_json(403, "forbidden", route.loopback_message)
-            return
-        if route.same_origin and self._reject_cross_origin():
+            remote_owner_authorized = (
+                route.owner_token_auth and self._is_owner_authorized()
+            )
+            if not remote_owner_authorized:
+                code = "owner_token_required" if route.owner_token_auth else "forbidden"
+                message = (
+                    OWNER_TOKEN_REQUIRED_MESSAGE
+                    if route.owner_token_auth
+                    else route.loopback_message
+                )
+                self._send_error_json(403, code, message)
+                return
+        if route.same_origin and not remote_owner_authorized and self._reject_cross_origin():
             return
         getattr(self, route.handler_name)(params)
 
@@ -300,10 +319,13 @@ class ObserverRequestHandler(BaseHTTPRequestHandler):
             "status": "ok",
             "service": "werewolf-observer",
             "instance_id": state.instance_id,
-            "owner_token": state.owner_token,
             "release_version": state.release_version,
             "protocol_version": state.protocol_version,
         }
+        if self._is_loopback():
+            payload["owner_token"] = state.owner_token
+        else:
+            payload["owner_token_configured"] = bool(state.owner_token)
         self._send_json(200, payload)
 
     def _route_capabilities(self, params: dict[str, str]) -> None:

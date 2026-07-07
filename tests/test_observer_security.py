@@ -17,6 +17,7 @@ from werewolf_eval.observer.security import (
     evaluate_request_guards,
     is_loopback_client,
     is_same_origin_local,
+    owner_token_authorized,
 )
 
 
@@ -101,6 +102,26 @@ class SameOriginLocalTests(unittest.TestCase):
                 }
             )
         )
+
+
+class OwnerTokenAuthorizationTests(unittest.TestCase):
+    def test_empty_configured_token_never_authorizes(self) -> None:
+        self.assertFalse(
+            owner_token_authorized({"Authorization": "Bearer owner-secret"}, "")
+        )
+
+    def test_bearer_token_match_authorizes(self) -> None:
+        self.assertTrue(
+            owner_token_authorized({"Authorization": "Bearer owner-secret"}, "owner-secret")
+        )
+
+    def test_missing_or_wrong_bearer_token_rejected(self) -> None:
+        for headers in (
+            {},
+            {"Authorization": "owner-secret"},
+            {"Authorization": "Bearer wrong"},
+        ):
+            self.assertFalse(owner_token_authorized(headers, "owner-secret"))
 
 
 class EvaluateRequestGuardsTests(unittest.TestCase):

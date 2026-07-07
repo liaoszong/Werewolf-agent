@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class ProviderLocalCredential {
@@ -30,6 +32,10 @@ abstract interface class ProviderCredentialStore {
   Future<void> writeBaseUrl(String provider, String baseUrl);
 
   Future<void> writeSelectedModel(String provider, String model);
+
+  Future<String?> readOwnerToken(String observerBaseUri);
+
+  Future<void> writeOwnerToken(String observerBaseUri, String ownerToken);
 }
 
 class SecureProviderCredentialStore implements ProviderCredentialStore {
@@ -95,6 +101,24 @@ class SecureProviderCredentialStore implements ProviderCredentialStore {
     await _storage.write(key: key, value: model.trim());
   }
 
+  @override
+  Future<String?> readOwnerToken(String observerBaseUri) {
+    return _storage.read(key: _ownerTokenKey(observerBaseUri));
+  }
+
+  @override
+  Future<void> writeOwnerToken(
+    String observerBaseUri,
+    String ownerToken,
+  ) async {
+    final key = _ownerTokenKey(observerBaseUri);
+    if (ownerToken.trim().isEmpty) {
+      await _storage.delete(key: key);
+      return;
+    }
+    await _storage.write(key: key, value: ownerToken.trim());
+  }
+
   static const _activeProviderKey = 'werewolf.provider.active';
 
   static String _apiKeyKey(String provider) =>
@@ -105,6 +129,12 @@ class SecureProviderCredentialStore implements ProviderCredentialStore {
 
   static String _modelKey(String provider) =>
       'werewolf.provider.$provider.model';
+
+  static String _ownerTokenKey(String observerBaseUri) =>
+      'werewolf.observer.${_storageSafe(observerBaseUri)}.owner_token';
+
+  static String _storageSafe(String value) =>
+      base64Url.encode(utf8.encode(value)).replaceAll('=', '');
 }
 
 class MemoryProviderCredentialStore implements ProviderCredentialStore {
@@ -167,6 +197,24 @@ class MemoryProviderCredentialStore implements ProviderCredentialStore {
     _values[key] = model.trim();
   }
 
+  @override
+  Future<String?> readOwnerToken(String observerBaseUri) async {
+    return _values[_ownerTokenKey(observerBaseUri)];
+  }
+
+  @override
+  Future<void> writeOwnerToken(
+    String observerBaseUri,
+    String ownerToken,
+  ) async {
+    final key = _ownerTokenKey(observerBaseUri);
+    if (ownerToken.trim().isEmpty) {
+      _values.remove(key);
+      return;
+    }
+    _values[key] = ownerToken.trim();
+  }
+
   static const _activeProviderKey = 'werewolf.provider.active';
 
   static String _apiKeyKey(String provider) =>
@@ -177,4 +225,10 @@ class MemoryProviderCredentialStore implements ProviderCredentialStore {
 
   static String _modelKey(String provider) =>
       'werewolf.provider.$provider.model';
+
+  static String _ownerTokenKey(String observerBaseUri) =>
+      'werewolf.observer.${_storageSafe(observerBaseUri)}.owner_token';
+
+  static String _storageSafe(String value) =>
+      base64Url.encode(utf8.encode(value)).replaceAll('=', '');
 }

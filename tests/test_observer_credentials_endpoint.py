@@ -244,5 +244,129 @@ class CredentialsEndpointLogicTests(unittest.TestCase):
             self.assertEqual(code, "invalid_json", f"expected invalid_json for body {non_dict}, got {code}")
 
 
+class CredentialOwnerTokenDispatchTests(unittest.TestCase):
+    def _handler(
+        self,
+        *,
+        path: str,
+        method_body: bytes = b"",
+        headers: dict[str, str] | None = None,
+        loopback: bool = False,
+        owner_token: str = "owner-secret",
+        credential_store: CredentialStore | None = None,
+    ):
+        import io
+
+        from werewolf_eval.observer_server import ObserverRequestHandler, ObserverServerState
+
+        cs = credential_store or CredentialStore()
+        state = ObserverServerState(
+            runs_dir=Path("/tmp"),
+            launcher=lambda r, d: 0,
+            credential_store=cs,
+            owner_token=owner_token,
+        )
+
+        class _FakeHandler(ObserverRequestHandler):
+            def __init__(self):  # noqa: D107
+                self.responses: list[tuple[int, object]] = []
+
+            def _send_error_json(self, status, code, message):
+                self.responses.append((status, {"code": code, "message": message}))
+
+            def _send_json(self, status, payload):
+                self.responses.append((status, payload))
+
+            def _is_loopback(self):
+                return loopback
+
+            def _get_state(self):
+                return state
+
+            @property
+            def path(self):
+                return path
+
+            @property
+            def headers(self):
+                base = {
+                    "Content-Type": "application/json",
+                    "Content-Length": str(len(method_body)),
+                }
+                if headers:
+                    base.update(headers)
+                return base
+
+            @property
+            def rfile(self):
+                return io.BytesIO(method_body)
+
+        return _FakeHandler(), cs
+
+    def test_remote_credential_post_requires_owner_token(self) -> None:
+        raw = b'{"provider":"deepseek","api_key":"sk-test-fake"}'
+        h, cs = self._handler(path="/api/credentials", method_body=raw)
+
+        h.do_POST()
+
+        self.assertEqual(h.responses[0][0], 403)
+        self.assertEqual(h.responses[0][1]["code"], "owner_token_required")  # type: ignore[index]
+        self.assertFalse(cs.has("deepseek"))
+        self.assertNotIn("sk-test-fake", str(h.responses))
+
+    def test_remote_credential_post_accepts_owner_token(self) -> None:
+        raw = b'{"provider":"deepseek","api_key":"sk-test-fake"}'
+        h, cs = self._handler(
+            path="/api/credentials",
+            method_body=raw,
+            headers={"Authorization": "Bearer owner-secret"},
+        )
+
+        h.do_POST()
+
+        self.assertEqual(h.responses[0], (200, {"stored": ["deepseek"]}))
+        self.assertTrue(cs.has("deepseek"))
+        self.assertNotIn("sk-test-fake", str(h.responses))
+
+    def test_remote_provider_models_requires_owner_token_before_key_check(self) -> None:
+        h, _ = self._handler(path="/api/providers/deepseek/models")
+
+        h.do_GET()
+
+        self.assertEqual(h.responses[0][0], 403)
+        self.assertEqual(h.responses[0][1]["code"], "owner_token_required")  # type: ignore[index]
+
+    def test_remote_provider_models_with_owner_token_reaches_credential_gate(self) -> None:
+        h, _ = self._handler(
+            path="/api/providers/deepseek/models",
+            headers={"Authorization": "Bearer owner-secret"},
+        )
+
+        h.do_GET()
+
+        self.assertEqual(h.responses[0][0], 403)
+        self.assertEqual(h.responses[0][1]["code"], "missing_api_key")  # type: ignore[index]
+
+    def test_remote_health_does_not_expose_owner_token(self) -> None:
+        h, _ = self._handler(path="/health")
+
+        h.do_GET()
+
+        self.assertEqual(h.responses[0][0], 200)
+        payload = h.responses[0][1]
+        self.assertNotIn("owner_token", payload)
+        self.assertEqual(payload["owner_token_configured"], True)  # type: ignore[index]
+        self.assertNotIn("owner-secret", str(payload))
+
+    def test_loopback_health_keeps_owner_token_for_release_host(self) -> None:
+        h, _ = self._handler(path="/health", loopback=True)
+
+        h.do_GET()
+
+        self.assertEqual(h.responses[0][0], 200)
+        payload = h.responses[0][1]
+        self.assertEqual(payload["owner_token"], "owner-secret")  # type: ignore[index]
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -56,11 +56,15 @@ class ProviderSpecSummary {
 }
 
 class ObserverApiClient {
-  ObserverApiClient({required this.baseUri, http.Client? httpClient})
-    : _http = httpClient ?? http.Client();
+  ObserverApiClient({
+    required this.baseUri,
+    http.Client? httpClient,
+    this.ownerToken,
+  }) : _http = httpClient ?? http.Client();
 
   final Uri baseUri;
   final http.Client _http;
+  String? ownerToken;
 
   Future<List<RunSummary>> listRuns() async {
     final response = await _http.get(baseUri.resolve('/api/runs'));
@@ -102,7 +106,7 @@ class ObserverApiClient {
     };
     final response = await _http.post(
       baseUri.resolve('/api/credentials'),
-      headers: const {'Content-Type': 'application/json'},
+      headers: _headers(contentTypeJson: true),
       body: jsonEncode(body),
     );
     final decoded = _decodeObject(response);
@@ -115,6 +119,7 @@ class ObserverApiClient {
     final encoded = Uri.encodeComponent(provider);
     final response = await _http.delete(
       baseUri.resolve('/api/credentials/$encoded'),
+      headers: _headers(),
     );
     final decoded = _decodeObject(response);
     if (response.statusCode >= 400) {
@@ -126,6 +131,7 @@ class ObserverApiClient {
     final encoded = Uri.encodeComponent(provider);
     final response = await _http.get(
       baseUri.resolve('/api/providers/$encoded/models'),
+      headers: _headers(),
     );
     final decoded = _decodeObject(response);
     if (response.statusCode >= 400) {
@@ -157,5 +163,17 @@ class ObserverApiClient {
         body['code'] as String? ??
         'http_$statusCode';
     return ObserverApiError(operation, statusCode, code);
+  }
+
+  Map<String, String> _headers({bool contentTypeJson = false}) {
+    final headers = <String, String>{};
+    if (contentTypeJson) {
+      headers['Content-Type'] = 'application/json';
+    }
+    final token = ownerToken?.trim();
+    if (token != null && token.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $token';
+    }
+    return headers;
   }
 }
