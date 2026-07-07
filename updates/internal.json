@@ -2,14 +2,14 @@
   "schemaVersion": 1,
   "channel": "internal",
   "applicationId": "io.werewolfagent.werewolf_app.internal",
-  "versionName": "0.2.1-internal.5",
-  "versionCode": 215,
-  "releaseTag": "v0.2.1-internal.5+215",
-  "gitCommit": "33e406187b1338ebfbf8396fde32b0f2d3a77670",
+  "versionName": "0.2.1-internal.6",
+  "versionCode": 216,
+  "releaseTag": "v0.2.1-internal.6+216",
+  "gitCommit": "4312050dc0777ae854bf0a3e450428778dac5bac",
   "signingCertificateSha256": "6aecb1c9680abbeef2731a90529e985e6a36bb130c1539ade7951fa9f3f3cca9",
-  "apkUrl": "https://github.com/liaoszong/Werewolf-agent/releases/download/v0.2.1-internal.5+215/werewolf-agent-internal-arm64.apk",
-  "sha256": "44800db2665e3d0c1c7c12cf14857a60d4b280b5942f2d5f69e21334563f9853",
-  "sizeBytes": 19386642,
-  "releaseNotes": "P3-E-2 live room usability: clearer room status, role-safe speech feed, and structured action panel polish.",
-  "publishedAt": "2026-07-05T03:32:41Z"
+  "apkUrl": "https://github.com/liaoszong/Werewolf-agent/releases/download/v0.2.1-internal.6+216/werewolf-agent-internal-arm64.apk",
+  "sha256": "9ee4d29d4fb6d37b78406801ad7b08d57eb82a2e50e9808bf3979bc8e986ff4f",
+  "sizeBytes": 21056014,
+  "releaseNotes": "Mobile provider and model selectors now open modal pickers for a cleaner settings flow.",
+  "publishedAt": "2026-07-07T05:38:09Z"
 }
